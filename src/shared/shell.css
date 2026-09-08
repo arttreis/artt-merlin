@@ -480,4 +480,25 @@ html.light{--color-1:#1c6fc4;--color-2:#b8600a;--color-3:#c4234f;--color-4:#7a3b
 .is-done > .mark,.mark[aria-checked="true"]{background:var(--green);border-color:var(--green);color:var(--on-green)}
 .is-done > .mark svg,.mark[aria-checked="true"] svg{opacity:1}
 
+
+/* ---------- a duracao de uma coisa ----------
+   clicar no numero e escrever "1h30" era um gesto que so o dia tinha; o cartao
+   da semana mostrava a duracao como texto morto. mora na casca porque as duas
+   telas a usam e o dia nao carrega o base.css. */
+.duration{
+  display:inline-flex;align-items:center;gap:5px;flex:0 0 auto;
+  font-family:var(--mono);font-size:11px;color:var(--ink-50);
+  border-radius:var(--br2);padding:2px 5px;margin:-2px -5px;
+  transition:color var(--t),background var(--t);
+}
+.duration:hover{color:var(--ink);background:var(--fill-hover)}
+.duration svg{width:11px;height:11px;flex:none;opacity:.6}
+.duration.is-empty{color:var(--ink-30)}
+.duration-input{
+  flex:0 0 auto;width:74px;background:var(--fill-hover);border:1px solid var(--ink-30);
+  border-radius:var(--br2);padding:2px 6px;
+  font-family:var(--mono);font-size:11px;color:var(--ink);
+}
+.duration-input:focus{outline:none}
+
 }

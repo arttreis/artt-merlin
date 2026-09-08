@@ -17,7 +17,7 @@ import { useState, useEffect, useLayoutEffect, useRef, useMemo, useCallback, cre
 import { createRoot } from "react-dom/client";
 import {
   collection, cloud, clients, listClients, clientName, md, brl, parseMoney,
-  api, notify, sendToDay,
+  api, notify, sendToDay, formatMin, readDuration,
   PAGES, CLOUD_STATUS, search, signIn, currentNotice, onNotice, closeNotice,
   toggleSidebar, setShellRenderer, currentBrand
 } from "./core.js";
@@ -309,6 +309,50 @@ export function EmptyStart({ title, text, groups, note, onPick, onBlank, blankLa
         </p>
       )}
     </section>
+  );
+}
+
+/* ---------- a duração de uma coisa ----------
+   clicar no número e escrever "1h30" era um gesto que só o dia tinha, e o
+   cartão da semana mostrava a duração como texto morto — para mudá-la era
+   preciso abrir a caixa de editar o cartão inteiro. o mesmo objeto tinha dois
+   comportamentos dependendo da tela em que estivesse.
+
+   a gramática é a estrita do core (readDuration), a mesma que o dia usa: ela
+   prefere não entender a entender errado. Enter grava, Esc desiste, e sair do
+   campo grava — porque quem clicou fora já disse o que queria. */
+export function DurationField({ min, onChange, label, placeholder, class: _c, className }) {
+  const [editing, setEditing] = useState(false);
+  const [text, setText] = useState("");
+  const ref = useRef(null);
+  const closed = useRef(false);
+  useLayoutEffect(() => { if (editing && ref.current) { ref.current.focus(); ref.current.select(); } }, [editing]);
+  const open = () => { setText(min ? formatMin(min) : ""); closed.current = false; setEditing(true); };
+  const finish = (apply) => {
+    if (closed.current) return;
+    closed.current = true;
+    setEditing(false);
+    if (!apply) return;
+    const next = readDuration(" " + text.trim() + " ").min;
+    if (next && next !== min) onChange(next);
+  };
+  if (editing) {
+    return (
+      <input ref={ref} className={"duration-input" + (className || _c ? " " + (className || _c) : "")}
+        value={text} placeholder="45m, 1h30" aria-label={label || "Duração"}
+        onChange={(e) => setText(e.currentTarget.value)} onBlur={() => finish(true)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") { e.preventDefault(); finish(true); }
+          else if (e.key === "Escape") { e.preventDefault(); finish(false); }
+        }} />
+    );
+  }
+  return (
+    <button className={"duration" + (min ? "" : " is-empty") + (className || _c ? " " + (className || _c) : "")}
+            type="button" aria-label={(label || "Duração") + (min ? ": " + formatMin(min) + ". Alterar" : ". Definir")}
+            onClick={(e) => { e.stopPropagation(); open(); }}>
+      {icon("clock")}<span>{min ? formatMin(min) : (placeholder || "duração")}</span>
+    </button>
   );
 }
 

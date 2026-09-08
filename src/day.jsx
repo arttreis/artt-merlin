@@ -4,7 +4,7 @@
 import "./shared/shell.css";
 import "./day.css";
 import {
-  initPage, newId, today, isDay, mondayOf, api, cloud,
+  initPage, newId, today, isDay, mondayOf, api, cloud, readDuration,
   readInbox, writeInbox, parseMentions, clientName
 } from "./shared/core.js";
 import { useState, useEffect, useLayoutEffect, useRef } from "react";
@@ -22,52 +22,6 @@ import {
 } from "./shared/day.js";
 
 initPage("day");
-
-/* ---------- tempo ---------- */
-
-/* escrito por extenso: so as formas que alguem realmente digita com pressa */
-const SPELLED = [
-  [/(?:^|\s)meia\s*hora(?=\s|$)/i, 30],
-  [/(?:^|\s)uma\s*hora\s*e\s*meia(?=\s|$)/i, 90],
-  [/(?:^|\s)(?:uma|1)\s*hora(?=\s|$)/i, 60],
-  [/(?:^|\s)duas\s*horas(?=\s|$)/i, 120],
-  [/(?:^|\s)tr[eê]s\s*horas(?=\s|$)/i, 180]
-];
-
-/* a duracao em qualquer ponto do texto. e mais estrita que o parseDuration
-   do core de proposito: "revisar 1h 20 slides" vira 1h e "revisar 20 slides",
-   porque minuto solto pode ser do titulo — o parser prefere nao entender a
-   entender errado. */
-function readDuration(text) {
-  /* por extenso primeiro: "meia hora" nao tem digito para os padroes abaixo pegarem */
-  for (const [re, value] of SPELLED) {
-    const m = text.match(re);
-    if (m) return sliceOut(text, m, value);
-  }
-
-  /* decimal com virgula ou ponto: "1,5h" e "1.5h" sao a mesma coisa aqui */
-  const decimal = text.match(/(?:^|\s)(\d{1,2})[.,](\d{1,2})\s*h(?:oras?)?(?=\s|$)/i);
-  if (decimal) {
-    const fraction = +("0." + decimal[2]);
-    return sliceOut(text, decimal, Math.round(((+decimal[1]) + fraction) * 60));
-  }
-
-  /* minutos so contam colados na hora ("1h30") ou com unidade ("1h 30m"):
-     senao "revisar 1h 20 slides" viraria 1h20 e comeria o "20" do titulo.
-     "1h 30" tambem nao conta, pela mesma razao — o 30 pode ser do titulo. */
-  const withHour = text.match(/(?:^|\s)(\d{1,2})\s*h(?:oras?)?(?:(\d{1,2})|\s*(\d{1,2})\s*(?:m|min|mins|minutos?))?(?=\s|$)/i);
-  const m = withHour || text.match(/(?:^|\s)(\d{1,3})\s*(?:m|min|mins|minutos?)(?=\s|$)/i);
-  if (!m) return { min: 0, title: text.replace(/\s+/g, " ").trim() };
-  const min = withHour ? (+m[1]) * 60 + (+(m[2] || m[3] || 0)) : +m[1];
-  return sliceOut(text, m, min);
-}
-
-/* fatia pela posicao real do match: replace(string) apagaria a primeira
-   ocorrencia literal, que pode nao ser a que casou */
-function sliceOut(text, m, min) {
-  const clean = text.slice(0, m.index) + " " + text.slice(m.index + m[0].length);
-  return { min: Math.min(min, MINUTES), title: clean.replace(/\s+/g, " ").trim() };
-}
 
 /* link de tarefa do ClickUp colado junto do titulo. so a forma /t/<id> —
    que e a unica que identifica uma tarefa — e a URL sai do titulo como a

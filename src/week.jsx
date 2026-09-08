@@ -10,7 +10,7 @@ import {
 import { useState, useEffect, useRef } from "react";
 import {
   mount, useCollection, useClients, useKeydown, isTyping,
-  useFields, Form, Field, Dialog, Markdown, ClientBadge, clientOptionList, icon
+  useFields, Form, Field, Dialog, Markdown, ClientBadge, clientOptionList, DurationField, icon
 } from "./shared/ui.jsx";
 
 initPage("week");
@@ -191,6 +191,7 @@ function Week() {
   /* reabrir e dizer que nao acabou. se o cartao tinha ido para o dia e foi
      fechado la, o vinculo com aquela tarefa morre aqui — senao ele reabre sem
      poder voltar para a fila. */
+  const setDuration = (c, min) => week.save({ ...c, min, updatedAt: Date.now() });
   const toggleDone = (c, value) =>
     week.save({ ...c, done: value, inDay: value ? c.inDay : "", updatedAt: Date.now() });
   const removeCard = (id) => {
@@ -290,7 +291,7 @@ function Week() {
     week.save({ ...original, day, order, inDay: keepLink(original, day), updatedAt: Date.now() });
   };
 
-  const actions = { toggleDone, removeCard, pull, edit: (id) => setForm({ id }), editing, setEditing, week, dragging, onDragStart, onDragEnd };
+  const actions = { toggleDone, setDuration, removeCard, pull, edit: (id) => setForm({ id }), editing, setEditing, week, dragging, onDragStart, onDragEnd };
 
   return (
     <>
@@ -378,14 +379,27 @@ function Card({ c, actions }) {
   return (
     <li className={"card" + (c.done ? " is-done" : "") + (actions.dragging === c.id ? " is-dragging" : "")} draggable="true" data-id={c.id}
         onDragStart={(e) => actions.onDragStart(e, c)} onDragEnd={actions.onDragEnd}>
-      <input type="checkbox" className="card__check" checked={c.done} aria-label={"Concluir " + c.title} onChange={(e) => actions.toggleDone(c, e.currentTarget.checked)} />
+      {/* a mesma caixa de marcar do dia e da checklist da nota. era um
+          <input type=checkbox> nativo aqui, com accent-color: o mesmo gesto
+          desenhado de dois jeitos em duas telas. */}
+      <button className="mark card__check" type="button" role="checkbox" aria-checked={String(c.done)}
+              aria-label={"Concluir " + c.title} onClick={() => actions.toggleDone(c, !c.done)}>{icon("check")}</button>
       {actions.editing === c.id
         ? <EditableTitle c={c} week={actions.week} onClose={() => actions.setEditing(null)} />
         : <span className="card__title" tabIndex="0" onClick={() => actions.setEditing(c.id)}>{c.title}</span>}
-      {c.inDay && <span className="badge badge--green">no dia</span>}
-      <ClientBadge id={c.client} />
-      {c.min > 0 && <span className="card__min mono">{formatMin(c.min)}</span>}
-      {c.recurring && <span className="card__recurring" title="toda semana"><RecurringIcon /></span>}
+      {/* o rodapé do cartão. os selos e a duração desceram para cá porque as
+          ações flutuam sobre o canto direito no hover: enquanto tudo dividia
+          uma linha só, a mão que ia clicar na duração encontrava a lixeira. */}
+      <span className="card__foot">
+        {c.inDay && <span className="badge badge--green">no dia</span>}
+        <ClientBadge id={c.client} />
+        {/* a duração deixa de ser texto morto: clicar nela muda, sem abrir a
+            caixa do cartão inteiro. é o gesto que a semana não tinha e o dia
+            tinha — e nenhum motivo justificava a diferença. */}
+        <DurationField className="card__min" min={c.min} label={"Duração de " + c.title}
+                       placeholder="—" onChange={(min) => actions.setDuration(c, min)} />
+        {c.recurring && <span className="card__recurring" title="toda semana"><RecurringIcon /></span>}
+      </span>
       <span className="card__actions">
         {canPull && <button className="action" type="button" title="puxar para o dia" onClick={() => actions.pull(c)}>{icon("clock")}</button>}
         <button className="action" type="button" title="editar" onClick={() => actions.edit(c.id)}>{icon("pencil")}</button>
