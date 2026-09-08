@@ -4,9 +4,9 @@
 import "./shared/base.css";
 import "./habits.css";
 import {
-  initPage, newId, today, dayOf, dateOf, addDays, mondayOf, monthLabel, notify, sendToDay, api, formatMin, parseDuration, foldKey, setMerlinAsks
+  initPage, newId, today, dayOf, dateOf, addDays, mondayOf, monthLabel, notify, sendToDay, api, formatMin, parseDuration, foldKey
 } from "./shared/core.js";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import {
   mount, useCollection, useKeydown, isTyping,
   useFields, Form, Field, Dialog, Markdown, EmptyStart, icon
@@ -184,10 +184,6 @@ function Habits() {
   };
 
   /* ---------- ler o mes com o merlin ---------- */
-  useEffect(() => setMerlinAsks(list.length
-    ? [{ id: "habits", label: "ler o mês", note: "o que se manteve, o que caiu e um ajuste", run: askSummary }]
-    : []), [month, list.length]);
-
   const askSummary = async () => {
     if (thinking) return;
     setThinking(true);

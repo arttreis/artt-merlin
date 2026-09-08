@@ -8,9 +8,8 @@ Vite; o build sai em `server/site/`. O que é comum vive aqui:
   (via `shell.css`), e os componentes: `.block`, `.pill`, `.chip`, `.badge`, `.input`,
   `.line`, `.table`, `.dialog`, `.notice`, `.meter`, `.bar`, `.tabs`, `.grid`/`.col-*`.
 - `core.js` — os **dados**: tema, sidebar, sessão/nuvem, coleções sincronizadas, clientes,
-  caixa de entrada do dia, aviso com desfazer, markdown, arquivos (R2) e o registro do que o
-  merlin faz em cada tela. **JavaScript puro, sem React**: dá para testar sem navegador. Não
-  desenha tela de módulo.
+  caixa de entrada do dia, aviso com desfazer, markdown e arquivos (R2). **JavaScript puro, sem
+  React**: dá para testar sem navegador. Não desenha tela de módulo.
 - `day.js` — o **documento do dia e a conta dele**: `loadDay()`, `budget(doc)`, `pendingOf`,
   `fmt`/`longFmt`/`clock`. Saiu de dentro do `day.jsx` quando o início passou a dizer quanto
   ainda cabe hoje: a sobra tem que ser a mesma nas duas telas, e duas cópias da mesma conta é
@@ -38,18 +37,6 @@ e escolher um já monta o documento. É um componente só porque era um problema
 tela não ensinava nada. Recebe `groups` na mesma forma dos modelos de funil e mapa
 (`[{ key, label, items: [{ id, name, summary, line }] }]`) e devolve o item inteiro no
 `onPick`: quem oferece é quem sabe construir.
-
-## O que o merlin faz aqui (`setMerlinAsks`)
-
-Cada página registra, num efeito, a lista do que o conselheiro faz nela. A casca mostra a lista
-num item da barra. Duas formas:
-
-```js
-{ id: "week", label: "ler a semana", note: "…", run: askSummary }   // roda agora
-{ id: "expand", label: "ramificar uma ideia", where: "abra uma ideia" } // precisa de um alvo
-```
-
-O que precisa de alvo **não finge que roda**: diz onde está o botão que escolhe o alvo.
 
 ## Esqueleto de uma página
 

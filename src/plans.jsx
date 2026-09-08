@@ -4,7 +4,7 @@
 import "./shared/base.css";
 import "./plans.css";
 import {
-  initPage, newId, today, dayOf, dateOf, addDays, mondayOf, monthLabel, dateLabel, notify, api, clientName, setMerlinAsks
+  initPage, newId, today, dayOf, dateOf, addDays, mondayOf, monthLabel, dateLabel, notify, api, clientName
 } from "./shared/core.js";
 import { useState, useEffect } from "react";
 import {
@@ -148,13 +148,6 @@ function Plans() {
     if (JSON.stringify(doc.review) === JSON.stringify(review)) return;
     saveDoc({ ...doc, review });
   };
-
-  useEffect(() => setMerlinAsks(KINDS
-    .filter((k) => docOf(k.id).goals.length)
-    .map((k) => ({
-      id: "review:" + k.id, label: "revisar " + (k.id === "week" ? "a semana" : k.id === "month" ? "o mês" : "o trimestre"),
-      note: periodLabel(k.id, periods[k.id]), run: () => askReview(k.id)
-    }))), [periods.quarter, periods.month, periods.week, plans.all().length]);
 
   /* ---------- revisar com o merlin ---------- */
   const askReview = async (kind) => {

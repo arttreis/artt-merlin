@@ -45,11 +45,6 @@ lista de modelos — tipos de negócio com os canais e o checklist de cada um, o
 com os vencimentos e as categorias, hábitos com frequência já escolhida. É o mesmo componente nos
 três, porque era o mesmo problema: a primeira tela não ensinava nada.
 
-**O merlin tem um lugar.** As dez tarefas do conselheiro viviam atrás de ícones de faísca que
-queriam dizer coisas diferentes em cada página. Agora a barra tem um item "merlin" que lista, em
-palavras, o que ele faz *nesta* tela — e o que precisa de um alvo diz onde escolher o alvo, em vez
-de fingir que roda.
-
 O princípio que amarra tudo: **só o dia tem minutos**. Todo o resto é reservatório sem hora,
 e entra no dia pelo gesto de puxar, pagando o pedágio da duração.
 

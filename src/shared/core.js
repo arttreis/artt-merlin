@@ -474,38 +474,6 @@ export const closeSignIn = () => signIn.hide();
 
 
 
-/* ---------- o merlin: o que ele sabe fazer, e onde ----------
-   as dez tarefas do conselheiro existiam ha tempo, cada uma atras de um
-   icone de faisca — e a mesma faisca queria dizer "ramificar" nas ideias,
-   "sugerir" no mapa e "da pra fazer com Claude?" no dia. quem nunca clicou
-   nao tinha como saber que qualquer uma delas existia.
-
-   aqui elas ganham um lugar. cada pagina registra o que o merlin faz nela; a
-   casca mostra a lista e chama de volta. o registro e de tela, nao de
-   documento: some ao recarregar, e a pagina o refaz.
-
-     { id, label, note, run() }        — roda agora, sem alvo
-     { id, label, note, where }        — precisa de um alvo; `where` diz onde
-                                         esta o botao que o escolhe */
-let merlinAsks = [];
-const askListeners = new Set();
-export function setMerlinAsks(list) {
-  merlinAsks = Array.isArray(list) ? list : [];
-  askListeners.forEach((f) => { try { f(merlinAsks); } catch (e) { console.error(e); } });
-}
-export const currentAsks = () => merlinAsks;
-export function onMerlinAsks(fn) { askListeners.add(fn); return () => askListeners.delete(fn); }
-
-/* a caixa do merlin: quem abre e a casca, e qualquer tela pode pedir */
-let merlinOpen = false;
-const openListeners = new Set();
-export function openMerlin(v = true) {
-  merlinOpen = !!v;
-  openListeners.forEach((f) => { try { f(merlinOpen); } catch (e) { console.error(e); } });
-}
-export const merlinIsOpen = () => merlinOpen;
-export function onMerlinOpen(fn) { openListeners.add(fn); return () => openListeners.delete(fn); }
-
 /* ---------- arquivos ----------
    um print colado numa ideia nao entra no documento: ele subiria e desceria
    inteiro a cada sincronizacao, e uma captura de tela pesa mais que o modulo

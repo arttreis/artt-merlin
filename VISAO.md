@@ -535,15 +535,21 @@ Clientes, financeiro e hábitos começavam com uma frase cinza. Agora começam c
 
 É um componente só (`EmptyStart`), porque era um problema só.
 
-### 7.3 O merlin ganhou um lugar
+### 7.3 A barra perdeu peso, e o perfil virou o cartão de quem está aqui
 
-As dez tarefas do conselheiro existiam há tempo, cada uma atrás de um ícone de faísca — e a mesma
-faísca queria dizer "ramificar" nas ideias, "sugerir" no mapa e "dá pra fazer com Claude?" no dia.
-Quem nunca clicou não tinha como saber que qualquer uma existia.
+Houve uma tentativa de dar às dez tarefas do conselheiro um lugar próprio: um item **merlin** na
+barra, abrindo a lista do que ele faz em cada tela. Ela foi construída e desfeita no mesmo dia —
+o Arthur olhou e disse que a ideia estava ruim, e ele tem razão pelo motivo mais simples: a barra
+é para ir a lugares, e "o que a IA faz aqui" não é um lugar. Um item que abre uma caixa em vez de
+trocar de tela quebra a única promessa que uma barra de navegação faz.
 
-A barra ganhou um item **merlin**, que não é uma página: é a lista, em palavras, do que ele faz
-*nesta* tela. O que precisa de um alvo (uma tarefa, uma ideia, um cliente) diz onde está o botão
-que escolhe o alvo, em vez de fingir que roda.
+O que ficou dessa passada foi a subtração: a segunda lista embaixo do separador saiu inteira. O
+tema já tinha ido para o perfil, e o perfil virou **o próprio cartão de quem está aqui** — ele já
+mostrava o rosto e o endereço, então uma linha "perfil" logo acima dele dizia a mesma coisa duas
+vezes. A barra voltou a ser só os módulos.
+
+As tarefas de IA seguem onde sempre estiveram: no botão da tela que as usa. O que a coletânea
+resolveu ali foi o nome, não o endereço — ver 7.4.
 
 ### 7.4 O que estava confuso, e por quê
 

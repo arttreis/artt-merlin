@@ -4,7 +4,7 @@
 import "./shared/base.css";
 import "./clients.css";
 import {
-  initPage, collection, newId, notify, sendToDay, api, setMerlinAsks,
+  initPage, collection, newId, notify, sendToDay, api,
   dateLabel, dayOf, brl, parseMoney, parseDuration, formatMin
 } from "./shared/core.js";
 import { useState, useEffect, useRef } from "react";
@@ -358,13 +358,6 @@ function Clients() {
   };
 
   /* ---------- Merlin: preparar reuniao ---------- */
-
-  useEffect(() => setMerlinAsks(doc
-    ? [
-        { id: "meeting", label: "pauta da reunião com " + doc.name, note: "sai do que está escrito na ficha, nos objetivos e no diário", run: askMeeting },
-        { id: "delegate", label: "dá pra fazer com o Claude?", where: "na faísca de cada item do backlog deste cliente" }
-      ]
-    : [{ id: "meeting", label: "pauta de reunião", where: "abra um cliente na lista" }]), [doc && doc.id, doc && doc.updatedAt]);
 
   const askMeeting = async () => {
     if (!doc || thinking) return;

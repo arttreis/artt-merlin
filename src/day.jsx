@@ -4,7 +4,7 @@
 import "./shared/shell.css";
 import "./day.css";
 import {
-  initPage, newId, today, isDay, mondayOf, api, cloud, setMerlinAsks,
+  initPage, newId, today, isDay, mondayOf, api, cloud,
   readInbox, writeInbox, parseMentions, clientName
 } from "./shared/core.js";
 import { useState, useEffect, useLayoutEffect, useRef } from "react";
@@ -819,13 +819,6 @@ function Day() {
   /* ao abrir: recolhe a caixa de entrada e os cartoes de hoje. uma vez;
      depois so por evento. */
   useEffect(() => { emptyInbox(); pullFromWeek(); syncFromWeek(); }, []);
-
-  /* no dia o merlin só responde sobre UMA tarefa: qual é a pergunta de quem
-     está olhando a fila. por isso ele não roda daqui — ele diz onde está o
-     botão que escolhe a tarefa. */
-  useEffect(() => setMerlinAsks([
-    { id: "delegate", label: "dá pra fazer com o Claude?", where: "na faísca de cada linha da fila — ele lê a tarefa e diz o que daria para montar" }
-  ]), []);
 
   /* outra aba, ou a nuvem, mexeu na semana: cartao novo de hoje entra, e o
      que fechou la fecha aqui */

@@ -4,7 +4,7 @@
 import "./shared/base.css";
 import "./ideas.css";
 import {
-  initPage, newId, today, dayOf, addDays, dateLabel, notify, sendToDay, api, cloud, setMerlinAsks,
+  initPage, newId, today, dayOf, addDays, dateLabel, notify, sendToDay, api, cloud,
   uploadFile, deleteFile, fileUrl, isImage, FILE_TYPES,
   parseMentions, listClients, clientName, collection
 } from "./shared/core.js";
@@ -256,10 +256,6 @@ function Ideas() {
     recordOutput(d, "client", "");
     location.href = "clients.html#new?idea=" + encodeURIComponent(d.id);
   };
-
-  useEffect(() => setMerlinAsks(open
-    ? [{ id: "expand", label: "ramificar “" + (open.title || "sem título") + "”", note: "perguntas a responder, caminhos possíveis e próximos passos", run: () => expand(open) }]
-    : [{ id: "expand", label: "ramificar uma ideia", where: "abra uma ideia na lista — o botão fica na barra do painel" }]), [open && open.id, open && open.updatedAt]);
 
   /* ---------- ramificar: o Merlin le a ideia e sugere perguntas, caminhos e passos ---------- */
   const expand = async (d) => {

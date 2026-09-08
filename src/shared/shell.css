@@ -407,3 +407,11 @@ html.light{--color-1:#1c6fc4;--color-2:#b8600a;--color-3:#c4234f;--color-4:#7a3b
 [data-color="1"]{--color:var(--color-1)}[data-color="2"]{--color:var(--color-2)}[data-color="3"]{--color:var(--color-3)}
 [data-color="4"]{--color:var(--color-4)}[data-color="5"]{--color:var(--color-5)}[data-color="6"]{--color:var(--color-6)}
 
+
+/* o cartao de quem esta aqui virou a porta do perfil. o "sair" fica fora do
+   link: botao dentro de <a> e HTML invalido, e sair nao e navegar. */
+.sb__me{display:flex;align-items:center;gap:10px;flex:1 1 auto;min-width:0;border-radius:var(--br3)}
+.sb__who{transition:background var(--t),border-color var(--t)}
+.sb__who:has(.sb__me:hover){background:var(--fill);border-color:var(--line)}
+.sb__me:hover .who b{color:var(--ink)}
+.sb__me[aria-current="page"] .who b{color:var(--green-ink)}

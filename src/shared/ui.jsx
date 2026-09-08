@@ -19,8 +19,7 @@ import {
   collection, cloud, clients, listClients, clientName, md, brl, parseMoney,
   api, notify, sendToDay,
   PAGES, CLOUD_STATUS, search, signIn, currentNotice, onNotice, closeNotice,
-  toggleSidebar, setShellRenderer, currentBrand,
-  currentAsks, onMerlinAsks, openMerlin, merlinIsOpen, onMerlinOpen
+  toggleSidebar, setShellRenderer, currentBrand
 } from "./core.js";
 import { LOGO, GL_LOGO, GL_MARK, ICONS, NAV_ICONS, icon } from "./icons.jsx";
 
@@ -501,7 +500,7 @@ function SearchBox({ onNavigate }) {
 }
 
 /* ---------- o cartao da nuvem e quem esta aqui ---------- */
-function CloudCard() {
+function CloudCard({ page }) {
   const c = useCloud();
   const info = CLOUD_STATUS[c.status] || CLOUD_STATUS.local;
   const email = c.signedIn ? String(c.email || "") : "";
@@ -516,8 +515,13 @@ function CloudCard() {
         )}
       </div>
       <div className="sb__who">
-        <span className={"avatar" + (email ? "" : " is-out")} id="sb-avatar">{email ? email[0].toUpperCase() : "?"}</span>
-        <span className="who"><b id="sb-name">{email ? email.split("@")[0] : "só você"}</b><span id="sb-email">{email || "sem sessão"}</span></span>
+        {/* quem está aqui É a porta do perfil: o cartão já mostrava o rosto e o
+            endereço, e uma linha "perfil" logo acima dele dizia a mesma coisa
+            duas vezes. */}
+        <a className="sb__me" href="profile.html" title="perfil" aria-current={page === "profile" ? "page" : undefined}>
+          <span className={"avatar" + (email ? "" : " is-out")} id="sb-avatar">{email ? email[0].toUpperCase() : "?"}</span>
+          <span className="who"><b id="sb-name">{email ? email.split("@")[0] : "só você"}</b><span id="sb-email">{email || "sem sessão"}</span></span>
+        </a>
         {c.signedIn && <button type="button" id="cloud-signout" onClick={() => c.signOut()}>sair</button>}
       </div>
     </>
@@ -607,77 +611,12 @@ function Notice() {
   );
 }
 
-/* ---------- a caixa do merlin ----------
-   o "assistente" não é um chat: é a lista do que o Merlin sabe fazer aqui,
-   dita em palavras. as dez tarefas já existiam — o que faltava era um lugar
-   onde elas fossem visíveis sem ter que descobrir um ícone de faísca por
-   tentativa. o que precisa de um alvo (uma tarefa, uma ideia, um cliente)
-   diz onde está o botão que escolhe o alvo, em vez de fingir que roda. */
-function MerlinPanel({ onClose }) {
-  const [asks, setAsks] = useState(currentAsks);
-  const [busy, setBusy] = useState("");
-  const c = useCloud();
-  useEffect(() => onMerlinAsks(setAsks), []);
-
-  const run = async (a) => {
-    if (busy || !a.run) return;
-    setBusy(a.id);
-    try { await a.run(); onClose(); }
-    finally { setBusy(""); }
-  };
-
-  const ready = asks.filter((a) => a.run);
-  const needTarget = asks.filter((a) => !a.run);
-
-  return (
-    <Dialog title="o merlin" wide label="O que o Merlin faz aqui" onClose={onClose}
-        sub="o que ele sabe fazer nesta tela. ele responde — nunca grava nada por conta própria."
-        actions={<button className="pill" type="button" onClick={onClose}>fechar</button>}>
-      {!c.signedIn && (
-        <p className="mk-note">Entre para usar o Merlin: a chave é do servidor, e ele só responde a quem tem sessão.</p>
-      )}
-      {!asks.length && <p className="empty">Nesta tela ele ainda não tem o que fazer.</p>}
-      {!!ready.length && (
-        <div className="mk-list">
-          {ready.map((a) => (
-            <button key={a.id} className="mk-item" type="button" disabled={!!busy} onClick={() => run(a)}>
-              <span className="mk-item__icon">{ICONS.spark}</span>
-              <span className="mk-item__text">
-                <b>{busy === a.id ? "pensando…" : a.label}</b>
-                {a.note && <small>{a.note}</small>}
-              </span>
-            </button>
-          ))}
-        </div>
-      )}
-      {!!needTarget.length && (
-        <>
-          <p className="mk-group t-mono">precisa que você escolha um</p>
-          <div className="mk-list">
-            {needTarget.map((a) => (
-              <div key={a.id} className="mk-item is-static">
-                <span className="mk-item__icon">{ICONS.spark}</span>
-                <span className="mk-item__text">
-                  <b>{a.label}</b>
-                  {a.where && <small>{a.where}</small>}
-                </span>
-              </div>
-            ))}
-          </div>
-        </>
-      )}
-    </Dialog>
-  );
-}
-
 /* ---------- a casca inteira ---------- */
 function Shell({ page }) {
   const [drawer, setDrawer] = useState(false);
   const [, setClosed] = useState(() => document.documentElement.classList.contains("sidebar-closed"));
   const [signInOpen, setSignInOpen] = useState(signIn.open);
-  const [merlin, setMerlin] = useState(merlinIsOpen);
   useEffect(() => signIn.onChange((s) => setSignInOpen(s.open)), []);
-  useEffect(() => onMerlinOpen(setMerlin), []);
   useRootClass("sidebar-open", drawer);
 
   const fold = () => { toggleSidebar(); setClosed(document.documentElement.classList.contains("sidebar-closed")); };
@@ -724,29 +663,14 @@ function Brand() {
             </li>
           ))}
         </ul>
-        <div className="sb__sep" />
-        {/* o tema morava aqui, solto, ao lado de nada. virou uma linha do
-            perfil — que e onde moram as coisas que sao da PESSOA e nao do
-            sistema: a identidade, a janela do dia, a aparencia. */}
-        <ul className="sb__list">
-          <li>
-            {/* o merlin nao e uma pagina: e o que ele faz NESTA. por isso um
-                botao que abre a caixa, e nao um link que troca de tela. */}
-            <button className="sb__item" type="button" title="o que o merlin faz aqui" onClick={() => openMerlin(true)}>
-              {ICONS.spark}<span>merlin</span>
-            </button>
-          </li>
-          <li>
-            <a className="sb__item" href="profile.html" title="perfil" aria-current={page === "profile" ? "page" : undefined}>
-              {NAV_ICONS.profile}<span>perfil</span>
-            </a>
-          </li>
-        </ul>
+        {/* aqui havia uma segunda lista, com "merlin" e "perfil". as duas
+            saíram: o perfil virou o próprio cartão de quem está aqui, e o
+            merlin não é uma página — é o que ele faz NESTA, e por isso mora
+            junto do que ele lê. */}
         <div className="sb__spacer" />
-        <CloudCard />
+        <CloudCard page={page} />
       </aside>
       {signInOpen && <SignInDialog />}
-      {merlin && <MerlinPanel onClose={() => openMerlin(false)} />}
       <Notice />
     </>
   );

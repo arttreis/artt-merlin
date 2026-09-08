@@ -4,7 +4,7 @@
 import "./shared/base.css";
 import "./week.css";
 import {
-  initPage, newId, today, isDay, notify, sendToDay, api, setMerlinAsks,
+  initPage, newId, today, isDay, notify, sendToDay, api,
   parseMentions, formatMin, parseDuration, mondayOf, addDays, dateLabel, dateOf, clientName
 } from "./shared/core.js";
 import { useState, useEffect, useRef } from "react";
@@ -226,10 +226,6 @@ function Week() {
     if (c.done) parts.push("feito");
     return parts.join(" · ");
   };
-  useEffect(() => setMerlinAsks([
-    { id: "week", label: "ler a semana", note: "o que fechou, o que ficou aberto e por cliente", run: askSummary }
-  ]), [monday]);
-
   const askSummary = async () => {
     if (thinking) return;
     setThinking(true);
