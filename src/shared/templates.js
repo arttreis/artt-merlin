@@ -1066,3 +1066,245 @@ export function buildMap(tpl, name) {
     children: (tpl.tree || []).map((spec, i) => node(spec, (i % 6) + 1))
   };
 }
+
+/* ================================================================
+   clientes
+   ================================================================
+   um modelo de cliente é um TIPO DE NEGÓCIO, não um cliente de mentira: ele
+   diz com que canais aquele negócio nasce, o que se persegue nele e o que
+   precisa estar montado antes de qualquer campanha. o checklist de cada
+   canal vem de CHANNEL_CHECKLISTS — o mesmo que o botão "novo canal" usa,
+   para o modelo não virar um segundo vocabulário.
+
+     channels: ["mercadolivre", "instagram"]
+     goals:    ["texto do objetivo", ...]
+     backlog:  ["o que precisa ser feito antes", ...]
+   ================================================================ */
+
+export const CLIENT_GROUPS = [
+  { key: "marketplace", label: "marketplace" },
+  { key: "own", label: "loja própria" },
+  { key: "service", label: "serviço" },
+  { key: "content", label: "conteúdo e infoproduto" }
+];
+
+export const CLIENT_TEMPLATES = [
+  {
+    id: "ml-seller", group: "marketplace", name: "seller no Mercado Livre",
+    summary: "vive de um catálogo dentro do ML: reputação, anúncio e Ads no mesmo lugar",
+    channels: ["mercadolivre"],
+    goals: ["reputação verde e mantida", "os 10 anúncios principais com ficha completa", "ACOS do Mercado Ads no alvo"],
+    backlog: ["levantar os 10 anúncios que mais vendem", "revisar título e ficha técnica dos campeões", "conferir o custo de frete por anúncio"]
+  },
+  {
+    id: "multi-seller", group: "marketplace", name: "seller multicanal",
+    summary: "o mesmo catálogo em mais de um marketplace, com preço e estoque que precisam bater",
+    channels: ["mercadolivre", "shopee", "amazon"],
+    goals: ["mesmo catálogo publicado nos três", "margem por canal conhecida", "estoque integrado ao ERP"],
+    backlog: ["mapear o que já está publicado em cada canal", "montar a planilha de margem por canal", "definir quem é o canal principal"]
+  },
+  {
+    id: "tiktok-seller", group: "marketplace", name: "loja no TikTok Shop",
+    summary: "venda por vídeo e afiliado: o criativo é o anúncio e a vitrine ao mesmo tempo",
+    channels: ["tiktokshop", "instagram"],
+    goals: ["10 creators afiliados ativos", "3 vídeos de produto por semana", "logística sem atraso"],
+    backlog: ["abrir e verificar a conta seller", "escolher os 3 produtos de entrada", "montar o roteiro do primeiro vídeo"]
+  },
+  {
+    id: "dtc-store", group: "own", name: "marca com loja própria",
+    summary: "site que vende direto, tráfego pago e a base de e-mail como ativo",
+    channels: ["site", "instagram", "email"],
+    goals: ["checkout sem atrito medido de ponta a ponta", "base de e-mail crescendo todo mês", "ROAS estável no Meta"],
+    backlog: ["conferir pixel e GA4 no checkout", "montar a sequência de boas-vindas", "revisar as fotos da página de produto"]
+  },
+  {
+    id: "store-ads", group: "own", name: "loja que vive de tráfego pago",
+    summary: "a operação inteira depende do anúncio: criativo, página e oferta são um só assunto",
+    channels: ["site", "instagram", "google"],
+    goals: ["criativo novo toda semana", "CPA dentro do teto", "página de produto que converte sem cupom"],
+    backlog: ["listar os criativos que já rodaram e o resultado de cada um", "definir o teto de CPA", "revisar a oferta da página principal"]
+  },
+  {
+    id: "local", group: "service", name: "serviço local",
+    summary: "quem precisa aparecer no mapa e ser encontrado por quem está perto",
+    channels: ["google", "instagram", "whatsapp"],
+    goals: ["perfil do Google Business completo e avaliado", "agenda cheia sem depender de indicação", "resposta no WhatsApp em minutos"],
+    backlog: ["completar o Google Business com fotos e horário", "pedir avaliação aos últimos 10 clientes", "escrever o script de primeira resposta"]
+  },
+  {
+    id: "b2b", group: "service", name: "consultoria ou B2B",
+    summary: "ticket alto e ciclo longo: a conversa vale mais que o clique",
+    channels: ["site", "email", "whatsapp"],
+    goals: ["reuniões qualificadas por mês", "proposta padrão que não precisa ser reescrita", "follow-up que não depende de memória"],
+    backlog: ["montar o modelo de proposta", "definir o que é lead qualificado", "escrever a sequência de follow-up"]
+  },
+  {
+    id: "infoproduct", group: "content", name: "infoprodutor",
+    summary: "audiência própria, lançamento e a lista como o único ativo que não se aluga",
+    channels: ["instagram", "email", "whatsapp"],
+    goals: ["lista crescendo fora da rede social", "uma oferta perene rodando entre lançamentos", "conteúdo semanal sem depender de pico"],
+    backlog: ["escolher a isca da captura", "montar o grupo de WhatsApp do lançamento", "definir a oferta perene"]
+  },
+  {
+    id: "creator", group: "content", name: "criador de conteúdo",
+    summary: "vive de atenção: a monetização vem depois da constância",
+    channels: ["instagram", "tiktokshop", "email"],
+    goals: ["calendário editorial que se sustenta", "uma fonte de receita além de publi", "base de e-mail iniciada"],
+    backlog: ["definir os três pilares de conteúdo", "montar o calendário do mês", "abrir a captura de e-mail"]
+  }
+];
+
+export const clientGroups = () => CLIENT_GROUPS
+  .map((g) => ({ ...g, items: CLIENT_TEMPLATES.filter((t) => t.group === g.key) }))
+  .filter((g) => g.items.length);
+
+/* os canais do modelo em uma linha, para escolher sem abrir nada */
+export const clientChannels = (tpl) => (tpl.channels || []).map((c) => CHANNEL_LABEL[c] || c);
+
+/* o modelo virando cliente de verdade. tudo o que ele traz é texto editável
+   a partir daqui: o modelo não fica preso ao documento nem volta a mexer
+   nele depois. */
+export function buildClient(tpl, name) {
+  return {
+    name: name || tpl.name,
+    status: "prospect",
+    summary: tpl.summary || "",
+    channels: (tpl.channels || []).map((type) => ({
+      id: newId(), type, name: CHANNEL_LABEL[type] || type, url: "", note: "",
+      items: (CHANNEL_CHECKLISTS[type] || []).map((text) => ({ id: newId(), text, done: false }))
+    })),
+    goals: (tpl.goals || []).map((text) => ({ id: newId(), text, keyResult: "", due: "", done: false, steps: [] })),
+    backlog: (tpl.backlog || []).map((text) => ({ id: newId(), text, min: 0, due: "", done: false, createdAt: Date.now() }))
+  };
+}
+
+/* ================================================================
+   hábitos
+   ================================================================
+   sugestões, não modelos: um hábito não tem estrutura para montar, tem uma
+   frequência e um nome. a lista existe porque a grade vazia não dá ideia
+   nenhuma — e porque "que hábito eu deveria ter" é uma pergunta pior de
+   responder do que "qual destes é o meu".
+   ================================================================ */
+
+export const HABIT_GROUPS = [
+  { key: "body", label: "corpo" },
+  { key: "mind", label: "cabeça" },
+  { key: "work", label: "trabalho" },
+  { key: "home", label: "casa e dinheiro" }
+];
+
+export const HABIT_SUGGESTIONS = [
+  { id: "move", group: "body", name: "mexer o corpo", schedule: { type: "perWeek", times: 4 }, min: 45, color: 5 },
+  { id: "walk", group: "body", name: "caminhar 30 minutos", schedule: { type: "daily" }, min: 30, color: 6 },
+  { id: "sleep", group: "body", name: "dormir antes das 23h", schedule: { type: "daily" }, min: 0, color: 1 },
+  { id: "water", group: "body", name: "beber 2 litros de água", schedule: { type: "daily" }, min: 0, color: 6 },
+  { id: "read", group: "mind", name: "ler 20 páginas", schedule: { type: "daily" }, min: 25, color: 4 },
+  { id: "write", group: "mind", name: "escrever o dia", schedule: { type: "daily" }, min: 10, color: 4 },
+  { id: "nophone", group: "mind", name: "primeira hora sem celular", schedule: { type: "weekdays", weekdays: [1, 2, 3, 4, 5] }, min: 0, color: 3 },
+  { id: "study", group: "mind", name: "estudar uma hora", schedule: { type: "perWeek", times: 3 }, min: 60, color: 1 },
+  { id: "deep", group: "work", name: "duas horas sem interrupção", schedule: { type: "weekdays", weekdays: [1, 2, 3, 4, 5] }, min: 120, color: 5 },
+  { id: "inbox", group: "work", name: "zerar a caixa de entrada", schedule: { type: "weekdays", weekdays: [1, 2, 3, 4, 5] }, min: 20, color: 2 },
+  { id: "review", group: "work", name: "revisar a semana", schedule: { type: "weekdays", weekdays: [5] }, min: 30, color: 2 },
+  { id: "prospect", group: "work", name: "falar com um cliente novo", schedule: { type: "perWeek", times: 3 }, min: 20, color: 3 },
+  { id: "money", group: "home", name: "lançar os gastos do dia", schedule: { type: "daily" }, min: 5, color: 2 },
+  { id: "tidy", group: "home", name: "arrumar a mesa antes de sair", schedule: { type: "weekdays", weekdays: [1, 2, 3, 4, 5] }, min: 10, color: 6 },
+  { id: "cook", group: "home", name: "cozinhar em casa", schedule: { type: "perWeek", times: 4 }, min: 45, color: 5 }
+];
+
+export const habitGroups = () => HABIT_GROUPS
+  .map((g) => ({ ...g, items: HABIT_SUGGESTIONS.filter((h) => h.group === g.key) }))
+  .filter((g) => g.items.length);
+
+/* ================================================================
+   financeiro
+   ================================================================
+   o esqueleto de um mês: o que se repete todo mês, com o dia do vencimento
+   já escolhido e o VALOR EM BRANCO. o valor é a única coisa que ninguém
+   pode adivinhar por você — e é justamente o que trava a primeira tela,
+   porque preencher uma planilha vazia começa por lembrar de tudo que existe.
+
+   as categorias vêm junto: um modelo que traz "aluguel" mas não traz a
+   categoria em que ele cai deixa o trabalho pela metade.
+
+     out: [["nome", diaDoMês, "categoria"], ...]
+     in:  o mesmo, para o que entra
+   ================================================================ */
+
+export const FINANCE_GROUPS = [
+  { key: "pf", label: "pessoa física" },
+  { key: "pj", label: "pessoa jurídica" },
+  { key: "both", label: "os dois juntos" }
+];
+
+export const FINANCE_TEMPLATES = [
+  {
+    id: "pf-basic", group: "pf", name: "o mês de uma pessoa",
+    summary: "moradia, contas de casa e o que entra fixo — o esqueleto mínimo de um mês",
+    categories: ["Moradia", "Casa", "Transporte", "Lazer", "Saúde", "Investimento"],
+    out: [
+      ["aluguel ou financiamento", 5, "Moradia"], ["condomínio", 5, "Moradia"],
+      ["energia", 10, "Casa"], ["água", 10, "Casa"], ["internet", 15, "Casa"],
+      ["celular", 15, "Casa"], ["mercado", 1, "Casa"], ["transporte", 1, "Transporte"],
+      ["plano de saúde", 10, "Saúde"], ["assinaturas", 20, "Lazer"]
+    ],
+    in: [["salário", 5, "Salário"]]
+  },
+  {
+    id: "pf-lean", group: "pf", name: "só o essencial",
+    summary: "quatro linhas: o que não dá para não pagar. bom para começar sem inventar despesa",
+    categories: ["Moradia", "Casa", "Transporte", "Investimento"],
+    out: [["moradia", 5, "Moradia"], ["contas de casa", 10, "Casa"], ["mercado", 1, "Casa"], ["transporte", 1, "Transporte"]],
+    in: [["renda principal", 5, "Salário"]]
+  },
+  {
+    id: "pj-solo", group: "pj", name: "operação de uma pessoa",
+    summary: "o custo de manter a empresa de pé: contador, ferramentas, imposto e pró-labore",
+    categories: ["Ferramentas", "Impostos", "Serviços", "Pró-labore", "Investimento"],
+    out: [
+      ["contador", 10, "Serviços"], ["Simples/DAS", 20, "Impostos"],
+      ["ferramentas e assinaturas", 5, "Ferramentas"], ["hospedagem e domínios", 5, "Ferramentas"],
+      ["pró-labore", 5, "Pró-labore"]
+    ],
+    in: [["contratos mensais", 10, "Recorrente"]]
+  },
+  {
+    id: "pj-agency", group: "pj", name: "operação com equipe",
+    summary: "quando já há gente e mídia no meio: folha, freelas e a verba que passa por você",
+    categories: ["Equipe", "Ferramentas", "Impostos", "Mídia", "Serviços", "Recorrente"],
+    out: [
+      ["folha e freelas", 5, "Equipe"], ["contador", 10, "Serviços"], ["Simples/DAS", 20, "Impostos"],
+      ["ferramentas e assinaturas", 5, "Ferramentas"], ["verba de mídia", 1, "Mídia"], ["pró-labore", 5, "Pró-labore"]
+    ],
+    in: [["contratos mensais", 10, "Recorrente"], ["projetos", 15, "Projeto"]]
+  },
+  {
+    id: "mixed", group: "both", name: "PF e PJ na mesma conta",
+    summary: "para quem ainda não separou: as duas listas juntas, marcadas por categoria",
+    categories: ["Básicas/PF", "Básicas/PJ", "Ferramentas", "Impostos", "Lazer", "Investimento", "Recorrente"],
+    out: [
+      ["moradia", 5, "Básicas/PF"], ["contas de casa", 10, "Básicas/PF"], ["mercado", 1, "Básicas/PF"],
+      ["contador", 10, "Básicas/PJ"], ["Simples/DAS", 20, "Impostos"],
+      ["ferramentas e assinaturas", 5, "Ferramentas"], ["assinaturas pessoais", 20, "Lazer"]
+    ],
+    in: [["pró-labore", 5, "Recorrente"], ["contratos mensais", 10, "Recorrente"]]
+  }
+];
+
+export const financeGroups = () => FINANCE_GROUPS
+  .map((g) => ({ ...g, items: FINANCE_TEMPLATES.filter((t) => t.group === g.key) }))
+  .filter((g) => g.items.length);
+
+/* as linhas fixas do modelo, prontas para virar documentos. o valor nasce em
+   zero de propósito: é o único número que só a pessoa sabe, e um valor
+   inventado no lugar dele seria pior que um campo em branco — a planilha
+   ficaria parecendo pronta. */
+export function buildFinance(tpl) {
+  const line = ([name, dayOfMonth, category], kind) => ({
+    type: "fixed", name, amount: 0, kind, category, dayOfMonth, active: true
+  });
+  return {
+    categories: (tpl.categories || []).slice(),
+    fixed: (tpl.out || []).map((l) => line(l, "out")).concat((tpl.in || []).map((l) => line(l, "in")))
+  };
+}

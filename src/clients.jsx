@@ -4,17 +4,18 @@
 import "./shared/base.css";
 import "./clients.css";
 import {
-  initPage, collection, newId, notify, sendToDay, api,
+  initPage, collection, newId, notify, sendToDay, api, setMerlinAsks,
   dateLabel, dayOf, brl, parseMoney, parseDuration, formatMin
 } from "./shared/core.js";
 import { useState, useEffect, useRef } from "react";
 import {
   mount, useCollection, useHash, setHash, useKeydown, isTyping,
-  useFields, Form, Field, Dialog, Markdown, TemplatePicker, icon,
+  useFields, Form, Field, Dialog, Markdown, TemplatePicker, EmptyStart, icon,
   useDelegate, DelegateDialog
 } from "./shared/ui.jsx";
 import {
-  CHANNEL_TYPES, CHANNEL_LABEL, CHANNEL_CHECKLISTS, FUNNEL_TEMPLATES, funnelGroups, funnelChain, buildFunnel
+  CHANNEL_TYPES, CHANNEL_LABEL, CHANNEL_CHECKLISTS, FUNNEL_TEMPLATES, funnelGroups, funnelChain, buildFunnel,
+  CLIENT_TEMPLATES, clientGroups, clientChannels, buildClient
 } from "./shared/templates.js";
 import { layoutNodes } from "./shared/funnel-layout.js";
 
@@ -225,7 +226,7 @@ function Clients() {
   const hash = useHash();
   const [selectedId, setSelectedId] = useState(null);
   const [tab, setTab] = useState("dashboard");
-  const [newForm, setNewForm] = useState(null);         // { name?, summary?, ideaOrigin? } | null
+  const [newForm, setNewForm] = useState(null);         // { name?, summary?, ideaOrigin?, template? } | null
   const [confirming, setConfirming] = useState(false);
   const [meeting, setMeeting] = useState(null);         // texto da pauta | null
   const [thinking, setThinking] = useState(false);
@@ -327,9 +328,19 @@ function Clients() {
 
   /* ---------- criar e apagar ---------- */
 
-  const createClient = ({ name, status, summary, ideaOrigin }) => {
+  const createClient = ({ name, status, summary, ideaOrigin, template }) => {
     const now = Date.now();
-    const created = normalize({ id: newId(), name, status, summary: summary || "", ideaOrigin: ideaOrigin || "", createdAt: now, updatedAt: now });
+    /* o modelo entra por baixo: nome e status sao sempre o que a pessoa
+       escolheu na caixa, e o resto (canais com checklist, objetivos,
+       backlog) vem dele. dali pra frente e texto — o documento nao guarda
+       de que modelo veio, e o modelo nunca mais o alcanca. */
+    const seed = template ? buildClient(template, name) : null;
+    const created = normalize({
+      ...(seed || {}),
+      id: newId(), name, status,
+      summary: summary || (seed ? seed.summary : ""),
+      ideaOrigin: ideaOrigin || "", createdAt: now, updatedAt: now
+    });
     clients.save(created);
     setNewForm(null);
     openClient(created.id);
@@ -347,6 +358,13 @@ function Clients() {
   };
 
   /* ---------- Merlin: preparar reuniao ---------- */
+
+  useEffect(() => setMerlinAsks(doc
+    ? [
+        { id: "meeting", label: "pauta da reunião com " + doc.name, note: "sai do que está escrito na ficha, nos objetivos e no diário", run: askMeeting },
+        { id: "delegate", label: "dá pra fazer com o Claude?", where: "na faísca de cada item do backlog deste cliente" }
+      ]
+    : [{ id: "meeting", label: "pauta de reunião", where: "abra um cliente na lista" }]), [doc && doc.id, doc && doc.updatedAt]);
 
   const askMeeting = async () => {
     if (!doc || thinking) return;
@@ -415,13 +433,27 @@ function Clients() {
         </div>
       </div>
 
+      {/* sem nenhum cliente, a tela de duas colunas nao tem o que mostrar em
+          nenhuma das duas. no lugar dela, os tipos de negocio: escolher um
+          ja monta os canais com checklist, os objetivos e o backlog. */}
+      {!list.length ? (
+        <EmptyStart
+          title="de que tipo é o primeiro cliente?"
+          text="Cada modelo é um tipo de negócio, não um cliente de mentira. Ele nasce com os canais daquele tipo (cada um com o próprio checklist), os objetivos que aquela operação persegue e o backlog do que precisa existir antes de qualquer campanha. Tudo editável a partir daí."
+          groups={clientGroups().map((g) => ({
+            ...g,
+            items: g.items.map((t) => ({ ...t, line: clientChannels(t).join(" · ") }))
+          }))}
+          onPick={(t) => setNewForm({ template: t.id })}
+          onBlank={() => openNew()}
+          note="Nenhum parece com ele?"
+          blankLabel="criar em branco" />
+      ) : (
       <div className="clients-screen" id="screen" data-view={selectedId ? "panel" : "list"}>
         <section className="list-column">
-          {list.length
-            ? <ul className="list" id="client-list">
-                {list.map((c) => <ClientRow key={c.id} c={c} active={c.id === selectedId} onOpen={() => openClient(c.id)} />)}
-              </ul>
-            : <p className="empty" id="list-empty">nenhum cliente por aqui ainda — crie o primeiro</p>}
+          <ul className="list" id="client-list">
+            {list.map((c) => <ClientRow key={c.id} c={c} active={c.id === selectedId} onOpen={() => openClient(c.id)} />)}
+          </ul>
         </section>
 
         <section className="panel-column">
@@ -431,6 +463,7 @@ function Clients() {
             : <div className="block" id="panel-empty"><p className="empty">escolha um cliente na lista, ou crie um novo</p></div>}
         </section>
       </div>
+      )}
 
       {newForm && <ClientForm prefill={newForm} onCreate={createClient} onClose={closeNew} />}
       {confirming && doc && (
@@ -861,8 +894,8 @@ function Backlog({ doc, ctx }) {
                 <input className="input backlog-due" type="date" title="prazo" value={b.due} onChange={(e) => updateItem(backlogOf, b.id, (x) => { x.due = e.currentTarget.value; })} />
                 <div className="row-actions">
                   <button className="action" type="button" disabled={!!delegate.busy} data-thinking={delegate.busy === b.id ? "yes" : null}
-                    title={delegate.busy === b.id ? "pensando…" : "dá pra fazer com Claude?"}
-                    aria-label="Dá pra fazer com Claude" onClick={() => ask(b)}>{icon("spark")}</button>
+                    title={delegate.busy === b.id ? "pensando…" : "perguntar ao merlin: dá pra fazer com o Claude?"}
+                    aria-label="Perguntar ao merlin se dá para fazer com o Claude" onClick={() => ask(b)}>{icon("spark")}</button>
                   <button className="action" type="button" aria-label="Puxar para o dia" onClick={() => pull(b)}>{icon("arrow")}</button>
                   <button className="action" type="button" aria-label="Remover" onClick={() => removeFrom(backlogOf, b.id, "item removido do backlog")}>{icon("trash")}</button>
                 </div>
@@ -1122,16 +1155,41 @@ function MeetingDialog({ text, onClose, onKeep }) {
 
 /* ---------- caixa: novo cliente ---------- */
 function ClientForm({ prefill, onCreate, onClose }) {
-  const [v, bind] = useFields({ name: prefill.name || "", status: "prospect" });
+  const first = CLIENT_TEMPLATES.find((t) => t.id === prefill.template);
+  const [v, bind, set] = useFields({ name: prefill.name || (first ? first.name : ""), status: "prospect" });
+  /* o modelo é o TIPO DE NEGÓCIO, não um cliente de mentira: ele traz os
+     canais com o checklist de cada um, os objetivos que aquele tipo de
+     operação persegue e o backlog do que precisa existir antes. depois de
+     criado, nada disso lembra que veio de um modelo. */
+  const [tplId, setTplId] = useState(prefill.template || "");
+  const tpl = CLIENT_TEMPLATES.find((t) => t.id === tplId) || null;
+  /* escolher o modelo com o nome ainda em branco preenche o nome: quase
+     sempre ele é provisório mesmo, e um campo obrigatório vazio depois de
+     uma escolha parece que a escolha não valeu. */
+  const choose = (id) => {
+    setTplId(id);
+    const t = CLIENT_TEMPLATES.find((x) => x.id === id);
+    if (t && !v.name.trim()) set("name", t.name);
+  };
   const submit = () => {
     const name = v.name.trim();
     if (!name) return false;
-    return onCreate({ name, status: v.status, summary: prefill.summary || "", ideaOrigin: prefill.ideaOrigin || "" });
+    return onCreate({
+      name, status: v.status, summary: prefill.summary || "",
+      ideaOrigin: prefill.ideaOrigin || "", template: tpl
+    });
   };
   return (
     <Form title="novo cliente" submit="criar" onSubmit={submit} onClose={onClose}>
       <Field label="nome" full><input className="input" required {...bind("name")} /></Field>
       <Field label="status" full><select className="select" {...bind("status")}>{STATUSES.map((s) => <option key={s} value={s}>{STATUS_LABEL[s]}</option>)}</select></Field>
+      <Field label="modelo" full>
+        <TemplatePicker groups={clientGroups()} empty="em branco" value={tplId} onChange={choose} id="client-tpl" />
+        {tpl && <>
+          <p className="tpl-note">{tpl.summary}</p>
+          <p className="tpl-chain">{clientChannels(tpl).join(" · ")} · {tpl.goals.length} objetivos · {tpl.backlog.length} no backlog</p>
+        </>}
+      </Field>
     </Form>
   );
 }

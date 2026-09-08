@@ -4,13 +4,14 @@
 import "./shared/base.css";
 import "./habits.css";
 import {
-  initPage, newId, today, dayOf, dateOf, addDays, mondayOf, monthLabel, notify, sendToDay, api, formatMin, parseDuration
+  initPage, newId, today, dayOf, dateOf, addDays, mondayOf, monthLabel, notify, sendToDay, api, formatMin, parseDuration, foldKey, setMerlinAsks
 } from "./shared/core.js";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   mount, useCollection, useKeydown, isTyping,
-  useFields, Form, Field, Dialog, Markdown, icon
+  useFields, Form, Field, Dialog, Markdown, EmptyStart, icon
 } from "./shared/ui.jsx";
+import { HABIT_SUGGESTIONS, habitGroups } from "./shared/templates.js";
 
 initPage("habits");
 
@@ -71,6 +72,27 @@ function scheduleLabel(h) {
   return s.weekdays.slice().sort().map((n) => WEEKDAY_NAMES[n]).join(" ") || "nenhum dia";
 }
 
+/* ---------- sugerir hábitos ----------
+   a grade vazia não dá ideia nenhuma, e "que hábito eu deveria ter" é uma
+   pergunta muito pior de responder do que "qual destes é o meu". as
+   sugestões vêm de shared/templates.js com frequência e duração já
+   escolhidas — a mesma lista serve a tela vazia e o botão do cabeçalho,
+   porque são a mesma pergunta feita em momentos diferentes.
+
+   escolher não cria na hora: marca. criar um por clique faria a lista
+   sumir embaixo do dedo assim que o primeiro entrasse. */
+function suggestionGroups(existing) {
+  const taken = new Set(existing.map((h) => foldKey(h.name)));
+  return habitGroups()
+    .map((g) => ({
+      ...g,
+      items: g.items
+        .filter((s) => !taken.has(foldKey(s.name)))
+        .map((s) => ({ ...s, line: scheduleLabel(s) + (s.min ? " · " + formatMin(s.min) : "") }))
+    }))
+    .filter((g) => g.items.length);
+}
+
 /* o dia e "esperado" quando a frequencia pede marca nele. quem e N vezes por
    semana nao tem dia fixo: nenhum e esperado, e a conta e por semana. */
 function isExpected(h, day) {
@@ -124,6 +146,8 @@ function Habits() {
   const habits = useCollection("habits", { normalize });
   const [month, setMonth] = useState(() => monthOf(today()));
   const [form, setForm] = useState(null);       // { id } | null
+  const [suggesting, setSuggesting] = useState(false);
+  const [chosen, setChosen] = useState([]);     // ids das sugestoes marcadas
   const [summary, setSummary] = useState(null); // texto do merlin | null
   const [thinking, setThinking] = useState(false);
   const t = today();
@@ -144,7 +168,26 @@ function Habits() {
   };
   const pull = (h) => sendToDay({ title: h.name, min: h.min, client: "", origin: { type: "habit", id: h.id } });
 
+  /* as escolhidas viram habitos de uma vez so: um saveMany, um aviso. depois
+     disso sao habitos comuns — nada lembra que vieram de uma sugestao. */
+  const toggleChosen = (s) => setChosen((c) => c.includes(s.id) ? c.filter((x) => x !== s.id) : c.concat([s.id]));
+  const addChosen = () => {
+    const now = Date.now();
+    const docs = HABIT_SUGGESTIONS.filter((s) => chosen.includes(s.id)).map((s, i) => normalize({
+      id: newId(), name: s.name, schedule: s.schedule, min: s.min, color: s.color,
+      order: now + i, archived: false, marks: {}, createdAt: now, updatedAt: now
+    }));
+    if (!docs.length) return;
+    habits.saveMany(docs);
+    setChosen([]); setSuggesting(false);
+    notify(docs.length === 1 ? "1 hábito criado" : docs.length + " hábitos criados");
+  };
+
   /* ---------- ler o mes com o merlin ---------- */
+  useEffect(() => setMerlinAsks(list.length
+    ? [{ id: "habits", label: "ler o mês", note: "o que se manteve, o que caiu e um ajuste", run: askSummary }]
+    : []), [month, list.length]);
+
   const askSummary = async () => {
     if (thinking) return;
     setThinking(true);
@@ -180,11 +223,24 @@ function Habits() {
             <span>{thinking ? "pensando…" : "ler o mês com o merlin"}</span>
           </button>
           <button className="pill" type="button" onClick={() => setMonth((m) => shiftMonth(m, 1))}>próximo ›</button>
+          <button className="pill" type="button" id="suggest-btn" onClick={() => setSuggesting(true)}>sugerir</button>
           <button className="pill pill--green" type="button" title="novo hábito (n)" onClick={() => setForm({ id: "" })}>{icon("plus")}hábito</button>
         </div>
       </div>
 
-      {!list.length && <p className="empty">Nenhum hábito ainda. O "+" cria o primeiro; marcar o dia é o registro.</p>}
+      {!list.length && (
+        <EmptyStart
+          title="quais destes são seus?"
+          text="Um hábito não tem estrutura para montar: tem um nome e uma frequência. Estes já vêm com as duas escolhidas. Marque os que forem seus — dá para mudar tudo depois, e o “+” cria qualquer outro."
+          groups={suggestionGroups(list)}
+          picked={(s) => chosen.includes(s.id)}
+          onPick={toggleChosen}
+          note={chosen.length ? "" : "Nenhum é seu?"}
+          onBlank={chosen.length ? addChosen : () => setForm({ id: "" })}
+          blankLabel={chosen.length
+            ? (chosen.length === 1 ? "criar o hábito escolhido" : "criar os " + chosen.length + " escolhidos")
+            : "criar um do zero"} />
+      )}
 
       {list.length > 0 && (
         <div className="table-scroll">
@@ -207,6 +263,20 @@ function Habits() {
           </table>
         </div>)}
 
+      {suggesting && (
+        <Dialog title="sugerir hábitos" sub="frequência e duração já vêm escolhidas; tudo editável depois" wide
+                label="Sugestões de hábito" onClose={() => { setSuggesting(false); setChosen([]); }}
+                actions={<>
+                  <button className="pill" type="button" onClick={() => { setSuggesting(false); setChosen([]); }}>fechar</button>
+                  {!!chosen.length && <button className="pill pill--green" type="button" onClick={addChosen}>
+                    {chosen.length === 1 ? "criar o escolhido" : "criar os " + chosen.length + " escolhidos"}
+                  </button>}
+                </>}>
+          {suggestionGroups(list).length
+            ? <EmptyStart title="" groups={suggestionGroups(list)} picked={(s) => chosen.includes(s.id)} onPick={toggleChosen} />
+            : <p className="empty">Você já tem todos os que eu sugeriria. O "+" cria qualquer outro.</p>}
+        </Dialog>
+      )}
       {form && <HabitForm habits={habits} id={form.id} onClose={() => setForm(null)} onArchive={archive} />}
       {summary != null && <MerlinDialog text={summary} onClose={() => setSummary(null)} />}
     </>
