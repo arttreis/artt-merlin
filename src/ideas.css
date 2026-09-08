@@ -35,6 +35,17 @@
 .list-col__scroll{flex:1 1 auto;min-height:0;overflow-y:auto;padding:4px 8px 24px}
 .group{margin:12px 6px 6px;font-family:var(--mono);font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-30)}
 .group:first-child{margin-top:8px}
+/* o rodape das arquivadas: mesmo rotulo dos dias, mas clicavel — e o unico
+   lugar da tela que abre e fecha, porque arquivar precisa ter volta a vista */
+.group--fold{
+  display:flex;align-items:center;gap:6px;width:calc(100% - 12px);
+  border-top:1px solid var(--line-soft);padding-top:10px;margin-top:20px;
+  color:var(--ink-30);transition:color var(--t);
+}
+.group--fold:hover{color:var(--ink-50)}
+.group--fold svg{width:12px;height:12px;flex:none}
+.is-archived .item{opacity:.55;transition:opacity var(--t)}
+.is-archived .item:hover,.is-archived .item.is-active{opacity:1}
 
 /* a linha: titulo + previa, hora que vira acoes no hover */
 .item{
@@ -222,3 +233,94 @@
   .panel__bar .pill{width:28px;padding:0;justify-content:center}
   .sheet{grid-template-columns:84px 1fr}
 }
+
+/* ---------- o passo virou passo ----------
+   com numero, com "agora" e com setas: a lista de marcar nao dizia em que
+   ordem as coisas aconteciam, e sem ordem "o proximo passo" e uma frase
+   sem dono. */
+.step__n{
+  flex:0 0 auto;width:16px;text-align:right;
+  font-size:10px;letter-spacing:.04em;color:var(--ink-30);
+}
+.step.is-done .step__n{opacity:.45}
+/* o texto e um botao para poder ser corrigido no lugar; nao pode parecer um */
+.step__text{
+  display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;
+  text-align:left;background:none;border:0;padding:0;font:inherit;color:inherit;cursor:text;
+}
+.step__edit{
+  flex:1 1 auto;min-width:0;background:none;border:0;padding:0;
+  font-size:13.5px;color:var(--ink);
+}
+.step__edit:focus{outline:none}
+/* o proximo da fila: o unico passo que a ideia esta realmente pedindo */
+.step__now{
+  flex:none;height:16px;padding:0 6px;border-radius:var(--br-pill);
+  background:color-mix(in srgb,var(--green) 15%,transparent);
+  color:var(--green-ink);font-size:9px;letter-spacing:.08em;
+  display:inline-flex;align-items:center;
+}
+.step.is-now{background:color-mix(in srgb,var(--green) 5%,transparent)}
+.step__actions .action{width:24px;height:24px}
+.step__actions .action svg{width:13px;height:13px}
+.step__actions .action:disabled{opacity:.25;cursor:default}
+.step__actions .action:disabled:hover{background:none;color:var(--ink-30)}
+.step--new .step__n{color:transparent}
+
+/* ---------- a atividade ----------
+   com um trilho e um ponto por acontecimento ela vira linha do tempo; sem
+   eles era uma lista de frases soltas que nao pareciam ter ordem nenhuma. */
+.activity{position:relative;padding-left:14px}
+.activity::before{
+  content:"";position:absolute;left:3px;top:12px;bottom:12px;width:1px;background:var(--line-soft);
+}
+.activity li{position:relative}
+.activity li::before{
+  content:"";position:absolute;left:-14px;top:12px;width:7px;height:7px;border-radius:50%;
+  background:var(--fill-hover);border:1px solid var(--line);
+}
+.activity li[data-kind="born"]::before{background:var(--ink-30);border-color:var(--ink-30)}
+.activity li[data-kind="step"]::before{background:var(--green);border-color:var(--green)}
+.activity li[data-kind="out"]::before{background:var(--ink-50);border-color:var(--ink-50)}
+
+/* ---------- os prints ----------
+   uma grade de miniaturas quadradas: o print e uma prova visual, e uma lista
+   de nomes de arquivo nao prova nada. o quadrado corta a captura, mas quem
+   quer ver inteiro clica — e ai ela abre do tamanho da tela. */
+.prints{border-radius:var(--br2);transition:background var(--t),box-shadow var(--t)}
+/* arrastando por cima: o painel inteiro vira alvo, nao um retangulo pontilhado
+   escondido no meio da pagina */
+.prints.is-over{box-shadow:inset 0 0 0 2px var(--green);background:color-mix(in srgb,var(--green) 6%,transparent)}
+.prints__grid{display:grid;gap:8px;grid-template-columns:repeat(auto-fill,minmax(104px,1fr));margin-bottom:10px}
+.print{position:relative;margin:0;aspect-ratio:1;border-radius:var(--br2);overflow:hidden;background:var(--fill);border:1px solid var(--line-soft)}
+.print__open{display:block;width:100%;height:100%;padding:0;border:0;background:none;cursor:zoom-in}
+.print__open img{width:100%;height:100%;object-fit:cover;display:block}
+/* pdf e afins: sem miniatura, entao o icone e o nome */
+.print__file{
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;
+  padding:10px;text-align:center;color:var(--ink-50);cursor:pointer;
+}
+.print__file svg{width:22px;height:22px}
+.print__file span{font-size:10.5px;line-height:1.25;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.print__remove{
+  position:absolute;top:4px;right:4px;width:24px;height:24px;
+  background:var(--surface-2);border:1px solid var(--line-soft);border-radius:var(--br2);
+  opacity:0;transition:opacity var(--t);
+}
+.print:hover .print__remove,.print:focus-within .print__remove{opacity:1}
+@media (hover:none){.print__remove{opacity:1}}
+.print--loading{background:var(--fill-hover);animation:print-wait 1.1s ease-in-out infinite alternate}
+@keyframes print-wait{from{opacity:.4}to{opacity:.85}}
+.prints__hint{margin:0 0 10px;font-size:12.5px;color:var(--ink-30)}
+.prints__hint kbd{margin:0 1px}
+.prints__foot{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.prints__note{font-size:11.5px;color:var(--ink-30)}
+
+/* o print inteiro, por cima de tudo. clicar em qualquer lugar fecha: nao ha
+   nada para fazer aqui alem de olhar. */
+.print-full{
+  position:fixed;inset:0;z-index:80;display:grid;place-items:center;padding:4vh 4vw;
+  background:color-mix(in srgb,var(--bg) 88%,transparent);cursor:zoom-out;
+  backdrop-filter:blur(3px);
+}
+.print-full img{max-width:100%;max-height:92vh;border-radius:var(--br2);box-shadow:var(--sombra-2)}

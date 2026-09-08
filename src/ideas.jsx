@@ -4,7 +4,8 @@
 import "./shared/base.css";
 import "./ideas.css";
 import {
-  initPage, newId, today, dayOf, addDays, dateLabel, notify, sendToDay, api,
+  initPage, newId, today, dayOf, addDays, dateLabel, notify, sendToDay, api, cloud, setMerlinAsks,
+  uploadFile, deleteFile, fileUrl, isImage, FILE_TYPES,
   parseMentions, listClients, clientName, collection
 } from "./shared/core.js";
 import { useState, useEffect, useLayoutEffect, useRef } from "react";
@@ -75,7 +76,16 @@ function normalize(d) {
     stage: STAGE_IDS.includes(d.stage) ? d.stage : "seed",
     client: d.client || "",
     steps: Array.isArray(d.steps) ? d.steps : [],
+    /* os prints: so o bilhete do arquivo, nunca o binario. um documento
+       antigo nao tem o campo, e isso e valido — a secao aparece vazia. */
+    files: (Array.isArray(d.files) ? d.files : []).map((f) => ({
+      id: String(f.id || ""), name: String(f.name || "").slice(0, 120),
+      type: String(f.type || ""), size: +f.size || 0, at: +f.at || 0
+    })).filter((f) => f.id),
     outputs: Array.isArray(d.outputs) ? d.outputs : [],
+    /* a historia guarda dois tipos: "stage" (mudou de estagio) e "step"
+       (concluiu um passo). documento antigo so tem o primeiro, e isso e
+       valido — a atividade simplesmente mostra menos. */
     history: Array.isArray(d.history) ? d.history : [],
     createdAt: d.createdAt || d.updatedAt || Date.now(),
     updatedAt: d.updatedAt || d.createdAt || Date.now()
@@ -145,7 +155,7 @@ function Ideas() {
   const [suggestions, setSuggestions] = useState(null);   // { targetId, items:[{type, title, note, checked}] } | null
   const [thinking, setThinking] = useState(false);
   const [panelSync, setPanelSync] = useState(0);          // sobe quando o painel deve reler o documento inteiro
-  const [sections, setSections] = useState({ steps: true, activity: true });
+  const [sections, setSections] = useState({ steps: true, prints: true, activity: true });
   const [, tick] = useState(0);
   const listRef = useRef(null);
   const focusTitle = useRef(false);   // o painel que montar em seguida leva o foco para o titulo
@@ -156,10 +166,13 @@ function Ideas() {
   const setOpen = (id) => { openIdRef.current = id; setOpenId(id); };
 
   const all = ideas.all();
-  /* arquivada nao aparece na lista — senao ela ficaria acumulando para
-     sempre, do mesmo jeito que uma tarefa feita nao volta a poluir a fila do
-     dia. quem quer ver as arquivadas usa o quadro, que tem a coluna delas. */
-  const listItems = all.filter((d) => d.stage !== "archived").sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+  /* arquivada sai da lista viva — senao ela ficaria acumulando para sempre,
+     do mesmo jeito que uma tarefa feita nao volta a poluir a fila do dia. mas
+     sair da lista nao e sumir: elas descem para o rodape, fechadas, e voltam
+     de la. arquivar que nao tem volta a vista e so um apagar com outro nome. */
+  const byRecent = (a, b) => (b.updatedAt || 0) - (a.updatedAt || 0);
+  const listItems = all.filter((d) => d.stage !== "archived").sort(byRecent);
+  const archivedItems = all.filter((d) => d.stage === "archived").sort(byRecent);
   const live = listItems.length;
   const open = openId ? ideas.get(openId) : null;
 
@@ -243,6 +256,10 @@ function Ideas() {
     recordOutput(d, "client", "");
     location.href = "clients.html#new?idea=" + encodeURIComponent(d.id);
   };
+
+  useEffect(() => setMerlinAsks(open
+    ? [{ id: "expand", label: "ramificar “" + (open.title || "sem título") + "”", note: "perguntas a responder, caminhos possíveis e próximos passos", run: () => expand(open) }]
+    : [{ id: "expand", label: "ramificar uma ideia", where: "abra uma ideia na lista — o botão fica na barra do painel" }]), [open && open.id, open && open.updatedAt]);
 
   /* ---------- ramificar: o Merlin le a ideia e sugere perguntas, caminhos e passos ---------- */
   const expand = async (d) => {
@@ -350,7 +367,7 @@ function Ideas() {
       <div className="screen" data-mobile={open ? "panel" : "list"}>
         {view === "list" ? (
           <>
-            <IdeaList items={listItems} openId={openId} listRef={listRef} actions={actions} />
+            <IdeaList items={listItems} archived={archivedItems} openId={openId} listRef={listRef} actions={actions} />
             {open
               ? <IdeaPanel key={open.id} idea={open} ideas={ideas} sync={panelSync} thinking={thinking} focusTitle={focusTitle} sections={sections} actions={actions} />
               : <EmptyPanel />}
@@ -365,7 +382,8 @@ function Ideas() {
 }
 
 /* ---------- a lista, agrupada por dia ---------- */
-function IdeaList({ items, openId, listRef, actions }) {
+function IdeaList({ items, archived, openId, listRef, actions }) {
+  const [openArchive, setOpenArchive] = useState(false);
   const rows = [];
   let group = "";
   items.forEach((d) => {
@@ -377,7 +395,21 @@ function IdeaList({ items, openId, listRef, actions }) {
     <section className="list-col">
       <div className="list-col__scroll">
         <div role="list" ref={listRef}>{rows}</div>
-        {!items.length && <p className="list-empty">Nada aqui. O "+" em cima guarda o que ainda não é tarefa; o quadro mostra as arquivadas.</p>}
+        {!items.length && <p className="list-empty">Nada aqui. O "+" em cima guarda o que ainda não é tarefa.</p>}
+        {!!archived.length && (
+          <>
+            <button className="group group--fold" type="button" aria-expanded={String(openArchive)}
+                    onClick={() => setOpenArchive((v) => !v)}>
+              {icon("archive")}
+              <span>{archived.length + (archived.length === 1 ? " arquivada" : " arquivadas")}</span>
+            </button>
+            {openArchive && (
+              <div role="list" className="is-archived">
+                {archived.map((d) => <IdeaItem key={d.id} d={d} active={d.id === openId} actions={actions} />)}
+              </div>
+            )}
+          </>
+        )}
       </div>
     </section>
   );
@@ -492,6 +524,9 @@ function IdeaPanel({ idea, ideas, sync, thinking, focusTitle, sections, actions 
   const saveTimer = useRef(null), savedTimer = useRef(null), wantBodyFocus = useRef(false), lastSync = useRef(sync);
 
   const total = idea.steps.length, done = stepsDone(idea);
+  /* "agora" e o primeiro nao feito NA ORDEM — e por isso que a ordem
+     precisou existir de verdade antes deste selo fazer sentido */
+  const nextStepId = (idea.steps.find((s) => !s.done) || {}).id || "";
 
   /* antes da pintura: quem abriu uma ideia sem titulo ja esta com o dedo no teclado */
   useLayoutEffect(() => {
@@ -566,10 +601,35 @@ function IdeaPanel({ idea, ideas, sync, thinking, focusTitle, sections, actions 
     if (!now) return;
     actions.save({ ...now, steps: now.steps.concat([{ id: newId(), text: text.slice(0, 200), done: false }]) });
   };
+  /* mover muda a SEQUENCIA, que e o que separa um passo a passo de uma lista
+     de marcar: sem ordem, "o proximo" nao quer dizer nada. */
+  const moveStep = (stepId, delta) => {
+    const now = ideas.get(idea.id);
+    if (!now) return;
+    const i = now.steps.findIndex((s) => s.id === stepId);
+    const j = i + delta;
+    if (i < 0 || j < 0 || j >= now.steps.length) return;
+    const steps = now.steps.slice();
+    const [moved] = steps.splice(i, 1);
+    steps.splice(j, 0, moved);
+    actions.save({ ...now, steps });
+  };
+  const editStep = (stepId, text) => {
+    const now = ideas.get(idea.id);
+    if (!now) return;
+    actions.save({ ...now, steps: now.steps.map((s) => s.id === stepId ? { ...s, text } : s) });
+  };
   const toggleStep = (stepId) => {
     const now = ideas.get(idea.id);
     if (!now) return;
-    actions.save({ ...now, steps: now.steps.map((s) => s.id === stepId ? { ...s, done: !s.done } : s) });
+    const step = now.steps.find((s) => s.id === stepId);
+    const steps = now.steps.map((s) => s.id === stepId ? { ...s, done: !s.done } : s);
+    /* so a conclusao entra na atividade: registrar o desmarcar tambem faria
+       um passo em duvida escrever duas linhas de historia a cada clique. */
+    const history = step && !step.done
+      ? now.history.concat([{ type: "step", text: step.text, at: Date.now() }])
+      : now.history;
+    actions.save({ ...now, steps, history });
   };
   const pullStep = (step) => {
     const now = ideas.get(idea.id);
@@ -638,8 +698,23 @@ function IdeaPanel({ idea, ideas, sync, thinking, focusTitle, sections, actions 
               {total > 0 && <span className="bar"><i style={{ width: Math.round(100 * done / total) + "%" }}></i></span>}
             </div>
             <div className="section__body">
-              <div>{idea.steps.map((s) => <Step key={s.id} step={s} onToggle={() => toggleStep(s.id)} onPull={() => pullStep(s)} onRemove={() => removeStep(s.id)} />)}</div>
+              <div>{idea.steps.map((s, i) => (
+                <Step key={s.id} step={s} index={i + 1} current={s.id === nextStepId}
+                      first={i === 0} last={i === idea.steps.length - 1}
+                      onToggle={() => toggleStep(s.id)} onEdit={(t) => editStep(s.id, t)}
+                      onMove={(d) => moveStep(s.id, d)} onPull={() => pullStep(s)} onRemove={() => removeStep(s.id)} />))}</div>
               <NewStep onAdd={addStep} />
+            </div>
+          </div>
+
+          <div className={"section" + (sections.prints ? "" : " is-closed")}>
+            <div className="section__head" onClick={() => actions.toggleSection("prints")}>
+              <ChevronIcon />
+              <span className="title">prints</span>
+              <span className="count">{idea.files.length || ""}</span>
+            </div>
+            <div className="section__body">
+              <Prints idea={idea} onChange={(files) => { const now = ideas.get(idea.id); if (now) actions.save({ ...now, files }); }} />
             </div>
           </div>
 
@@ -656,12 +731,42 @@ function IdeaPanel({ idea, ideas, sync, thinking, focusTitle, sections, actions 
   );
 }
 
-function Step({ step, onToggle, onPull, onRemove }) {
+/* ---------- um passo ----------
+   eram caixas de marcar soltas, uma embaixo da outra: bullet notes com
+   checkbox. um passo a passo tem ORDEM — o número na frente diz em que
+   posição ele está, "agora" diz qual é o próximo que importa, e as setas
+   mudam a sequência sem precisar apagar e reescrever. o texto também virou
+   editável no lugar: corrigir uma palavra não pode custar refazer o passo. */
+function Step({ step, index, current, onToggle, onEdit, onPull, onRemove, onMove, first, last }) {
+  const [editing, setEditing] = useState(false);
+  const [text, setText] = useState(step.text);
+  const commit = () => {
+    setEditing(false);
+    const t = text.trim().slice(0, 200);
+    if (!t) { setText(step.text); return; }
+    if (t !== step.text) onEdit(t);
+  };
   return (
-    <div className={"step" + (step.done ? " is-done" : "")} data-id={step.id}>
-      <button className="step__check" type="button" title="marcar feito" onClick={onToggle}>{icon("check")}</button>
-      <span className="step__text">{step.text}</span>
+    <div className={"step" + (step.done ? " is-done" : "") + (current ? " is-now" : "")} data-id={step.id}>
+      <span className="step__n t-mono" aria-hidden="true">{index}</span>
+      <button className="step__check" type="button" title={step.done ? "desmarcar" : "marcar feito"} onClick={onToggle}>{icon("check")}</button>
+      {editing ? (
+        <input className="step__edit" autoFocus maxLength="200" value={text}
+               onChange={(e) => setText(e.currentTarget.value)}
+               onBlur={commit}
+               onKeyDown={(e) => {
+                 if (e.key === "Enter") { e.preventDefault(); commit(); }
+                 if (e.key === "Escape") { e.preventDefault(); setText(step.text); setEditing(false); }
+               }} />
+      ) : (
+        <button className="step__text" type="button" title="editar" onClick={() => { setText(step.text); setEditing(true); }}>
+          {step.text}
+          {current && <span className="step__now t-mono">agora</span>}
+        </button>
+      )}
       <span className="step__actions">
+        <button className="action" type="button" title="subir" disabled={first} onClick={() => onMove(-1)}>{icon("chevronUp")}</button>
+        <button className="action" type="button" title="descer" disabled={last} onClick={() => onMove(1)}>{icon("chevronDown")}</button>
         <button className="action" type="button" title="puxar para o dia" onClick={onPull}>{icon("clock")}</button>
         <button className="action" type="button" title="apagar" onClick={onRemove}>{icon("trash")}</button>
       </span>
@@ -672,32 +777,131 @@ function NewStep({ onAdd }) {
   const [text, setText] = useState("");
   return (
     <form className="step step--new" autoComplete="off" onSubmit={(e) => { e.preventDefault(); const t = text.trim(); if (!t) return; onAdd(t); setText(""); }}>
+      <span className="step__n" aria-hidden="true"></span>
       <span className="step__check" aria-hidden="true"></span>
-      <input maxLength="200" placeholder="um próximo passo… (Enter adiciona)" aria-label="Novo passo" value={text} onChange={(e) => setText(e.currentTarget.value)} />
+      <input maxLength="200" placeholder="o próximo passo… (Enter adiciona)" aria-label="Novo passo" value={text} onChange={(e) => setText(e.currentTarget.value)} />
     </form>
   );
 }
 
-/* a atividade e a linha do tempo da ideia: quando nasceu, por onde passou,
-   para onde saiu. tudo que ja esta no documento, so contado em ordem. */
+/* a atividade e a linha do tempo da ideia: quando nasceu, por onde passou, o
+   que foi feito nela e para onde saiu.
+
+   ela listava só a criação e as trocas de estágio — o que, numa ideia que
+   ninguém mudou de estágio, era uma linha só dizendo "criada". agora o que
+   se FAZ na ideia também conta: passo concluído é acontecimento, e é o
+   registro que responde "isto andou?" sem ter que comparar checklists. */
 const OUTPUT_LABELS = { day: "puxada para o dia", map: "virou mapa mental", client: "virou projeto de cliente", funnel: "virou funil" };
 function Activity({ idea }) {
-  const events = [{ at: idea.createdAt, key: "created", node: <b>criada</b> }]
+  const events = [{ at: idea.createdAt, key: "created", kind: "born", node: <b>criada</b> }]
     .concat(idea.history.filter((h) => h.type === "stage").map((h, i) => ({
-      at: h.at, key: "stage:" + i,
+      at: h.at, key: "stage:" + i, kind: "stage",
       node: <>passou de <span className="tag">{stageLabel(h.from)}</span> para <span className="tag">{stageLabel(h.to)}</span></>
     })))
-    .concat(idea.outputs.map((o, i) => ({ at: o.at, key: "output:" + i, node: <b>{OUTPUT_LABELS[o.type] || o.type}</b> })))
+    .concat(idea.history.filter((h) => h.type === "step").map((h, i) => ({
+      at: h.at, key: "step:" + i, kind: "step",
+      node: <>fez <span className="tag">{h.text}</span></>
+    })))
+    .concat(idea.outputs.map((o, i) => ({ at: o.at, key: "output:" + i, kind: "out", node: <b>{OUTPUT_LABELS[o.type] || o.type}</b> })))
     .sort((a, b) => b.at - a.at);
   return (
     <ul className="activity">
       {events.map((ev) => (
-        <li key={ev.key}>
+        <li key={ev.key} data-kind={ev.kind}>
           <span className="txt">{ev.node}</span>
           <span className="when" title={stampLabel(ev.at)}>{longWhen(ev.at)}</span>
         </li>
       ))}
     </ul>
+  );
+}
+
+/* ---------- os prints ----------
+   uma ideia quase sempre nasce de uma tela: um anúncio, um gráfico, uma
+   conversa. descrever isso por escrito é perder o que fez a ideia existir.
+
+   três gestos para a mesma coisa, porque é assim que uma captura chega: Ctrl
+   V (o caminho de quem acabou de recortar a tela), arrastar para cima do
+   painel, e o botão para quem já tem o arquivo salvo. o binário vai para o
+   R2; o documento guarda só {id, name, type, size}. */
+function Prints({ idea, onChange }) {
+  const [busy, setBusy] = useState(0);
+  const [over, setOver] = useState(false);
+  const [open, setOpen] = useState(null);   // o print aberto grande | null
+  const inputRef = useRef(null);
+  const files = idea.files || [];
+
+  const take = async (list) => {
+    const chosen = Array.from(list || []).filter((f) => f && f.size);
+    if (!chosen.length) return;
+    setBusy((n) => n + chosen.length);
+    const added = [];
+    for (const f of chosen) {
+      try { added.push(await uploadFile(f)); }
+      catch (e) { notify(e.message || "não consegui subir o arquivo"); }
+      finally { setBusy((n) => n - 1); }
+    }
+    if (added.length) onChange(files.concat(added));
+  };
+
+  const remove = (f) => {
+    onChange(files.filter((x) => x.id !== f.id));
+    /* o bilhete sai do documento na hora; o objeto some depois. desfazer
+       traria o bilhete de volta apontando para um arquivo já apagado, então
+       aqui não há desfazer — e é por isso que a caixa pergunta antes. */
+    deleteFile(f.id);
+    notify("print apagado");
+  };
+
+  /* colar só vale com o painel em foco: um Ctrl V no meio do corpo da ideia
+     é texto, e roubar isso seria pior que não ter o atalho. */
+  const onPaste = (e) => {
+    const items = Array.from((e.clipboardData || {}).items || []).filter((i) => i.kind === "file");
+    if (!items.length) return;
+    e.preventDefault();
+    take(items.map((i) => i.getAsFile()));
+  };
+
+  return (
+    <div className={"prints" + (over ? " is-over" : "")}
+         onPaste={onPaste}
+         onDragOver={(e) => { e.preventDefault(); setOver(true); }}
+         onDragLeave={() => setOver(false)}
+         onDrop={(e) => { e.preventDefault(); setOver(false); take(e.dataTransfer.files); }}>
+      {!!files.length && (
+        <div className="prints__grid">
+          {files.map((f) => (
+            <figure key={f.id} className="print">
+              {isImage(f.type)
+                ? <button type="button" className="print__open" title={f.name || "abrir"} onClick={() => setOpen(f)}>
+                    <img src={fileUrl(f.id)} alt={f.name || "print"} loading="lazy" />
+                  </button>
+                : <a className="print__open print__file" href={fileUrl(f.id)} target="_blank" rel="noreferrer" title={f.name || "abrir"}>
+                    {icon("docs")}<span>{f.name || "arquivo"}</span>
+                  </a>}
+              <button className="print__remove action" type="button" title="apagar" aria-label={"Apagar " + (f.name || "print")} onClick={() => remove(f)}>{icon("trash")}</button>
+            </figure>
+          ))}
+          {busy > 0 && Array.from({ length: busy }, (_, i) => <div key={"up" + i} className="print print--loading" />)}
+        </div>
+      )}
+      {!files.length && busy > 0 && <p className="prints__hint">subindo…</p>}
+      {!files.length && !busy && (
+        <p className="prints__hint">Cole com <kbd>ctrl</kbd> <kbd>v</kbd>, arraste para cá, ou escolha o arquivo.</p>
+      )}
+      <div className="prints__foot">
+        <button className="pill pill--mini" type="button" onClick={() => inputRef.current && inputRef.current.click()}>{icon("plus")}print</button>
+        <input ref={inputRef} type="file" accept={FILE_TYPES.join(",")} multiple hidden
+               onChange={(e) => { take(e.currentTarget.files); e.currentTarget.value = ""; }} />
+        {!cloud.signedIn && <span className="prints__note">entre para anexar — o arquivo precisa de onde morar</span>}
+      </div>
+      {open && (
+        <div className="print-full" role="dialog" aria-modal="true" aria-label={open.name || "print"}
+             onClick={() => setOpen(null)}>
+          <img src={fileUrl(open.id)} alt={open.name || "print"} />
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -715,7 +919,7 @@ function IdeaForm({ onCreate, onClose }) {
     onCreate({
       id: newId(), title, body: "", stage: "seed",
       client: v.client || found.client || "",
-      steps: [], outputs: [], history: [], createdAt: now, updatedAt: now
+      steps: [], files: [], outputs: [], history: [], createdAt: now, updatedAt: now
     });
   };
   return (
