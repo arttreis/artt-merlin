@@ -228,12 +228,18 @@ function DayBlock({ doc }) {
         <span className="t-mono">o dia</span>
         <span className="t-mono bx__aside">{clock(doc.start)}–{clock(doc.end)}</span>
       </p>
+      {/* três estados, e o terceiro é o que aparece toda noite: passou da hora
+          de fechar. sem ele o bloco dizia "— além do que cabe" às 20h com a
+          fila vazia, porque a sobra e o estouro são ambos zero quando a janela
+          acabou. o dia não estourou: ele terminou. */}
       {stale
-        ? <p className="bx__big">outro dia<small>a fila aberta não é de hoje</small></p>
-        : <p className={"bx__big" + (b.slack > 0 ? "" : " is-over")}>
-            {b.slack > 0 ? fmt(b.slack) : fmt(b.overflow)}
-            <small>{b.slack > 0 ? "ainda cabe" : "além do que cabe"}</small>
-          </p>}
+        ? <p className="bx__big is-over">outro dia<small>a fila aberta não é de hoje</small></p>
+        : b.overtime
+          ? <p className="bx__big is-over">{clock(doc.end)}<small>{open.length ? "passou, e ainda há fila" : "passou. o dia fechou."}</small></p>
+          : <p className={"bx__big" + (b.slack > 0 ? "" : " is-over")}>
+              {b.slack > 0 ? fmt(b.slack) : fmt(b.overflow)}
+              <small>{b.slack > 0 ? "ainda cabe" : "além do que cabe"}</small>
+            </p>}
       <div className="bx__track" aria-hidden="true">
         <i className="bx__used" style={{ width: used + "%" }} />
         <i className="bx__busy" style={{ width: busy + "%" }} />
