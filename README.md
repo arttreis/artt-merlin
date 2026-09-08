@@ -4,7 +4,7 @@ Sistema pessoal, de uma pessoa só — e agora de uma pessoa só **por vez**: o 
 entra pelo mesmo endereço e cada um ganha um Merlin inteiro, que ninguém mais vê. Nasceu como
 o `artt · planner` — um controle
 de tarefas de um dia — e virou um conjunto de módulos ligados entre si: o dia, a semana, as
-ideias, os clientes (com canais), os funis, os mapas mentais, o financeiro, os
+notas, os clientes (com canais), os funis, os mapas mentais, o financeiro, os
 hábitos e os planos. A visão completa e as decisões estão em [VISAO.md](VISAO.md).
 
 Cada módulo é **uma página**: um HTML na raiz, com o CSS dela inline, e um módulo em
@@ -27,7 +27,7 @@ está em [MIGRATION.md](MIGRATION.md).
 | `index.html` | o início: uma página inicial no sentido do navegador — um campo no meio e os atalhos embaixo, cada um dizendo o número que faria você abrir aquilo. |
 | `day.html` | o dia: a fila de hoje, a barra que se gasta, a sobra. O único lugar com minutos. |
 | `week.html` | a semana em colunas (seg a sex e fim de semana). |
-| `ideas.html` | o que ainda não é tarefa, numa caixa de entrada: lista por dia à esquerda, a ideia aberta à direita com corpo, estágio, passos e atividade. |
+| `notes.html` | o que ainda não é tarefa, numa caixa de entrada: lista por dia à esquerda, a nota aberta à direita com corpo, estágio, checklist e histórico. |
 | `clients.html` | clientes com canais (Mercado Livre, Shopee, TikTok Shop…), objetivos, backlog, diário e ofertas. |
 | `funnels.html` | funil como grafo com tipos de nó, vazão por etapa, criativos, automações, ofertas e gatilhos. |
 | `maps.html` | mapa mental com teclado e layout automático. |

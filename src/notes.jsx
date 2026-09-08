@@ -1,8 +1,8 @@
-/* merlin · a caixa de ideias
-   a ideia chega como uma mensagem chega: vira uma linha na lista da esquerda,
+/* merlin · a caixa de notas
+   a nota chega como uma mensagem chega: vira uma linha na lista da esquerda,
    agrupada por dia, e abre no painel da direita sem sair da tela. */
 import "./shared/base.css";
-import "./ideas.css";
+import "./notes.css";
 import {
   initPage, newId, today, dayOf, addDays, dateLabel, notify, sendToDay, api, cloud,
   uploadFile, deleteFile, fileUrl, isImage, FILE_TYPES,
@@ -14,7 +14,7 @@ import {
   useKeydown, isTyping, useFields, Form, Field, Dialog, Markdown, clientOptionList, icon
 } from "./shared/ui.jsx";
 
-initPage("ideas");   // monta a barra, carrega os clientes, retoma a sessao
+initPage("notes");   // monta a barra, carrega os clientes, retoma a sessao
 
 /* icones proprios: so esta pagina usa. a faisca e o gesto de pedir ajuda ao
    Merlin; a caixa e arquivar (a de icons.jsx); a pessoa e "virar projeto de
@@ -93,7 +93,7 @@ function normalize(d) {
 }
 
 /* unica excecao ao "nao grave no localStorage": preferencia de tela */
-const VIEW_KEY = "merlin:ideas:view";
+const VIEW_KEY = "merlin:notes:view";
 const readView = () => { try { return localStorage.getItem(VIEW_KEY) === "board" ? "board" : "list"; } catch (e) { return "list"; } };
 
 /* ---------- tempo, do jeito que uma caixa de entrada mostra ---------- */
@@ -142,11 +142,11 @@ const isUntouched = (d) => d.stage === "seed" && !d.body && !d.steps.length;
 const stepsDone = (d) => d.steps.filter((s) => s.done).length;
 
 /* ---------- a pagina ----------
-   o estado de tela mora aqui: a visao (lista/quadro), a ideia aberta, a
-   caixa de ideia nova, as sugestoes do merlin e as secoes dobradas. nada
+   o estado de tela mora aqui: a visao (lista/quadro), a nota aberta, a
+   caixa de nota nova, as sugestoes do merlin e as secoes dobradas. nada
    disso e documento — some ao recarregar, como deve (a visao e a excecao). */
-function Ideas() {
-  const ideas = useCollection("ideas", { normalize });
+function Notes() {
+  const notes = useCollection("notes", { normalize });
   useClients();
   const hash = useHash();
   const [view, setView] = useState(readView);
@@ -165,7 +165,7 @@ function Ideas() {
   const openIdRef = useRef(null);
   const setOpen = (id) => { openIdRef.current = id; setOpenId(id); };
 
-  const all = ideas.all();
+  const all = notes.all();
   /* arquivada sai da lista viva — senao ela ficaria acumulando para sempre,
      do mesmo jeito que uma tarefa feita nao volta a poluir a fila do dia. mas
      sair da lista nao e sumir: elas descem para o rodape, fechadas, e voltam
@@ -174,17 +174,17 @@ function Ideas() {
   const listItems = all.filter((d) => d.stage !== "archived").sort(byRecent);
   const archivedItems = all.filter((d) => d.stage === "archived").sort(byRecent);
   const live = listItems.length;
-  const open = openId ? ideas.get(openId) : null;
+  const open = openId ? notes.get(openId) : null;
 
   /* a hora relativa ("5 min") envelhece sozinha */
   useEffect(() => { const t = setInterval(() => tick((n) => n + 1), 60000); return () => clearInterval(t); }, []);
 
   const changeView = (v) => { setView(v); try { localStorage.setItem(VIEW_KEY, v); } catch (e) {} };
-  const hashId = () => { const h = decodeURIComponent(location.hash.slice(1)); return h && ideas.has(h) ? h : ""; };
+  const hashId = () => { const h = decodeURIComponent(location.hash.slice(1)); return h && notes.has(h) ? h : ""; };
 
   /* ---------- abrir e fechar o painel ---------- */
-  const openIdea = (id, opts = {}) => {
-    const d = ideas.get(id);
+  const openNote = (id, opts = {}) => {
+    const d = notes.get(id);
     if (!d) return;
     const changed = openIdRef.current !== id;
     focusTitle.current = !opts.noFocus && changed && !d.title;
@@ -195,34 +195,34 @@ function Ideas() {
     setOpen(null);
     if (!opts.keepHash && hashId()) history.replaceState(null, "", location.pathname + location.search);
   };
-  /* o hash manda: quem chega por link abre a ideia; quem apaga o hash fecha.
+  /* o hash manda: quem chega por link abre a nota; quem apaga o hash fecha.
      le a URL agora, nao o valor que disparou o efeito: entre o hashchange e
      a pintura um Esc pode ja ter limpado o hash. */
   useEffect(() => {
     const id = hashId();
-    if (id) { if (view !== "list") changeView("list"); openIdea(id, { keepHash: true }); }
+    if (id) { if (view !== "list") changeView("list"); openNote(id, { keepHash: true }); }
     else if (openIdRef.current) closePanel({ keepHash: true });
   }, [hash]);
-  /* a ideia aberta sumiu por fora (outra aba): o painel fecha sozinho */
+  /* a nota aberta sumiu por fora (outra aba): o painel fecha sozinho */
   useEffect(() => { if (openId && !open) closePanel({ keepHash: true }); });
 
   /* ---------- gravar ---------- */
-  const saveIdea = (doc) => ideas.save({ ...doc, updatedAt: Date.now() });
-  const recordOutput = (doc, type, refId) => saveIdea({ ...doc, outputs: doc.outputs.concat([{ type, id: refId || "", at: Date.now() }]) });
+  const saveNote = (doc) => notes.save({ ...doc, updatedAt: Date.now() });
+  const recordOutput = (doc, type, refId) => saveNote({ ...doc, outputs: doc.outputs.concat([{ type, id: refId || "", at: Date.now() }]) });
   /* mudar de estagio deixa rastro: e a unica mudanca de campo que conta como
      acontecimento — cliente e classificacao, estagio e caminho */
   const changeStage = (doc, next) => {
     if (!doc || doc.stage === next) return;
-    saveIdea({ ...doc, stage: next, history: doc.history.concat([{ type: "stage", from: doc.stage, to: next, at: Date.now() }]) });
+    saveNote({ ...doc, stage: next, history: doc.history.concat([{ type: "stage", from: doc.stage, to: next, at: Date.now() }]) });
   };
   const pull = (doc) => {
-    sendToDay({ title: doc.title || "ideia sem título", client: doc.client || "", origin: { type: "idea", id: doc.id } });
+    sendToDay({ title: doc.title || "nota sem título", client: doc.client || "", origin: { type: "note", id: doc.id } });
     recordOutput(doc, "day", "");
   };
-  const removeIdea = (id) => {
-    const before = ideas.remove(id);
+  const removeNote = (id) => {
+    const before = notes.remove(id);
     if (openId === id) closePanel();
-    if (before) notify("ideia apagada", () => ideas.save(before));
+    if (before) notify("nota apagada", () => notes.save(before));
   };
   const archiveOrRestore = (doc) => {
     if (doc.stage === "archived") {
@@ -231,13 +231,13 @@ function Ideas() {
       changeStage(doc, last && STAGE_IDS.includes(last.from) && last.from !== "archived" ? last.from : "seed");
     } else {
       changeStage(doc, "archived");
-      notify("ideia arquivada", () => { const now = ideas.get(doc.id); if (now) changeStage(now, doc.stage); });
+      notify("nota arquivada", () => { const now = notes.get(doc.id); if (now) changeStage(now, doc.stage); });
     }
   };
   const create = (doc) => {
-    ideas.save(doc);
+    notes.save(doc);
     if (view !== "list") changeView("list");
-    openIdea(doc.id);
+    openNote(doc.id);
   };
 
   /* ---------- saidas: mapa e cliente ---------- */
@@ -245,7 +245,7 @@ function Ideas() {
     const maps = collection("maps");
     const mapId = newId(), now = Date.now();
     maps.save({
-      id: mapId, name: d.title || "sem título", idea: d.id, client: d.client || "",
+      id: mapId, name: d.title || "sem título", note: d.id, client: d.client || "",
       root: { id: newId(), title: d.title || "sem título", note: "", color: 0, collapsed: false, children: [] },
       createdAt: now, updatedAt: now
     });
@@ -254,10 +254,10 @@ function Ideas() {
   };
   const toClient = (d) => {
     recordOutput(d, "client", "");
-    location.href = "clients.html#new?idea=" + encodeURIComponent(d.id);
+    location.href = "clients.html#new?note=" + encodeURIComponent(d.id);
   };
 
-  /* ---------- ramificar: o Merlin le a ideia e sugere perguntas, caminhos e passos ---------- */
+  /* ---------- ramificar: o Merlin le a nota e sugere perguntas, caminhos e passos ---------- */
   const expand = async (d) => {
     if (thinking) return;
     const targetId = d.id;
@@ -295,7 +295,7 @@ function Ideas() {
      confundir com um passo de execucao); caminho vira uma secao de markdown no
      corpo — e o unico dos tres que e prosa, nao checklist. */
   const addSuggestions = () => {
-    const d = ideas.get(suggestions.targetId);
+    const d = notes.get(suggestions.targetId);
     if (!d) { setSuggestions(null); return; }
     const chosen = suggestions.items.filter((s) => s.checked);
     const newSteps = chosen.filter((s) => s.type === "question" || s.type === "step")
@@ -307,28 +307,28 @@ function Ideas() {
       body += (body ? "\n\n" : "") + "## caminhos\n" + paths.map((s) => "- **" + s.title + "**" + (s.note ? " — " + s.note : "")).join("\n");
     }
     const targetId = suggestions.targetId;
-    saveIdea({ ...d, steps: d.steps.concat(newSteps), body });
+    saveNote({ ...d, steps: d.steps.concat(newSteps), body });
     setSuggestions(null);
-    /* refresca o painel se ainda for a mesma ideia aberta: isto e uma acao
+    /* refresca o painel se ainda for a mesma nota aberta: isto e uma acao
        explicita (nao digitacao), entao pode reler o documento inteiro sem
        medo de atropelar o que o usuario esta escrevendo */
     if (openId === targetId) setPanelSync((n) => n + 1);
   };
 
   /* ---------- setas percorrem a lista como numa caixa de entrada ----------
-     a ideia abre ao lado sem tirar o foco da lista, entao da para ler varias
+     a nota abre ao lado sem tirar o foco da lista, entao da para ler varias
      so com o teclado */
   const goTo = (delta) => {
     if (!listItems.length) return;
     const i = listItems.findIndex((d) => d.id === openId);
     const target = listItems[i < 0 ? (delta > 0 ? 0 : listItems.length - 1) : Math.max(0, Math.min(listItems.length - 1, i + delta))];
-    openIdea(target.id, { noFocus: true });
+    openNote(target.id, { noFocus: true });
     const el = listRef.current && listRef.current.querySelector('[data-id="' + target.id + '"]');
     if (el) { el.focus({ preventScroll: true }); el.scrollIntoView({ block: "nearest" }); }
   };
 
   /* ---------- atalhos ----------
-     o dialogo de sugestoes e a caixa de ideia nova fecham o proprio Esc em
+     o dialogo de sugestoes e a caixa de nota nova fecham o proprio Esc em
      captura (ui.jsx), antes de chegar aqui. */
   useKeydown((e) => {
     if (e.key === "Escape") {
@@ -343,17 +343,17 @@ function Ideas() {
   });
 
   const actions = {
-    open: (id) => openIdea(id), close: () => closePanel(),
-    pull, archive: archiveOrRestore, remove: removeIdea, save: saveIdea, changeStage, toMap, toClient, expand,
+    open: (id) => openNote(id), close: () => closePanel(),
+    pull, archive: archiveOrRestore, remove: removeNote, save: saveNote, changeStage, toMap, toClient, expand,
     toggleSection: (k) => setSections((s) => ({ ...s, [k]: !s[k] }))
   };
 
   return (
     <>
       <div className="top">
-        <h1>ideias</h1>
-        <span className="count">{live + (live === 1 ? " ideia" : " ideias")}</span>
-        <button className="pill pill--green pill--mini top__new" type="button" title="nova ideia (n)" onClick={() => setForm(true)}>{icon("plus")}ideia</button>
+        <h1>notas</h1>
+        <span className="count">{live + (live === 1 ? " nota" : " notas")}</span>
+        <button className="pill pill--green pill--mini top__new" type="button" title="nova nota (n)" onClick={() => setForm(true)}>{icon("plus")}nota</button>
         <div className="views" role="tablist" aria-label="Visão">
           <button className="action" type="button" role="tab" aria-selected={String(view === "list")} title="lista" onClick={() => changeView("list")}><ListIcon /></button>
           <button className="action" type="button" role="tab" aria-selected={String(view === "board")} title="quadro por estágio" onClick={() => changeView("board")}><BoardIcon /></button>
@@ -363,29 +363,29 @@ function Ideas() {
       <div className="screen" data-mobile={open ? "panel" : "list"}>
         {view === "list" ? (
           <>
-            <IdeaList items={listItems} archived={archivedItems} openId={openId} listRef={listRef} actions={actions} />
+            <NoteList items={listItems} archived={archivedItems} openId={openId} listRef={listRef} actions={actions} />
             {open
-              ? <IdeaPanel key={open.id} idea={open} ideas={ideas} sync={panelSync} thinking={thinking} focusTitle={focusTitle} sections={sections} actions={actions} />
+              ? <NotePanel key={open.id} note={open} notes={notes} sync={panelSync} thinking={thinking} focusTitle={focusTitle} sections={sections} actions={actions} />
               : <EmptyPanel />}
           </>
-        ) : <Board items={all} onDrop={(id, stage) => changeStage(ideas.get(id), stage)} onOpen={(id) => { changeView("list"); openIdea(id); }} />}
+        ) : <Board items={all} onDrop={(id, stage) => changeStage(notes.get(id), stage)} onOpen={(id) => { changeView("list"); openNote(id); }} />}
       </div>
 
-      {form && <IdeaForm onCreate={create} onClose={() => setForm(false)} />}
+      {form && <NoteForm onCreate={create} onClose={() => setForm(false)} />}
       {suggestions && <SuggestionsDialog items={suggestions.items} onToggle={toggleSuggestion} onAdd={addSuggestions} onClose={() => setSuggestions(null)} />}
     </>
   );
 }
 
 /* ---------- a lista, agrupada por dia ---------- */
-function IdeaList({ items, archived, openId, listRef, actions }) {
+function NoteList({ items, archived, openId, listRef, actions }) {
   const [openArchive, setOpenArchive] = useState(false);
   const rows = [];
   let group = "";
   items.forEach((d) => {
     const day = dayOfStamp(d.updatedAt || d.createdAt);
     if (day !== group) { group = day; rows.push(<p key={"day:" + day} className="group">{groupLabel(day)}</p>); }
-    rows.push(<IdeaItem key={d.id} d={d} active={d.id === openId} actions={actions} />);
+    rows.push(<NoteItem key={d.id} d={d} active={d.id === openId} actions={actions} />);
   });
   return (
     <section className="list-col">
@@ -401,7 +401,7 @@ function IdeaList({ items, archived, openId, listRef, actions }) {
             </button>
             {openArchive && (
               <div role="list" className="is-archived">
-                {archived.map((d) => <IdeaItem key={d.id} d={d} active={d.id === openId} actions={actions} />)}
+                {archived.map((d) => <NoteItem key={d.id} d={d} active={d.id === openId} actions={actions} />)}
               </div>
             )}
           </>
@@ -412,7 +412,7 @@ function IdeaList({ items, archived, openId, listRef, actions }) {
 }
 
 /* a linha: clicar fora dos icones abre; Enter e espaco tambem */
-function IdeaItem({ d, active, actions }) {
+function NoteItem({ d, active, actions }) {
   const total = d.steps.length, done = stepsDone(d);
   const text = preview(d);
   const stop = (f) => (e) => { e.stopPropagation(); f(); };
@@ -500,31 +500,31 @@ function EmptyPanel() {
     <section className="panel">
       <div className="panel__empty">
         <BulbIcon />
-        <p>escolha uma ideia ao lado, ou escreva uma nova.<br /><span className="small"><kbd>/</kbd> foca o campo · <kbd>↑</kbd><kbd>↓</kbd> percorrem a lista</span></p>
+        <p>escolha uma nota ao lado, ou escreva uma nova.<br /><span className="small"><kbd>/</kbd> foca o campo · <kbd>↑</kbd><kbd>↓</kbd> percorrem a lista</span></p>
       </div>
     </section>
   );
 }
 
-/* ---------- o painel da ideia aberta ----------
-   e montado de novo a cada ideia (key pelo id): o rascunho de titulo e corpo
+/* ---------- o painel da nota aberta ----------
+   e montado de novo a cada nota (key pelo id): o rascunho de titulo e corpo
    nasce do documento e dali em diante e so da tela — uma sincronizacao que
    chega no meio da digitacao nao apaga nada. os outros pedacos (ficha,
    passos, atividade) leem o documento fresco a cada render. */
-function IdeaPanel({ idea, ideas, sync, thinking, focusTitle, sections, actions }) {
-  const [draft, setDraft] = useState({ title: idea.title, body: idea.body });
-  const [viewing, setViewing] = useState(!!idea.body);   // ideia com corpo abre lendo; vazia abre escrevendo
+function NotePanel({ note, notes, sync, thinking, focusTitle, sections, actions }) {
+  const [draft, setDraft] = useState({ title: note.title, body: note.body });
+  const [viewing, setViewing] = useState(!!note.body);   // nota com corpo abre lendo; vazia abre escrevendo
   const [saved, setSaved] = useState(false);
   const titleRef = useRef(null), bodyRef = useRef(null);
   const draftRef = useRef(draft); draftRef.current = draft;
   const saveTimer = useRef(null), savedTimer = useRef(null), wantBodyFocus = useRef(false), lastSync = useRef(sync);
 
-  const total = idea.steps.length, done = stepsDone(idea);
+  const total = note.steps.length, done = stepsDone(note);
   /* "agora" e o primeiro nao feito NA ORDEM — e por isso que a ordem
      precisou existir de verdade antes deste selo fazer sentido */
-  const nextStepId = (idea.steps.find((s) => !s.done) || {}).id || "";
+  const nextStepId = (note.steps.find((s) => !s.done) || {}).id || "";
 
-  /* antes da pintura: quem abriu uma ideia sem titulo ja esta com o dedo no teclado */
+  /* antes da pintura: quem abriu uma nota sem titulo ja esta com o dedo no teclado */
   useLayoutEffect(() => {
     if (focusTitle.current) { focusTitle.current = false; if (titleRef.current) titleRef.current.focus(); }
   }, []);
@@ -539,7 +539,7 @@ function IdeaPanel({ idea, ideas, sync, thinking, focusTitle, sections, actions 
      estagio e cliente salvam na hora, porque "change" ja e um gesto so */
   const flush = () => {
     clearTimeout(saveTimer.current); saveTimer.current = null;
-    const now = ideas.get(idea.id);
+    const now = notes.get(note.id);
     if (!now) return;
     actions.save({ ...now, title: draftRef.current.title.trim().slice(0, 300), body: draftRef.current.body });
   };
@@ -547,14 +547,14 @@ function IdeaPanel({ idea, ideas, sync, thinking, focusTitle, sections, actions 
     clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(() => { flush(); showSaved(); }, 500);
   };
-  /* ao sair (outra ideia, fechar, quadro) o que ficou pendente e gravado na ideia certa */
+  /* ao sair (outra nota, fechar, quadro) o que ficou pendente e gravado na nota certa */
   useEffect(() => () => { if (saveTimer.current) flush(); clearTimeout(savedTimer.current); }, []);
 
   /* uma acao explicita (as sugestoes do merlin) mudou o documento: rele tudo e abre lendo */
   useEffect(() => {
     if (sync === lastSync.current) return;
     lastSync.current = sync;
-    const now = ideas.get(idea.id);
+    const now = notes.get(note.id);
     if (!now) return;
     clearTimeout(saveTimer.current); saveTimer.current = null;
     setDraft({ title: now.title, body: now.body });
@@ -582,10 +582,10 @@ function IdeaPanel({ idea, ideas, sync, thinking, focusTitle, sections, actions 
   const onBodyInput = (e) => { const body = e.currentTarget.value; setDraft((v) => ({ ...v, body })); scheduleSave(); };
 
   /* ---------- a ficha ---------- */
-  const clientValue = listClients().some((c) => c.id === idea.client) ? idea.client : "";
-  const onStageChange = (e) => { actions.changeStage(ideas.get(idea.id), e.currentTarget.value); showSaved(); };
+  const clientValue = listClients().some((c) => c.id === note.client) ? note.client : "";
+  const onStageChange = (e) => { actions.changeStage(notes.get(note.id), e.currentTarget.value); showSaved(); };
   const onClientChange = (e) => {
-    const now = ideas.get(idea.id);
+    const now = notes.get(note.id);
     if (!now) return;
     actions.save({ ...now, client: e.currentTarget.value });
     showSaved();
@@ -593,14 +593,14 @@ function IdeaPanel({ idea, ideas, sync, thinking, focusTitle, sections, actions 
 
   /* ---------- passos ---------- */
   const addStep = (text) => {
-    const now = ideas.get(idea.id);
+    const now = notes.get(note.id);
     if (!now) return;
     actions.save({ ...now, steps: now.steps.concat([{ id: newId(), text: text.slice(0, 200), done: false }]) });
   };
   /* mover muda a SEQUENCIA, que e o que separa um passo a passo de uma lista
      de marcar: sem ordem, "o proximo" nao quer dizer nada. */
   const moveStep = (stepId, delta) => {
-    const now = ideas.get(idea.id);
+    const now = notes.get(note.id);
     if (!now) return;
     const i = now.steps.findIndex((s) => s.id === stepId);
     const j = i + delta;
@@ -611,12 +611,12 @@ function IdeaPanel({ idea, ideas, sync, thinking, focusTitle, sections, actions 
     actions.save({ ...now, steps });
   };
   const editStep = (stepId, text) => {
-    const now = ideas.get(idea.id);
+    const now = notes.get(note.id);
     if (!now) return;
     actions.save({ ...now, steps: now.steps.map((s) => s.id === stepId ? { ...s, text } : s) });
   };
   const toggleStep = (stepId) => {
-    const now = ideas.get(idea.id);
+    const now = notes.get(note.id);
     if (!now) return;
     const step = now.steps.find((s) => s.id === stepId);
     const steps = now.steps.map((s) => s.id === stepId ? { ...s, done: !s.done } : s);
@@ -628,41 +628,41 @@ function IdeaPanel({ idea, ideas, sync, thinking, focusTitle, sections, actions 
     actions.save({ ...now, steps, history });
   };
   const pullStep = (step) => {
-    const now = ideas.get(idea.id);
+    const now = notes.get(note.id);
     if (!now) return;
-    sendToDay({ title: step.text, client: now.client || "", origin: { type: "idea", id: now.id } });
+    sendToDay({ title: step.text, client: now.client || "", origin: { type: "note", id: now.id } });
   };
   const removeStep = (stepId) => {
-    const now = ideas.get(idea.id);
+    const now = notes.get(note.id);
     if (!now) return;
     const before = now.steps;
     actions.save({ ...now, steps: before.filter((s) => s.id !== stepId) });
-    notify("passo apagado", () => { const again = ideas.get(now.id); if (again) actions.save({ ...again, steps: before }); });
+    notify("passo apagado", () => { const again = notes.get(now.id); if (again) actions.save({ ...again, steps: before }); });
   };
 
   return (
     <section className="panel">
       <div className="panel__bar">
         <button className="action back-btn" type="button" title="voltar para a lista" aria-label="Voltar" onClick={actions.close}><BackIcon /></button>
-        <button className="pill" type="button" title="puxar para o dia" onClick={() => actions.pull(idea)}>{icon("clock")}<span>puxar para o dia</span></button>
-        <button className="pill" type="button" title="abrir como mapa mental" onClick={() => actions.toMap(idea)}>{icon("map")}<span>mapa</span></button>
-        <button className="pill" type="button" title="virar projeto de cliente" onClick={() => actions.toClient(idea)}><PersonIcon /><span>cliente</span></button>
+        <button className="pill" type="button" title="puxar para o dia" onClick={() => actions.pull(note)}>{icon("clock")}<span>puxar para o dia</span></button>
+        <button className="pill" type="button" title="abrir como mapa mental" onClick={() => actions.toMap(note)}>{icon("map")}<span>mapa</span></button>
+        <button className="pill" type="button" title="virar projeto de cliente" onClick={() => actions.toClient(note)}><PersonIcon /><span>cliente</span></button>
         <span className="sep"></span>
-        <button className="pill" type="button" id="expand-btn" title="o Merlin sugere perguntas, caminhos e passos" disabled={thinking} onClick={() => actions.expand(idea)}><SparkIcon /><span>{thinking ? "pensando…" : "ramificar"}</span></button>
+        <button className="pill" type="button" id="expand-btn" title="o Merlin sugere perguntas, caminhos e passos" disabled={thinking} onClick={() => actions.expand(note)}><SparkIcon /><span>{thinking ? "pensando…" : "ramificar"}</span></button>
         <span className="spacer"></span>
         <span className={"saved" + (saved ? " is-visible" : "")} aria-live="polite">salvo</span>
         <button className="link" type="button" onClick={toggleViewing}>{viewing ? "editar" : "ver"}</button>
         <span className="sep"></span>
-        <button className="action" type="button" title={idea.stage === "archived" ? "desarquivar" : "arquivar"} onClick={() => actions.archive(idea)}>{icon("archive")}</button>
-        <button className="action" type="button" title="apagar ideia" onClick={() => actions.remove(idea.id)}>{icon("trash")}</button>
+        <button className="action" type="button" title={note.stage === "archived" ? "desarquivar" : "arquivar"} onClick={() => actions.archive(note)}>{icon("archive")}</button>
+        <button className="action" type="button" title="apagar nota" onClick={() => actions.remove(note.id)}>{icon("trash")}</button>
       </div>
 
       <div className="panel__scroll">
         <div className="panel__body">
-          <input ref={titleRef} className="title-input" maxLength="300" placeholder="título da ideia" aria-label="Título da ideia"
+          <input ref={titleRef} className="title-input" maxLength="300" placeholder="título da nota" aria-label="Título da nota"
                  value={draft.title} onChange={onTitleInput}
                  onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); editBody(); } }} />
-          <textarea ref={bodyRef} className="body-input" rows="2" placeholder="o que é essa ideia… (markdown simples)" aria-label="Corpo da ideia"
+          <textarea ref={bodyRef} className="body-input" rows="2" placeholder="o que é essa nota… (markdown simples)" aria-label="Corpo da nota"
                     hidden={viewing} value={draft.body} onChange={onBodyInput}></textarea>
           {viewing && (
             <div className="body-md" onClick={(e) => { if (e.target.closest("a")) return; editBody(); }}>
@@ -672,16 +672,16 @@ function IdeaPanel({ idea, ideas, sync, thinking, focusTitle, sections, actions 
 
           <div className="sheet">
             <span className="k">estágio</span>
-            <span className="v v--stage" data-stage={idea.stage}>
+            <span className="v v--stage" data-stage={note.stage}>
               <i className="stage-dot" aria-hidden="true"></i>
-              <select className="pill-select pill-select--stage" aria-label="Estágio" value={idea.stage} onChange={onStageChange}>
+              <select className="pill-select pill-select--stage" aria-label="Estágio" value={note.stage} onChange={onStageChange}>
                 {STAGES.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
               </select>
             </span>
             <span className="k">cliente</span>
             <span className="v"><select className="pill-select" aria-label="Cliente" value={clientValue} onChange={onClientChange}>{clientOptionList("sem cliente")}</select></span>
             <span className="k">criada</span>
-            <span className="v"><span className="weak" title={stampLabel(idea.createdAt)}>{longWhen(idea.createdAt)}</span></span>
+            <span className="v"><span className="weak" title={stampLabel(note.createdAt)}>{longWhen(note.createdAt)}</span></span>
             <span className="k">passos</span>
             <span className="v"><span className="t-mono">{total ? done + " de " + total : "nenhum"}</span></span>
           </div>
@@ -694,9 +694,9 @@ function IdeaPanel({ idea, ideas, sync, thinking, focusTitle, sections, actions 
               {total > 0 && <span className="bar"><i style={{ width: Math.round(100 * done / total) + "%" }}></i></span>}
             </div>
             <div className="section__body">
-              <div>{idea.steps.map((s, i) => (
+              <div>{note.steps.map((s, i) => (
                 <Step key={s.id} step={s} index={i + 1} current={s.id === nextStepId}
-                      first={i === 0} last={i === idea.steps.length - 1}
+                      first={i === 0} last={i === note.steps.length - 1}
                       onToggle={() => toggleStep(s.id)} onEdit={(t) => editStep(s.id, t)}
                       onMove={(d) => moveStep(s.id, d)} onPull={() => pullStep(s)} onRemove={() => removeStep(s.id)} />))}</div>
               <NewStep onAdd={addStep} />
@@ -707,10 +707,10 @@ function IdeaPanel({ idea, ideas, sync, thinking, focusTitle, sections, actions 
             <div className="section__head" onClick={() => actions.toggleSection("prints")}>
               <ChevronIcon />
               <span className="title">prints</span>
-              <span className="count">{idea.files.length || ""}</span>
+              <span className="count">{note.files.length || ""}</span>
             </div>
             <div className="section__body">
-              <Prints idea={idea} onChange={(files) => { const now = ideas.get(idea.id); if (now) actions.save({ ...now, files }); }} />
+              <Prints note={note} onChange={(files) => { const now = notes.get(note.id); if (now) actions.save({ ...now, files }); }} />
             </div>
           </div>
 
@@ -719,7 +719,7 @@ function IdeaPanel({ idea, ideas, sync, thinking, focusTitle, sections, actions 
               <ChevronIcon />
               <span className="title">atividade</span>
             </div>
-            <div className="section__body"><Activity idea={idea} /></div>
+            <div className="section__body"><Activity note={note} /></div>
           </div>
         </div>
       </div>
@@ -780,25 +780,25 @@ function NewStep({ onAdd }) {
   );
 }
 
-/* a atividade e a linha do tempo da ideia: quando nasceu, por onde passou, o
+/* a atividade e a linha do tempo da nota: quando nasceu, por onde passou, o
    que foi feito nela e para onde saiu.
 
-   ela listava só a criação e as trocas de estágio — o que, numa ideia que
+   ela listava só a criação e as trocas de estágio — o que, numa nota que
    ninguém mudou de estágio, era uma linha só dizendo "criada". agora o que
-   se FAZ na ideia também conta: passo concluído é acontecimento, e é o
+   se FAZ na nota também conta: passo concluído é acontecimento, e é o
    registro que responde "isto andou?" sem ter que comparar checklists. */
 const OUTPUT_LABELS = { day: "puxada para o dia", map: "virou mapa mental", client: "virou projeto de cliente", funnel: "virou funil" };
-function Activity({ idea }) {
-  const events = [{ at: idea.createdAt, key: "created", kind: "born", node: <b>criada</b> }]
-    .concat(idea.history.filter((h) => h.type === "stage").map((h, i) => ({
+function Activity({ note }) {
+  const events = [{ at: note.createdAt, key: "created", kind: "born", node: <b>criada</b> }]
+    .concat(note.history.filter((h) => h.type === "stage").map((h, i) => ({
       at: h.at, key: "stage:" + i, kind: "stage",
       node: <>passou de <span className="tag">{stageLabel(h.from)}</span> para <span className="tag">{stageLabel(h.to)}</span></>
     })))
-    .concat(idea.history.filter((h) => h.type === "step").map((h, i) => ({
+    .concat(note.history.filter((h) => h.type === "step").map((h, i) => ({
       at: h.at, key: "step:" + i, kind: "step",
       node: <>fez <span className="tag">{h.text}</span></>
     })))
-    .concat(idea.outputs.map((o, i) => ({ at: o.at, key: "output:" + i, kind: "out", node: <b>{OUTPUT_LABELS[o.type] || o.type}</b> })))
+    .concat(note.outputs.map((o, i) => ({ at: o.at, key: "output:" + i, kind: "out", node: <b>{OUTPUT_LABELS[o.type] || o.type}</b> })))
     .sort((a, b) => b.at - a.at);
   return (
     <ul className="activity">
@@ -813,19 +813,19 @@ function Activity({ idea }) {
 }
 
 /* ---------- os prints ----------
-   uma ideia quase sempre nasce de uma tela: um anúncio, um gráfico, uma
-   conversa. descrever isso por escrito é perder o que fez a ideia existir.
+   uma nota quase sempre nasce de uma tela: um anúncio, um gráfico, uma
+   conversa. descrever isso por escrito é perder o que fez a nota existir.
 
    três gestos para a mesma coisa, porque é assim que uma captura chega: Ctrl
    V (o caminho de quem acabou de recortar a tela), arrastar para cima do
    painel, e o botão para quem já tem o arquivo salvo. o binário vai para o
    R2; o documento guarda só {id, name, type, size}. */
-function Prints({ idea, onChange }) {
+function Prints({ note, onChange }) {
   const [busy, setBusy] = useState(0);
   const [over, setOver] = useState(false);
   const [open, setOpen] = useState(null);   // o print aberto grande | null
   const inputRef = useRef(null);
-  const files = idea.files || [];
+  const files = note.files || [];
 
   const take = async (list) => {
     const chosen = Array.from(list || []).filter((f) => f && f.size);
@@ -849,7 +849,7 @@ function Prints({ idea, onChange }) {
     notify("print apagado");
   };
 
-  /* colar só vale com o painel em foco: um Ctrl V no meio do corpo da ideia
+  /* colar só vale com o painel em foco: um Ctrl V no meio do corpo da nota
      é texto, e roubar isso seria pior que não ter o atalho. */
   const onPaste = (e) => {
     const items = Array.from((e.clipboardData || {}).items || []).filter((i) => i.kind === "file");
@@ -901,16 +901,16 @@ function Prints({ idea, onChange }) {
   );
 }
 
-/* ---------- criar ideia (botao + caixa) ----------
+/* ---------- criar nota (botao + caixa) ----------
    o titulo aceita "@cliente" como o resto do sistema; os
-   campos ao lado ganham quando preenchidos. a ideia nasce semente e ja
+   campos ao lado ganham quando preenchidos. a nota nasce semente e ja
    abre no painel, para ganhar corpo se for o caso. */
-function IdeaForm({ onCreate, onClose }) {
+function NoteForm({ onCreate, onClose }) {
   const [v, bind] = useFields({ title: "", client: "" });
   const submit = () => {
     const found = parseMentions(v.title);   // @cliente no texto vira o campo, e some do titulo
     const title = found.title.slice(0, 300);
-    if (!title) { notify("a ideia precisa de um título"); return false; }
+    if (!title) { notify("a nota precisa de um título"); return false; }
     const now = Date.now();
     onCreate({
       id: newId(), title, body: "", stage: "seed",
@@ -919,7 +919,7 @@ function IdeaForm({ onCreate, onClose }) {
     });
   };
   return (
-    <Form title="nova ideia" submit="guardar" onClose={onClose} onSubmit={submit}>
+    <Form title="nova nota" submit="guardar" onClose={onClose} onSubmit={submit}>
       <Field label="título" full>
         <input className="input" maxLength="300" required placeholder="o que ainda não é tarefa · @cliente" {...bind("title")} />
       </Field>
@@ -959,4 +959,4 @@ function SuggestionsDialog({ items, onToggle, onAdd, onClose }) {
   );
 }
 
-mount(<Ideas />, "app");
+mount(<Notes />, "app");

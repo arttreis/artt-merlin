@@ -54,8 +54,8 @@ const TILES = [
     line: (d) => (d.weekOpen ? d.weekOpen + (d.weekOpen === 1 ? " cartão aberto" : " cartões abertos") : "a semana está limpa")
   },
   {
-    id: "ideas", label: "as ideias", href: "ideas.html",
-    line: (d) => (d.ideas ? d.ideas + (d.ideas === 1 ? " ideia na caixa" : " ideias na caixa") : "a caixa está vazia")
+    id: "notes", label: "as notas", href: "notes.html",
+    line: (d) => (d.notes ? d.notes + (d.notes === 1 ? " nota" : " notas") : "nenhuma nota ainda")
   },
   {
     id: "clients", label: "os clientes", href: "clients.html",
@@ -97,7 +97,7 @@ const TOUR = [
   },
   {
     title: "nada entra sozinho",
-    text: "Ideia, cartão da semana, objetivo, item de backlog: nada vira tarefa por conta própria. Vira quando você puxa — e puxar cobra o pedágio da duração. É por isso que o número grande do dia é confiável."
+    text: "Nota, cartão da semana, objetivo, item de backlog: nada vira tarefa por conta própria. Vira quando você puxa — e puxar cobra o pedágio da duração. É por isso que o número grande do dia é confiável."
   },
   {
     title: "criar é sempre o mesmo gesto",
@@ -128,7 +128,7 @@ function Tour({ onClose }) {
 /* ---------- o campo do meio ----------
    o análogo da barra de endereço: uma linha só, e o Enter decide o destino.
    com duração no texto, vai para a fila de hoje; sem duração, cai na caixa de
-   ideias — que é exatamente a regra que a caixa de entrada do dia já aplica.
+   notas — e sem duração ela nasce agora, não quando o dia abrir.
    não inventamos um terceiro destino: o início escreve o mesmo bilhete que
    qualquer outro módulo escreveria. */
 function Capture() {
@@ -161,14 +161,14 @@ function Capture() {
     <form className="hm-capture" autoComplete="off" onSubmit={submit}>
       <label className="hm-capture__field">
         {icon("plus")}
-        <input id="hm-field" maxLength="300" placeholder="escreve o que apareceu…" aria-label="Escreva uma tarefa ou uma ideia"
+        <input id="hm-field" maxLength="300" placeholder="escreve o que apareceu…" aria-label="Escreva uma tarefa ou uma nota"
                value={text} onChange={(e) => { setText(e.currentTarget.value); preview(e.currentTarget.value); }} />
       </label>
       {ghost && (
         <p className="hm-ghost">
           {ghost.min
-            ? <>vai para <b>a fila de hoje</b>, ocupando {longFmt(ghost.min)}</>
-            : <>vai para <b>a caixa de ideias</b> — sem duração, não custa minuto nenhum</>}
+            ? <>entra na <b>fila de hoje</b> quando você abrir o dia, ocupando {longFmt(ghost.min)}</>
+            : <>vira <b>uma nota</b> — sem duração, não custa minuto nenhum</>}
           {ghost.client && clientName(ghost.client) ? <> · {clientName(ghost.client)}</> : null}
         </p>
       )}
@@ -180,7 +180,7 @@ function Home() {
   const c = useCloud();
   useClients();
   const week = useCollection("week");
-  const ideas = useCollection("ideas");
+  const notes = useCollection("notes");
   const funnels = useCollection("funnels");
   const maps = useCollection("maps");
   const finance = useCollection("finance");
@@ -224,7 +224,7 @@ function Home() {
     open: pendingOf(dayDoc).length,
     slack: b.slack,
     weekOpen: week.all().filter((c) => !c.done && weekDays.has(c.day)).length,
-    ideas: ideas.all().filter((i) => i.stage !== "archived").length,
+    notes: notes.all().filter((n) => n.stage !== "archived").length,
     clients: clientsCol.all().filter((c) => c.status !== "closed").length,
     funnels: funnels.all().length,
     maps: maps.all().length,

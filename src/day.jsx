@@ -168,13 +168,13 @@ function withTask(doc, spec) {
   return { doc: { ...doc, day, tasks: [task, ...tasks] }, id: task.id };
 }
 
-/* ---------- a caixa de ideias, vista daqui ----------
-   a caixa e a colecao "ideas" do merlin, a mesma de ideas.html: la a ideia
+/* ---------- a caixa de notas, vista daqui ----------
+   a caixa e a colecao "notes" do merlin, a mesma de notes.html: la a nota
    ganha corpo, estagio e passos; aqui so aparece a ponta — as nao
    arquivadas, as mais recentes primeiro. */
 const MAX_IDEAS = 30;
-const normalizeIdea = (i) => ({ ...i, title: String(i.title || "").slice(0, 300), stage: i.stage || "seed" });
-const liveIdeas = (col) => col.all()
+const normalizeNote = (i) => ({ ...i, title: String(i.title || "").slice(0, 300), stage: i.stage || "seed" });
+const liveNotes = (col) => col.all()
   .filter((i) => i.title && i.stage !== "archived")
   .sort((a, b) => (b.updatedAt || b.createdAt || 0) - (a.updatedAt || a.createdAt || 0))
   .slice(0, MAX_IDEAS);
@@ -215,7 +215,7 @@ function Day() {
   const [doc, setDoc] = useState(load);
   const docRef = useRef(doc);
   const week = useCollection("week");
-  const ideasCol = useCollection("ideas", { normalize: normalizeIdea });
+  const notesCol = useCollection("notes", { normalize: normalizeNote });
   useClients();
   const delegate = useDelegate();               /* "da pra fazer com Claude?" */
   const [, setTick] = useState(0);              /* o relogio: redesenha a cada 30s */
@@ -261,7 +261,7 @@ function Day() {
      uma pilha, e nao uma variavel unica: apagar duas coisas seguidas deixava
      so a ultima recuperavel. cada acao volta sozinha, na ordem. o retrato
      guarda tudo que uma acao desfazivel alcanca: a faixa de ontem mexe no
-     dia, o editor troca a janela, e puxar uma ideia tira ela da caixa. */
+     dia, o editor troca a janela, e puxar uma nota tira ela da caixa. */
   const showToast = (label) => {
     setToast(label);
     clearTimeout(toastTimer.current);
@@ -277,7 +277,7 @@ function Day() {
     const before = {
       tasks: d.tasks.map((t) => ({ ...t })),
       day: d.day, start: d.start, end: d.end,
-      ideas: ideasCol.all().map((i) => ({ ...i })),
+      notes: notesCol.all().map((n) => ({ ...n })),
       label
     };
     /* so os cartoes que a acao desvinculou entram no passo — a semana inteira
@@ -295,7 +295,7 @@ function Day() {
     if (!stack.length) return;
     const step = stack.pop();
     commit({ ...docRef.current, tasks: step.tasks, day: step.day, start: step.start, end: step.end });
-    restoreIdeas(step.ideas);
+    restoreNotes(step.notes);
     /* a tarefa voltou para a fila, entao o cartao volta a apontar para ela:
        sem isto o cartao ficaria puxavel e o dia ganharia a mesma tarefa duas
        vezes na proxima sincronizacao */
@@ -479,25 +479,25 @@ function Day() {
     const { min, title, clickup, client } = readLine(text);
     const name = title || raw;
     const reserved = isReserve(name);
-    if (min) { createAndClose({ title: stripPrefix(name), min, reserved, clickup, client, ideaId: null }); return; }
+    if (min) { createAndClose({ title: stripPrefix(name), min, reserved, clickup, client, noteId: null }); return; }
     /* o link e o @ lidos do campo sobrevivem ao pedagio: a tarefa so nasce
        depois dos chips, e a URL ja saiu do campo. digitar no campo e uma
-       intencao nova: uma ideia que esperava duracao nao tem a ver com isso. */
-    setPending({ title: stripPrefix(name), reserved, clickup, client, ideaId: null });
+       intencao nova: uma nota que esperava duracao nao tem a ver com isso. */
+    setPending({ title: stripPrefix(name), reserved, clickup, client, noteId: null });
   };
 
   const createAndClose = (spec) => {
-    /* promocao de ideia: sair da caixa e entrar na fila sao o mesmo gesto,
+    /* promocao de nota: sair da caixa e entrar na fila sao o mesmo gesto,
        entao um desfazer so devolve os dois. criar tarefa do zero continua sem
-       desfazer — o que ganha desfazer aqui e a ideia ter sumido. a ideia traz
+       desfazer — o que ganha desfazer aqui e a nota ter sumido. a nota traz
        o cliente dela, se o @ nao disse outra coisa. */
-    const idea = spec.ideaId ? ideasCol.get(spec.ideaId) : null;
-    const client = spec.client || (idea && idea.client) || "";
+    const note = spec.noteId ? notesCol.get(spec.noteId) : null;
+    const client = spec.client || (note && note.client) || "";
     const task = { title: spec.title, min: spec.min, reserved: spec.reserved, clickup: spec.clickup, client };
-    if (idea) {
+    if (note) {
       withUndo("puxei “" + shortTitle(spec.title) + "” pro dia", () => {
         create(task);
-        ideasCol.remove(idea.id);
+        notesCol.remove(note.id);
       });
     } else create(task);
     setText("");
@@ -519,54 +519,54 @@ function Day() {
     if (fieldRef.current) fieldRef.current.focus();
   };
 
-  /* ---------- caixa de ideias ----------
-     o que ainda nao e tarefa. entra sem duracao de proposito: ideia nao
+  /* ---------- caixa de notas ----------
+     o que ainda nao e tarefa. entra sem duracao de proposito: nota nao
      ocupa minuto nenhum, e por isso nao aparece na chamada, no trilho nem na
      conta. virar tarefa passa pelo mesmo pedagio de duracao do composer — e
      ai, sim, ela custa espaco como qualquer outra. */
-  const ideas = liveIdeas(ideasCol);
-  const createIdea = (title, extra) => {
+  const notes = liveNotes(notesCol);
+  const createNote = (title, extra) => {
     const clean = String(title).replace(/\s+/g, " ").trim();
     if (!clean) return false;
     const now = Date.now();
-    ideasCol.save({
+    notesCol.save({
       id: newId(), title: clean.slice(0, 300), body: "", stage: "seed",
       client: (extra && extra.client) || "",
       steps: [], outputs: [], history: [], createdAt: now, updatedAt: now
     });
     return true;
   };
-  const removeIdea = (id) => {
-    const i = ideasCol.get(id);
+  const removeNote = (id) => {
+    const i = notesCol.get(id);
     if (!i) return;
-    withUndo("apaguei “" + shortTitle(i.title) + "”", () => { ideasCol.remove(id); });
+    withUndo("apaguei “" + shortTitle(i.title) + "”", () => { notesCol.remove(id); });
   };
-  /* ideia nao tem duracao, e tarefa sem duracao nao existe: puxar abre o
-     mesmo pedagio do composer. a ideia so sai da caixa quando o tempo dela
+  /* nota nao tem duracao, e tarefa sem duracao nao existe: puxar abre o
+     mesmo pedagio do composer. a nota so sai da caixa quando o tempo dela
      for respondido — desistir dos chips deixa tudo como estava. */
-  const pullIdea = (id) => {
-    const i = ideasCol.get(id);
+  const pullNote = (id) => {
+    const i = notesCol.get(id);
     if (!i) return;
-    setPending({ title: i.title, reserved: isReserve(i.title), clickup: "", client: "", ideaId: id });
+    setPending({ title: i.title, reserved: isReserve(i.title), clickup: "", client: "", noteId: id });
   };
   /* o desfazer guarda um retrato da caixa; voltar e gravar de novo o que
      sumiu e apagar o que nasceu depois — a colecao carimba tudo como novo. */
-  const restoreIdeas = (snapshot) => {
-    const now = new Set(ideasCol.all().map((i) => i.id));
+  const restoreNotes = (snapshot) => {
+    const now = new Set(notesCol.all().map((i) => i.id));
     const before = new Set(snapshot.map((i) => i.id));
-    snapshot.forEach((i) => { if (!now.has(i.id)) ideasCol.save(i); });
-    ideasCol.all().forEach((i) => { if (!before.has(i.id)) ideasCol.remove(i.id); });
+    snapshot.forEach((i) => { if (!now.has(i.id)) notesCol.save(i); });
+    notesCol.all().forEach((i) => { if (!before.has(i.id)) notesCol.remove(i.id); });
   };
 
   /* ---------- caixa de entrada ----------
      os outros modulos nao tocam no documento do dia: eles deixam um bilhete
      em merlin:inbox e o dia recolhe. com duracao vira tarefa na hora; sem
-     duracao cai na caixa de ideias, onde paga o pedagio como qualquer outra. */
+     duracao cai na caixa de notas, onde paga o pedagio como qualquer outra. */
   const emptyInbox = () => {
     const list = readInbox();
     if (!list.length) return;
     writeInbox([]);
-    let d = docRef.current, tasks = 0, newIdeas = 0;
+    let d = docRef.current, tasks = 0, newNotes = 0;
     list.forEach((it) => {
       if (!it || !it.title) return;
       const title = String(it.title);
@@ -575,12 +575,12 @@ function Day() {
            cartao da semana de onde ela veio */
         const r = withTask(d, { title, min: it.min, reserved: isReserve(title), client: it.client, origin: it.origin });
         if (r) { d = r.doc; tasks++; }
-      } else if (createIdea(title, it)) newIdeas++;
+      } else if (createNote(title, it)) newNotes++;
     });
     if (tasks) commit(d);
     const parts = [];
     if (tasks) parts.push(tasks + (tasks === 1 ? " tarefa" : " tarefas") + " na fila");
-    if (newIdeas) parts.push(newIdeas + (newIdeas === 1 ? " ideia" : " ideias") + " na caixa");
+    if (newNotes) parts.push(newNotes + (newNotes === 1 ? " nota" : " notas") + " na caixa");
     if (parts.length) showToast("chegou de outro módulo: " + parts.join(" e "));
   };
 
@@ -952,7 +952,7 @@ function Day() {
       </main>
 
       <div className="side" id="side-left">
-        <IdeasBox ideas={ideas} onCreate={createIdea} onPull={pullIdea} onRemove={removeIdea} />
+        <NotesBox notes={notes} onCreate={createNote} onPull={pullNote} onRemove={removeNote} />
       </div>
       <div className="side" id="side-right">
         <Matrix doc={doc} open={pendingOf(doc)} onApply={applyMatrix} />
@@ -1125,7 +1125,7 @@ function Reserves({ list, onRemove }) {
 /* de onde uma tarefa pode ter vindo. o documento guarda origin.type desde que
    a semana passou a mandar cartão para cá; os outros módulos foram chegando
    depois, cada um com o seu. o mapa vive aqui porque é rótulo de tela. */
-const ORIGIN_LABEL = { week: "semana", idea: "ideia", habit: "hábito", client: "cliente", plan: "plano", funnel: "funil" };
+const ORIGIN_LABEL = { week: "semana", idea: "nota", habit: "hábito", client: "cliente", plan: "plano", funnel: "funil" };
 
 function TaskRow({ t, start, slot, fits, dragging, leaving, actions }) {
   const [draft, setDraft] = useState(t.title);
@@ -1370,10 +1370,10 @@ function Chips({ pending, slack, onPick, onOther, onEscape }) {
   );
 }
 
-/* ---------- caixa de ideias ----------
-   linha mais leve que a da tarefa de proposito: ideia nao tem duracao, entao
+/* ---------- caixa de notas ----------
+   linha mais leve que a da tarefa de proposito: nota nao tem duracao, entao
    ela nao tem a coluna de medida que toda tarefa tem. */
-function IdeasBox({ ideas, onCreate, onPull, onRemove }) {
+function NotesBox({ notes, onCreate, onPull, onRemove }) {
   const [text, setText] = useState("");
   const submit = (e) => {
     e.preventDefault();
@@ -1381,28 +1381,28 @@ function IdeasBox({ ideas, onCreate, onPull, onRemove }) {
     if (onCreate(m.title, m)) setText("");
   };
   return (
-    <section className="block" id="ideas">
+    <section className="block" id="notes">
       <p className="section-label">
-        <span className="t-mono">{ideas.length ? ideas.length + (ideas.length === 1 ? " ideia" : " ideias") : "ideias"}</span>
-        <a className="text-link" href="ideas.html">todas</a>
+        <span className="t-mono">{notes.length ? notes.length + (notes.length === 1 ? " nota" : " notas") : "notas"}</span>
+        <a className="text-link" href="notes.html">todas</a>
       </p>
-      <p className="ideas__note">não custam minuto nenhum até virarem tarefa</p>
-      {!ideas.length && <p className="ideas__empty">Nada aqui. Escreve embaixo o que ainda não é tarefa.</p>}
-      <ul className="idea-list">
-        {ideas.map((i) => (
-          <li key={i.id} className="idea" data-id={i.id}>
-            <span className="idea__name">{i.title}</span>
-            <span className="idea__actions">
-              <a className="idea__action" href={"ideas.html#" + encodeURIComponent(i.id)} title="abrir a ideia" aria-label={'Abrir "' + i.title + '"'}>{icon("link")}</a>
-              <button className="idea__action" type="button" title="apagar" aria-label={'Apagar "' + i.title + '"'} onClick={() => onRemove(i.id)}>{icon("trash")}</button>
+      <p className="notes__note">não custam minuto nenhum até virarem tarefa</p>
+      {!notes.length && <p className="notes__empty">Nada aqui. Escreve embaixo o que ainda não é tarefa.</p>}
+      <ul className="note-list">
+        {notes.map((i) => (
+          <li key={i.id} className="note" data-id={i.id}>
+            <span className="note__name">{i.title}</span>
+            <span className="note__actions">
+              <a className="note__action" href={"notes.html#" + encodeURIComponent(i.id)} title="abrir a nota" aria-label={'Abrir "' + i.title + '"'}>{icon("link")}</a>
+              <button className="note__action" type="button" title="apagar" aria-label={'Apagar "' + i.title + '"'} onClick={() => onRemove(i.id)}>{icon("trash")}</button>
             </span>
-            <button className="idea__pull" type="button" title="puxar para o dia — ela vai pedir a duração"
+            <button className="note__pull" type="button" title="puxar para o dia — ela vai pedir a duração"
               aria-label={'Puxar "' + i.title + '" para o dia'} onClick={() => onPull(i.id)}>{icon("clock")}<span>puxar</span></button>
           </li>
         ))}
       </ul>
-      <form className="idea-form" autoComplete="off" onSubmit={submit}>
-        <input id="idea-field" maxLength="300" placeholder="uma ideia" aria-label="Nova ideia" value={text} onChange={(e) => setText(e.currentTarget.value)} />
+      <form className="note-form" autoComplete="off" onSubmit={submit}>
+        <input id="note-field" maxLength="300" placeholder="uma nota" aria-label="Nova nota" value={text} onChange={(e) => setText(e.currentTarget.value)} />
       </form>
     </section>
   );

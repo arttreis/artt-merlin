@@ -365,7 +365,7 @@ a.action{color:var(--ink-30);text-decoration:none}
 .reserve .actions{opacity:0}
 .reserve:hover .actions,.reserve:focus-within .actions{opacity:1}
 
-/* link em texto, tinta baixa: "todas" na caixa de ideias, "descartar" na matriz */
+/* link em texto, tinta baixa: "todas" na caixa de notas, "descartar" na matriz */
 .text-link{
   font-size:11.5px;color:var(--ink-50);
   text-decoration:underline;text-underline-offset:3px;text-decoration-color:var(--line);
@@ -454,7 +454,7 @@ a.action{color:var(--ink-30);text-decoration:none}
 /* no celular o aparelho vira a tela inteira */
 /* ---------- bento ----------
    o aparelho nao muda: mesmo tamanho, mesmo miolo, mesma casca. a grade so
-   abre trilho AO LADO dele para os blocos novos (ideias, matriz, etc).
+   abre trilho AO LADO dele para os blocos novos (notas, matriz, etc).
    trilho vazio nao existe — :empty tira do fluxo, entao ate o primeiro bloco
    nascer a tela e exatamente a de hoje. */
 .side{display:flex;flex-direction:column;gap:var(--pd);width:100%;max-width:496px}
@@ -469,50 +469,50 @@ a.action{color:var(--ink-30);text-decoration:none}
   box-shadow:var(--sombra);
 }
 
-/* ---------- caixa de ideias ----------
-   linha mais leve que a da tarefa de proposito: ideia nao tem duracao, entao
+/* ---------- caixa de notas ----------
+   linha mais leve que a da tarefa de proposito: nota nao tem duracao, entao
    ela nao tem a coluna de medida que toda tarefa tem. a diferenca de peso na
    tela e a mesma diferenca que existe no dia. */
 /* o bloco vira container para o botao de puxar poder encolher quando a
-   coluna do bento aperta — sem isso o titulo da ideia sobrava em quatorze
+   coluna do bento aperta — sem isso o titulo da nota sobrava em quatorze
    caracteres para a palavra "puxar" caber. */
-#ideas{container-type:inline-size}
-@container (max-width: 320px){.idea__pull span{display:none}.idea__pull{padding:0 7px}}
-.ideas__note{margin:0 0 var(--pd2);font-size:12px;color:var(--ink-30)}
-.ideas__empty{margin:0 0 var(--pd2);font-size:13px;color:var(--ink-30)}
-.idea-list{list-style:none;margin:0 0 var(--pd2);padding:0;display:flex;flex-direction:column;gap:var(--pd3)}
-.idea{
+#notes{container-type:inline-size}
+@container (max-width: 320px){.note__pull span{display:none}.note__pull{padding:0 7px}}
+.notes__note{margin:0 0 var(--pd2);font-size:12px;color:var(--ink-30)}
+.notes__empty{margin:0 0 var(--pd2);font-size:13px;color:var(--ink-30)}
+.note-list{list-style:none;margin:0 0 var(--pd2);padding:0;display:flex;flex-direction:column;gap:var(--pd3)}
+.note{
   display:flex;align-items:center;gap:var(--pd2);padding:6px 6px 6px 12px;
   border-radius:var(--br2);background:var(--fill);border:1px solid var(--line-soft);
 }
-.idea .idea__name{
+.note .note__name{
   flex:1 1 auto;min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;
   font-size:13px;color:var(--ink-70);
 }
-.idea .idea__actions{flex:0 0 auto;display:flex;align-items:center;gap:2px;opacity:0;transition:opacity var(--t)}
-.idea:hover .idea__actions,.idea:focus-within .idea__actions{opacity:1}
-.idea__action{
+.note .note__actions{flex:0 0 auto;display:flex;align-items:center;gap:2px;opacity:0;transition:opacity var(--t)}
+.note:hover .note__actions,.note:focus-within .note__actions{opacity:1}
+.note__action{
   width:26px;height:26px;display:grid;place-items:center;border-radius:var(--br2);
   color:var(--ink-30);transition:color var(--t),background var(--t);
 }
-.idea__action:hover{color:var(--ink);background:var(--fill-hover)}
-.idea__action svg{width:14px;height:14px}
+.note__action:hover{color:var(--ink);background:var(--fill-hover)}
+.note__action svg{width:14px;height:14px}
 /* puxar e o unico gesto que a linha promete, entao e o unico que nao se
    esconde: abrir e apagar ainda pedem o hover, ele nao. */
-.idea__pull{
+.note__pull{
   flex:0 0 auto;height:26px;padding:0 10px;display:inline-flex;align-items:center;gap:6px;
   border-radius:var(--br-pill);border:1px solid var(--line-soft);background:var(--fill);
   font-size:11.5px;color:var(--ink-50);transition:color var(--t),background var(--t),border-color var(--t);
 }
-.idea__pull:hover{color:var(--ink);background:var(--fill-hover);border-color:var(--line)}
-.idea__pull svg{width:13px;height:13px;flex:none}
+.note__pull:hover{color:var(--ink);background:var(--fill-hover);border-color:var(--line)}
+.note__pull svg{width:13px;height:13px;flex:none}
 /* sem hover no toque, as acoes ficam sempre visiveis */
-@media (hover:none){.idea .idea__actions{opacity:1}}
-.idea-form input{
+@media (hover:none){.note .note__actions{opacity:1}}
+.note-form input{
   width:100%;background:var(--fill);border:1px solid var(--line);
   border-radius:var(--br-pill);padding:8px 14px;font-size:13px;color:var(--ink);
 }
-.idea-form input::placeholder{color:var(--ink-30)}
+.note-form input::placeholder{color:var(--ink-30)}
 
 /* ---------- matriz de eisenhower ----------
    ela e um instrumento do medidor, nao um painel ao lado dele: por isso a

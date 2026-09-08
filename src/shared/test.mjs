@@ -39,7 +39,9 @@ globalThis.document = {
   /* o core pinta a barra do navegador ao aplicar o tema; aqui nao ha meta */
   querySelector: () => null
 };
-globalThis.window = { addEventListener: noop };
+/* matchMedia entra porque navegador SEM tema salvo e um estado legitimo — e o
+   primeiro de todos. sem ele, so da para testar um navegador que ja escolheu. */
+globalThis.window = { addEventListener: noop, matchMedia: () => ({ matches: false, addEventListener: noop, removeEventListener: noop }) };
 
 let reloaded = 0;
 globalThis.location = { reload: () => { reloaded++; } };
@@ -233,6 +235,95 @@ const dataLeft = () => globalThis.localStorage.keys().filter((k) => k in DATA);
   await cloud.resume();
   await cloud.signOut();
   check("sair leva a marca junto", currentBrand() === "", currentBrand());
+}
+
+{
+  /* ---- ideias viraram notas ----
+     a mudança de nome copia documento entre coleções, e é o único lugar do
+     cliente que grava sem carimbar. o que estes casos protegem não é a cópia
+     (essa é fácil): é a janela entre dois aparelhos que migram em momentos
+     diferentes, em que o atrasado carrega uma cópia velha da nuvem. */
+  const ideas = (items) => JSON.stringify({ items, serverV: 0, dirty: [], refused: {} });
+  const note = (id, v, title) => ({ v, doc: { id, v, title, body: "", stage: "seed", steps: [], files: [], outputs: [], history: [], createdAt: v - 1, updatedAt: v } });
+
+  {
+    const { migrateNotes, collection } = await fresh({
+      "merlin:ideas": ideas({ a: note("a", 1000, "frete grátis"), b: note("b", 2000, "série de reels") })
+    });
+    migrateNotes(true);
+    const all = collection("notes").entries().sort((x, y) => x.v - y.v);
+    check("a migração copia as notas", all.length === 2, String(all.length));
+    check("a migração PRESERVA o carimbo", all[0].v === 1000 && all[1].v === 2000, JSON.stringify(all.map((e) => e.v)));
+    check("a migração preserva o conteúdo", all[0].doc.title === "frete grátis", all[0].doc.title);
+    check("a coleção antiga fica de arquivo", localStorage.has("merlin:ideas"));
+    check("a migração deixa as notas para subir", collection("notes").pending());
+  }
+
+  {
+    /* o caso que justifica o adopt existir. este navegador já migrou e editou;
+       um segundo, atrasado, migra depois com a cópia velha da nuvem. sem
+       preservar o carimbo, a cópia velha ganharia por ser a gravação mais
+       recente — e a edição sumiria sem ninguém ver. */
+    const { migrateNotes, collection } = await fresh({
+      "merlin:ideas": ideas({ a: note("a", 1000, "a cópia velha da nuvem") }),
+      "merlin:notes": ideas({ a: note("a", 5000, "editada depois de migrar") })
+    });
+    migrateNotes(true);
+    check("migração atrasada não sobrescreve o que é mais novo",
+      collection("notes").get("a").title === "editada depois de migrar",
+      collection("notes").get("a").title);
+  }
+
+  {
+    /* e o contrário: o que a nuvem trouxe DEPOIS da migração local ainda entra */
+    const { migrateNotes, collection } = await fresh({
+      "merlin:ideas": ideas({ a: note("a", 9000, "a versão nova, vinda de fora") }),
+      "merlin:notes": ideas({ a: note("a", 1000, "a que este navegador tinha") })
+    });
+    migrateNotes(true);
+    check("a versão mais nova da coleção antiga entra",
+      collection("notes").get("a").title === "a versão nova, vinda de fora",
+      collection("notes").get("a").title);
+  }
+
+  {
+    /* a marca só é posta quando a fonte está completa. com sessão e sem o
+       download da coleção antiga, migrar metade e marcar feito perderia o
+       resto para sempre. */
+    const { migrateNotes, cloud } = await fresh({ "merlin:ideas": ideas({ a: note("a", 1000, "x") }) });
+    cloud.signedIn = true;
+    migrateNotes(true);
+    check("com sessão e sem download, não marca como migrado", !localStorage.has("merlin:renamed:notes"));
+    cloud.signedIn = false;
+    migrateNotes(true);
+    check("sem sessão, marca como migrado", localStorage.has("merlin:renamed:notes"));
+  }
+
+  {
+    /* rodar antes da primeira pintura é o que faz a tela nascer certa; rodar
+       de novo depois não pode custar nada nem desfazer o que se editou no meio. */
+    const { migrateNotes, collection } = await fresh({ "merlin:ideas": ideas({ a: note("a", 1000, "original") }) });
+    migrateNotes();
+    check("a passada de antes da pintura já copia", collection("notes").entries().length === 1);
+    check("e não marca como migrado sozinha", !localStorage.has("merlin:renamed:notes"));
+    const doc = collection("notes").get("a");
+    collection("notes").save({ ...doc, title: "editada no meio" });
+    migrateNotes(true);
+    check("a segunda passada não desfaz a edição", collection("notes").get("a").title === "editada no meio", collection("notes").get("a").title);
+  }
+
+  {
+    /* sem duração, o que se manda para o dia vira nota na hora. antes ele ia
+       para um bilhete que só era recolhido quando day.html abrisse — e até lá
+       não existia em lugar nenhum que a busca alcançasse. */
+    const { sendToDay, collection, readInbox } = await fresh({});
+    sendToDay({ title: "testar frete grátis" });
+    check("sem duração vira nota na hora", collection("notes").entries().length === 1, String(collection("notes").entries().length));
+    check("sem duração não passa pela caixa de entrada", readInbox().length === 0, String(readInbox().length));
+    sendToDay({ title: "gravar o vídeo", min: 90 });
+    check("com duração continua na caixa de entrada", readInbox().length === 1, String(readInbox().length));
+    check("com duração não vira nota", collection("notes").entries().length === 1, String(collection("notes").entries().length));
+  }
 }
 
 console.log("\n" + passed + " passaram, " + failures.length + " falharam");

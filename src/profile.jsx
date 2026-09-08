@@ -20,7 +20,7 @@ initPage("profile");
 /* as colecoes que a pessoa tem, na ordem da navegacao. o dia nao esta aqui
    porque nao e colecao: e um documento so, o de hoje. */
 const KINDS = [
-  { type: "ideas", one: "ideia", many: "ideias", href: "ideas.html" },
+  { type: "notes", one: "nota", many: "notas", href: "notes.html" },
   { type: "clients", one: "cliente", many: "clientes", href: "clients.html" },
   { type: "week", one: "cartão", many: "cartões", href: "week.html" },
   { type: "funnels", one: "funil", many: "funis", href: "funnels.html" },

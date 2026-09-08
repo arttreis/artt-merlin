@@ -1,6 +1,6 @@
 # src/shared/ · como um módulo do Merlin é feito
 
-Cada módulo é **uma página**: um HTML na raiz (`ideas.html`, `clients.html`…) com o CSS dela
+Cada módulo é **uma página**: um HTML na raiz (`notes.html`, `clients.html`…) com o CSS dela
 inline, e um módulo `src/<nome>.jsx` com a tela, em **React 19 com JSX**. O HTML é a entrada do
 Vite; o build sai em `server/site/`. O que é comum vive aqui:
 
@@ -30,6 +30,26 @@ Vite; o build sai em `server/site/`. O que é comum vive aqui:
 Identificadores, chaves, campos e classes são em inglês; texto de tela e comentários, em
 português. O dicionário completo está em [`MIGRATION.md`](../MIGRATION.md).
 
+## Mudar uma coleção de nome
+
+As ideias viraram **notas** em 08/09/2026, e o dado foi junto — o que é raro aqui: a decisão
+14 da VISAO diz "sem migração dos dados gravados". O que fez valer a pena foi haver um jeito
+de migrar sem janela de perda, e ele é o único motivo de `collection` ter duas portas de
+baixo nível:
+
+- `entries()` devolve os documentos **como estão gravados**, com o carimbo `v` e sem
+  normalizar. Normalizar aqui jogaria o `v` fora.
+- `adopt(list)` grava **sem carimbar**, e recusa o que não tiver carimbo maior.
+
+O par existe porque dois aparelhos migram em momentos diferentes. Se a cópia usasse
+`save()`, ela carimbaria `Date.now()` — e o aparelho que migrasse por último, carregando uma
+cópia velha da nuvem, ganharia por ser a gravação mais recente. Preservando o `v`, o
+servidor recusa a cópia velha sozinho, com a regra que ele já tem.
+
+A migração roda **antes da primeira pintura** (`initPage`), e de novo depois que a nuvem
+responde. A marca de "já migrou" só é posta quando a fonte está completa — com sessão, isso
+é depois de a coleção antiga ter baixado.
+
 ## Tela vazia oferece (`EmptyStart`)
 
 Clientes, financeiro e hábitos não dizem "nada aqui": mostram uma grade de modelos agrupados,
@@ -49,7 +69,7 @@ O HTML é só a casca: o CSS da página, o anti-flash do tema e o ponto de monta
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#0d0d0d">
-<title>merlin · ideias</title>
+<title>merlin · notas</title>
 <link rel="icon" href="data:image/svg+xml,...">  <!-- copie o do index.html -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -85,7 +105,7 @@ function Ideas() {
   return (
     <>
       <div className="header">
-        <div><h1>ideias</h1><p className="sub">o que ainda não é tarefa</p></div>
+        <div><h1>notas</h1><p className="sub">o que ainda não é tarefa</p></div>
         <div className="actions">
           <button className="pill pill--green" type="button" onClick={() => setForm({})}>{icon("plus")}ideia</button>
         </div>
@@ -183,7 +203,7 @@ Um documento é um objeto JSON plano. Coloque nele o que o módulo precisa, mas 
 | tipo | dono | forma mínima que outros módulos leem |
 | --- | --- | --- |
 | `clients` | clients.html | `{id, name, status, channels:[{id, type, name, items:[{id, text, done}]}], goals:[…], backlog:[…], journal:[…], contract:{…}, contacts:[…], links:[…], offers:[…]}` |
-| `ideas` | ideas.html | `{id, title, body, stage, client, steps:[{id, text, done}], outputs:[{type, id, at}], history:[{type:'stage', from, to, at}]}` |
+| `notes` | notes.html | `{id, title, body, stage, client, steps:[{id, text, done}], files:[{id, name, type, size}], outputs:[{type, id, at}], history:[{type:'stage'\|'step', …, at}]}` |
 | `week` | week.html | `{id, title, day ('YYYY-MM-DD' ou 'weekend:YYYY-MM-DD' da segunda), client, min, done, recurring}` |
 | `maps` | maps.html | `{id, name, root:{id, title, note, color, collapsed, children:[…]}, client, idea, funnel}` |
 | `funnels` | funnels.html | `{id, name, client, channel, nodes:[{id, type, title, x, y, fields:{}, number}], edges:[{from, to}], creatives:[…], automations:[…], offers:[…], triggers:[…], snapshots:[…]}` |
@@ -193,7 +213,7 @@ Um documento é um objeto JSON plano. Coloque nele o que o módulo precisa, mas 
 | `plans` | plans.html | um doc por período, id `kind:period`: `{id, kind:'quarter'|'month'|'week', period:'2026-Q4'|'2026-09'|'2026-W37', goals:[{id, text, client, done, parent, card, order}], review:{went, didnt, next}}` |
 
 Ligações entre módulos são **por id**, nunca por cópia. Para abrir outra página num item:
-`clients.html#<id>`, `maps.html#<id>`, `funnels.html#<id>`, `ideas.html#<id>`. Cada
+`clients.html#<id>`, `maps.html#<id>`, `funnels.html#<id>`, `notes.html#<id>`. Cada
 página lê o hash (`useHash()`) e abre o item, se existir.
 
 ## Criar é um botão e uma caixa
@@ -234,13 +254,14 @@ por isso o funil criado a partir de um deles já nasce ligado ao canal do client
 ## Mandar para o dia
 
 `sendToDay({title, min, client, origin:{type, id}})`. Com `min`, vira tarefa na
-fila de hoje; sem `min`, vai para a caixa de ideias do dia (onde ganha duração). Nada mais
+fila de hoje **quando ele abrir**; sem `min`, vira nota na hora, ali mesmo — sem duração
+aquilo não custa minuto nenhum, então nunca precisou tocar no dia. Nada mais
 toca no documento do dia. O aviso já é mostrado pelo core.
 
 ## Regras de casa
 
 - Português do Brasil em tudo que aparece na tela e nos comentários. Minúsculas nos rótulos,
-  como o resto do sistema ("ideias", "puxar para o dia"). Sem emoji na interface.
+  como o resto do sistema ("notas", "puxar para o dia"). Sem emoji na interface.
 - **Inglês em todo identificador**: variável, função, componente, prop, chave, campo, classe
   de CSS, id de elemento, nome de arquivo.
 - React 19 e Vite. `npm run dev` para trabalhar, `npm run build` para gerar `server/site/`.

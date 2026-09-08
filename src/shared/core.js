@@ -187,7 +187,7 @@ export const PAGES = [
   { id: "home", label: "início", href: "index.html" },
   { id: "day", label: "dia", href: "day.html" },
   { id: "week", label: "semana", href: "week.html" },
-  { id: "ideas", label: "ideias", href: "ideas.html" },
+  { id: "notes", label: "notas", href: "notes.html" },
   { id: "clients", label: "clientes", href: "clients.html" },
   { id: "funnels", label: "funis", href: "funnels.html" },
   { id: "maps", label: "mapas", href: "maps.html" },
@@ -205,11 +205,11 @@ export function toggleSidebar() {
 }
 
 /* ---------- busca global ----------
-   procura por titulo em tudo que mora no navegador: ideias, clientes,
+   procura por titulo em tudo que mora no navegador: notas, clientes,
    cartoes da semana, mapas, funis, lancamentos, habitos e objetivos. nao e indice: e um filtro
    sobre o que ja esta em memoria, e por isso e instantaneo. */
 const SEARCH_SOURCES = [
-  { type: "ideas", label: "ideia", field: "title", href: (d) => "ideas.html#" + encodeURIComponent(d.id) },
+  { type: "notes", label: "nota", field: "title", href: (d) => "notes.html#" + encodeURIComponent(d.id) },
   { type: "clients", label: "cliente", field: "name", href: (d) => "clients.html#" + encodeURIComponent(d.id) },
   { type: "week", label: "semana", field: "title", href: () => "week.html", filter: (d) => !d.done },
   { type: "maps", label: "mapa", field: "name", href: (d) => "maps.html#" + encodeURIComponent(d.id) },
@@ -589,6 +589,33 @@ export function collection(type, options = {}) {
       return Object.values(data.items).map(docOf).filter(Boolean);
     },
     get(id) { return docOf(data.items[id]); },
+    /* os documentos como estao gravados, com carimbo e sem normalizar. so a
+       mudanca de nome de colecao usa isto: normalizar aqui jogaria fora o `v`,
+       que e justamente o que protege a migracao. */
+    entries() {
+      return Object.values(data.items)
+        .filter((it) => it && it.doc && !it.doc.deleted)
+        .map((it) => ({ v: it.v, doc: it.doc }));
+    },
+    /* gravar SEM carimbar. e o contrario de save(), e existe por um motivo so:
+       na mudanca de nome, o carimbo do documento antigo e o que impede um
+       navegador atrasado de sobrescrever o que ja foi editado do outro lado.
+       carimbar aqui seria dar ao atrasado a versao mais nova do mundo. */
+    adopt(list) {
+      let changed = false;
+      (list || []).forEach((d) => {
+        if (!d || !d.id) return;
+        const v = Math.round(+d.v) || 0;
+        const cur = data.items[d.id];
+        if (!v || (cur && cur.v >= v)) return;
+        data.items[d.id] = { v, doc: { ...d, id: String(d.id), v } };
+        enqueue(d.id);
+        changed = true;
+      });
+      if (!changed) return 0;
+      persist(); scheduleUpload(); emit("local");
+      return 1;
+    },
     has(id) { return !!(data.items[id] && !data.items[id].doc.deleted); },
     save(doc) {
       if (!doc || !doc.id) throw new Error("documento sem id");
@@ -733,7 +760,7 @@ document.addEventListener("visibilitychange", () => {
    nao baixou espera a proxima sincronizacao, e a marca de "feito" so e
    gravada quando todas fecharam. depois disso ela nunca mais faz nada. */
 const FRONTS_PURGED = "merlin:fronts-removed";
-const PURGE_TYPES = ["ideas", "clients", "week", "maps", "funnels", "finance", "habits", "plans"];
+const PURGE_TYPES = ["notes", "clients", "week", "maps", "funnels", "finance", "habits", "plans"];
 function stripFront(value) {
   if (Array.isArray(value)) return value.map(stripFront).some(Boolean);
   if (!value || typeof value !== "object") return false;
@@ -773,6 +800,36 @@ export function purgeFronts() {
   try { localStorage.setItem(FRONTS_PURGED, String(Date.now())); } catch (e) {}
 }
 
+/* ---------- ideias viraram notas ----------
+   a tela mudou de nome e o Arthur decidiu que o dado fosse junto. copiar e a
+   parte facil; o difícil e que dois navegadores migram em momentos
+   diferentes, e o que migra depois carrega uma copia velha da nuvem.
+
+   por isso a copia PRESERVA o carimbo `v` de cada documento em vez de gravar
+   um novo. o servidor so aceita carimbo maior (worker.js, uploadDoc), entao a
+   migracao tardia de um navegador atrasado e recusada por ele em vez de
+   sobrescrever a nota que ja foi editada do outro lado. sem isso, `save()`
+   carimbaria Date.now() e a copia velha ganharia por ser a mais recente — que
+   e a janela de perda que este bloco existe para fechar.
+
+   a colecao antiga NAO e apagada. ela fica de arquivo: nao custa quase nada,
+   e uma aba velha aberta noutro lugar continua funcionando ate ser recarregada.
+
+   com sessao, a migracao espera a colecao antiga baixar. migrar metade e
+   marcar feito perderia o que ainda estava por vir. */
+const NOTES_MIGRATED = "merlin:renamed:notes";
+export function migrateNotes(complete) {
+  try { if (localStorage.getItem(NOTES_MIGRATED)) return; } catch (e) { return; }
+  const from = collection("ideas");
+  const old = from.entries();
+  if (old.length) collection("notes").adopt(old.map((e) => ({ ...e.doc, v: e.v })));
+  /* a marca so e posta quando a fonte esta completa — com sessao, depois de a
+     colecao antiga ter baixado. ate la a migracao roda de novo a cada
+     abertura, e repetir nao custa: o adopt recusa carimbo que nao seja maior. */
+  if (!complete || (cloud.signedIn && !from.hasDownloaded())) return;
+  try { localStorage.setItem(NOTES_MIGRATED, String(old.length)); } catch (e) {}
+}
+
 /* clientes: o indice leve que os outros modulos usam para selo e escolha.
    a colecao inteira mora em clientes.html; aqui so o que e comum. */
 export const clients = () => collection("clients");
@@ -810,7 +867,41 @@ export function writeInbox(list) {
   try { localStorage.setItem(INBOX_KEY, JSON.stringify(list)); } catch (e) {}
 }
 /* item: {title, min?, client?, origin:{type,id}} */
+/* a forma de uma nota nova, num lugar so. quatro telas criavam este objeto
+   por conta propria, cada uma com a sua versao dos campos vazios — e quem
+   esquecesse um deixava o normalize da pagina consertar em silencio. */
+export function newNote(spec) {
+  const now = Date.now();
+  const doc = {
+    id: newId(),
+    title: String((spec && spec.title) || "").slice(0, 300),
+    body: String((spec && spec.body) || ""),
+    stage: "seed",
+    client: String((spec && spec.client) || ""),
+    steps: [], files: [], outputs: [], history: [],
+    createdAt: now, updatedAt: now
+  };
+  if (!doc.title) return null;
+  collection("notes").save(doc);
+  return doc;
+}
+
 export function sendToDay(item) {
+  /* sem duracao aquilo nao custa minuto nenhum, entao nunca precisou tocar no
+     dia: vira nota aqui mesmo, na hora. o aviso antigo dizia "foi para a caixa
+     de ideias do dia" e mentia duas vezes — a caixa so era recolhida quando
+     day.html abrisse, e ate la o item nao existia em lugar nenhum que a busca
+     ou outra tela alcancasse.
+
+     a caixa de entrada continua existindo, e continua sendo so para o que tem
+     duracao: so o dia escreve no documento do dia, e um segundo escritor e
+     exatamente a forma do bug que o vinculo com a semana fechou. o que muda e
+     que agora o aviso diz isso em voz alta. */
+  if (!item.min) {
+    const note = newNote({ title: item.title, client: item.client });
+    if (note) notify("virou nota");
+    return;
+  }
   const list = readInbox();
   list.push({
     id: newId(),
@@ -821,7 +912,7 @@ export function sendToDay(item) {
     at: Date.now()
   });
   writeInbox(list);
-  notify(item.min ? "foi para a fila de hoje" : "foi para a caixa de ideias do dia — lá ela ganha duração");
+  notify("entra na fila quando você abrir o dia");
 }
 
 /* ---------- markdown minimo ----------
@@ -866,9 +957,15 @@ export function setShellRenderer(fn) { renderShell = fn; }
 export function initPage(id) {
   if (renderShell) renderShell(id);
   clients();
+  /* a mudanca de nome roda ANTES da primeira pintura. o que ja esta neste
+     navegador nao depende de rede, e esperar o /me responder faz a tela nascer
+     vazia e se corrigir sozinha um instante depois — pior que nascer certa. e
+     ha um caso em que ela nem se corrige: se a resposta chegar antes de o React
+     montar, o aviso da colecao nao encontra ouvinte nenhum. */
+  migrateNotes();
   /* limpar e a ultima coisa: resume() descobre se ha sessao e baixa o que a
      nuvem tem; so entao da para apagar as frentes antigas sem apagar no
      escuro. a pagina desenha antes disso e redesenha quando os dados chegam.
      quem nao baixou nesta carga fica para a proxima — a limpeza sabe esperar. */
-  cloud.resume().finally(purgeFronts);
+  cloud.resume().finally(() => { migrateNotes(true); purgeFronts(); });
 }

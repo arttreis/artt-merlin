@@ -264,15 +264,17 @@ function Clients() {
 
   /* ---------- rota por hash ----------
      "#<id>" abre o cliente; "#new?idea=<id>" abre a caixa de novo cliente
-     ja com o titulo e o corpo da ideia (leitura so: quem normaliza e e dona
-     da colecao "ideas" e ideas.html). hash vazio fecha o painel. */
+     (o parametro e o campo ideaOrigin seguem com o nome antigo: sao dado
+     gravado, e renomea-los custaria uma migracao por cosmetica)
+     ja com o titulo e o corpo da nota (leitura so: quem normaliza e e dona
+     da colecao "notes" e notes.html). hash vazio fecha o painel. */
   useEffect(() => {
     if (!hash) { if (selectedRef.current) closePanel(); return; }
     if (hash.startsWith("new")) {
       const q = new URLSearchParams(hash.split("?")[1] || "");
-      const ideaId = q.get("idea");
-      const idea = ideaId ? collection("ideas").get(ideaId) : null;
-      openNew(idea ? { name: String(idea.title || ""), summary: String(idea.body || ""), ideaOrigin: ideaId } : null);
+      const noteId = q.get("idea");
+      const note = noteId ? collection("notes").get(noteId) : null;
+      openNew(note ? { name: String(note.title || ""), summary: String(note.body || ""), ideaOrigin: noteId } : null);
       return;
     }
     if (clients.has(hash)) openClient(hash);

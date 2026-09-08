@@ -16,7 +16,7 @@ initPage("maps");
 
 /* ---------- forma do documento ----------
    raiz e cada filho tem sempre a mesma forma. quem cria um mapa de fora
-   (ideas.html, por exemplo) so precisa acertar {title}; o resto nasce
+   (notes.html, por exemplo) so precisa acertar {title}; o resto nasce
    aqui — e por isso "abrir por hash" funciona mesmo com um doc incompleto. */
 function normalizeNode(raw) {
   const n = raw && typeof raw === "object" ? raw : {};
@@ -840,7 +840,7 @@ function Maps() {
 /* ---------- lista de mapas ---------- */
 function MapList({ maps }) {
   useClients();
-  const ideas = useCollection("ideas"), funnels = useCollection("funnels");
+  const notes = useCollection("notes"), funnels = useCollection("funnels");
   const [form, setForm] = useState(false);
   const [renaming, setRenaming] = useState(null);
   const all = maps.all().sort((a, b) => b.updatedAt - a.updatedAt);
@@ -876,7 +876,7 @@ function MapList({ maps }) {
       </div>
       <ul className="list mp-list" id="map-list">
         {all.map((m) => (
-          <MapRow key={m.id} m={m} maps={maps} ideas={ideas} funnels={funnels}
+          <MapRow key={m.id} m={m} maps={maps} notes={notes} funnels={funnels}
             renaming={renaming === m.id} onRename={() => setRenaming(m.id)} onRenamed={() => setRenaming(null)}
             onDuplicate={() => duplicate(m.id)} onRemove={() => remove(m.id)} />
         ))}
@@ -887,11 +887,11 @@ function MapList({ maps }) {
   );
 }
 
-/* a linha: clicar em qualquer parte neutra abre; os links de ideia, cliente
+/* a linha: clicar em qualquer parte neutra abre; os links de nota, cliente
    e funil navegam por conta propria */
-function MapRow({ m, ideas, funnels, maps, renaming, onRename, onRenamed, onDuplicate, onRemove }) {
+function MapRow({ m, notes, funnels, maps, renaming, onRename, onRenamed, onDuplicate, onRemove }) {
   const n = countNodes(m.root);
-  const idea = m.idea ? ideas.get(m.idea) : null;
+  const note = m.idea ? notes.get(m.idea) : null;
   const funnel = m.funnel ? funnels.get(m.funnel) : null;
   const open = () => { location.hash = m.id; };
   const stop = (e) => e.stopPropagation();
@@ -903,7 +903,7 @@ function MapRow({ m, ideas, funnels, maps, renaming, onRename, onRenamed, onDupl
       <span className="measure t-mono">{n + (n === 1 ? " nó" : " nós")}</span>
       <span className="measure t-mono">{"editado há " + relativeTime(m.updatedAt)}</span>
       <span className="mp-links">
-        {idea && <a className="link" href={"ideas.html#" + m.idea} onClick={stop}>{idea.title || "ideia"}</a>}
+        {note && <a className="link" href={"notes.html#" + m.idea} onClick={stop}>{note.title || "nota"}</a>}
         {m.client && <a className="link" href={"clients.html#" + m.client} onClick={stop}>{clientName(m.client) || "cliente"}</a>}
         {funnel && <a className="link" href={"funnels.html#" + m.funnel} onClick={stop}>{funnel.name || "funil"}</a>}
       </span>
@@ -1221,12 +1221,12 @@ function Editor({ id, maps }) {
   const toIdea = () => {
     if (!selectedNode) return;
     const now = Date.now();
-    collection("ideas").save({
+    collection("notes").save({
       id: newId(), title: selectedNode.node.title || doc.name, body: selectedNode.node.note || "",
       stage: "seed", client: doc.client,
       steps: [], outputs: [], history: [], createdAt: now, updatedAt: now
     });
-    notify("virou ideia");
+    notify("virou nota");
   };
 
   /* ---- merlin: sugestao de ramos ----
@@ -1551,7 +1551,7 @@ function NodePanel({ node, onClose, onFieldFocus, onFieldBlur, onTitle, onNote, 
       </div>
       <div className="row">
         <button className="pill pill--mini" type="button" id="panel-day" onClick={onPull}>puxar para o dia</button>
-        <button className="pill pill--mini" type="button" id="panel-idea" onClick={onIdea}>virar ideia</button>
+        <button className="pill pill--mini" type="button" id="panel-idea" onClick={onIdea}>virar nota</button>
       </div>
     </aside>
   );

@@ -4,8 +4,8 @@
    especificidade. importado logo depois do base.css, a ordem volta a ser a de
    sempre: primeiro o comum, depois o da pagina. */
 
-/* ideas.html — uma caixa de entrada.
-   a ideia chega como uma mensagem chega: vira uma linha na lista da
+/* notes.html — uma caixa de entrada.
+   a nota chega como uma mensagem chega: vira uma linha na lista da
    esquerda, agrupada por dia, e abre no painel da direita sem sair da
    tela. nada de modal — o painel e a tela. a pagina ocupa a altura toda e
    cada coluna rola sozinha, como um cliente de e-mail. */
@@ -66,7 +66,7 @@
 .item__preview .stage{flex:0 0 auto;color:var(--ink-30);font-family:var(--mono);font-size:10px;letter-spacing:.06em;text-transform:uppercase}
 .item__preview .stage.is-green{color:var(--green-ink)}
 .item__preview .phrase{min-width:0;overflow:hidden;text-overflow:ellipsis}
-/* a bolinha verde: ideia que ainda e semente sem corpo nem passo — chegou e
+/* a bolinha verde: nota que ainda e semente sem corpo nem passo — chegou e
    ninguem mexeu, como uma mensagem nao lida */
 .item__new{width:7px;height:7px;border-radius:50%;background:var(--green);flex:0 0 auto;align-self:center;box-shadow:0 0 8px var(--green-glow)}
 .item__actions{
@@ -253,7 +253,7 @@
   font-size:13.5px;color:var(--ink);
 }
 .step__edit:focus{outline:none}
-/* o proximo da fila: o unico passo que a ideia esta realmente pedindo */
+/* o proximo da fila: o unico passo que a nota esta realmente pedindo */
 .step__now{
   flex:none;height:16px;padding:0 6px;border-radius:var(--br-pill);
   background:color-mix(in srgb,var(--green) 15%,transparent);
