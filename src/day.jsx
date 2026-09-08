@@ -1122,6 +1122,11 @@ function Reserves({ list, onRemove }) {
    o titulo e um campo controlado por um rascunho local: uma sincronizacao
    que chega no meio da digitacao nao apaga o que esta sendo escrito, e o
    change (blur ou Enter) e quem grava. */
+/* de onde uma tarefa pode ter vindo. o documento guarda origin.type desde que
+   a semana passou a mandar cartão para cá; os outros módulos foram chegando
+   depois, cada um com o seu. o mapa vive aqui porque é rótulo de tela. */
+const ORIGIN_LABEL = { week: "semana", idea: "ideia", habit: "hábito", client: "cliente", plan: "plano", funnel: "funil" };
+
 function TaskRow({ t, start, slot, fits, dragging, leaving, actions }) {
   const [draft, setDraft] = useState(t.title);
   useEffect(() => { setDraft(t.title); }, [t.title]);
@@ -1180,7 +1185,16 @@ function TaskRow({ t, start, slot, fits, dragging, leaving, actions }) {
             : <button className="task__time" type="button" data-missing={t.min ? null : "yes"}
                 aria-label={t.min ? "Duração: " + longFmt(t.min) + ". Alterar" : "Sem duração, contando " + longFmt(GUESS) + " como palpite. Definir"}
                 onClick={() => setEditingTime(true)}>{icon("clock")}<span>{(t.min ? fmt(t.min) : "definir duração · contando " + fmt(GUESS)) + partial}</span></button>}
-          {!!client && <div className="task__badges"><ClientBadge id={t.client} /></div>}
+          {/* de onde ela veio. o vínculo já existia no documento (origin), mas
+              só a semana o mostrava — o dia recebia sem dizer de onde, e quem
+              olhava a fila não sabia qual linha tinha um fio preso do outro
+              lado. o selo anuncia o FIO, não "isto entrou sozinho". */}
+          {(!!client || !!t.origin) && (
+            <div className="task__badges">
+              <ClientBadge id={t.client} />
+              {t.origin && ORIGIN_LABEL[t.origin.type] && <span className="badge">{ORIGIN_LABEL[t.origin.type]}</span>}
+            </div>
+          )}
         </div>
       </div>
       <div className="actions">

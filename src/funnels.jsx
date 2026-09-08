@@ -1730,7 +1730,7 @@ function CreativesTab({ doc, actions }) {
           <td><input className="input" value={c.url || ""} placeholder="link" onChange={(e) => patch(c.id, { url: e.currentTarget.value })} /></td>
           <td><NodeSelect doc={doc} value={c.node} onChange={(v) => patch(c.id, { node: v })} /></td>
           <td><div className="row-actions">
-            <button className="action" type="button" title="puxar para o dia" onClick={() => actions.pullCreative(c)}>{icon("arrow")}</button>
+            <button className="action" type="button" title="puxar para o dia" onClick={() => actions.pullCreative(c)}>{icon("clock")}</button>
             <TrashButton onClick={() => actions.removeItem("creatives", c.id)} />
           </div></td>
         </tr>))}</tbody>

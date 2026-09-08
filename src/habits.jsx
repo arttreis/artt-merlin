@@ -304,7 +304,7 @@ function HabitRow({ h, days, today: t, onToggle, onEdit, onArchive, onPull }) {
       <td className="num">{stats.expected ? stats.rate + "%" : "—"}</td>
       <td className="habit-actions">
         <span className="row-actions">
-          {h.min > 0 && !h.marks[t] && <button className="action" type="button" title="puxar para o dia" onClick={onPull}>{icon("arrow")}</button>}
+          {h.min > 0 && !h.marks[t] && <button className="action" type="button" title="puxar para o dia" onClick={onPull}>{icon("clock")}</button>}
           <button className="action" type="button" title="editar" onClick={onEdit}>{icon("pencil")}</button>
           <button className="action" type="button" title="arquivar" onClick={onArchive}>{icon("archive")}</button>
         </span>

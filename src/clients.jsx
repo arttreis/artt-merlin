@@ -526,8 +526,14 @@ function Panel({ doc, tab, ctx, vault, thinking, onBack, onDelete, onMeeting }) 
 
 /* ---------- aba: painel (resumo) ---------- */
 function Dashboard({ doc, setTab }) {
-  const goalsDue = doc.goals.filter((g) => !g.done && g.due).sort((a, b) => a.due.localeCompare(b.due));
-  const backlogDue = doc.backlog.filter((b) => !b.done && b.due).sort((a, b) => a.due.localeCompare(b.due)).slice(0, 6);
+  /* prazo ordena, mas não é ingresso. antes o painel só listava o que tinha
+     data, e um cliente recém-criado por modelo — que nasce com objetivos e
+     backlog sem prazo (templates.js, buildClient) — aterrissava numa tela
+     dizendo "nenhum objetivo em aberto" logo depois de o modelo ter escrito
+     seis coisas. o que tem data vem primeiro; o resto vem embaixo. */
+  const byDue = (a, b) => (a.due ? 0 : 1) - (b.due ? 0 : 1) || String(a.due).localeCompare(String(b.due));
+  const goalsDue = doc.goals.filter((g) => !g.done).sort(byDue);
+  const backlogDue = doc.backlog.filter((b) => !b.done).sort(byDue).slice(0, 6);
   const incomplete = doc.channels.filter((c) => c.items.some((i) => !i.done));
   const last = doc.journal.slice().sort((a, b) => b.at - a.at)[0];
   return (
@@ -889,7 +895,7 @@ function Backlog({ doc, ctx }) {
                   <button className="action" type="button" disabled={!!delegate.busy} data-thinking={delegate.busy === b.id ? "yes" : null}
                     title={delegate.busy === b.id ? "pensando…" : "perguntar ao merlin: dá pra fazer com o Claude?"}
                     aria-label="Perguntar ao merlin se dá para fazer com o Claude" onClick={() => ask(b)}>{icon("spark")}</button>
-                  <button className="action" type="button" aria-label="Puxar para o dia" onClick={() => pull(b)}>{icon("arrow")}</button>
+                  <button className="action" type="button" title="puxar para o dia" aria-label="Puxar para o dia" onClick={() => pull(b)}>{icon("clock")}</button>
                   <button className="action" type="button" aria-label="Remover" onClick={() => removeFrom(backlogOf, b.id, "item removido do backlog")}>{icon("trash")}</button>
                 </div>
               </li>))}
