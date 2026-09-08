@@ -8,8 +8,10 @@
  * docs) para os outros modulos — ideas, clients, maps, funnels, finance.
  * ele nao entende nada do que esta dentro: so devolve e diz qual e mais novo.
  *
- * e um sistema de uma pessoa: OWNER_EMAILS no wrangler.toml lista quem pode
- * entrar. outro e-mail recebe a mesma resposta de sucesso e nenhum codigo.
+ * OWNER_EMAILS no wrangler.toml diz quem pode entrar — enderecos soltos ou um
+ * dominio inteiro, para o time. outro e-mail recebe a mesma resposta de
+ * sucesso e nenhum codigo. cada pessoa que entra ganha um Merlin proprio: as
+ * tabelas sao todas por `person`, e nada aqui cruza essa coluna.
  */
 
 const SESSION_DAYS = 90;     /* quanto tempo voce fica logado */
@@ -45,12 +47,27 @@ function sameString(a, b) {
 
 const normalizeEmail = (v) => String(v || "").trim().toLowerCase();
 
-/* os e-mails do dono, separados por virgula. vazio = qualquer um entra (so
-   faz sentido em desenvolvimento). */
+/* quem pode entrar, separado por virgula. uma entrada pode ser um endereco
+   inteiro ("arthur@exemplo.com") ou um dominio ("@guessless.com.br"), e ai
+   qualquer endereco dele entra. o dominio existe para o time: sem ele, cada
+   pessoa nova custaria um deploy. vazio = qualquer um entra (so faz sentido
+   em desenvolvimento).
+
+   entrar nao e ver: cada pessoa que entra ganha uma linha em `people` e um
+   Merlin proprio, e nenhuma consulta cruza o `person` da sessao. o dominio
+   abre a porta da casa, nao a gaveta de ninguem. */
 const owners = (env) => String(env.OWNER_EMAILS || "").split(",").map(normalizeEmail).filter(Boolean);
-const isOwner = (env, email) => { const o = owners(env); return !o.length || o.includes(email); };
+const isOwner = (env, email) => {
+  const o = owners(env);
+  if (!o.length) return true;
+  /* o e-mail ja passou por isValidEmail nos dois chamadores, entao ha um @ */
+  return o.includes(email) || o.includes(email.slice(email.indexOf("@")));
+};
 const DOC_TYPE = /^[a-z][a-z0-9_-]{0,31}$/;
 const DOC_ID = /^[A-Za-z0-9_.:-]{1,64}$/;
+/* o id de um arquivo e um uuid do proprio worker: confer-lo antes de tocar
+   no bucket impede que um caminho vindo da URL vire prefixo de outra pessoa */
+const FILE_ID = /^[0-9a-f-]{36}$/;
 const isValidEmail = (v) => /^[^@\s]+@[^@\s.]+\.[^@\s]+$/.test(v);
 const isDay = (v) => typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v);
 
@@ -113,13 +130,46 @@ const deadCookie = () =>
 
 /* ---------- o e-mail ---------- */
 
-/* o e-mail e um pedaco do app fora do app: mesmo fundo, mesma fonte mono no
-   codigo, mesmo verde. tudo inline e em tabela porque cliente de e-mail nao
-   le <style> nem variavel de css. as fontes sao as do sistema: Gmail descarta
-   web font, e o Sora/JetBrains do site ficam so como primeira opcao. */
-function codeEmailHtml(code) {
-  const sans = '"Sora",-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif';
-  const mono = '"JetBrains Mono","SF Mono",Menlo,Consolas,"Liberation Mono",monospace';
+/* o e-mail e um pedaco do app fora do app: mesmo fundo, mesma mono no codigo,
+   mesmo destaque — e agora a marca certa, porque quem entra pela Guessless nao
+   deve receber um e-mail verde de um produto que ela nao conhece. tudo inline
+   e em tabela porque cliente de e-mail nao le <style> nem variavel de css. as
+   fontes sao as do sistema: Gmail descarta web font, e a da marca fica so como
+   primeira opcao. */
+/* a paleta e o nome de cada marca, do lado do servidor. o cliente tem a
+   mesma tabela em core.js (BRANDS); as duas existem porque o e-mail sai daqui
+   e a tela sai de la, e nenhum dos dois pode perguntar ao outro na hora.
+   se um dominio novo entrar, entra nos dois. */
+const BRANDS = {
+  "": {
+    name: "Merlin",
+    /* aspas SIMPLES nos nomes: a style="..." e delimitada por aspas duplas, e
+       uma dupla aqui dentro fecha o atributo no meio — o resto do estilo vira
+       texto solto e o e-mail chega sem formatacao nenhuma. */
+    sans: "'Sora',-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif",
+    bg: "#0d0d0d", card: "#141414", edge: "#262626", rule: "#1f1f1f",
+    accent: "#2EE86B", ink: "#f2f2f2", mute: "#8c8c8c", faint: "#5c5c5c", ghost: "#4a4a4a",
+    line: "Digite no Merlin para entrar."
+  },
+  gl: {
+    name: "GuessLess · Merlin",
+    /* DM Sans e a display da casa; cliente de e-mail descarta web font, entao
+       ela e so a primeira opcao e o sistema resolve o resto. */
+    sans: "'DM Sans','Manrope',-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif",
+    bg: "#0A0A0A", card: "#121212", edge: "#1f1f1f", rule: "#1a1a1a",
+    accent: "#368DFF", ink: "#ffffff", mute: "#9a9a9a", faint: "#6a6a6a", ghost: "#555555",
+    line: "Digite no Merlin da casa para entrar."
+  }
+};
+/* qual marca cada dominio veste. e a mesma tabela do BRANDS do core.js, do
+   outro lado do fio: dominio novo entra nos dois. */
+const EMAIL_BRANDS = { "@guessless.com.br": "gl" };
+const brandOf = (email) => EMAIL_BRANDS[email.slice(email.indexOf("@"))] || "";
+
+function codeEmailHtml(code, brand) {
+  const b = BRANDS[brand] || BRANDS[""];
+  const mono = "'JetBrains Mono','SF Mono',Menlo,Consolas,'Liberation Mono',monospace";
+  const sans = b.sans;
   return `<!doctype html>
 <html lang="pt-BR">
 <head>
@@ -129,31 +179,31 @@ function codeEmailHtml(code) {
 <meta name="supported-color-schemes" content="dark">
 <title>Seu código do Merlin</title>
 </head>
-<body style="margin:0;padding:0;background:#0d0d0d;">
-<div style="display:none;max-height:0;overflow:hidden;opacity:0;color:#0d0d0d;">Vale por ${CODE_MINUTES} minutos e só funciona uma vez.</div>
-<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background:#0d0d0d;">
+<body style="margin:0;padding:0;background:${b.bg};">
+<div style="display:none;max-height:0;overflow:hidden;opacity:0;color:${b.bg};">Vale por ${CODE_MINUTES} minutos e só funciona uma vez.</div>
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background:${b.bg};">
 <tr><td align="center" style="padding:48px 20px;">
   <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="max-width:420px;">
-    <tr><td style="padding:0 0 28px;font-family:${mono};font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#7a7a7a;">
-      <span style="display:inline-block;width:7px;height:7px;border-radius:7px;background:#2EE86B;vertical-align:1px;margin-right:9px;"></span>Merlin
+    <tr><td style="padding:0 0 28px;font-family:${mono};font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:${b.mute};">
+      <span style="display:inline-block;width:7px;height:7px;border-radius:7px;background:${b.accent};vertical-align:1px;margin-right:9px;"></span>${b.name}
     </td></tr>
-    <tr><td style="padding:0 0 6px;font-family:${sans};font-size:20px;font-weight:600;letter-spacing:-.02em;color:#f2f2f2;">
+    <tr><td style="padding:0 0 6px;font-family:${sans};font-size:20px;font-weight:600;letter-spacing:-.02em;color:${b.ink};">
       Seu código
     </td></tr>
-    <tr><td style="padding:0 0 20px;font-family:${sans};font-size:14px;line-height:1.5;color:#8c8c8c;">
-      Digite no Merlin para entrar.
+    <tr><td style="padding:0 0 20px;font-family:${sans};font-size:14px;line-height:1.5;color:${b.mute};">
+      ${b.line}
     </td></tr>
-    <tr><td style="padding:22px 16px;background:#141414;border:1px solid #262626;border-radius:12px;text-align:center;font-family:${mono};font-size:36px;font-weight:500;letter-spacing:.28em;color:#2EE86B;">
+    <tr><td style="padding:22px 16px;background:${b.card};border:1px solid ${b.edge};border-radius:12px;text-align:center;font-family:${mono};font-size:36px;font-weight:500;letter-spacing:.28em;color:${b.accent};">
       ${code}
     </td></tr>
-    <tr><td style="padding:18px 0 0;font-family:${sans};font-size:13px;line-height:1.55;color:#8c8c8c;">
-      Vale por <span style="color:#f2f2f2;">${CODE_MINUTES} minutos</span> e só funciona uma vez.
+    <tr><td style="padding:18px 0 0;font-family:${sans};font-size:13px;line-height:1.55;color:${b.mute};">
+      Vale por <span style="color:${b.ink};">${CODE_MINUTES} minutos</span> e só funciona uma vez.
     </td></tr>
-    <tr><td style="padding:28px 0 0;"><div style="border-top:1px solid #1f1f1f;"></div></td></tr>
-    <tr><td style="padding:20px 0 0;font-family:${sans};font-size:12px;line-height:1.55;color:#5c5c5c;">
+    <tr><td style="padding:28px 0 0;"><div style="border-top:1px solid ${b.rule};"></div></td></tr>
+    <tr><td style="padding:20px 0 0;font-family:${sans};font-size:12px;line-height:1.55;color:${b.faint};">
       Se não foi você que pediu, ignore. Ninguém entra sem este código.
     </td></tr>
-    <tr><td style="padding:22px 0 0;font-family:${mono};font-size:11px;letter-spacing:.06em;color:#4a4a4a;">
+    <tr><td style="padding:22px 0 0;font-family:${mono};font-size:11px;letter-spacing:.06em;color:${b.ghost};">
       merlin.arttreis.com.br
     </td></tr>
   </table>
@@ -182,7 +232,7 @@ async function sendCode(env, email, code) {
       subject: code + " — seu código do Merlin",
       /* o codigo no assunto tambem: na maioria dos clientes de e-mail voce le
          sem precisar abrir a mensagem. */
-      html: codeEmailHtml(code),
+      html: codeEmailHtml(code, brandOf(email)),
       /* a versao em texto fica: e o que aparece em cliente sem html e o que
          alguns filtros de spam olham quando o html vem sozinho. */
       text: "Seu código é " + code + ".\n\n" +
@@ -368,6 +418,70 @@ async function uploadDoc(req, env, person) {
   }, 409);
 }
 
+/* ---------- arquivos (R2) ----------
+   um print colado numa ideia não cabe no documento: ele sobe e desce inteiro
+   a cada sincronização, e uma captura de tela pesa mais que o módulo todo.
+   por isso o binário mora no R2 e o documento guarda só o bilhete
+   ({id, name, type, size}).
+
+   a chave no bucket começa com o `person` da sessão, e toda leitura confere
+   esse prefixo antes de devolver o objeto. não é obscuridade de id: é a
+   mesma regra das tabelas — nenhuma consulta atravessa a coluna da pessoa.
+   quem descobrir o id de outra pessoa recebe 404 igual a quem inventou um. */
+
+const FILE_TYPES = ["image/png", "image/jpeg", "image/webp", "image/gif", "application/pdf"];
+/* 8MB: uma captura de tela de monitor grande em PNG fica perto de 3MB, e o
+   limite de uma requisição do Worker é bem maior. o teto existe para um
+   cliente com defeito não encher o bucket, não para apertar o uso. */
+const FILE_MAX = 8 * 1024 * 1024;
+
+const fileKey = (person, id) => person + "/" + id;
+
+async function uploadFile(req, env, person) {
+  if (!env.FILES) return fail("o servidor não tem onde guardar arquivos", 503);
+  const type = String(req.headers.get("x-file-type") || "").toLowerCase();
+  if (!FILE_TYPES.includes(type)) return fail("tipo de arquivo não aceito");
+  /* o nome vem no cabeçalho e passa por decodeURIComponent porque cabeçalho
+     é ASCII: "captura de tela.png" com acento chegaria quebrado. */
+  let name = "";
+  try { name = decodeURIComponent(String(req.headers.get("x-file-name") || "")).slice(0, 120); }
+  catch (e) { name = ""; }
+
+  const body = await req.arrayBuffer();
+  if (!body.byteLength) return fail("arquivo vazio");
+  if (body.byteLength > FILE_MAX) return fail("arquivo grande demais (máximo 8MB)", 413);
+
+  const id = crypto.randomUUID();
+  await env.FILES.put(fileKey(person, id), body, {
+    httpMetadata: { contentType: type },
+    customMetadata: { name }
+  });
+  return json({ id, name, type, size: body.byteLength });
+}
+
+async function downloadFile(req, env, person, id) {
+  if (!env.FILES) return fail("não existe", 404);
+  if (!FILE_ID.test(id)) return fail("não existe", 404);
+  const obj = await env.FILES.get(fileKey(person, id));
+  /* de outra pessoa é "não existe", e não "não pode": responder diferente
+     contaria que o arquivo existe. */
+  if (!obj) return fail("não existe", 404);
+  const headers = new Headers();
+  obj.writeHttpMetadata(headers);
+  headers.set("etag", obj.httpEtag);
+  /* privado e imutável: o conteúdo de um id nunca muda (id novo a cada
+     upload), então o navegador pode guardar para sempre — mas só ele. */
+  headers.set("cache-control", "private, max-age=31536000, immutable");
+  return new Response(obj.body, { headers });
+}
+
+async function deleteFile(env, person, id) {
+  if (!env.FILES) return fail("não existe", 404);
+  if (!FILE_ID.test(id)) return fail("não existe", 404);
+  await env.FILES.delete(fileKey(person, id));
+  return json({ ok: true });
+}
+
 /* ---------- merlin, o conselheiro ----------
    a unica rota que pensa. recebe um contexto (um no do mapa, um funil) e pede
    a Claude sugestoes em JSON. a chave e segredo do worker, como a do Resend;
@@ -376,6 +490,10 @@ async function uploadDoc(req, env, person) {
 
 const MODEL = "claude-opus-5";
 const MAX_SUGGESTIONS = 12;
+/* conselhos por pessoa por hora. e folgado para quem trabalha e apertado
+   para quem esqueceu o dedo no botao: ninguem pede trinta conselhos numa
+   hora de proposito. */
+const ADVICE_PER_HOUR = 30;
 /* o vocabulario de etapas que a tela aceita. se NODE_TYPES mudar em
    funnels.jsx, muda aqui junto: sugestao com tipo que nao existe do outro
    lado e descartada em silencio, e o Merlin parece ter ficado mudo. */
@@ -387,10 +505,14 @@ const NODE_TYPES = [
   "upsell", "downsell", "onboarding", "repurchase", "custom"
 ].join(", ");
 
+/* o conselheiro fala com quem esta na tela, e quem esta na tela e qualquer
+   pessoa do time. por isso o contexto e da casa, nao de uma pessoa: dizer
+   "o Arthur" para quem nao e o Arthur sai errado na cara dela. */
 const SYSTEM = [
-  "Você é o Merlin, conselheiro do Arthur Reis — consultor de growth, branding e desenvolvimento;",
-  "sócio da Guessless (agência de growth marketing) e da GL Suite (tecnologia sob demanda).",
-  "Os clientes dele vendem em Mercado Livre, Shopee, TikTok Shop, Amazon e sites próprios; o checkout da casa é Stripe.",
+  "Você é o Merlin, conselheiro do time da Guessless — agência de growth marketing, irmã da GL Suite (tecnologia sob demanda).",
+  "A casa faz growth, branding e desenvolvimento.",
+  "Os clientes vendem em Mercado Livre, Shopee, TikTok Shop, Amazon e sites próprios; o checkout da casa é Stripe.",
+  "Fale com quem está na tela, em segunda pessoa: nunca suponha o nome nem o cargo de quem perguntou.",
   "Responda SEMPRE em português do Brasil, com acentuação correta, curto e concreto: nada de frases genéricas.",
   "Responda SOMENTE com um objeto JSON, sem texto antes ou depois, sem cercas de código."
 ].join(" ");
@@ -541,15 +663,15 @@ const TEXT_TASKS = {
       (c.cpl ? "CPL: " + String(c.cpl).slice(0, 40) + "\n" : "") +
       (c.cac ? "CAC: " + String(c.cac).slice(0, 40) + "\n" : "")
   }),
-  /* uma demanda: da pra fazer com o Claude, e o que sobra pro Arthur.
+  /* uma demanda: da pra fazer com o Claude, e o que sobra pra pessoa.
      quando da, a resposta termina numa linha "Montar: ..." — e ela que a tela
      transforma em tarefa do dia. quando nao da, a linha nao vem e nao ha botao:
      o merlin nao inventa trabalho para justificar a propria resposta. */
   delegate: (c) => ({
     instruction:
       "Diga se esta demanda pode ser feita com o Claude. Comece com uma linha só, em negrito, com o veredicto — **dá**, **dá em parte** ou **não dá** — seguida de uma frase curta dizendo por quê. " +
-      "Depois, em markdown simples e no máximo 170 palavras: o que exatamente o Claude faria e de que forma; o que precisa existir antes (arquivo, acesso, conta, um exemplo do resultado certo); e o que continua sendo trabalho do Arthur. " +
-      "As formas possíveis são: Claude Code numa pasta ou repositório (lê e escreve arquivos, roda comandos, mexe em planilha e CSV, escreve e publica código); uma skill, que são instruções salvas ensinando uma tarefa recorrente (ele já tem uma para gerar criativos com o Nano Banana); um agente ligado por MCP a uma ferramenta que ele já usa (ClickUp, Meta Ads, Miro, HeyGen, Magnific, Resend, Supabase, Google Drive, Google Agenda, Stripe); um artifact, que é uma página publicada com link para mandar ao cliente (relatório, painel, formulário); um agente agendado, que roda sozinho num horário; ou a API dentro de um produto, como este próprio Merlin. Escolha uma e diga qual — nunca responda que \"dá para automatizar\" sem dizer com o quê. " +
+      "Depois, em markdown simples e no máximo 170 palavras: o que exatamente o Claude faria e de que forma; o que precisa existir antes (arquivo, acesso, conta, um exemplo do resultado certo); e o que continua sendo trabalho de quem pediu. " +
+      "As formas possíveis são: Claude Code numa pasta ou repositório (lê e escreve arquivos, roda comandos, mexe em planilha e CSV, escreve e publica código); uma skill, que são instruções salvas ensinando uma tarefa recorrente (a casa já tem uma para gerar criativos com o Nano Banana); um agente ligado por MCP a uma ferramenta que a casa já usa (ClickUp, Meta Ads, Miro, HeyGen, Magnific, Resend, Supabase, Google Drive, Google Agenda, Stripe); um artifact, que é uma página publicada com link para mandar ao cliente (relatório, painel, formulário); um agente agendado, que roda sozinho num horário; ou a API dentro de um produto, como este próprio Merlin. Escolha uma e diga qual — nunca responda que \"dá para automatizar\" sem dizer com o quê. " +
       "Seja honesto e sem entusiasmo: o que depende do julgamento dele, de estar presente, da relação com o cliente ou de apertar botão em ferramenta sem API é **não dá**, e uma linha explica. " +
       (+c.min > 0
         ? "A estimativa de hoje é " + Math.round(+c.min) + " minutos: diga em quantos minutos a demanda ficaria com o Claude fazendo a parte dele, contando o que sobra como supervisão. "
@@ -573,7 +695,7 @@ function extractJson(text) {
   try { return JSON.parse(text.slice(a, b + 1)); } catch (e) { return null; }
 }
 
-async function advise(req, env) {
+async function advise(req, env, person) {
   if (!env.ANTHROPIC_API_KEY) return fail("o Merlin ainda não tem chave: npx wrangler secret put ANTHROPIC_API_KEY", 503);
   const body = await req.json().catch(() => null);
   const name = String((body && body.task) || "");
@@ -581,6 +703,23 @@ async function advise(req, env) {
   if (!task || !body.context || typeof body.context !== "object") return fail("tarefa inválida");
   const isText = !!TEXT_TASKS[name];
   const { instruction, context } = task(body.context);
+
+  /* o teto por pessoa. a chave e uma so para o time, e um botao que chama
+     Opus nao pode virar a fatura de todo mundo porque alguem deixou o dedo
+     preso. contamos ANTES de perguntar: um pedido que falha la fora tambem
+     gastou a nossa vez, e contar depois deixaria a porta aberta em cima do
+     erro. o limite e por hora e por pessoa, entao esperar resolve. */
+  const hour = Math.floor(Date.now() / 3600e3);
+  const used = await env.DB.prepare(
+    "SELECT n FROM advice WHERE person = ? AND hour = ?"
+  ).bind(person, hour).first();
+  if (used && used.n >= ADVICE_PER_HOUR) {
+    return fail("você já pediu bastante conselho nesta hora; volte daqui a pouco", 429);
+  }
+  await env.DB.prepare(
+    "INSERT INTO advice (person, hour, n) VALUES (?, ?, 1) " +
+    "ON CONFLICT(person, hour) DO UPDATE SET n = n + 1"
+  ).bind(person, hour).run();
 
   const r = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
@@ -643,21 +782,37 @@ export default {
       if (route === "/sign-out" && req.method === "POST") return signOut();
       if (route === "/me" && req.method === "GET") return await whoAmI(req, env);
 
+      /* /files/<id> e a unica rota com caminho variavel: separamos o id aqui
+         para o resto do roteamento continuar comparando strings inteiras */
+      const fileMatch = route.match(/^\/files\/([^/]+)$/);
+      const base = fileMatch ? "/files/:id" : route;
+
       /* rota que nao existe e 404 antes de ser 401: pedir login para um
          caminho inexistente mente sobre a causa do erro */
-      if (route !== "/days" && route !== "/docs" && route !== "/merlin") return fail("não existe", 404);
+      if (base !== "/days" && base !== "/docs" && base !== "/merlin"
+          && base !== "/files" && base !== "/files/:id") return fail("não existe", 404);
 
       /* daqui pra baixo, so quem entrou */
       const person = await readSession(readCookie(req, "session"), env.SESSION_SECRET);
       if (!person) return fail("entre primeiro", 401);
 
       if (route === "/merlin") {
-        if (req.method === "POST") return await advise(req, env);
+        if (req.method === "POST") return await advise(req, env, person);
         return fail("método não serve aqui", 405);
       }
       if (route === "/docs") {
         if (req.method === "GET") return await downloadDocs(req, env, person);
         if (req.method === "POST") return await uploadDoc(req, env, person);
+        return fail("método não serve aqui", 405);
+      }
+      if (base === "/files") {
+        if (req.method === "POST") return await uploadFile(req, env, person);
+        return fail("método não serve aqui", 405);
+      }
+      if (base === "/files/:id") {
+        const id = decodeURIComponent(fileMatch[1]);
+        if (req.method === "GET") return await downloadFile(req, env, person, id);
+        if (req.method === "DELETE") return await deleteFile(env, person, id);
         return fail("método não serve aqui", 405);
       }
       if (req.method === "GET") return await downloadDays(req, env, person);

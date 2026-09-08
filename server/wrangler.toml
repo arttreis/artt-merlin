@@ -33,15 +33,31 @@ binding = "DB"
 database_name = "artt-planner"
 database_id = "9011ef3f-3d1d-4019-8db9-c5ff07df0446"
 
+# onde moram os prints anexados as ideias. o binario nao cabe no documento:
+# ele subiria e desceria inteiro a cada sincronizacao. aqui fica o arquivo, e
+# o documento guarda so o bilhete. a chave de todo objeto comeca com o
+# `person` da sessao, e o worker confere esse prefixo em toda leitura.
+#
+# o bucket precisa existir antes do primeiro deploy:
+#   npx wrangler r2 bucket create merlin-files
+[[r2_buckets]]
+binding = "FILES"
+bucket_name = "merlin-files"
+
 [vars]
 # o remetente precisa estar num dominio verificado no Resend.
 # o onboarding@resend.dev so entrega no e-mail da propria conta.
 SENDER_EMAIL = "merlin@arttreis.com.br"
 
-# quem pode entrar. e um sistema de uma pessoa: qualquer outro e-mail recebe
-# a mesma resposta de sucesso e nenhum codigo. vazio libera todo mundo — so
-# para desenvolvimento local.
-OWNER_EMAILS = "midia@guessless.com.br,arthurcastilhos@gmail.com"
+# quem pode entrar. cada entrada e um endereco inteiro ou um dominio comecado
+# por @ — e o dominio que abre o Merlin para o time da Guessless sem um deploy
+# por pessoa que entra. qualquer outro e-mail recebe a mesma resposta de
+# sucesso e nenhum codigo. vazio libera todo mundo — so para desenvolvimento.
+#
+# abrir a porta nao e abrir a gaveta: quem entra ganha um Merlin proprio, e as
+# consultas do worker nunca cruzam o `person` da sessao. o time divide o
+# endereco, o custo e o codigo — nunca o dia, o cliente nem o financeiro.
+OWNER_EMAILS = "@guessless.com.br,arthurcastilhos@gmail.com"
 
 # segredos NAO ficam aqui. sao tres, e vao por linha de comando:
 #   npx wrangler secret put RESEND_API_KEY

@@ -3,7 +3,7 @@
 import worker from "./worker.js";
 
 /* ---- D1 falso: entende so as consultas que o worker faz ---- */
-const db = { people: [], codes: [], days: [], docs: [] };
+const db = { people: [], codes: [], days: [], docs: [], advice: [] };
 let sentEmails = [];
 
 function prepare(sql) {
@@ -78,6 +78,14 @@ function run(sql, a, mode) {
   if (s.startsWith("SELECT doc, v FROM docs")) {
     return db.docs.find(d => d.person === a[0] && d.type === a[1] && d.id === a[2]) || null;
   }
+  if (s.startsWith("SELECT n FROM advice")) {
+    return db.advice.find(x => x.person === a[0] && x.hour === a[1]) || null;
+  }
+  if (s.startsWith("INSERT INTO advice")) {
+    const ex = db.advice.find(x => x.person === a[0] && x.hour === a[1]);
+    if (ex) ex.n++; else db.advice.push({ person: a[0], hour: a[1], n: 1 });
+    return { meta: { changes: 1 } };
+  }
   if (s.startsWith("DELETE FROM codes")) {
     const before = db.codes.length;
     db.codes = db.codes.filter(c => c.expires_at >= a[0]);
@@ -106,7 +114,28 @@ globalThis.fetch = async (url, opts) => {
 };
 
 const ASSETS = { fetch: async () => new Response("<!doctype html><title>merlin</title>", { headers: { "content-type": "text/html" } }) };
-const env = { DB: { prepare }, ASSETS, RESEND_API_KEY: "re_teste", SENDER_EMAIL: "p@x.com", SESSION_SECRET: "segredo-de-teste-longo-o-bastante", OWNER_EMAILS: "" };
+
+/* ---- R2 falso: um mapa de chave -> bytes, com so o que o worker usa ----
+   o que importa provar nao e a gravacao, e a CHAVE: ela comeca com a pessoa
+   da sessao, e e isso que impede um arquivo de atravessar para outra. */
+const bucket = {};
+const FILES = {
+  put: async (key, body, opts) => {
+    bucket[key] = { body: new Uint8Array(body), type: (opts && opts.httpMetadata || {}).contentType || "", meta: (opts && opts.customMetadata) || {} };
+  },
+  get: async (key) => {
+    const o = bucket[key];
+    if (!o) return null;
+    return {
+      body: o.body,
+      httpEtag: '"' + key + '"',
+      writeHttpMetadata: (h) => h.set("content-type", o.type)
+    };
+  },
+  delete: async (key) => { delete bucket[key]; }
+};
+
+const env = { DB: { prepare }, ASSETS, FILES, RESEND_API_KEY: "re_teste", SENDER_EMAIL: "p@x.com", SESSION_SECRET: "segredo-de-teste-longo-o-bastante", OWNER_EMAILS: "" };
 
 const call = (method, route, body, cookie) =>
   worker.fetch(new Request("https://x.com/api" + route, {
@@ -255,7 +284,69 @@ r = await call("POST", "/code", { email: "arthur@exemplo.com" });
 check("dono recebe codigo", r.status === 200 && sentEmails.length === 1);
 env.OWNER_EMAILS = "";
 
-/* ---- 13d. o merlin ---- */
+/* ---- 13d. o time entra por dominio ----
+   uma entrada de OWNER_EMAILS pode ser "@casa.com.br": e assim que o time
+   entra sem um deploy por pessoa. abrir a porta nao abre a gaveta — o ultimo
+   teste daqui e o que garante isso. */
+env.OWNER_EMAILS = "@guessless.com.br,arthurcastilhos@gmail.com";
+sentEmails = [];
+r = await call("POST", "/code", { email: " Maria@Guessless.com.BR " });
+check("dominio do time recebe codigo", r.status === 200 && sentEmails.length === 1, String(sentEmails.length));
+const mariaCode = codeFromEmail();
+r = await call("POST", "/code", { email: "gente@outracasa.com" });
+check("fora do dominio recebe a mesma resposta", r.status === 200);
+check("fora do dominio NAO recebe codigo", sentEmails.length === 1, String(sentEmails.length));
+/* o e-mail veste a marca de quem vai receber: quem entra pela Guessless nao
+   deve abrir um e-mail verde de um produto que ela nao conhece. */
+check("e-mail da casa usa o azul da casa", sentEmails[0].html.includes("#368DFF"), "sem o azul");
+check("e-mail da casa assina GuessLess", sentEmails[0].html.includes("GuessLess"), "sem a assinatura");
+check("e-mail da casa nao leva o verde do Merlin", !sentEmails[0].html.includes("#2EE86B"));
+
+/* o atributo style e delimitado por aspas duplas. uma aspa dupla DENTRO dele
+   (o classico font-family:"DM Sans") fecha o atributo no meio, e o e-mail
+   chega sem formatacao nenhuma — foi assim por muito tempo sem ninguem notar,
+   porque olhar se a cor "aparece no html" nao prova que ela esta aplicada.
+   este teste le cada style="..." ate a proxima aspa e cobra o que tem que
+   estar la dentro. */
+function brokenStyles(html) {
+  const quebrados = [];
+  for (const m of html.matchAll(/style="([^"]*)"/g)) {
+    /* um style que termina logo depois de "font-family:" foi cortado ali */
+    if (/(?:font-family|background|color|border):\s*$/.test(m[1])) quebrados.push(m[1].slice(-40));
+  }
+  return quebrados;
+}
+for (const [quem, html] of [["da casa", sentEmails[0].html]]) {
+  const q = brokenStyles(html);
+  check("e-mail " + quem + ": nenhum style cortado no meio", q.length === 0, q.join(" | "));
+  /* e a prova positiva: o cartao do codigo chega inteiro */
+  const card = [...html.matchAll(/style="([^"]*)"/g)].map((m) => m[1]).find((s) => s.includes("font-size:36px"));
+  check("e-mail " + quem + ": o codigo mantem tamanho, fundo e cor", !!card && /background:#/.test(card) && /color:#/.test(card), String(card).slice(0, 60));
+}
+r = await call("POST", "/code", { email: "arthurcastilhos@gmail.com" });
+check("endereco solto vale ao lado do dominio", sentEmails.length === 2, String(sentEmails.length));
+check("fora da casa continua verde", sentEmails[1].html.includes("#2EE86B"));
+check("fora da casa nao vira Guessless", !sentEmails[1].html.includes("GuessLess"));
+/* o Merlin tinha o mesmo defeito de aspas; as duas marcas passam pela prova */
+{
+  const q = brokenStyles(sentEmails[1].html);
+  check("e-mail do Merlin: nenhum style cortado no meio", q.length === 0, q.join(" | "));
+  const card = [...sentEmails[1].html.matchAll(/style="([^"]*)"/g)].map((m) => m[1]).find((s) => s.includes("font-size:36px"));
+  check("e-mail do Merlin: o codigo mantem tamanho, fundo e cor", !!card && /background:#/.test(card) && /color:#/.test(card), String(card).slice(0, 60));
+}
+/* "@guessless.com.br" e regra de dominio, nunca um endereco que da para usar */
+r = await call("POST", "/sign-in", { email: "maria@guessless.com.br", code: mariaCode });
+check("pessoa do time entra", r.status === 200, String(r.status));
+const mariaCookie = cookieOf(r);
+r = await call("GET", "/docs?type=ideas&since=0", null, mariaCookie);
+body = await r.json();
+check("quem entra pelo dominio NAO ve o doc de quem ja estava", body.docs.length === 0, JSON.stringify(body.docs));
+r = await call("GET", "/days?since=0", null, mariaCookie);
+body = await r.json();
+check("quem entra pelo dominio NAO ve o dia de quem ja estava", body.days.length === 0, JSON.stringify(body.days));
+env.OWNER_EMAILS = "";
+
+/* ---- 13e. o merlin ---- */
 r = await call("POST", "/merlin", { task: "branches", context: { node: "x" } }, cookie);
 check("merlin sem chave responde 503", r.status === 503, String(r.status));
 env.ANTHROPIC_API_KEY = "sk-teste";
@@ -294,7 +385,87 @@ check("merlin revisa o periodo", r.status === 200 && /MVP/.test(body.text), JSON
 claudeAnswer = { stop_reason: "refusal", content: [] };
 r = await call("POST", "/merlin", { task: "funnel", context: { name: "f", stages: ["lp"] } }, cookie);
 check("merlin repassa a recusa", r.status === 422);
+
+/* ---- 13f. o teto do conselheiro ----
+   a chave da Anthropic e uma so para o time. o teto e por pessoa e por hora:
+   quem gastou espera, e quem esta ao lado nao paga por isso. */
+claudeAnswer = { stop_reason: "end_turn", content: [{ type: "text", text: '{"text":"ok"}' }] };
+const askAdvice = (c) => call("POST", "/merlin", { task: "week", context: { range: "1-7 set", cards: [] } }, c);
+let lastAdvice = 200;
+for (let i = 0; i < 40 && lastAdvice !== 429; i++) lastAdvice = (await askAdvice(cookie)).status;
+check("limita conselhos por hora", lastAdvice === 429, String(lastAdvice));
+r = await askAdvice(otherCookie);
+check("o teto e de quem gastou, nao do time", r.status === 200, String(r.status));
 env.ANTHROPIC_API_KEY = "";
+
+
+/* ---- 13g. os arquivos (R2) ----
+   o binario de um print nao cabe no documento: ele subiria e desceria
+   inteiro a cada sincronizacao. o que este bloco prova nao e o upload — e
+   que a chave do objeto comeca com a pessoa da sessao, e que quem pedir o
+   arquivo de outra pessoa recebe "nao existe", nao "nao pode": responder
+   diferente ja contaria que o arquivo existe. */
+
+const png = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3, 4]);
+const sendFile = (bytes, type, name, cookie) =>
+  worker.fetch(new Request("https://x.com/api/files", {
+    method: "POST",
+    headers: {
+      "content-type": "application/octet-stream",
+      "x-file-type": type,
+      "x-file-name": encodeURIComponent(name || ""),
+      ...(cookie ? { cookie } : {})
+    },
+    body: bytes
+  }), env);
+
+r = await sendFile(png, "image/png", "captura de tela.png");
+check("arquivo sem sessao e recusado", r.status === 401, String(r.status));
+
+r = await sendFile(png, "text/html", "x.html", cookie);
+check("recusa tipo que nao e imagem nem pdf", r.status === 400, String(r.status));
+
+r = await sendFile(new Uint8Array(9 * 1024 * 1024), "image/png", "gigante.png", cookie);
+check("recusa arquivo grande demais", r.status === 413, String(r.status));
+
+r = await sendFile(png, "image/png", "captura de tela.png", cookie);
+let fileBody = await r.json();
+check("aceita o print", r.status === 200 && !!fileBody.id, JSON.stringify(fileBody));
+check("devolve o tamanho", fileBody.size === png.length, String(fileBody.size));
+check("o nome com acento volta inteiro", fileBody.name === "captura de tela.png", fileBody.name);
+check("a chave comeca com a pessoa da sessao",
+  Object.keys(bucket).some((k) => k.endsWith("/" + fileBody.id) && k.split("/")[0].length > 0),
+  Object.keys(bucket).join(","));
+
+const fileGet = (id, c) =>
+  worker.fetch(new Request("https://x.com/api/files/" + id, { headers: c ? { cookie: c } : {} }), env);
+
+r = await fileGet(fileBody.id, cookie);
+check("devolve o print de quem o subiu", r.status === 200, String(r.status));
+check("devolve com o tipo certo", r.headers.get("content-type") === "image/png", r.headers.get("content-type"));
+check("o print nao entra em cache compartilhado", /private/.test(r.headers.get("cache-control") || ""), r.headers.get("cache-control"));
+
+r = await fileGet(fileBody.id, otherCookie);
+check("o print de outra pessoa e 'nao existe', nao 'nao pode'", r.status === 404, String(r.status));
+
+r = await fileGet("../outra/coisa", cookie);
+check("id fora de forma nao vira caminho", r.status === 404, String(r.status));
+
+r = await fileGet(fileBody.id);
+check("sem sessao nao ha print", r.status === 401, String(r.status));
+
+r = await worker.fetch(new Request("https://x.com/api/files/" + fileBody.id, { method: "DELETE", headers: { cookie: otherCookie } }), env);
+check("apagar so alcanca o proprio", (await fileGet(fileBody.id, cookie)).status === 200, "o de outra pessoa sumiu");
+
+r = await worker.fetch(new Request("https://x.com/api/files/" + fileBody.id, { method: "DELETE", headers: { cookie } }), env);
+check("apaga o proprio print", r.status === 200 && (await fileGet(fileBody.id, cookie)).status === 404, String(r.status));
+
+/* sem o bucket configurado a rota diz isso, em vez de estourar */
+const noBucket = { ...env, FILES: null };
+r = await worker.fetch(new Request("https://x.com/api/files", {
+  method: "POST", headers: { "content-type": "application/octet-stream", "x-file-type": "image/png", cookie }, body: png
+}), noBucket);
+check("sem bucket, a rota avisa em vez de quebrar", r.status === 503, String(r.status));
 
 /* ---- 14. o site sai do mesmo worker que a api ---- */
 const raw = (path) => worker.fetch(new Request("https://x.com" + path), env);
