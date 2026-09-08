@@ -7,6 +7,47 @@
    importa este arquivo. o dia carrega so a casca porque tem CSS proprio com
    nomes de classe que colidiriam com os componentes.
    --------------------------------------------------------------- */
+
+/* ---------- a camada ----------
+   o que e COMUM vive numa camada de cascata, e o que e da pagina fica fora
+   dela. regra sem camada ganha de regra em camada, sempre, independente da
+   ordem em que as folhas chegam no <head> — e e exatamente essa ordem que
+   nao dava para controlar.
+
+   o build separa o CSS comum num arquivo proprio e o linka DEPOIS do da
+   pagina (conferido no server/site/*.html: "notes.css" vem antes de
+   "base.css" em dez das onze paginas). o comentario no topo de cada CSS de
+   pagina dizia o contrario, e estava errado desde que o CSS saiu do <style>:
+   quem escrevesse uma regra de pagina empatada com uma do comum veria a do
+   comum ganhar, sem nenhum aviso.
+
+   com a camada, a intencao passa a valer sozinha e a ordem do <head> deixa de
+   importar. nada aqui precisa de !important nem de especificidade inflada. */
+@layer base {
+/* ---------- o reset ----------
+   mora aqui porque toda pagina carrega a casca, inclusive o dia — e porque
+   estar em dois arquivos custou caro: o dia tinha a propria copia, fora da
+   camada, e regra sem camada ganha de regra em camada. o `button{border:0}`
+   solto derrubava a borda da .mark sem ninguem entender por que. */
+*{box-sizing:border-box}
+/* varias classes usam display:flex, que venceria o display:none do atributo hidden */
+[hidden]{display:none !important}
+html,body{margin:0;padding:0}
+body{
+  background:var(--bg);color:var(--ink);
+  font-family:var(--sans);font-size:14px;line-height:1.35;
+  letter-spacing:-.01em;
+  -webkit-font-smoothing:antialiased;
+  min-height:100dvh;
+}
+/* a tinta sobre o destaque é token porque muda com a marca: escura sobre o
+   verde do Merlin, branca sobre o azul da casa. */
+::selection{background:var(--green);color:var(--on-green)}
+a{color:inherit;text-decoration:none}
+button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer}
+input,select,textarea{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--green);outline-offset:2px;border-radius:var(--br2)}
+
 :root{
   --pd:16px; --pd2:8px; --pd3:4px;
   --br:16px; --br2:8px; --br3:12px; --br-pill:100px;
@@ -415,3 +456,28 @@ html.light{--color-1:#1c6fc4;--color-2:#b8600a;--color-3:#c4234f;--color-4:#7a3b
 .sb__who:has(.sb__me:hover){background:var(--fill);border-color:var(--line)}
 .sb__me:hover .who b{color:var(--ink)}
 .sb__me[aria-current="page"] .who b{color:var(--green-ink)}
+
+
+/* ---------- a caixa de marcar ----------
+   nasceu no dia, com 44px, e a checklist da nota precisou dela pequena. duas
+   definicoes seriam duas caixas — e e assim que um design system se desfaz.
+   o ✓ fica fantasma ate o ponteiro chegar: a caixa vazia tem que parecer
+   vazia, mas quem passa por cima precisa ver o que vai acontecer.
+
+   mora AQUI, e nao no base.css, porque o dia nao carrega o base: ele carrega
+   so a casca. um componente comum que a tela mais importante do produto nao
+   enxerga nao e comum. */
+.mark{
+  flex:0 0 auto;width:22px;height:22px;border-radius:var(--br2);
+  background:var(--fill);border:1px solid var(--line);
+  display:grid;place-items:center;color:var(--ink);cursor:pointer;
+  transition:background var(--t),color var(--t),border-color var(--t);
+}
+.mark svg{width:12px;height:12px;opacity:.18;transition:opacity var(--t)}
+.mark:hover{background:var(--green);border-color:var(--green);color:var(--on-green)}
+.mark:hover svg{opacity:1}
+/* marcada: o verde fica, e o ✓ para de ser fantasma */
+.is-done > .mark,.mark[aria-checked="true"]{background:var(--green);border-color:var(--green);color:var(--on-green)}
+.is-done > .mark svg,.mark[aria-checked="true"] svg{opacity:1}
+
+}

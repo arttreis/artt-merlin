@@ -39,24 +39,13 @@
   --t:220ms var(--ease);
 }
 
-*{box-sizing:border-box}
-/* varias classes usam display:flex, que venceria o display:none do atributo hidden */
-[hidden]{display:none !important}
-html,body{margin:0;padding:0}
+/* o reset mora na casca (shell.css), que o dia carrega. o que fica aqui e so
+   o que e do dia mesmo: o corpo que centraliza o aparelho na tela. */
 body{
-  background:var(--bg);color:var(--ink);
-  font-family:var(--sans);font-size:14px;line-height:1.35;
-  letter-spacing:-.01em;
-  -webkit-font-smoothing:antialiased;
-  min-height:100dvh;
   display:grid;place-items:center;
   /* a barra do merlin flutua no topo: o corpo reserva a altura dela */
   padding:calc(var(--nav-h) + clamp(16px,4vh,48px)) clamp(12px,3vw,40px) clamp(24px,7vh,88px);
 }
-
-button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer}
-input{font:inherit;color:inherit}
-:focus-visible{outline:2px solid var(--green);outline-offset:2px;border-radius:var(--br2)}
 
 /* rotulo mono, o .t-mono do sistema */
 .t-mono{
@@ -250,15 +239,12 @@ body::after{
 .task[data-fits="no"] .mark{border-style:dashed}
 
 /* o ladrilho de icone e o proprio botao de concluir */
-.mark{
-  flex:0 0 auto;width:44px;height:44px;border-radius:var(--br3);
-  background:var(--fill);border:1px solid var(--line);
-  display:grid;place-items:center;color:var(--ink);
-  transition:background var(--t),color var(--t),border-color var(--t);
-}
-.mark svg{width:18px;height:18px;opacity:.18;transition:opacity var(--t)}
-.mark:hover{background:var(--green);border-color:var(--green);color:var(--on-green)}
-.mark:hover svg,.task:focus-within .mark svg{opacity:1}
+/* a .mark mora em base.css desde que a checklist da nota passou a usá-la; o
+   que fica aqui é só o que é do dia: o tamanho grande e o ✓ que aparece
+   quando a linha ganha foco pelo teclado. */
+.mark{width:44px;height:44px;border-radius:var(--br3)}
+.mark svg{width:18px;height:18px}
+.task:focus-within .mark svg{opacity:1}
 
 .task__body{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:2px}
 .task__title{

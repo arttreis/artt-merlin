@@ -637,7 +637,7 @@ function NotePanel({ note, notes, sync, thinking, focusTitle, sections, actions 
     if (!now) return;
     const before = now.steps;
     actions.save({ ...now, steps: before.filter((s) => s.id !== stepId) });
-    notify("passo apagado", () => { const again = notes.get(now.id); if (again) actions.save({ ...again, steps: before }); });
+    notify("item apagado", () => { const again = notes.get(now.id); if (again) actions.save({ ...again, steps: before }); });
   };
 
   return (
@@ -648,10 +648,9 @@ function NotePanel({ note, notes, sync, thinking, focusTitle, sections, actions 
         <button className="pill" type="button" title="abrir como mapa mental" onClick={() => actions.toMap(note)}>{icon("map")}<span>mapa</span></button>
         <button className="pill" type="button" title="virar projeto de cliente" onClick={() => actions.toClient(note)}><PersonIcon /><span>cliente</span></button>
         <span className="sep"></span>
-        <button className="pill" type="button" id="expand-btn" title="o Merlin sugere perguntas, caminhos e passos" disabled={thinking} onClick={() => actions.expand(note)}><SparkIcon /><span>{thinking ? "pensando…" : "ramificar"}</span></button>
+        <button className="pill" type="button" id="expand-btn" title="o Merlin lê a nota e sugere perguntas, caminhos e o que fazer" disabled={thinking} onClick={() => actions.expand(note)}><SparkIcon /><span>{thinking ? "pensando…" : "ramificar"}</span></button>
         <span className="spacer"></span>
         <span className={"saved" + (saved ? " is-visible" : "")} aria-live="polite">salvo</span>
-        <button className="link" type="button" onClick={toggleViewing}>{viewing ? "editar" : "ver"}</button>
         <span className="sep"></span>
         <button className="action" type="button" title={note.stage === "archived" ? "desarquivar" : "arquivar"} onClick={() => actions.archive(note)}>{icon("archive")}</button>
         <button className="action" type="button" title="apagar nota" onClick={() => actions.remove(note.id)}>{icon("trash")}</button>
@@ -662,13 +661,25 @@ function NotePanel({ note, notes, sync, thinking, focusTitle, sections, actions 
           <input ref={titleRef} className="title-input" maxLength="300" placeholder="título da nota" aria-label="Título da nota"
                  value={draft.title} onChange={onTitleInput}
                  onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); editBody(); } }} />
-          <textarea ref={bodyRef} className="body-input" rows="2" placeholder="o que é essa nota… (markdown simples)" aria-label="Corpo da nota"
-                    hidden={viewing} value={draft.body} onChange={onBodyInput}></textarea>
-          {viewing && (
-            <div className="body-md" onClick={(e) => { if (e.target.closest("a")) return; editBody(); }}>
-              {draft.body ? <Markdown text={draft.body} /> : <p className="weak">sem corpo — clique em editar para escrever.</p>}
-            </div>
-          )}
+          {/* a descrição agora tem rótulo, moldura e o gesto de editar ao lado
+              dela — não num canto da barra. o "ver formatado" só aparece quando
+              há o que formatar: oferecer a leitura de um texto que não existe é
+              a forma mais barata de confundir alguém. */}
+          <div className={"body" + (viewing ? " is-reading" : "")}>
+            <p className="body__label">
+              <span className="t-mono">descrição</span>
+              {!!draft.body && <button className="link" type="button" onClick={toggleViewing}>{viewing ? "editar" : "ver formatado"}</button>}
+            </p>
+            <textarea ref={bodyRef} className="body-input" rows="3"
+                      placeholder="o que é essa nota. aceita markdown simples: **negrito**, - listas, # títulos."
+                      aria-label="Descrição da nota"
+                      hidden={viewing} value={draft.body} onChange={onBodyInput}></textarea>
+            {viewing && (
+              <div className="body-md" onClick={(e) => { if (e.target.closest("a")) return; editBody(); }}>
+                <Markdown text={draft.body} />
+              </div>
+            )}
+          </div>
 
           <div className="sheet">
             <span className="k">estágio</span>
@@ -682,20 +693,20 @@ function NotePanel({ note, notes, sync, thinking, focusTitle, sections, actions 
             <span className="v"><select className="pill-select" aria-label="Cliente" value={clientValue} onChange={onClientChange}>{clientOptionList("sem cliente")}</select></span>
             <span className="k">criada</span>
             <span className="v"><span className="weak" title={stampLabel(note.createdAt)}>{longWhen(note.createdAt)}</span></span>
-            <span className="k">passos</span>
-            <span className="v"><span className="t-mono">{total ? done + " de " + total : "nenhum"}</span></span>
+            <span className="k">checklist</span>
+            <span className="v"><span className="t-mono">{total ? done + " de " + total : "vazia"}</span></span>
           </div>
 
           <div className={"section" + (sections.steps ? "" : " is-closed")}>
             <div className="section__head" onClick={() => actions.toggleSection("steps")}>
               <ChevronIcon />
-              <span className="title">passos</span>
+              <span className="title">checklist</span>
               <span className="count">{total ? done + "/" + total : ""}</span>
               {total > 0 && <span className="bar"><i style={{ width: Math.round(100 * done / total) + "%" }}></i></span>}
             </div>
             <div className="section__body">
               <div>{note.steps.map((s, i) => (
-                <Step key={s.id} step={s} index={i + 1} current={s.id === nextStepId}
+                <Step key={s.id} step={s} current={s.id === nextStepId}
                       first={i === 0} last={i === note.steps.length - 1}
                       onToggle={() => toggleStep(s.id)} onEdit={(t) => editStep(s.id, t)}
                       onMove={(d) => moveStep(s.id, d)} onPull={() => pullStep(s)} onRemove={() => removeStep(s.id)} />))}</div>
@@ -717,7 +728,7 @@ function NotePanel({ note, notes, sync, thinking, focusTitle, sections, actions 
           <div className={"section" + (sections.activity ? "" : " is-closed")}>
             <div className="section__head" onClick={() => actions.toggleSection("activity")}>
               <ChevronIcon />
-              <span className="title">atividade</span>
+              <span className="title">histórico</span>
             </div>
             <div className="section__body"><Activity note={note} /></div>
           </div>
@@ -733,7 +744,7 @@ function NotePanel({ note, notes, sync, thinking, focusTitle, sections, actions 
    posição ele está, "agora" diz qual é o próximo que importa, e as setas
    mudam a sequência sem precisar apagar e reescrever. o texto também virou
    editável no lugar: corrigir uma palavra não pode custar refazer o passo. */
-function Step({ step, index, current, onToggle, onEdit, onPull, onRemove, onMove, first, last }) {
+function Step({ step, current, onToggle, onEdit, onPull, onRemove, onMove, first, last }) {
   const [editing, setEditing] = useState(false);
   const [text, setText] = useState(step.text);
   const commit = () => {
@@ -744,8 +755,8 @@ function Step({ step, index, current, onToggle, onEdit, onPull, onRemove, onMove
   };
   return (
     <div className={"step" + (step.done ? " is-done" : "") + (current ? " is-now" : "")} data-id={step.id}>
-      <span className="step__n t-mono" aria-hidden="true">{index}</span>
-      <button className="step__check" type="button" title={step.done ? "desmarcar" : "marcar feito"} onClick={onToggle}>{icon("check")}</button>
+      <button className="step__check mark" type="button" role="checkbox" aria-checked={String(step.done)}
+              aria-label={step.text} onClick={onToggle}>{icon("check")}</button>
       {editing ? (
         <input className="step__edit" autoFocus maxLength="200" value={text}
                onChange={(e) => setText(e.currentTarget.value)}
@@ -769,13 +780,13 @@ function Step({ step, index, current, onToggle, onEdit, onPull, onRemove, onMove
     </div>
   );
 }
+
 function NewStep({ onAdd }) {
   const [text, setText] = useState("");
   return (
     <form className="step step--new" autoComplete="off" onSubmit={(e) => { e.preventDefault(); const t = text.trim(); if (!t) return; onAdd(t); setText(""); }}>
-      <span className="step__n" aria-hidden="true"></span>
-      <span className="step__check" aria-hidden="true"></span>
-      <input maxLength="200" placeholder="o próximo passo… (Enter adiciona)" aria-label="Novo passo" value={text} onChange={(e) => setText(e.currentTarget.value)} />
+      <span className="step__check mark" aria-hidden="true"></span>
+      <input maxLength="200" placeholder="mais um item… (Enter adiciona)" aria-label="Novo item da checklist" value={text} onChange={(e) => setText(e.currentTarget.value)} />
     </form>
   );
 }

@@ -6,23 +6,25 @@
    --------------------------------------------------------------- */
 @import url("shell.css");
 
-*{box-sizing:border-box}
-[hidden]{display:none !important}
-html,body{margin:0;padding:0}
-body{
-  background:var(--bg);color:var(--ink);
-  font-family:var(--sans);font-size:14px;line-height:1.35;
-  letter-spacing:-.01em;
-  -webkit-font-smoothing:antialiased;
-  min-height:100dvh;
-}
-/* a tinta sobre o destaque é token porque muda com a marca: escura sobre o
-   verde do Merlin, branca sobre o azul da casa. */
-::selection{background:var(--green);color:var(--on-green)}
-a{color:inherit;text-decoration:none}
-button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer}
-input,select,textarea{font:inherit;color:inherit}
-:focus-visible{outline:2px solid var(--green);outline-offset:2px;border-radius:var(--br2)}
+/* ---------- a camada ----------
+   o que e COMUM vive numa camada de cascata, e o que e da pagina fica fora
+   dela. regra sem camada ganha de regra em camada, sempre, independente da
+   ordem em que as folhas chegam no <head> — e e exatamente essa ordem que
+   nao dava para controlar.
+
+   o build separa o CSS comum num arquivo proprio e o linka DEPOIS do da
+   pagina (conferido no server/site/*.html: "notes.css" vem antes de
+   "base.css" em dez das onze paginas). o comentario no topo de cada CSS de
+   pagina dizia o contrario, e estava errado desde que o CSS saiu do <style>:
+   quem escrevesse uma regra de pagina empatada com uma do comum veria a do
+   comum ganhar, sem nenhum aviso.
+
+   com a camada, a intencao passa a valer sozinha e a ordem do <head> deixa de
+   importar. nada aqui precisa de !important nem de especificidade inflada. */
+@layer base {
+
+/* o reset mora na casca: toda pagina a carrega, inclusive o dia, e ele
+   estava escrito duas vezes. */
 
 .t-mono{font-family:var(--mono);font-size:11px;font-weight:400;letter-spacing:.08em;text-transform:uppercase}
 .t-mute{color:var(--ink-50)}
@@ -285,3 +287,6 @@ kbd{font-family:var(--mono);font-size:10.5px;padding:1px 6px;border-radius:5px;b
 .start__foot{margin:var(--pd) 0 0;font-size:12.5px;color:var(--ink-30)}
 .start__foot .link{background:none;border:0;padding:0;cursor:pointer}
 
+
+
+}

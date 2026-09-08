@@ -164,22 +164,12 @@
 
 .step{display:flex;align-items:center;gap:10px;padding:6px 4px;border-radius:var(--br2);transition:background var(--t)}
 .step:hover{background:var(--fill)}
-.step__check{
-  flex:0 0 auto;width:20px;height:20px;border-radius:50%;
-  border:1.5px solid var(--line);display:grid;place-items:center;color:transparent;
-  transition:background var(--t),border-color var(--t),color var(--t);
-}
-.step__check:hover{border-color:var(--ink-50)}
-.step__check svg{width:11px;height:11px}
-.step.is-done .step__check{background:var(--green);border-color:var(--green);color:var(--on-green)}
 .step__text{flex:1 1 auto;min-width:0;font-size:13.5px;overflow-wrap:anywhere}
 .step.is-done .step__text{color:var(--ink-30);text-decoration:line-through}
 .step__actions{flex:0 0 auto;display:flex;gap:2px;opacity:0;transition:opacity var(--t)}
 .step:hover .step__actions,.step:focus-within .step__actions{opacity:1}
 @media (hover:none){.step__actions{opacity:1}}
 .step--new{padding-left:4px}
-.step--new .step__check{border-style:dashed;color:var(--ink-30);cursor:default}
-.step--new .step__check svg{width:10px;height:10px}
 .step--new input{flex:1 1 auto;min-width:0;background:none;border:0;padding:0;font-size:13.5px;color:var(--ink)}
 .step--new input:focus{outline:none}
 .step--new input::placeholder{color:var(--ink-30)}
@@ -324,3 +314,49 @@
   backdrop-filter:blur(3px);
 }
 .print-full img{max-width:100%;max-height:92vh;border-radius:var(--br2);box-shadow:var(--sombra-2)}
+
+/* ---------- a descricao ----------
+   era um paragrafo solto embaixo do titulo, sem rotulo e sem moldura, e o
+   gesto de edita-la morava num "editar" no canto oposto da barra. quem abria
+   a nota nao tinha como saber que aquele texto era dele para mexer.
+   agora ela tem nome, borda que responde ao ponteiro, e o gesto ao lado. */
+.body{margin:0 0 var(--pd)}
+.body__label{
+  display:flex;align-items:baseline;justify-content:space-between;gap:10px;
+  margin:0 0 6px;color:var(--ink-30);
+}
+.body__label .link{font-size:11.5px}
+.body .body-input,.body .body-md{
+  width:100%;border-radius:var(--br2);padding:10px 12px;
+  border:1px solid var(--line-soft);background:var(--fill);
+  transition:border-color var(--t),background var(--t);
+}
+.body .body-input:focus{border-color:var(--ink-30);background:var(--fill-hover);color:var(--ink)}
+/* lendo: a moldura so acende no ponteiro, para o texto formatado respirar */
+.body.is-reading .body-md{background:none;border-color:transparent;cursor:text}
+.body.is-reading .body-md:hover{border-color:var(--line-soft);background:var(--fill)}
+
+/* ---------- a checklist ----------
+   o numero na frente e o circulo fino somavam para o mesmo lugar errado:
+   lista numerada com marcador. quem olha uma checklist procura uma caixa de
+   marcar, e agora acha a mesma do dia, em tamanho de lista. a ordem continua
+   existindo — ela esta na posicao, no "agora" e nas setas. */
+.step{gap:10px}
+.step__check{margin-top:1px}
+.step__check svg{width:12px;height:12px;opacity:0}
+
+.step__check:hover svg{opacity:1}
+.step.is-done .step__check svg{opacity:1}
+.step--new .step__check{border-style:dashed;cursor:default;background:none}
+.step--new .step__check:hover{background:none;border-color:var(--line);color:var(--ink)}
+
+/* o texto do item é um botão para poder ser corrigido no lugar; não pode
+   parecer um. e a linha inteira alinha pelo topo, porque item de checklist
+   quebra em duas linhas com frequência. */
+.step{align-items:flex-start}
+.step__text{
+  display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;
+  text-align:left;background:none;border:0;padding:0;font:inherit;color:inherit;cursor:text;
+  line-height:1.35;padding-top:2px;
+}
+.step__edit{padding-top:2px}
