@@ -10,7 +10,7 @@ import {
 import { useState, useEffect, useLayoutEffect, useRef, useMemo, createElement } from "react";
 import {
   mount, useCollection, useClients, useHash, useKeydown, isTyping, useFields,
-  Form, Field, Dialog, Markdown, ClientBadge, clientOptionList, TemplatePicker, icon
+  Form, Field, Dialog, Markdown, ClientBadge, clientOptionList, TemplatePicker, EmptyStart, icon
 } from "./shared/ui.jsx";
 import { FUNNEL_TEMPLATES, funnelGroups, funnelChain, buildFunnel } from "./shared/templates.js";
 import { NODE_W, NODE_H, computeLayers, layoutNodes } from "./shared/funnel-layout.js";
@@ -2036,8 +2036,9 @@ function applyTemplate(doc, tpl) {
    continua valendo (a mesma gramática do dia); o campo ao lado ganha quando
    preenchido. o modelo é opcional: em branco, o funil nasce vazio como
    sempre nasceu. */
-function FunnelForm({ funnels, onClose }) {
-  const [v, bind, set] = useFields({ name: "", client: "", template: "" });
+function FunnelForm({ funnels, preset, onClose }) {
+  const first = preset && preset.template ? FUNNEL_TEMPLATES.find((t) => t.id === preset.template) : null;
+  const [v, bind, set] = useFields({ name: first ? first.name : "", client: "", template: first ? first.id : "" });
   const tpl = v.template ? FUNNEL_TEMPLATES.find((t) => t.id === v.template) : null;
   /* escolher o modelo batiza o funil, quando o nome ainda está vazio */
   const pickTemplate = (id) => {
@@ -2112,8 +2113,25 @@ function FunnelList({ funnels }) {
         <div className="actions"><button className="pill pill--green" type="button" id="new-funnel" title="novo funil (n)" onClick={() => setForm(true)}>{icon("plus")}funil</button></div>
       </div>
       <div className="fl-grid">{list.map((f) => <FunnelCard key={f.id} f={f} onDuplicate={() => duplicate(f.id)} onRemove={() => remove(f.id)} />)}</div>
-      {!list.length && <p className="empty">nenhum funil ainda — o "+" em cima cria o primeiro e já abre.</p>}
-      {form && <FunnelForm funnels={funnels} onClose={() => setForm(false)} />}
+      {/* eram trinta e nove modelos prontos, com as taxas médias já
+          preenchidas, escondidos dentro do <select> da caixa de criar — e a
+          tela vazia era uma frase cinza mandando descobrir sozinho que eles
+          existiam. descobrir uma feature clicando nela é a resposta da casa;
+          um tour que explica não é. */}
+      {!list.length && (
+        <EmptyStart
+          title="de que tipo é o primeiro funil?"
+          text="Cada modelo já traz as etapas na ordem, quem liga em quem e a taxa média esperada em cada passagem — o suficiente para você comparar o seu número com o que costuma acontecer. Tudo editável depois, e o “+” cria um em branco."
+          groups={funnelGroups().map((g) => ({
+            ...g,
+            items: g.items.map((t) => ({ ...t, summary: t.summary, line: funnelChain(t).join(" → ") }))
+          }))}
+          onPick={(t) => setForm({ template: t.id })}
+          onBlank={() => setForm(true)}
+          note="Nenhum parece com ele?"
+          blankLabel="começar em branco" />
+      )}
+      {form && <FunnelForm funnels={funnels} preset={form === true ? null : form} onClose={() => setForm(false)} />}
     </main>
   );
 }

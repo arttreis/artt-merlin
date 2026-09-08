@@ -356,6 +356,10 @@ function Home() {
     setTour(false);
     markSeen("tour");
     if (location.hash) history.replaceState(null, "", location.pathname);
+    /* a quick win: quem acabou de ler as quatro frases é devolvido ao campo,
+       com o cursor dentro. o pior quadro possível depois de uma apresentação é
+       nove ladrilhos dizendo "nenhum" e nenhuma sugestão do que fazer. */
+    requestAnimationFrame(() => { const f = document.getElementById("hm-field"); if (f) f.focus(); });
   };
   useEffect(() => {
     const f = () => { if (location.hash === "#apresentacao") setTour(true); };

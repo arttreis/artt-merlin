@@ -8,7 +8,7 @@ import { createRoot } from "react-dom/client";
 import { flushSync } from "react-dom";
 import {
   mount, useCollection, useClients, useHash, useKeydown, isTyping, useFields,
-  Form, Field, Dialog, Markdown, TemplatePicker, icon
+  Form, Field, Dialog, Markdown, TemplatePicker, EmptyStart, icon
 } from "./shared/ui.jsx";
 import { MAP_TEMPLATES, mapGroups, mapBranches, buildMap } from "./shared/templates.js";
 
@@ -881,8 +881,23 @@ function MapList({ maps }) {
             onDuplicate={() => duplicate(m.id)} onRemove={() => remove(m.id)} />
         ))}
       </ul>
-      {!all.length && <p className="empty" id="list-empty">Nenhum mapa ainda. O "+" em cima cria o primeiro e já abre.</p>}
-      {form && <MapForm maps={maps} onClose={() => setForm(false)} />}
+      {/* dezenove mapas prontos moravam dentro do <select> da caixa de criar.
+          quem chegava na tela vazia via uma frase cinza e tinha que descobrir
+          sozinho que eles existiam. */}
+      {!all.length && (
+        <EmptyStart
+          title="de que o primeiro mapa é?"
+          text="Cada modelo abre com os galhos de primeiro nível já escritos — o esqueleto de um assunto, para você mexer em vez de encarar um nó sozinho no meio da tela. O “+” cria um em branco."
+          groups={mapGroups().map((g) => ({
+            ...g,
+            items: g.items.map((t) => ({ ...t, line: mapBranches(t).join(" · ") }))
+          }))}
+          onPick={(t) => setForm({ template: t.id })}
+          onBlank={() => setForm(true)}
+          note="Nenhum serve?"
+          blankLabel="começar em branco" />
+      )}
+      {form && <MapForm maps={maps} preset={form === true ? null : form} onClose={() => setForm(false)} />}
     </main>
   );
 }
@@ -939,8 +954,9 @@ function RenameInput({ map, maps, onDone }) {
 /* criar e um botao e uma caixa, como em todo o sistema: nome e modelo. o
    mapa ja abre com o nome como ideia central; com modelo, os galhos dele ja
    nascem pendurados nela, cada um de uma cor. */
-function MapForm({ maps, onClose }) {
-  const [v, bind, set] = useFields({ name: "", template: "" });
+function MapForm({ maps, preset, onClose }) {
+  const first = preset && preset.template ? MAP_TEMPLATES.find((t) => t.id === preset.template) : null;
+  const [v, bind, set] = useFields({ name: first ? first.name : "", template: first ? first.id : "" });
   const tpl = v.template ? MAP_TEMPLATES.find((t) => t.id === v.template) : null;
   /* escolher o modelo batiza o mapa, quando o nome ainda esta vazio */
   const pickTemplate = (id) => {
