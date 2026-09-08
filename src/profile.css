@@ -1,0 +1,50 @@
+/* merlin · o CSS desta pagina
+   sai do <style> do HTML para ca porque o Vite injeta o CSS do bundle no fim
+   do <head>, depois do <style> — o que invertia quem vence empate de
+   especificidade. importado logo depois do base.css, a ordem volta a ser a de
+   sempre: primeiro o comum, depois o da pagina. */
+
+/* ---------- quem esta aqui ----------
+   o mesmo cartao do rodape da barra, agora do tamanho de quem ele descreve.
+   la ele e um cracha espremido; aqui e a linha de identidade da pessoa. */
+.pf-who{display:flex;align-items:center;gap:12px;margin:0 0 var(--pd2);min-width:0}
+.pf-avatar{
+  width:44px;height:44px;flex:none;border-radius:50%;display:grid;place-items:center;
+  background:var(--green);color:var(--on-green);font-weight:600;font-size:17px;
+}
+.pf-avatar.is-out{background:var(--fill-hover);color:var(--ink-50)}
+.pf-who__text{flex:1 1 auto;min-width:0}
+.pf-who__text b{display:block;font-weight:600;font-size:15px;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pf-who__text span{display:block;margin-top:1px;font-size:12.5px;color:var(--ink-30);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+.pf-cloud{
+  display:flex;align-items:center;gap:6px;margin:0 0 var(--pd2);
+  font-family:var(--mono);font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-30);
+}
+.pf-cloud[data-status="synced"]{color:var(--green-ink)}
+.pf-cloud[data-status="error"]{color:var(--ink-70)}
+.pf-cloud .dot{width:6px;height:6px;border-radius:50%;background:currentColor;flex:none}
+
+.pf-actions{display:flex;flex-wrap:wrap;gap:var(--pd2);margin-top:var(--pd2)}
+.pf-brand{margin-top:var(--pd2)}
+
+/* ---------- aparencia ---------- */
+.pf-now{margin:var(--pd2) 0 0;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-30)}
+/* duas secoes num ladrilho so: a linha e o que diz que a segunda comeca */
+.pf-sep{height:1px;background:var(--line-soft);margin:var(--pd) 0}
+
+/* ---------- o que esta guardado ----------
+   um numero por colecao, e cada um e a porta dela. nao e grafico nem
+   relatorio: e o inventario que responde "o que eu tenho aqui dentro". */
+.pf-counts{
+  list-style:none;margin:0;padding:0;
+  display:grid;gap:var(--pd2);grid-template-columns:repeat(auto-fit,minmax(130px,1fr));
+}
+.pf-counts a{
+  display:flex;flex-direction:column;gap:2px;padding:12px 14px;
+  border-radius:var(--br3);background:var(--fill);border:1px solid var(--line-soft);
+  transition:background var(--t),border-color var(--t);
+}
+.pf-counts a:hover{background:var(--fill-hover);border-color:var(--line)}
+.pf-counts b{font-size:22px;font-weight:500;letter-spacing:-.03em;line-height:1;color:var(--ink)}
+.pf-counts span{font-size:12px;color:var(--ink-30)}

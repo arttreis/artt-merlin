@@ -1,0 +1,621 @@
+/* merlin · o CSS desta pagina
+   sai do <style> do HTML para ca porque o Vite injeta o CSS do bundle no fim
+   do <head>, depois do <style> — o que invertia quem vence empate de
+   especificidade. importado logo depois do base.css, a ordem volta a ser a de
+   sempre: primeiro o comum, depois o da pagina. */
+
+/* ---------------------------------------------------------------
+   design system arttreis.com.br — lado escuro dos tokens, repetido aqui
+   para a pagina continuar inteira sozinha. o lado claro (html.light) e a
+   barra vem de shared/shell.css. a unica adicao e --br3 (12px),
+   um passo intermediario entre --br2 e --br para os ladrilhos de 44px.
+   --------------------------------------------------------------- */
+:root{
+  --pd:16px; --pd2:8px; --pd3:4px;
+  --br:16px; --br2:8px; --br3:12px; --br-pill:100px;
+
+  --bg:#0d0d0d;
+  --surface:#141414;
+  --surface-2:#1b1b1b;
+
+  --ink:#f2f2f2;
+  --ink-70:rgba(242,242,242,.7);
+  --ink-50:rgba(242,242,242,.5);
+  --ink-30:rgba(242,242,242,.32);
+
+  --line:rgba(242,242,242,.13);
+  --line-soft:rgba(242,242,242,.07);
+  --fill:rgba(242,242,242,.05);
+  --fill-hover:rgba(242,242,242,.1);
+  --scrim:rgba(13,13,13,.62);
+
+  --green:#2EE86B;
+  --green-glow:rgba(46,232,107,.3);
+  --on-green:#0d0d0d;
+
+  --sans:"Sora",system-ui,-apple-system,sans-serif;
+  --mono:"JetBrains Mono",ui-monospace,monospace;
+  --ease:cubic-bezier(.16,1,.3,1);
+  --t:220ms var(--ease);
+}
+
+*{box-sizing:border-box}
+/* varias classes usam display:flex, que venceria o display:none do atributo hidden */
+[hidden]{display:none !important}
+html,body{margin:0;padding:0}
+body{
+  background:var(--bg);color:var(--ink);
+  font-family:var(--sans);font-size:14px;line-height:1.35;
+  letter-spacing:-.01em;
+  -webkit-font-smoothing:antialiased;
+  min-height:100dvh;
+  display:grid;place-items:center;
+  /* a barra do merlin flutua no topo: o corpo reserva a altura dela */
+  padding:calc(var(--nav-h) + clamp(16px,4vh,48px)) clamp(12px,3vw,40px) clamp(24px,7vh,88px);
+}
+
+button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer}
+input{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--green);outline-offset:2px;border-radius:var(--br2)}
+
+/* rotulo mono, o .t-mono do sistema */
+.t-mono{
+  font-family:var(--mono);font-size:11px;font-weight:400;
+  letter-spacing:.08em;text-transform:uppercase;
+}
+
+/* a raiz do preact ocupa o body inteiro e repete a grade que ele tinha:
+   e nela que o aparelho e os trilhos do bento se arrumam */
+#app{display:grid;place-items:center;width:100%;align-self:stretch;justify-self:stretch}
+
+/* ---------- a luz ----------
+   o mesmo movimento do .funil do arttreis.com.br: um radial largo de
+   --green-glow ancorado fora da tela, em opacidade baixa. a luz entra pela
+   esquerda e morre antes de chegar do outro lado — o preto para de ser
+   chapado sem virar cenario. */
+body::before{
+  content:"";position:fixed;inset:0;pointer-events:none;z-index:0;
+  background:radial-gradient(104% 78% at 22% 6%,var(--green-glow),transparent 64%);
+  opacity:var(--glow-op);
+}
+/* a grade de 28px do sistema, mascarada onde a luz bate: da textura ao fundo
+   e some sozinha no escuro. e a mesma de .work__media no site. */
+body::after{
+  content:"";position:fixed;inset:0;pointer-events:none;z-index:0;
+  background-image:
+    linear-gradient(var(--line-soft) 1px,transparent 1px),
+    linear-gradient(90deg,var(--line-soft) 1px,transparent 1px);
+  background-size:28px 28px;
+  -webkit-mask-image:radial-gradient(84% 68% at 22% 6%,#000,transparent 76%);
+  mask-image:radial-gradient(84% 68% at 22% 6%,#000,transparent 76%);
+  opacity:.42;
+}
+
+/* ---------- o aparelho ---------- */
+.device{
+  position:relative;z-index:1;
+  width:100%;max-width:496px;
+  height:min(880px,calc(100dvh - var(--nav-h) - clamp(40px,11vh,136px)));
+  display:flex;flex-direction:column;
+  background:var(--surface);
+  border:1px solid var(--line);
+  border-radius:calc(var(--br) * 1.75);
+  overflow:hidden;
+  box-shadow:var(--sombra);
+}
+/* a mesma luz atravessa o aparelho — e por isso que ele parece aceso, e nao
+   recortado. fica atras do conteudo, que sobe pro z-index 1. */
+.device::before{
+  content:"";position:absolute;inset:0;pointer-events:none;z-index:0;
+  background:radial-gradient(128% 56% at -4% 16%,var(--green-glow),transparent 58%);
+  opacity:.3;
+}
+.top,.scroll,.composer{position:relative;z-index:1}
+
+.top{
+  flex:0 0 auto;
+  display:flex;justify-content:space-between;align-items:center;gap:var(--pd);
+  padding:calc(var(--pd) * 1.25) calc(var(--pd) * 1.5) var(--pd3);
+  color:var(--ink-30);
+}
+.window{
+  font-family:var(--mono);font-size:11px;letter-spacing:.04em;color:var(--ink-30);
+  border-bottom:1px dashed var(--line);padding-bottom:1px;
+  transition:color var(--t);
+}
+.window:hover{color:var(--ink-70)}
+
+/* a area que rola; a pilula fica parada no pe */
+.scroll{
+  flex:1 1 auto;min-height:0;overflow-y:auto;overscroll-behavior:contain;
+  padding:var(--pd) calc(var(--pd) * 1.5) var(--pd2);
+  scrollbar-width:thin;scrollbar-color:var(--line) transparent;
+}
+.scroll::-webkit-scrollbar{width:6px}
+.scroll::-webkit-scrollbar-thumb{background:var(--line);border-radius:3px}
+
+.logo-tile{
+  width:52px;height:52px;border-radius:var(--br3);
+  background:var(--fill);border:1px solid var(--line);
+  display:grid;place-items:center;margin-bottom:calc(var(--pd) * 1.5);
+}
+.logo-tile svg{width:23px;height:23px;color:var(--green)}
+/* o cliente na linha da tarefa: o selo vem da casca, aqui so encolhe.
+   fica na mesma linha da duracao, e nao numa terceira — o cliente e parte
+   da leitura rapida da tarefa, nao um rodape. */
+.task__foot{display:flex;align-items:center;gap:var(--pd2);flex-wrap:wrap;min-width:0}
+.task__badges{display:flex;gap:4px;flex-wrap:wrap;min-width:0}
+.task__badges .badge{height:18px;font-size:9.5px;padding:0 7px;color:var(--ink-70)}
+.task.is-done .task__badges{display:none}
+
+/* ---------- chamada ---------- */
+.headline{
+  margin:0 0 var(--pd2);font-size:30px;font-weight:600;line-height:1.14;
+  letter-spacing:-.038em;
+}
+.headline .headline__l1{display:block;color:var(--ink)}
+.headline .headline__l2{display:block;color:var(--ink)}
+/* se e medida, e mono — o .n do sistema */
+.headline .measure{
+  font-family:var(--mono);font-weight:500;letter-spacing:-.03em;
+  color:var(--green);
+}
+/* nao ha vermelho neste sistema: quando nao cabe, o verde simplesmente some */
+.headline[data-tone="overflow"] .measure{color:var(--ink)}
+.context{margin:0 0 calc(var(--pd) * 1.25);font-size:13px;color:var(--ink-50);min-height:18px}
+
+/* ---------- trilho do dia ---------- */
+.track{
+  display:flex;height:12px;border-radius:var(--br2);overflow:hidden;
+  background:var(--bg);border:1px solid var(--line-soft);
+}
+.band{min-width:0;transition:background var(--t)}
+.band+.band{box-shadow:inset 1px 0 0 var(--bg)}
+.spent{background:var(--bg)}
+/* reservado: ocupado, mas nao por voce — tinta mais fraca que a banda de trabalho */
+.reserved{background:repeating-linear-gradient(90deg,var(--fill) 0 2px,var(--bg) 2px 5px)}
+.slot{background:var(--fill-hover)}
+.slot.is-highlight{background:var(--ink)}
+/* banda de palpite: ocupa o mesmo espaco, mas nao finge ser medida */
+.slot.guess{
+  background:repeating-linear-gradient(45deg,var(--fill-hover) 0 4px,transparent 4px 8px);
+}
+.free{background:var(--green);flex:1 1 auto}
+.free.receipt{background:var(--ink)}
+.overflow{
+  /* com estouro pequeno a barra vira um respingo de 3px e parece sujeira */
+  height:6px;min-width:18px;margin-top:var(--pd3);border-radius:3px;
+  background:repeating-linear-gradient(45deg,var(--ink-30) 0 3px,transparent 3px 6px);
+}
+.note{
+  display:block;margin-top:var(--pd2);text-align:right;
+  color:var(--ink-30);min-height:15px;font-size:10px;
+}
+.window-editor{
+  display:flex;align-items:center;gap:var(--pd2);flex-wrap:wrap;margin-top:var(--pd2);
+  font-family:var(--mono);font-size:11px;color:var(--ink-50);
+}
+.window-editor input{
+  background:var(--fill);border:1px solid var(--line);border-radius:var(--br2);
+  padding:5px 8px;font-family:var(--mono);font-size:11px;color:var(--ink);
+}
+.window-editor button{color:var(--green);text-decoration:underline;text-underline-offset:3px}
+
+.section-label{
+  margin:calc(var(--pd) * 1.25) 0 var(--pd2);color:var(--ink-50);
+  display:flex;justify-content:space-between;align-items:center;gap:var(--pd);
+}
+/* .pill do sistema */
+.pill{
+  display:inline-flex;align-items:center;gap:7px;height:26px;padding:0 14px;
+  font-size:12.5px;color:var(--ink-70);
+  background:var(--fill);border:1px solid var(--line);border-radius:var(--br-pill);
+  transition:background var(--t),color var(--t);
+}
+.pill:hover{background:var(--fill-hover);color:var(--ink)}
+.pill svg{width:11px;height:11px;transition:transform var(--t)}
+
+/* ---------- lista ---------- */
+.queue{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:var(--pd2)}
+.task{
+  display:flex;align-items:center;gap:var(--pd);
+  padding:10px 12px;border-radius:var(--br);
+  background:var(--fill);border:1px solid var(--line-soft);
+  transition:background var(--t),border-color var(--t),opacity var(--t),transform var(--t);
+}
+.task:hover,.task:focus-within{background:var(--fill-hover);border-color:var(--line)}
+.task.is-leaving{opacity:0;transform:translateX(12px)}
+.task.is-dragging{
+  position:relative;z-index:2;cursor:grabbing;
+  background:var(--surface-2);border-color:var(--line);
+  box-shadow:0 14px 30px rgba(0,0,0,.55);transition:none;
+}
+
+/* alca de arrastar: fica sempre visivel, senao ninguem descobre que da pra reordenar */
+.grip{
+  flex:0 0 auto;width:30px;height:30px;display:grid;place-items:center;
+  border-radius:var(--br2);color:var(--ink-30);cursor:grab;
+  touch-action:none;transition:color var(--t),background var(--t);
+}
+.grip:hover{color:var(--ink-70);background:var(--fill-hover)}
+.grip svg{width:15px;height:15px}
+
+/* o corte: daqui pra baixo nao da tempo hoje */
+.cut{
+  display:flex;align-items:center;gap:var(--pd2);
+  margin:var(--pd2) 2px var(--pd3);color:var(--ink-30);
+}
+.cut::after{content:"";flex:1 1 auto;height:1px;background:var(--line)}
+.task[data-fits="no"]{opacity:.45}
+.task[data-fits="no"] .mark{border-style:dashed}
+
+/* o ladrilho de icone e o proprio botao de concluir */
+.mark{
+  flex:0 0 auto;width:44px;height:44px;border-radius:var(--br3);
+  background:var(--fill);border:1px solid var(--line);
+  display:grid;place-items:center;color:var(--ink);
+  transition:background var(--t),color var(--t),border-color var(--t);
+}
+.mark svg{width:18px;height:18px;opacity:.18;transition:opacity var(--t)}
+.mark:hover{background:var(--green);border-color:var(--green);color:var(--on-green)}
+.mark:hover svg,.task:focus-within .mark svg{opacity:1}
+
+.task__body{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:2px}
+.task__title{
+  font-size:14.5px;font-weight:500;color:var(--ink);letter-spacing:-.015em;
+  background:none;border:0;outline:0;padding:0;width:100%;
+  text-overflow:ellipsis;cursor:text;
+}
+.task__time{
+  align-self:flex-start;display:flex;align-items:center;gap:6px;
+  font-family:var(--mono);font-size:10.5px;letter-spacing:.06em;
+  color:var(--ink-30);padding:1px 0;text-align:left;transition:color var(--t);
+}
+.task__time:hover{color:var(--ink-70)}
+.task__time svg{width:11px;height:11px;flex:0 0 auto}
+/* a tarefa cuja duracao se perdeu no caminho: cobra, em vez de sumir da conta */
+.task__time[data-missing="yes"]{color:var(--ink-70);text-decoration:underline;text-underline-offset:3px}
+/* editar duracao na propria linha, no lugar exato onde ela e lida */
+.task__time-input{
+  align-self:flex-start;width:104px;
+  background:var(--fill);border:1px solid var(--green-glow);border-radius:var(--br2);
+  padding:2px 7px;font-family:var(--mono);font-size:10.5px;letter-spacing:.06em;
+  color:var(--ink);
+}
+
+.actions{flex:0 0 auto;display:flex;align-items:center;gap:2px;opacity:0;transition:opacity var(--t)}
+.task:hover .actions,.task:focus-within .actions{opacity:1}
+.action{
+  width:30px;height:30px;display:grid;place-items:center;border-radius:var(--br2);
+  color:var(--ink-30);transition:color var(--t),background var(--t);
+}
+.action:hover{color:var(--ink);background:var(--fill-hover)}
+/* o vinculo do ClickUp e o unico .action que e <a>: sem isto ele viria azul e
+   sublinhado, fora do sistema */
+a.action{color:var(--ink-30);text-decoration:none}
+.action svg{width:15px;height:15px}
+/* ---------- a fila e de outro dia ----------
+   nao e erro nem alarme: e um fato com duas saidas. por isso tinta neutra e
+   nenhum vermelho — o sistema nao tem um, e isso aqui nao pediria. */
+.stale{
+  margin:calc(var(--pd) * 1.25) 0 0;
+  padding:var(--pd);
+  background:var(--fill);
+  border:1px solid var(--line);
+  border-radius:var(--br3);
+}
+.stale__text{margin:0 0 var(--pd2);font-size:13px;color:var(--ink-70)}
+.stale__text b{color:var(--ink);font-weight:600}
+.stale__actions{display:flex;gap:var(--pd2);flex-wrap:wrap}
+
+/* ---------- dia vazio ---------- */
+.empty{padding:var(--pd3) 0}
+.empty__sub{margin:0 0 var(--pd);font-size:13.5px;color:var(--ink-50)}
+.examples{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:var(--pd2)}
+.examples li{
+  display:flex;align-items:center;gap:var(--pd);
+  padding:10px 12px;border-radius:var(--br);
+  border:1px dashed var(--line);color:var(--ink-30);
+}
+.examples .examples__mark{
+  flex:0 0 auto;width:44px;height:44px;border-radius:var(--br3);
+  border:1px dashed var(--line);
+}
+.examples .examples__body{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:2px}
+.examples .examples__name{font-size:14.5px;font-weight:500;color:var(--ink-50)}
+.examples .examples__sub{font-family:var(--mono);font-size:10.5px;letter-spacing:.06em}
+.examples .examples__sub b{font-weight:400;color:var(--green)}
+.empty__foot{margin:var(--pd) 0 0;font-size:12.5px;color:var(--ink-30)}
+
+/* ---------- concluidas ---------- */
+.done-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:var(--pd3)}
+.done[data-open="no"] .done-list{display:none}
+.done[data-open="no"] .pill svg{transform:rotate(-90deg)}
+.done-item{
+  display:flex;align-items:center;gap:var(--pd);padding:6px 12px;border-radius:var(--br2);
+  color:var(--ink-30);transition:background var(--t);
+}
+.done-item:hover{background:var(--fill)}
+.done-item .mark{width:30px;height:30px;border-radius:var(--br2);color:var(--green);background:var(--fill)}
+.done-item .mark svg{width:13px;height:13px;opacity:1}
+.done-item .done-item__name{
+  flex:1 1 auto;min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;
+  font-size:13.5px;text-decoration:line-through;text-decoration-color:var(--line);
+}
+.done-item .done-item__time{flex:0 0 auto;font-family:var(--mono);font-size:10.5px;letter-spacing:.06em}
+
+/* ---------- o que ocupa o dia sem ser trabalho ----------
+   fica acima da fila porque acontece antes dela na conta: e o dia que voce
+   ja nao tem. sem check, porque nao se conclui almoco para ganhar tempo. */
+.reserve-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:var(--pd3)}
+.reserve{
+  display:flex;align-items:center;gap:var(--pd2);padding:7px 12px;border-radius:var(--br2);
+  color:var(--ink-50);background:var(--fill);transition:background var(--t);
+}
+.reserve:hover{background:var(--fill-hover)}
+.reserve .reserve__mark{
+  flex:0 0 auto;width:22px;height:22px;display:grid;place-items:center;color:var(--ink-30);
+}
+.reserve .reserve__mark svg{width:13px;height:13px}
+.reserve .reserve__name{
+  flex:1 1 auto;min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-size:13px;
+}
+.reserve .reserve__time{flex:0 0 auto;font-family:var(--mono);font-size:10.5px;letter-spacing:.06em}
+.reserve .action{width:26px;height:26px}
+.reserve .actions{opacity:0}
+.reserve:hover .actions,.reserve:focus-within .actions{opacity:1}
+
+/* link em texto, tinta baixa: "todas" na caixa de ideias, "descartar" na matriz */
+.text-link{
+  font-size:11.5px;color:var(--ink-50);
+  text-decoration:underline;text-underline-offset:3px;text-decoration-color:var(--line);
+  transition:color var(--t);
+}
+.text-link:hover{color:var(--ink)}
+
+/* ---------- pilula do composer ---------- */
+.composer{flex:0 0 auto;padding:var(--pd2) calc(var(--pd) * 1.25) calc(var(--pd) * 1.25)}
+.ghost{
+  display:flex;align-items:center;gap:var(--pd2);
+  margin:0 var(--pd3) var(--pd2);padding:9px 12px;
+  border:1px dashed var(--line);border-radius:var(--br);color:var(--ink-30);
+}
+.ghost .ghost__name{flex:1 1 auto;min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-size:13.5px}
+.ghost .ghost__time{flex:0 0 auto;font-family:var(--mono);font-size:10.5px;letter-spacing:.06em}
+.ghost[data-fits="no"]{border-style:solid;border-color:var(--line);color:var(--ink-70)}
+
+/* ---------- os chips de duracao ----------
+   toda tarefa tem duracao: quando o texto nao traz uma, ela e perguntada aqui
+   antes de a tarefa existir. e um passo, nao um erro — dai a tinta neutra. */
+.chips{
+  margin:0 var(--pd3) var(--pd2);padding:10px 12px;
+  background:var(--surface-2);border:1px solid var(--line);border-radius:var(--br);
+}
+.chips__text{
+  margin:0 0 var(--pd2);font-size:12px;color:var(--ink-50);
+  overflow:hidden;white-space:nowrap;text-overflow:ellipsis;
+}
+.chips__text b{color:var(--ink-70);font-weight:500}
+.chips__row{display:flex;gap:6px;flex-wrap:wrap}
+.chip{
+  height:30px;padding:0 13px;border-radius:var(--br-pill);
+  background:var(--fill);border:1px solid var(--line);
+  font-family:var(--mono);font-size:11.5px;color:var(--ink-70);
+  transition:background var(--t),color var(--t),border-color var(--t);
+}
+.chip:hover{background:var(--fill-hover);color:var(--ink)}
+.chip[data-fits="no"]{color:var(--ink-30)}
+.chip--other{font-family:var(--sans);font-size:12px;color:var(--ink-50)}
+
+.entry{
+  display:flex;align-items:center;gap:var(--pd2);
+  height:56px;padding:0 var(--pd2);
+  background:var(--fill);border:1px solid var(--line);
+  border-radius:var(--br-pill);transition:border-color var(--t),background var(--t);
+}
+.entry:focus-within{border-color:var(--green-glow);background:var(--fill-hover)}
+.entry__plus{
+  flex:0 0 auto;width:38px;height:38px;border-radius:50%;
+  background:var(--fill-hover);border:1px solid var(--line);
+  display:grid;place-items:center;color:var(--ink-50);
+  transition:background var(--t),color var(--t),border-color var(--t);
+}
+.entry__plus svg{width:16px;height:16px}
+.entry:focus-within .entry__plus{background:var(--green);border-color:var(--green);color:var(--on-green)}
+.entry input{
+  flex:1 1 auto;min-width:0;background:none;border:0;outline:0;
+  font-size:14.5px;caret-color:var(--green);
+}
+.entry input::placeholder{color:var(--ink-30)}
+.entry__send{
+  flex:0 0 auto;width:38px;height:38px;border-radius:50%;
+  display:grid;place-items:center;color:var(--ink-30);
+  transition:color var(--t),background var(--t);
+}
+.entry__send svg{width:16px;height:16px}
+.entry__send:hover{color:var(--ink);background:var(--fill-hover)}
+.storage-warning{margin:var(--pd2) 6px 0;font-size:11.5px;color:var(--ink-70)}
+
+/* ---------- desfazer ---------- */
+.toast{
+  position:absolute;left:var(--pd);right:var(--pd);bottom:86px;z-index:5;
+  display:flex;align-items:center;justify-content:space-between;gap:var(--pd);
+  padding:11px 14px;border-radius:var(--br);
+  background:var(--surface-2);border:1px solid var(--line);
+  font-size:13px;color:var(--ink);
+  box-shadow:var(--sombra-2);
+}
+.toast span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.toast button{
+  flex:0 0 auto;color:var(--green);font-size:12.5px;
+  text-decoration:underline;text-underline-offset:3px;padding:var(--pd3) 2px;
+}
+
+/* no celular o aparelho vira a tela inteira */
+/* ---------- bento ----------
+   o aparelho nao muda: mesmo tamanho, mesmo miolo, mesma casca. a grade so
+   abre trilho AO LADO dele para os blocos novos (ideias, matriz, etc).
+   trilho vazio nao existe — :empty tira do fluxo, entao ate o primeiro bloco
+   nascer a tela e exatamente a de hoje. */
+.side{display:flex;flex-direction:column;gap:var(--pd);width:100%;max-width:496px}
+.side:empty{display:none}
+
+/* o ladrilho dos blocos novos: mesma superficie e mesma sombra do aparelho,
+   um raio abaixo — o dia continua sendo o objeto principal da tela. */
+.block{
+  position:relative;
+  background:var(--surface);border:1px solid var(--line);
+  border-radius:var(--br);padding:calc(var(--pd) * 1.25);
+  box-shadow:var(--sombra);
+}
+
+/* ---------- caixa de ideias ----------
+   linha mais leve que a da tarefa de proposito: ideia nao tem duracao, entao
+   ela nao tem a coluna de medida que toda tarefa tem. a diferenca de peso na
+   tela e a mesma diferenca que existe no dia. */
+/* o bloco vira container para o botao de puxar poder encolher quando a
+   coluna do bento aperta — sem isso o titulo da ideia sobrava em quatorze
+   caracteres para a palavra "puxar" caber. */
+#ideas{container-type:inline-size}
+@container (max-width: 320px){.idea__pull span{display:none}.idea__pull{padding:0 7px}}
+.ideas__note{margin:0 0 var(--pd2);font-size:12px;color:var(--ink-30)}
+.ideas__empty{margin:0 0 var(--pd2);font-size:13px;color:var(--ink-30)}
+.idea-list{list-style:none;margin:0 0 var(--pd2);padding:0;display:flex;flex-direction:column;gap:var(--pd3)}
+.idea{
+  display:flex;align-items:center;gap:var(--pd2);padding:6px 6px 6px 12px;
+  border-radius:var(--br2);background:var(--fill);border:1px solid var(--line-soft);
+}
+.idea .idea__name{
+  flex:1 1 auto;min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;
+  font-size:13px;color:var(--ink-70);
+}
+.idea .idea__actions{flex:0 0 auto;display:flex;align-items:center;gap:2px;opacity:0;transition:opacity var(--t)}
+.idea:hover .idea__actions,.idea:focus-within .idea__actions{opacity:1}
+.idea__action{
+  width:26px;height:26px;display:grid;place-items:center;border-radius:var(--br2);
+  color:var(--ink-30);transition:color var(--t),background var(--t);
+}
+.idea__action:hover{color:var(--ink);background:var(--fill-hover)}
+.idea__action svg{width:14px;height:14px}
+/* puxar e o unico gesto que a linha promete, entao e o unico que nao se
+   esconde: abrir e apagar ainda pedem o hover, ele nao. */
+.idea__pull{
+  flex:0 0 auto;height:26px;padding:0 10px;display:inline-flex;align-items:center;gap:6px;
+  border-radius:var(--br-pill);border:1px solid var(--line-soft);background:var(--fill);
+  font-size:11.5px;color:var(--ink-50);transition:color var(--t),background var(--t),border-color var(--t);
+}
+.idea__pull:hover{color:var(--ink);background:var(--fill-hover);border-color:var(--line)}
+.idea__pull svg{width:13px;height:13px;flex:none}
+/* sem hover no toque, as acoes ficam sempre visiveis */
+@media (hover:none){.idea .idea__actions{opacity:1}}
+.idea-form input{
+  width:100%;background:var(--fill);border:1px solid var(--line);
+  border-radius:var(--br-pill);padding:8px 14px;font-size:13px;color:var(--ink);
+}
+.idea-form input::placeholder{color:var(--ink-30)}
+
+/* ---------- matriz de eisenhower ----------
+   ela e um instrumento do medidor, nao um painel ao lado dele: por isso a
+   previa da fila resultante, com a linha de corte, fica dentro do bloco e
+   anda junto com o arrasto. sem ela os quadrantes teriam capacidade infinita
+   e priorizar voltaria a ser de graca — que e exatamente o que a ordem da
+   fila existe para impedir. */
+.matrix__note{margin:0 0 var(--pd2);font-size:12px;color:var(--ink-30)}
+.matrix__label{display:block;color:var(--ink-30);margin-bottom:var(--pd3);font-size:9.5px}
+.matrix__field{display:flex;flex-direction:column;gap:var(--pd2)}
+/* minmax(0,1fr), e nao 1fr: trilha de grid tem min-width auto, entao o chip
+   mais longo alargaria o quadrante em vez de ser cortado com reticencias */
+.matrix__grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:var(--pd2)}
+.zone{
+  border:1px dashed var(--line);border-radius:var(--br2);padding:var(--pd2);
+  min-height:64px;min-width:0;transition:border-color var(--t),background var(--t);
+}
+.zone[data-target="yes"]{border-color:var(--green);background:var(--fill)}
+.zone--pool{min-height:44px}
+.zone__chips{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:3px;min-height:20px;min-width:0}
+.matrix-chip{
+  display:flex;align-items:center;gap:6px;padding:5px 8px;
+  border-radius:var(--br2);background:var(--fill-hover);
+  font-size:12px;color:var(--ink-70);cursor:grab;touch-action:none;min-width:0;
+}
+.matrix-chip .matrix-chip__name{flex:1 1 auto;min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.matrix-chip .matrix-chip__min{flex:0 0 auto;font-family:var(--mono);font-size:9.5px;color:var(--ink-30)}
+.matrix-chip.is-dragging{opacity:.45;cursor:grabbing;pointer-events:none}
+
+.preview-label{margin:var(--pd) 0 var(--pd3)}
+.preview{list-style:none;margin:0;padding:0;counter-reset:p}
+.preview li{
+  display:flex;align-items:center;gap:6px;padding:3px 0;
+  font-size:12px;color:var(--ink-70);
+}
+.preview li::before{
+  counter-increment:p;content:counter(p);
+  flex:0 0 auto;width:14px;font-family:var(--mono);font-size:9.5px;color:var(--ink-30);
+}
+.preview .preview__name{flex:1 1 auto;min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+/* daqui pra baixo o dia nao alcanca — a mesma frase que a fila ja usa */
+.preview li[data-fits="no"]{color:var(--ink-30)}
+.preview li[data-cut="yes"]{
+  border-top:1px solid var(--line);margin-top:var(--pd3);padding-top:var(--pd2);
+}
+.preview li[data-cut="yes"]::after{
+  content:"daqui não dá tempo";
+  font-family:var(--mono);font-size:9px;letter-spacing:.08em;
+  text-transform:uppercase;color:var(--ink-30);flex:0 0 auto;
+}
+.preview__empty{font-size:12px;color:var(--ink-30);margin:0}
+.matrix__actions{display:flex;align-items:center;gap:var(--pd);margin-top:var(--pd)}
+
+/* ---------- os trilhos, quando cabem ----------
+   as tres colunas pedem ~1140px de espaco livre. o @media mede a JANELA, e a
+   barra lateral come 248px (64 quando recolhida) antes de sobrar espaco para
+   a pagina — por isso sao dois pontos de virada, um para cada estado dela.
+   com um so, medindo 1200 de janela, o dia rolava 28px na horizontal a 1360
+   com a barra aberta: a grade ligava antes de caber. */
+@media (min-width:1392px){
+  #app{
+    /* o aparelho fica na coluna do meio, no tamanho que sempre teve.
+       os trilhos so existem se tiverem bloco dentro. */
+    grid-template-columns:minmax(272px,340px) 496px minmax(300px,380px);
+    justify-content:center;
+    align-items:start;
+    gap:var(--pd);
+  }
+  .device{grid-column:2;grid-row:1}
+  #side-left{grid-column:1;grid-row:1}
+  #side-right{grid-column:3;grid-row:1}
+  /* alinha o topo dos blocos com o topo do aparelho */
+  .side{max-width:none}
+}
+/* com a barra recolhida sobram 184px a mais, e os trilhos cabem bem antes */
+@media (min-width:1208px){
+  html.sidebar-closed #app{
+    grid-template-columns:minmax(272px,340px) 496px minmax(300px,380px);
+    justify-content:center;
+    align-items:start;
+    gap:var(--pd);
+  }
+  html.sidebar-closed .device{grid-column:2;grid-row:1}
+  html.sidebar-closed #side-left{grid-column:1;grid-row:1}
+  html.sidebar-closed #side-right{grid-column:3;grid-row:1}
+  html.sidebar-closed .side{max-width:none}
+}
+
+@media (max-width:480px){
+  body{padding:var(--nav-h) 0 0}
+  .device{max-width:none;height:calc(100dvh - var(--nav-h));border-radius:0;border:0;box-shadow:none}
+  .top{padding-top:max(18px,env(safe-area-inset-top))}
+  .composer{padding-bottom:max(var(--pd),env(safe-area-inset-bottom))}
+  .headline{font-size:27px}
+  /* sem hover no toque, as acoes ficam sempre visiveis — entao elas precisam
+     custar menos largura, senao comem o titulo */
+  .actions{opacity:1}
+  .task{gap:10px;padding:10px}
+  .mark{width:40px;height:40px}
+  .action{width:28px;height:28px}
+  .examples li{gap:10px;padding:10px}
+  .examples .examples__mark{width:40px;height:40px}
+}
+@media (prefers-reduced-motion:reduce){
+  *{transition-duration:.01ms !important;animation-duration:.01ms !important}
+}
