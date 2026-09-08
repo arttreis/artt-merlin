@@ -646,6 +646,13 @@ function createMapEngine(mapId, handlers) {
     movedEnough = false;
     if (target) { mode = "node-pending"; pendingId = target.dataset.id; }
     else { mode = "pan-pending"; panOriginView = { x: view.x, y: view.y }; }
+    /* o navegador comeca a propria selecao junto com o arrasto. como o svg e
+       user-select:none, ela nao pega texto nenhum e sobe para o container,
+       que aparece contornado de branco enquanto o dedo esta apertado. o pan e
+       o arraste do no ja fazem tudo por conta propria — nao ha default a
+       preservar aqui. depois das guardas, para que sair de um no em edicao
+       continue tirando o foco do campo. */
+    e.preventDefault();
     try { svgEl.setPointerCapture(e.pointerId); } catch (err) {}
     svgEl.addEventListener("pointermove", onPointerMove);
     svgEl.addEventListener("pointerup", onPointerUp, { once: true });

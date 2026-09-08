@@ -56,7 +56,12 @@ html.light{
 .mp-name:hover,.mp-name:focus{background:var(--fill);border-color:var(--line);outline:none}
 .mp-menu{display:flex;flex-direction:column;gap:8px}
 .mp-menu .pill{justify-content:flex-start;height:38px}
-.mp-body{position:relative;flex:1 1 auto;min-height:0;background:var(--mp-canvas)}
+.mp-body{
+  position:relative;flex:1 1 auto;min-height:0;background:var(--mp-canvas);
+  /* o container tambem: sem isto a selecao que nasce no svg encontra o
+     primeiro ancestral selecionavel e contorna a tela inteira */
+  user-select:none;-webkit-user-select:none;-webkit-tap-highlight-color:transparent;
+}
 /* sem selecao de texto: arrastar um no por cima dos outros selecionava os
    titulos, e o arraste seguinte, comecando em texto selecionado, virava um
    arrasto nativo de texto e nunca chegava ao mapa (pointercancel) */

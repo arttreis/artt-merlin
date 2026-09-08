@@ -4,7 +4,7 @@
 import "./shared/base.css";
 import "./week.css";
 import {
-  initPage, newId, today, isDay, notify, sendToDay, api,
+  initPage, newId, today, isDay, notify, sendToDay, api, setMerlinAsks,
   parseMentions, formatMin, parseDuration, mondayOf, addDays, dateLabel, dateOf, clientName
 } from "./shared/core.js";
 import { useState, useEffect, useRef } from "react";
@@ -226,6 +226,10 @@ function Week() {
     if (c.done) parts.push("feito");
     return parts.join(" · ");
   };
+  useEffect(() => setMerlinAsks([
+    { id: "week", label: "ler a semana", note: "o que fechou, o que ficou aberto e por cliente", run: askSummary }
+  ]), [monday]);
+
   const askSummary = async () => {
     if (thinking) return;
     setThinking(true);
@@ -387,7 +391,7 @@ function Card({ c, actions }) {
       {c.min > 0 && <span className="card__min mono">{formatMin(c.min)}</span>}
       {c.recurring && <span className="card__recurring" title="toda semana"><RecurringIcon /></span>}
       <span className="card__actions">
-        {canPull && <button className="action" type="button" title="puxar para o dia" onClick={() => actions.pull(c)}>{icon("arrow")}</button>}
+        {canPull && <button className="action" type="button" title="puxar para o dia" onClick={() => actions.pull(c)}>{icon("clock")}</button>}
         <button className="action" type="button" title="editar" onClick={() => actions.edit(c.id)}>{icon("pencil")}</button>
         <button className="action" type="button" title="apagar" onClick={() => actions.removeCard(c.id)}>{icon("trash")}</button>
       </span>
