@@ -1,6 +1,8 @@
 # merlin
 
-Sistema pessoal do Arthur, de uma pessoa só. Nasceu como o `artt · planner` — um controle
+Sistema pessoal, de uma pessoa só — e agora de uma pessoa só **por vez**: o time da Guessless
+entra pelo mesmo endereço e cada um ganha um Merlin inteiro, que ninguém mais vê. Nasceu como
+o `artt · planner` — um controle
 de tarefas de um dia — e virou um conjunto de módulos ligados entre si: o dia, a semana, as
 ideias, os clientes (com canais), os funis, os mapas mentais, o financeiro, os
 hábitos e os planos. A visão completa e as decisões estão em [VISAO.md](VISAO.md).
@@ -22,7 +24,8 @@ está em [MIGRATION.md](MIGRATION.md).
 
 | página | o que é |
 | --- | --- |
-| `index.html` | o dia: a fila de hoje, a barra que se gasta, a sobra. O único lugar com minutos. |
+| `index.html` | o início: uma página inicial no sentido do navegador — um campo no meio e os atalhos embaixo, cada um dizendo o número que faria você abrir aquilo. |
+| `day.html` | o dia: a fila de hoje, a barra que se gasta, a sobra. O único lugar com minutos. |
 | `week.html` | a semana em colunas (seg a sex e fim de semana). |
 | `ideas.html` | o que ainda não é tarefa, numa caixa de entrada: lista por dia à esquerda, a ideia aberta à direita com corpo, estágio, passos e atividade. |
 | `clients.html` | clientes com canais (Mercado Livre, Shopee, TikTok Shop…), objetivos, backlog, diário e ofertas. |
@@ -30,17 +33,41 @@ está em [MIGRATION.md](MIGRATION.md).
 | `maps.html` | mapa mental com teclado e layout automático. |
 | `finance.html` | do jeito da planilha: o mês dia a dia com saldo previsto, o ano em doze colunas, e o painel com saídas fixas, entradas fixas, compras no cartão e dívidas, mais a divisão 50/30/20. |
 | `habits.html` | a grade do mês: hábitos nas linhas, dias nas colunas, uma marca por dia. Sequência e taxa do mês. |
-| `plans.html` | trimestre, mês e semana lado a lado: desdobrar de um horizonte para o outro, e a revisão de cada período. |
+| `plans.html` | trimestre, mês e semana lado a lado: desdobrar de um horizonte para o outro. Acender um objetivo apaga tudo que não tem parentesco com ele nas outras colunas. |
+| `profile.html` | o perfil: a sessão, a aparência (o tema mora aqui), a apresentação e o inventário do que está guardado. |
 
 Em toda tela, criar é o mesmo gesto: um botão "+" abre uma caixa (pop-up) com os campos. Nenhuma
 lista tem formulário aberto no meio, e nenhuma tela tem filtro — a busca da sidebar acha qualquer
 coisa pelo nome.
 
+Tela vazia não diz "nada aqui": ela **oferece**. Clientes, financeiro e hábitos começam por uma
+lista de modelos — tipos de negócio com os canais e o checklist de cada um, o esqueleto de um mês
+com os vencimentos e as categorias, hábitos com frequência já escolhida. É o mesmo componente nos
+três, porque era o mesmo problema: a primeira tela não ensinava nada.
+
+**O merlin tem um lugar.** As dez tarefas do conselheiro viviam atrás de ícones de faísca que
+queriam dizer coisas diferentes em cada página. Agora a barra tem um item "merlin" que lista, em
+palavras, o que ele faz *nesta* tela — e o que precisa de um alvo diz onde escolher o alvo, em vez
+de fingir que roda.
+
 O princípio que amarra tudo: **só o dia tem minutos**. Todo o resto é reservatório sem hora,
 e entra no dia pelo gesto de puxar, pagando o pedágio da duração.
 
-Em `server/` há o Worker (Cloudflare + D1 + Resend) que leva tudo para outros aparelhos e
-só aceita os e-mails do dono. Sem ele nada se perde além da sincronização.
+Em `server/` há o Worker (Cloudflare + D1 + R2 + Resend) que leva tudo para outros aparelhos e só
+aceita quem está em `OWNER_EMAILS` — endereços soltos ou o domínio inteiro da Guessless. Sem
+ele nada se perde além da sincronização — com uma exceção honesta: **print anexado numa ideia só
+existe para quem entrou**, porque o binário mora no R2 e não no navegador. O bucket precisa
+existir antes do primeiro deploy: `npx wrangler r2 bucket create merlin-files`.
+
+**Entrar não é ver.** Todas as tabelas são por `person`, nenhuma consulta cruza essa coluna, e
+o navegador guarda o Merlin de uma pessoa só: se o e-mail da sessão não for o mesmo da última
+vez, tudo que começa com `merlin:` sai antes da primeira sincronização. O time divide o
+endereço, o custo e o código — nunca o dia, o cliente nem o financeiro.
+
+**A marca segue quem entrou.** Um e-mail `@guessless.com.br` veste o Merlin com a identidade da
+casa (`html.gl` no [shell.css](src/shared/shell.css): fundo `#0A0A0A`, DM Sans, Manrope, o azul
+`#368DFF`, o logotipo da Guessless com `merlin` de sub-rótulo); qualquer outro vê o Merlin. É
+só pele — nenhuma tela muda de comportamento e nenhum dado sabe que ela existe.
 
 ## O dia
 
@@ -127,7 +154,7 @@ desfazer — e ele empilha: desfazer duas vezes volta duas ações, na ordem inv
 
 ## Onde ficam os dados
 
-Em `localStorage`, na chave `merlin:dia` (os outros módulos usam `merlin:<tipo>`), no seu próprio navegador. Duas abas abertas se
+Em `localStorage`, na chave `merlin:day` (os outros módulos usam `merlin:<tipo>`), no seu próprio navegador. Duas abas abertas se
 conversam pelo evento `storage` em vez de uma sobrescrever a outra.
 
 ### Levar o mesmo dia para outros aparelhos
@@ -161,8 +188,10 @@ No dia: recorrência, tags, múltiplos dias, colaboração. Todos criariam um se
 ordenação numa fila cuja única ordem é a prioridade. A semana e o backlog dos clientes existem
 justamente para que isso não precise entrar aqui: lá as coisas têm data; aqui têm minutos.
 
-Colaboração continua fora: a fila é de uma pessoa só, e é isso que faz o número grande ser
-confiável — ninguém pode te mandar tarefa.
+Colaboração continua fora, e o time não mudou isso: a fila é de uma pessoa só, e é isso que faz
+o número grande ser confiável — ninguém pode te mandar tarefa. Abrir a entrada para a Guessless
+deu a cada um o seu Merlin, não um Merlin comum. Não há responsável, não há cliente
+compartilhado, e `@` no texto continua significando cliente, nunca colega.
 
 Conta e servidor deixaram de estar aqui. A sincronização por arquivo cobria dois desktops no
 Chrome, mas não cobria celular nem Safari — e era esse o limite. O login por e-mail é a menor

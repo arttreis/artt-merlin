@@ -1,8 +1,12 @@
 # Merlin · visão
 
 O `artt planner` deixa de ser um app para qualquer pessoa usar e vira **Merlin**: um sistema
-de uma pessoa só, do Arthur, com vários módulos ligados entre si. O aparelho do dia continua
-sendo o coração — o que muda é o que gira em volta dele.
+de uma pessoa só, com vários módulos ligados entre si. O aparelho do dia continua sendo o
+coração — o que muda é o que gira em volta dele.
+
+Nasceu para o Arthur e hoje o time da Guessless entra pelo mesmo endereço, cada um no seu.
+"Uma pessoa só" nunca quis dizer "um usuário": quer dizer que o dia, a fila e o número grande
+são de quem os vive. Isso não mudou e não vai mudar.
 
 Este documento é a fonte das decisões. O que está aqui é o que o código faz ou vai fazer; o que
 não está, não existe ainda.
@@ -22,11 +26,77 @@ no `localStorage`, o worker `merlin-api` e o remetente `merlin@arttreis.com.br`.
 
 ## 2. Princípios
 
-### Uma pessoa
+### Uma pessoa (07/09/2026: uma pessoa por vez)
 
-O login por e-mail continua existindo porque é o que leva os dados ao celular e ao Safari. Mas o
-worker só aceita os **e-mails do dono**, fixados em `OWNER_EMAILS` no `wrangler.toml`. Outro
-endereço recebe uma resposta idêntica à de sucesso e nenhum código é enviado.
+O login por e-mail continua existindo porque é o que leva os dados ao celular e ao Safari. O
+worker só aceita quem está em `OWNER_EMAILS`, no `wrangler.toml`. Outro endereço recebe uma
+resposta idêntica à de sucesso e nenhum código é enviado.
+
+O que mudou é que uma entrada dessa lista pode ser um **domínio** (`@guessless.com.br`), e é
+assim que o time entra sem um deploy por pessoa. **Não** virou um sistema de várias pessoas: o
+princípio continua inteiro, só passou a valer uma vez por pessoa em vez de uma vez só.
+
+> Abrir a porta não é abrir a gaveta.
+
+Todas as tabelas são por `person`, nenhuma consulta do worker cruza essa coluna, e cada e-mail
+que entra ganha um Merlin inteiro. O que o time divide é o endereço, a chave da Anthropic e o
+código — nunca o dia, o cliente, o funil nem o financeiro. Não existe responsável em lugar
+nenhum, `@` no texto continua sendo cliente e não colega, e a fila do dia segue sendo de quem
+vive o dia: é isso que faz o número grande ser confiável.
+
+Duas coisas tiveram que existir para essa frase ser verdade:
+
+- **O navegador guarda o Merlin de uma pessoa só.** As chaves do `localStorage` não têm dono —
+  `merlin:ideas` é `merlin:ideas` para quem estiver na frente da tela. Numa máquina dividida
+  isso vazava: quem entrasse depois de um colega subiria os documentos dele para a própria
+  conta na primeira sincronização. Agora `merlin:who` guarda de quem é o navegador, e quando a
+  identidade muda tudo que começa com `merlin:` sai **antes** de qualquer sincronização (tema e
+  sidebar atravessam: preferência não é dado). Sair também limpa — a menos que haja coisa por
+  subir, porque perder trabalho é pior que deixar dado na máquina, e a próxima pessoa a entrar
+  apaga isso de qualquer jeito.
+- **O conselheiro tem teto por pessoa.** A chave da Anthropic é uma só para o time. Sem conta,
+  uma pessoa sozinha gastaria o mês de todo mundo e ninguém descobriria antes da fatura: a
+  tabela `advice` conta os pedidos por pessoa por hora, e o teto é de quem gastou.
+
+O Merlin conselheiro também deixou de falar do Arthur em terceira pessoa: o contexto agora é o
+da casa (Guessless, GL Suite, os canais, o Stripe), e ele fala com quem está na tela sem supor
+nome nem cargo.
+
+### A marca segue quem entrou
+
+Quem entra por um e-mail `@guessless.com.br` vê o Merlin **com a identidade da Guessless**;
+todo o resto vê o Merlin. É a mesma decisão do login, aplicada à pele: um deploy, um endereço,
+duas caras.
+
+> A marca é só pele. Nenhuma tela muda de comportamento, nenhum dado sabe que ela existe.
+
+A identidade vem do design system dos documentos da casa
+(`docs.guessless.com.br/assets/dashboard.css`), que é a fonte de verdade: fundo `#0A0A0A`,
+**DM Sans** no display, **Manrope** no corpo, **Instrument Serif** no itálico de ênfase,
+**JetBrains Mono** nos rótulos e `#368DFF` no destaque. A mono é a mesma dos dois lados — é por
+isso que a troca não desmonta nada. O `#0014FF` que aparece por aí não é a marca; o próprio CSS
+da casa anota isso.
+
+Como funciona, em três peças:
+
+- **`html.gl` no `shell.css`** troca o valor dos tokens que já existiam. Nenhum componente
+  ganhou regra nova, com duas exceções anotadas lá: o display em DM Sans (o Merlin usa a mesma
+  fonte nos dois papéis) e o mono mais aberto da casa.
+- **`merlin:brand` no `localStorage`**, escrito junto com `merlin:who` e lido pelo `<head>` de
+  cada página **antes da primeira pintura**. Se dependesse do `/me`, a pessoa da casa veria um
+  quadro de Merlin antes do próprio Merlin a cada carregamento.
+- **O lockup na barra**: o logotipo da Guessless com `merlin` de sub-rótulo, que é como a casa
+  já assina os próprios produtos (`[GUESSLESS] docs`). Recolhida, entra o isotipo — ele existe
+  exatamente para esse tamanho. O e-mail do código também veste a marca de quem vai recebê-lo:
+  ninguém deve abrir um e-mail verde de um produto que não conhece.
+
+Duas coisas ficaram de fora, de propósito:
+
+- **O endereço continua `merlin.arttreis.com.br`.** Um `merlin.guessless.com.br` apontando para
+  o mesmo Worker resolve (a Cloudflare aceita mais de um `custom_domain`), mas depende de um
+  registro de DNS no domínio da casa — decisão de quem tem a zona, não do código.
+- **O token de destaque ainda se chama `--green`** e carrega o azul. São 174 ocorrências em 22
+  arquivos: renomear para `--accent` é mecânico e merece um commit só dele, longe deste.
 
 ### Só o dia tem minutos
 
@@ -420,3 +490,114 @@ Decidido em 07/09/2026:
 15. **Hábitos e planos** (seções 4.9 e 4.10) entram depois da migração terminar.
 
 Em aberto: nada.
+
+
+---
+
+## 7. A coletânea de 08/09/2026
+
+Vinte e três incômodos de uma vez, atacados em seis lotes. O que eles tinham em comum não era
+uma lista de defeitos: era que o sistema **sabia fazer coisas que ninguém descobria**, e recebia
+quem chegava com uma fila de minutos.
+
+### 7.1 O que mudou de estrutural
+
+**O início é a porta, o dia é o destino.** `index.html` deixou de ser o dia e virou uma página
+inicial no sentido do navegador: um campo no meio (escreva qualquer coisa — com duração vai para
+a fila de hoje, sem duração cai na caixa de ideias) e os atalhos embaixo, cada um dizendo o
+número que faria você abrir aquilo. O dia mudou para `day.html`, inteiro, sem perder nada.
+
+A conta do dia saiu para `shared/day.js`. O motivo não é organização: o início e o dia precisam
+responder "quanto ainda cabe hoje", e uma sobra calculada de dois jeitos são duas verdades sobre
+o mesmo dia — a que aparecer primeiro é a que a pessoa acredita.
+
+**O perfil existe.** `profile.html`: a sessão, a aparência, a apresentação e o inventário do que
+está guardado. O tema morava solto no fim da barra, ao lado de nada; agora é uma linha do perfil
+— e ganhou a terceira resposta que o interruptor não sabia dar, que é seguir o sistema.
+
+**A apresentação.** Quatro frases na primeira visita: só o dia tem minutos; nada entra sozinho;
+criar é sempre o mesmo gesto; o que é seu fica seu. Não é um passo a passo — são quatro cartões,
+e quem ler dois e fechar leu o que precisava.
+
+### 7.2 Tela vazia oferece, não avisa
+
+Clientes, financeiro e hábitos começavam com uma frase cinza. Agora começam com uma lista:
+
+- **Clientes**: nove tipos de negócio (seller no ML, marca com loja própria, serviço local,
+  infoprodutor…). Escolher um monta os canais com o checklist de cada um, os objetivos que
+  aquela operação persegue e o backlog do que precisa existir antes. O mesmo seletor entrou na
+  caixa de criar — é o "modelo da página de clientes".
+- **Financeiro**: cinco esqueletos de mês, com o dia de vencimento e a categoria de cada linha
+  fixa e **o valor em branco**. O valor é a única coisa que ninguém pode adivinhar, e inventar
+  um faria a planilha parecer pronta.
+- **Hábitos**: quinze sugestões com frequência e duração já escolhidas. Marcar não cria na hora:
+  criar um por clique faria a lista sumir embaixo do dedo assim que o primeiro entrasse.
+
+É um componente só (`EmptyStart`), porque era um problema só.
+
+### 7.3 O merlin ganhou um lugar
+
+As dez tarefas do conselheiro existiam há tempo, cada uma atrás de um ícone de faísca — e a mesma
+faísca queria dizer "ramificar" nas ideias, "sugerir" no mapa e "dá pra fazer com Claude?" no dia.
+Quem nunca clicou não tinha como saber que qualquer uma existia.
+
+A barra ganhou um item **merlin**, que não é uma página: é a lista, em palavras, do que ele faz
+*nesta* tela. O que precisa de um alvo (uma tarefa, uma ideia, um cliente) diz onde está o botão
+que escolhe o alvo, em vez de fingir que roda.
+
+### 7.4 O que estava confuso, e por quê
+
+Quase todo item de confusão era o **mesmo gesto com dois nomes**:
+
+- *puxar para o dia* era relógio nas ideias e seta na semana e no dia — e a seta aponta para
+  fora, então lia-se "ir para", não "trazer para cá". Agora é sempre o relógio.
+- *arquivar* uma ideia era indistinguível de apagar: ela sumia da lista e só aparecia no quadro.
+  Agora desce para o rodapé da própria lista, fechada, e volta de lá.
+- os *passos* de uma ideia eram bullet notes com caixa de marcar. Ganharam número, "agora" no
+  primeiro não feito, setas para mudar a sequência e edição no lugar — sem ordem, "o próximo
+  passo" é uma frase sem dono.
+- a *atividade* listava só criação e troca de estágio. Passou a registrar passo concluído, que é
+  o que responde "isto andou?".
+
+### 7.5 O que era bug
+
+- O dia anunciava "atualizei com o que veio do outro aparelho" **toda vez que abria**: o servidor
+  recusa com 409 um dia reenviado com carimbo igual, e o cliente lia todo 409 como novidade.
+- **Semana e dia só escutavam num sentido.** Concluir no dia fechava o cartão; fechar o cartão na
+  semana deixava a tarefa aberta na fila. E o `inDay` — a afirmação "isto está na fila de hoje" —
+  era apagado pelos dois lados, o que abria janela para a mesma coisa entrar duas vezes. Agora o
+  dia é o dono do vínculo e reconcilia os dois lados na mesma passada.
+- Arrastar no mapa mental contornava a tela de branco: o `pointerdown` não chamava
+  `preventDefault`, então o navegador começava uma seleção nativa junto com o pan.
+
+### 7.6 Prints nas ideias (R2)
+
+Uma ideia quase sempre nasce de uma tela. Três gestos para a mesma coisa, porque é assim que uma
+captura chega: `ctrl v`, arrastar para o painel, ou escolher o arquivo.
+
+O binário **não entra no documento** — ele subiria e desceria inteiro a cada sincronização, e uma
+captura pesa mais que o módulo todo. Vai para um bucket R2 (`merlin-files`), e o documento guarda
+só o bilhete `{id, name, type, size}`. A chave de todo objeto começa com o `person` da sessão, e
+o worker confere esse prefixo em toda leitura: quem pedir o arquivo de outra pessoa recebe "não
+existe", e não "não pode" — responder diferente já contaria que o arquivo existe.
+
+**A consequência honesta**: anexo só existe para quem entrou. Sem sessão não há onde guardar, e
+inventar um depósito local seria prometer uma sincronização que não aconteceria. A tela diz isso.
+
+### 7.7 Planos e financeiro
+
+**Planos** perdeu a revisão de dentro das colunas — três campos abertos em cada uma, nove
+textareas vazias que era o que a tela dizia o tempo todo. Virou botão e caixa, como todo o resto
+do sistema. No lugar delas entrou a única coisa que essa tela faz e uma lista não faria: acender
+um objetivo apaga tudo que não tem parentesco com ele nas outras colunas, três gerações de uma
+vez — de onde uma semana veio e onde um trimestre aterrissa.
+
+**Financeiro** ganhou a aba **hoje**, que é a primeira e responde as três perguntas que se faz
+antes de qualquer outra: quanto tenho, quanto sobra no fim do mês (e por qual buraco ele passa
+antes de fechar), e o que vence nos próximos sete dias. Nenhuma conta nova mora ali — saldo e
+projeção saem do mesmo `balanceUntil` e `buildMonth` do mês e do ano.
+
+E as **categorias** saíram de dentro da caixa de config, onde eram uma fileira de chips em que um
+clique apagava sem perguntar e sem desfazer. Agora cada uma diz quanto passou por ela no mês —
+que é a única coisa que faz uma etiqueta valer alguma coisa. Renomear arrasta junto tudo que
+estava marcado com o nome antigo; apagar avisa quantos lançamentos ficam órfãos, e volta atrás.
