@@ -74,3 +74,42 @@
 @media (max-width:640px){
   .year{grid-template-columns:repeat(12,124px)}
 }
+
+/* ---------- hoje: a primeira tela do dinheiro ----------
+   os proximos sete dias, agrupados por dia. e uma lista curta de proposito:
+   o que passa disso e o mes, e o mes tem aba. */
+.soon{margin:0 0 var(--pd2)}
+.soon:last-of-type{margin-bottom:0}
+.soon__day{margin:0 0 6px;font-size:10px;letter-spacing:.08em;color:var(--ink-30)}
+
+/* ---------- as categorias ----------
+   elas viviam como uma fileira de chips dentro da caixa de config, onde um
+   clique apagava sem perguntar. aqui cada uma diz quanto passou por ela no
+   mes — que e a unica coisa que faz uma etiqueta valer alguma coisa. */
+.cats{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:2px}
+.cat{
+  display:flex;align-items:center;gap:10px;min-height:30px;
+  padding:3px 4px 3px 8px;border-radius:var(--br2);
+  transition:background var(--t);
+}
+.cat:hover{background:var(--fill)}
+.cat .input{height:28px;padding:4px 8px;font-size:12.5px}
+.cat__name{flex:0 0 auto;max-width:44%;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-size:12.5px;color:var(--ink)}
+.cat__name small{margin-left:6px;font-size:9.5px;color:var(--ink-30)}
+.cat__bar{flex:1 1 auto;height:4px;border-radius:100px;background:var(--fill-hover);overflow:hidden;min-width:20px}
+.cat__bar i{display:block;height:100%;background:var(--ink-30);border-radius:100px;transition:width .35s var(--ease)}
+.cat__value{flex:0 0 auto;font-size:11.5px;color:var(--ink-50)}
+.cat .row-actions{opacity:0}
+.cat:hover .row-actions,.cat:focus-within .row-actions{opacity:1}
+@media (hover:none){.cat .row-actions{opacity:1}}
+/* etiqueta que nao esta mais na lista mas ainda marca lancamentos: some da
+   lista faria as somas do mes nao fecharem */
+.cat.is-orphan .cat__name{color:var(--ink-50)}
+
+/* dois numeros no mesmo ladrilho: em .meters eles disputavam a largura e se
+   sobrepunham. uma linha cada, e a barra embaixo e quem compara. */
+.money-pair{display:flex;flex-direction:column;gap:6px}
+.money-pair span{display:flex;align-items:baseline;justify-content:space-between;gap:10px}
+.money-pair b{font-size:clamp(16px,1.5vw,20px);font-weight:500;letter-spacing:-.02em;color:var(--ink)}
+.money-pair b.is-green{color:var(--green-ink)}
+.money-pair small{font-size:11.5px;color:var(--ink-30)}

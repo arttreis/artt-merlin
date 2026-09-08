@@ -8,36 +8,71 @@
    trimestre, mes e semana lado a lado: e assim que "o que esta aberto no meu
    trimestre" e "na minha semana" se leem de um lugar so. no celular vira uma
    coluna, e a semana vem primeiro porque e a mais usada. */
-.horizons{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:var(--pd);align-items:start}
+.horizons{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:var(--pd);align-items:stretch}
 @media (max-width:1000px){.horizons{grid-template-columns:1fr}.horizon--week{order:-1}}
-.horizon{padding:var(--pd)}
+/* a coluna e uma coluna de verdade: cabeca em cima, pe embaixo, e a lista
+   crescendo no meio. antes o pe subia junto com a lista curta e as tres
+   colunas terminavam em alturas diferentes. */
+.horizon{padding:var(--pd);display:flex;flex-direction:column;min-height:220px}
 .horizon__head{display:flex;align-items:flex-start;justify-content:space-between;gap:var(--pd2);margin:0 0 var(--pd2)}
-.horizon__kind{margin:0}
-.horizon__period{margin:2px 0 0;font-size:15px;font-weight:600;letter-spacing:-.02em;color:var(--ink)}
-.horizon__open{margin:2px 0 0;font-size:12px;color:var(--ink-50)}
+.horizon__title{min-width:0}
+.horizon__period{
+  display:flex;align-items:center;gap:7px;
+  margin:0;font-size:15px;font-weight:600;letter-spacing:-.02em;color:var(--ink);
+}
+/* o periodo de agora nao precisa da palavra "atual" ao lado do nome dele:
+   um ponto verde diz o mesmo e nao rouba a linha */
+.horizon__now{width:6px;height:6px;border-radius:50%;background:var(--green);flex:none}
+.horizon__open{margin:3px 0 0;font-size:12px;color:var(--ink-30)}
+.horizon__open .t-mono{font-size:10px;letter-spacing:.08em;color:var(--ink-30)}
 .horizon__nav{display:flex;align-items:center;gap:2px;flex:none}
 .horizon__nav .action{width:24px;height:24px}
 .horizon__nav .action svg{width:13px;height:13px}
-.horizon__body{display:flex;flex-direction:column;gap:var(--pd2)}
+.horizon__body{flex:1 1 auto;display:flex;flex-direction:column;gap:var(--pd2)}
 .horizon .empty{padding:var(--pd2) 0}
+/* o pe: as duas coisas que se faz com um horizonte, e nada mais */
+.horizon__foot{
+  display:flex;flex-wrap:wrap;gap:6px;
+  margin-top:var(--pd2);padding-top:var(--pd2);border-top:1px solid var(--line-soft);
+}
 
-/* o objetivo: caixa, texto, e os selos e desdobramentos no rodape */
-.goal{padding:6px 6px 6px 10px;gap:8px;align-items:flex-start}
-.goal__check{flex:0 0 auto;width:14px;height:14px;margin-top:2px;accent-color:var(--green);cursor:pointer}
-.goal__main{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:3px}
+/* ---------- o objetivo ---------- */
+.goal{padding:6px 6px 6px 10px;gap:8px;align-items:flex-start;transition:opacity var(--t),border-color var(--t),background var(--t)}
+.goal__check{flex:0 0 auto;width:14px;height:14px;margin-top:3px;accent-color:var(--green);cursor:pointer}
+/* o corpo do objetivo e um botao: clicar acende o parentesco. por isso ele
+   reseta o que um <button> traz de fabrica e volta a parecer texto. */
+.goal__main{
+  flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:4px;
+  text-align:left;background:none;border:0;padding:0;font:inherit;color:inherit;cursor:pointer;
+}
 .goal__text{font-size:13px;color:var(--ink);white-space:normal;line-height:1.35}
 .goal.is-done .goal__text{color:var(--ink-30);text-decoration:line-through}
 .goal__meta{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
 .goal__meta .badge{height:17px;padding:0 6px;font-size:9px}
 .goal__parent{font-family:var(--mono);font-size:10px;letter-spacing:.04em;color:var(--ink-30);overflow:hidden;white-space:nowrap;text-overflow:ellipsis;max-width:100%}
-.goal__children{font-family:var(--mono);font-size:10px;letter-spacing:.04em;color:var(--ink-50)}
+/* o desdobramento com barra: "0/1 no mes" e um numero que ninguem sente. a
+   barra faz o trimestre parecer o que ele e — uma promessa parcialmente
+   cumprida em outro horizonte. */
+.goal__children{display:flex;align-items:center;gap:6px;font-family:var(--mono);font-size:10px;letter-spacing:.04em;color:var(--ink-50)}
+.goal__bar{display:block;width:34px;height:3px;border-radius:100px;background:var(--fill-hover);overflow:hidden;flex:none}
+.goal__bar i{display:block;height:100%;background:var(--green);border-radius:100px;transition:width .35s var(--ease)}
 .goal .row-actions{align-self:center}
 @media (hover:none){.goal .row-actions{opacity:1}}
 
-/* a revisao: tres campos livres no pe da coluna. e do arthur, o merlin so sugere. */
-.review{border-top:1px solid var(--line-soft);padding-top:var(--pd2);display:flex;flex-direction:column;gap:6px}
-.review__head{display:flex;align-items:center;justify-content:space-between;gap:var(--pd2)}
-.review__head .t-mono{color:var(--ink-30)}
-.review .textarea{min-height:44px;font-size:12.5px;padding:6px 10px}
-.review .field-label{margin-bottom:2px}
+/* ---------- o parentesco aceso ----------
+   com um objetivo escolhido, as tres colunas param de ser tres listas: o
+   escolhido ganha a borda, quem tem sangue dele fica em tinta cheia e todo o
+   resto apaga. e a unica coisa que esta tela faz e uma lista nao faria. */
+.goal.is-focus{border-color:var(--green);background:color-mix(in srgb,var(--green) 9%,transparent)}
+.goal.is-kin{border-color:color-mix(in srgb,var(--green) 34%,transparent)}
+.goal.is-dim{opacity:.3}
+.goal.is-dim:hover{opacity:.65}
+
+/* ---------- a revisao ----------
+   tres campos numa caixa, nao tres campos abertos em cada coluna: revisar e
+   gesto de fim de periodo, e nove textareas vazias eram o que a tela dizia o
+   tempo todo. */
+.review{display:flex;flex-direction:column;gap:var(--pd2)}
+.review .textarea{min-height:56px;font-size:13px}
+.review .field-label{margin-bottom:4px}
 #merlin-btn:disabled,.merlin-btn:disabled{opacity:.6;cursor:default}

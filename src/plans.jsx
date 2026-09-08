@@ -4,7 +4,7 @@
 import "./shared/base.css";
 import "./plans.css";
 import {
-  initPage, newId, today, dayOf, dateOf, addDays, mondayOf, monthLabel, dateLabel, notify, api, clientName
+  initPage, newId, today, dayOf, dateOf, addDays, mondayOf, monthLabel, dateLabel, notify, api, clientName, setMerlinAsks
 } from "./shared/core.js";
 import { useState, useEffect } from "react";
 import {
@@ -97,6 +97,10 @@ function Plans() {
   const [periods, setPeriods] = useState(() => ({ quarter: periodOf("quarter", t), month: periodOf("month", t), week: periodOf("week", t) }));
   const [form, setForm] = useState(null);       // { kind, period, id?, parent? } | null
   const [summary, setSummary] = useState(null); // { title, text } | null
+  const [reviewing, setReviewing] = useState(""); // id do horizonte com a revisao aberta
+  /* o objetivo aceso. e so estado de tela: some ao recarregar, e nao existe
+     campo nenhum no documento para "estou olhando este". */
+  const [focus, setFocus] = useState("");
 
   const docOf = (kind) => plans.get(docId(kind, periods[kind])) || normalize({ id: docId(kind, periods[kind]), kind, period: periods[kind] });
   const allGoals = plans.all().flatMap((d) => d.goals.map((g) => ({ ...g, kind: d.kind, period: d.period, docId: d.id })));
@@ -145,6 +149,13 @@ function Plans() {
     saveDoc({ ...doc, review });
   };
 
+  useEffect(() => setMerlinAsks(KINDS
+    .filter((k) => docOf(k.id).goals.length)
+    .map((k) => ({
+      id: "review:" + k.id, label: "revisar " + (k.id === "week" ? "a semana" : k.id === "month" ? "o mês" : "o trimestre"),
+      note: periodLabel(k.id, periods[k.id]), run: () => askReview(k.id)
+    }))), [periods.quarter, periods.month, periods.week, plans.all().length]);
+
   /* ---------- revisar com o merlin ---------- */
   const askReview = async (kind) => {
     const doc = docOf(kind);
@@ -159,9 +170,27 @@ function Plans() {
   };
 
   useKeydown((e) => {
-    if (form || summary) return;
+    if (form || summary || reviewing) return;
+    if (e.key === "Escape" && focus) { e.preventDefault(); setFocus(""); return; }
     if (e.key === "n" && !isTyping() && !e.ctrlKey && !e.metaKey && !e.altKey) { e.preventDefault(); setForm({ kind: "week", period: periods.week }); }
   });
+
+  /* com um objetivo aceso, as outras colunas ficam com o parentesco dele em
+     tinta cheia e o resto apagado. e o unico jeito de ver, sem cruzar tres
+     listas na cabeca, de onde uma semana veio e onde um trimestre aterrissa. */
+  const shade = (id) => {
+    if (!focus) return "";
+    if (id === focus) return " is-focus";
+    const f = allGoals.find((g) => g.id === focus);
+    if (!f) return "";
+    if (f.parent === id) return " is-kin";
+    const g = allGoals.find((x) => x.id === id);
+    if (g && g.parent === focus) return " is-kin";
+    /* neto e avo: o trimestre acende junto com a semana que saiu dele */
+    if (g && f.parent && g.id === (allGoals.find((x) => x.id === f.parent) || {}).parent) return " is-kin";
+    if (g && g.parent && f.id === (allGoals.find((x) => x.id === g.parent) || {}).parent) return " is-kin";
+    return " is-dim";
+  };
 
   const shift = (kind, n) => setPeriods((p) => ({ ...p, [kind]: shiftPeriod(kind, p[kind], n) }));
   const goToday = () => setPeriods({ quarter: periodOf("quarter", t), month: periodOf("month", t), week: periodOf("week", t) });
@@ -172,7 +201,9 @@ function Plans() {
       <div className="header">
         <div>
           <h1>planos</h1>
-          <p className="sub">{openCount("quarter")} abertos no trimestre · {openCount("month")} no mês · {openCount("week")} na semana</p>
+          <p className="sub">{focus
+            ? "acesso: só o que tem parentesco com ele — Esc apaga"
+            : openCount("quarter") + " abertos no trimestre · " + openCount("month") + " no mês · " + openCount("week") + " na semana"}</p>
         </div>
         <div className="actions">
           <button className="pill" type="button" onClick={goToday}>hoje</button>
@@ -182,13 +213,15 @@ function Plans() {
 
       <div className="horizons">
         {KINDS.map((k) => <Horizon key={k.id} kind={k} doc={docOf(k.id)} period={periods[k.id]} today={t}
-          childrenOf={childrenOf} parentOf={parentOf}
+          childrenOf={childrenOf} parentOf={parentOf} focus={focus} onFocus={setFocus} shade={shade}
           onShift={(n) => shift(k.id, n)} onNew={() => setForm({ kind: k.id, period: periods[k.id] })}
           onToggle={(g, v) => toggleDone(k.id, g, v)} onEdit={(g) => setForm({ kind: k.id, period: periods[k.id], id: g.id })}
           onRemove={(g) => removeGoal(k.id, g)} onUnfold={k.id === "week" ? null : (g) => unfold(k.id, g)}
-          onPull={k.id === "week" ? pullToWeek : null} onReview={(r) => saveReview(k.id, r)} onAsk={() => askReview(k.id)} />)}
+          onPull={k.id === "week" ? pullToWeek : null} onReview={() => setReviewing(k.id)} />)}
       </div>
 
+      {reviewing && <ReviewDialog kind={KINDS.find((k) => k.id === reviewing)} doc={docOf(reviewing)}
+        onSave={(r) => saveReview(reviewing, r)} onAsk={() => askReview(reviewing)} onClose={() => setReviewing("")} />}
       {form && <GoalForm plans={plans} form={form} onClose={() => setForm(null)} onRemove={(g) => removeGoal(form.kind, g)} parentOf={parentOf} />}
       {summary && <MerlinDialog title={summary.title} text={summary.text} onClose={() => setSummary(null)} />}
     </>
@@ -196,54 +229,81 @@ function Plans() {
 }
 
 /* ---------- uma coluna: um horizonte ---------- */
-function Horizon({ kind, doc, period, today: t, childrenOf, parentOf, onShift, onNew, onToggle, onEdit, onRemove, onUnfold, onPull, onReview, onAsk }) {
+function Horizon({ kind, doc, period, today: t, childrenOf, parentOf, focus, onFocus, onShift, onNew, onToggle, onEdit, onRemove, onUnfold, onPull, onReview, shade }) {
   const isCurrent = period === periodOf(kind.id, t);
   const open = doc.goals.filter((g) => !g.done).length;
   /* uma lista so: feitos no fim, e a ordem que a pessoa deu no resto */
   const goals = doc.goals.slice().sort((a, b) => (a.done - b.done) || a.order - b.order || a.createdAt - b.createdAt);
+  const written = doc.review.went || doc.review.didnt || doc.review.next;
   return (
     <section className={"block block--flat horizon horizon--" + kind.id + (isCurrent ? " is-current" : "")}>
       <div className="horizon__head">
-        <div>
-          <p className="horizon__kind t-mono t-mute">{kind.label}{isCurrent ? " · atual" : ""}</p>
-          <p className="horizon__period">{periodLabel(kind.id, period)}</p>
-          <p className="horizon__open">{periodSub(kind.id, period) ? periodSub(kind.id, period) + " · " : ""}{open ? open + (open === 1 ? " aberto" : " abertos") : (doc.goals.length ? "tudo feito" : "nada planejado")}</p>
+        <div className="horizon__title">
+          <p className="horizon__period">
+            {isCurrent && <i className="horizon__now" title="o período de agora" />}
+            {periodLabel(kind.id, period)}
+          </p>
+          <p className="horizon__open">
+            <span className="t-mono">{kind.label}</span>
+            {periodSub(kind.id, period) ? " · " + periodSub(kind.id, period) : ""}
+            {" · "}
+            {open ? open + (open === 1 ? " aberto" : " abertos") : (doc.goals.length ? "tudo feito" : "nada planejado")}
+          </p>
         </div>
         <div className="horizon__nav">
           <button className="action" type="button" title="anterior" onClick={() => onShift(-1)}>{icon("chevronLeft")}</button>
           <button className="action" type="button" title="próximo" onClick={() => onShift(1)}>{icon("chevronRight")}</button>
-          <button className="action" type="button" title={kind.newLabel} aria-label={kind.newLabel} onClick={onNew}>{icon("plus")}</button>
         </div>
       </div>
       <div className="horizon__body">
         {!doc.goals.length && <p className="empty">{kind.id === "quarter" ? "O que este trimestre precisa entregar." : kind.id === "month" ? "Desdobre o trimestre, ou escreva direto." : "O que fecha esta semana. Daqui vira cartão."}</p>}
         {!!goals.length && (
           <ul className="list">
-            {goals.map((goal) => <Goal key={goal.id} g={goal} kind={kind.id} children={childrenOf(goal.id)} parent={goal.parent ? parentOf(goal.parent) : null}
+            {goals.map((goal) => <Goal key={goal.id} g={goal} kind={kind.id} kids={childrenOf(goal.id)} parent={goal.parent ? parentOf(goal.parent) : null}
+              shade={shade(goal.id)} focused={focus === goal.id} onFocus={onFocus}
               onToggle={onToggle} onEdit={onEdit} onRemove={onRemove} onUnfold={onUnfold} onPull={onPull} />)}
           </ul>)}
-        <Review key={doc.id} review={doc.review} onSave={onReview} onAsk={onAsk} canAsk={doc.goals.length > 0} />
+      </div>
+      {/* o pé da coluna: as duas coisas que se faz com um horizonte. a revisão
+          era três campos abertos aqui dentro, sempre — nove caixas vazias na
+          tela para um gesto de fim de período. virou botão e caixa, como todo
+          o resto do sistema. */}
+      <div className="horizon__foot">
+        <button className="pill pill--mini" type="button" onClick={onNew}>{icon("plus")}{kind.newLabel}</button>
+        <button className={"pill pill--mini" + (written ? " is-on" : "")} type="button" onClick={onReview}>
+          {written ? "revisão escrita" : "revisão"}
+        </button>
       </div>
     </section>
   );
 }
 
-/* ---------- um objetivo ---------- */
-function Goal({ g, kind, children, parent, onToggle, onEdit, onRemove, onUnfold, onPull }) {
-  const doneChildren = children.filter((c) => c.done).length;
+/* ---------- um objetivo ----------
+   clicar no texto acende o objetivo e apaga tudo que não tem parentesco com
+   ele nas outras colunas. é a única coisa que esta tela sabe fazer e que uma
+   lista não faria: mostrar de onde uma semana vem e onde um trimestre
+   aterrissa, sem ter que ler três listas e cruzar na cabeça. */
+function Goal({ g, kind, kids, parent, shade, focused, onFocus, onToggle, onEdit, onRemove, onUnfold, onPull }) {
+  const doneKids = kids.filter((c) => c.done).length;
   return (
-    <li className={"line goal" + (g.done ? " is-done" : "")}>
+    <li className={"line goal" + (g.done ? " is-done" : "") + shade}>
       <input type="checkbox" className="goal__check" checked={g.done} aria-label={"Concluir " + g.text} onChange={(e) => onToggle(g, e.currentTarget.checked)} />
-      <div className="goal__main">
+      <button className="goal__main" type="button" aria-pressed={String(focused)}
+              title={kids.length || parent ? "ver o parentesco nas outras colunas" : "sem desdobramento"}
+              onClick={() => onFocus(focused ? "" : g.id)}>
         <span className="goal__text">{g.text}</span>
-        {(g.client || parent || children.length > 0 || g.card) && (
+        {(g.client || parent || kids.length > 0 || g.card) && (
           <span className="goal__meta">
             <ClientBadge id={g.client} />
             {g.card && <span className="badge badge--green">na semana</span>}
-            {children.length > 0 && <span className="goal__children" title="desdobrado">{doneChildren}/{children.length} {kind === "quarter" ? "no mês" : "na semana"}</span>}
+            {kids.length > 0 && (
+              <span className="goal__children" title="desdobrado">
+                <i className="goal__bar"><i style={{ width: Math.round((doneKids / kids.length) * 100) + "%" }} /></i>
+                {doneKids}/{kids.length} {kind === "quarter" ? "no mês" : "na semana"}
+              </span>)}
             {parent && <span className="goal__parent" title={parent.text}>↳ {parent.text}</span>}
           </span>)}
-      </div>
+      </button>
       <span className="row-actions">
         {onPull && !g.done && !g.card && <button className="action" type="button" title="puxar para a semana" onClick={() => onPull(g)}>{icon("arrow")}</button>}
         {onUnfold && !g.done && <button className="action" type="button" title={kind === "quarter" ? "desdobrar no mês" : "desdobrar na semana"} onClick={() => onUnfold(g)}>{icon("unfold")}</button>}
@@ -255,24 +315,29 @@ function Goal({ g, kind, children, parent, onToggle, onEdit, onRemove, onUnfold,
 }
 
 /* ---------- a revisao do periodo ----------
-   tres campos livres, gravados ao sair do campo. o merlin propoe; quem
-   escreve e o arthur. */
-function Review({ review, onSave, onAsk, canAsk }) {
-  const [v, bind, , setValues] = useFields(review);
+   tres campos livres, gravados ao fechar. o merlin propoe; quem escreve e o
+   arthur. mora numa caixa porque revisar e um gesto de fim de periodo — e
+   nao o que a tela deve estar dizendo o tempo todo. */
+function ReviewDialog({ kind, doc, onSave, onAsk, onClose }) {
+  const [v, bind] = useFields(doc.review);
   const [thinking, setThinking] = useState(false);
-  useEffect(() => { setValues(review); }, [review.went, review.didnt, review.next]);
-  const save = () => onSave({ went: v.went, didnt: v.didnt, next: v.next });
+  const close = () => { onSave({ went: v.went, didnt: v.didnt, next: v.next }); onClose(); };
   const ask = async () => { if (thinking) return; setThinking(true); try { await onAsk(); } finally { setThinking(false); } };
   return (
-    <div className="review">
-      <div className="review__head">
-        <span className="t-mono">revisão</span>
-        <button className="pill pill--mini merlin-btn" type="button" disabled={thinking || !canAsk} onClick={ask}>{icon("spark")}{thinking ? "pensando…" : "revisar com o merlin"}</button>
+    <Dialog title={"revisão · " + periodLabel(kind.id, doc.period)} wide label="Revisão do período" onClose={close}
+        sub="o que foi, o que não foi e o que muda — três frases, não um relatório"
+        actions={<>
+          <button className="pill merlin-btn" type="button" disabled={thinking || !doc.goals.length} onClick={ask}>
+            {icon("spark")}{thinking ? "pensando…" : "revisar com o merlin"}
+          </button>
+          <button className="pill pill--green" type="button" onClick={close}>guardar</button>
+        </>}>
+      <div className="review">
+        <div><label className="field-label">o que foi</label><textarea className="textarea" rows="3" {...bind("went")}></textarea></div>
+        <div><label className="field-label">o que não foi</label><textarea className="textarea" rows="3" {...bind("didnt")}></textarea></div>
+        <div><label className="field-label">o que muda</label><textarea className="textarea" rows="3" {...bind("next")}></textarea></div>
       </div>
-      <div><label className="field-label">o que foi</label><textarea className="textarea" rows="2" {...bind("went")} onBlur={save}></textarea></div>
-      <div><label className="field-label">o que não foi</label><textarea className="textarea" rows="2" {...bind("didnt")} onBlur={save}></textarea></div>
-      <div><label className="field-label">o que muda</label><textarea className="textarea" rows="2" {...bind("next")} onBlur={save}></textarea></div>
-    </div>
+    </Dialog>
   );
 }
 
