@@ -38,11 +38,19 @@ database_id = "9011ef3f-3d1d-4019-8db9-c5ff07df0446"
 # o documento guarda so o bilhete. a chave de todo objeto comeca com o
 # `person` da sessao, e o worker confere esse prefixo em toda leitura.
 #
-# o bucket precisa existir antes do primeiro deploy:
-#   npx wrangler r2 bucket create merlin-files
-[[r2_buckets]]
-binding = "FILES"
-bucket_name = "merlin-files"
+# DESLIGADO em 08/09/2026: o R2 ainda nao esta habilitado nesta conta da
+# Cloudflare, e o deploy recusa um binding para bucket que nao existe. O codigo
+# do worker ja trata a ausencia: sem env.FILES, POST /api/files responde 503
+# ("o servidor nao tem onde guardar arquivos") e a tela mostra essa frase — em
+# vez de estourar. Anexar print e a UNICA coisa que nao funciona sem isto.
+#
+# para ligar, dois passos e um deploy:
+#   1. dash.cloudflare.com -> R2 Object Storage -> habilitar (camada gratuita)
+#   2. npx wrangler r2 bucket create merlin-files
+#   3. descomentar as tres linhas abaixo e subir
+# [[r2_buckets]]
+# binding = "FILES"
+# bucket_name = "merlin-files"
 
 [vars]
 # o remetente precisa estar num dominio verificado no Resend.
