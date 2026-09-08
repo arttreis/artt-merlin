@@ -62,3 +62,25 @@
   .clients-screen[data-view="list"] .panel-column{display:none}
   .back-btn{display:inline-flex}
 }
+
+/* ---------- os primeiros passos ----------
+   o que fazer depois de criar um cliente era uma pergunta sem resposta: sete
+   abas vazias e cabia a quem chegou adivinhar. o bloco some por conteudo (cada
+   passo, quando e dado) e por idade (o bloco, depois da primeira semana). */
+.first-steps__grid{display:grid;gap:var(--pd2);grid-template-columns:repeat(auto-fit,minmax(230px,1fr))}
+.first-step{
+  display:flex;align-items:flex-start;gap:11px;text-align:left;
+  padding:12px 14px;border-radius:var(--br3);
+  background:var(--fill);border:1px solid var(--line-soft);
+  transition:background var(--t),border-color var(--t);
+}
+.first-step:hover{background:var(--fill-hover);border-color:var(--line)}
+.first-step .mark{margin-top:1px;pointer-events:none}
+.first-step__text{display:flex;flex-direction:column;gap:2px;min-width:0}
+.first-step__text b{font-size:13px;font-weight:500;color:var(--ink)}
+.first-step__text small{font-size:12px;line-height:1.4;color:var(--ink-30)}
+/* dado: a caixa fica verde e o texto sai da frente do que falta */
+.first-step.is-done{opacity:.5}
+.first-step.is-done .mark{background:var(--green);border-color:var(--green);color:var(--on-green)}
+.first-step.is-done .mark svg{opacity:1}
+.first-step.is-done .first-step__text b{text-decoration:line-through}

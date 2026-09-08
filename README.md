@@ -28,7 +28,7 @@ está em [MIGRATION.md](MIGRATION.md).
 | `day.html` | o dia: a fila de hoje, a barra que se gasta, a sobra. O único lugar com minutos. |
 | `week.html` | a semana em colunas (seg a sex e fim de semana). |
 | `notes.html` | o que ainda não é tarefa, numa caixa de entrada: lista por dia à esquerda, a nota aberta à direita com corpo, estágio, checklist e histórico. |
-| `clients.html` | clientes com canais (Mercado Livre, Shopee, TikTok Shop…), objetivos, backlog, diário e ofertas. |
+| `clients.html` | clientes com canais (Mercado Livre, Shopee, TikTok Shop…), backlog, diário, objetivos, ficha e cofre. Um cliente novo abre com os primeiros passos. |
 | `funnels.html` | funil como grafo com tipos de nó, vazão por etapa, criativos, automações, ofertas e gatilhos. |
 | `maps.html` | mapa mental com teclado e layout automático. |
 | `finance.html` | do jeito da planilha: o mês dia a dia com saldo previsto, o ano em doze colunas, e o painel com saídas fixas, entradas fixas, compras no cartão e dívidas, mais a divisão 50/30/20. |

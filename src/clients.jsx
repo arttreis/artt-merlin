@@ -28,22 +28,30 @@ const STATUSES = ["prospect", "proposal", "active", "paused", "closed"];
 const STATUS_LABEL = { prospect: "prospecto", proposal: "proposta", active: "ativo", paused: "pausado", closed: "encerrado" };
 const RECURRENCES = ["monthly", "project", "hourly", ""];
 const RECURRENCE_LABEL = { monthly: "mensal", project: "projeto", hourly: "hora" };
-const OFFER_TYPES = ["product", "service", "subscription", "bump", "upsell"];
-const OFFER_LABEL = { product: "produto", service: "serviço", subscription: "assinatura", bump: "bump", upsell: "upsell" };
 const JOURNAL_TYPES = ["note", "meeting", "decision", "delivery"];
 const JOURNAL_LABEL = { note: "nota", meeting: "reunião", decision: "decisão", delivery: "entrega" };
 
 /* o vocabulario de canal (tipos, rotulos e o checklist de cada um) mora em
    shared/templates.js, junto dos funis de cada canal: e o mesmo assunto. */
 
+/* a ordem é a do uso, não a do organograma: quem abre um cliente quer saber o
+   que fazer (backlog) e o que aconteceu (diário) muito mais vezes do que quer
+   reler o CNPJ. a ficha desceu por isso, e não por ser menos importante.
+
+   a aba de ofertas saiu. ela era write-only: nada no sistema lia
+   `client.offers` além da pauta de reunião — nem o funil, que tem a própria
+   lista de ofertas com promessa, garantia e escada, e que é a oferta comercial
+   de verdade. e o enum dela era um híbrido que ensinava o mal-entendido:
+   "produto" e "serviço" puxam para catálogo, "bump" e "upsell" para oferta
+   comercial. o catálogo tem sistema de registro próprio — o Mercado Livre, a
+   Shopify — e uma segunda verdade aqui dentro é uma que ninguém mantém. */
 const TABS = [
   { id: "dashboard", label: "painel" },
-  { id: "profile", label: "ficha" },
-  { id: "channels", label: "canais" },
-  { id: "goals", label: "objetivos" },
   { id: "backlog", label: "backlog" },
   { id: "journal", label: "diário" },
-  { id: "offers", label: "ofertas" },
+  { id: "channels", label: "canais" },
+  { id: "goals", label: "objetivos" },
+  { id: "profile", label: "ficha" },
   { id: "vault", label: "cofre" }
 ];
 
@@ -71,6 +79,9 @@ function normalize(d) {
     goals: listOrEmpty(d.goals).map((g) => ({ ...g, steps: listOrEmpty(g.steps) })),
     backlog: listOrEmpty(d.backlog),
     journal: listOrEmpty(d.journal),
+    /* a aba saiu, o campo fica: apagar em silêncio o que alguém cadastrou
+       seria pior que a aba confusa. o painel mostra o que sobrou e oferece
+       levar para o funil, que é onde oferta mora agora. */
     offers: listOrEmpty(d.offers),
     /* so rotulo/usuario/url do acesso ficam aqui em claro; segredo e nota
        vao cifrados (ver "cofre de acessos" mais abaixo). o sal que deriva a
@@ -203,7 +214,12 @@ function meetingContext(c) {
     }),
     journal: c.journal.slice().sort((a, b) => b.at - a.at).slice(0, 15)
       .map((e) => journalDate(e.at) + " · " + (JOURNAL_LABEL[e.type] || e.type) + " · " + e.text),
-    offers: c.offers.map((o) => o.name + " · " + brl(o.price))
+    /* as ofertas vêm dos funis dele, que é onde elas moram desde que a aba do
+       cliente saiu. por id, nunca por cópia: se o funil mudar o preço, a pauta
+       da próxima reunião já sai com o novo. */
+    offers: collection("funnels").all()
+      .filter((f) => f.client === c.id)
+      .flatMap((f) => (f.offers || []).map((o) => o.name + " · " + brl(o.price) + " · " + f.name))
   };
 }
 
@@ -326,7 +342,9 @@ function Clients() {
       clients.save(back);
     });
   };
-  const ctx = { update, updateItem, removeFrom, funnels, setTab };
+  /* clearOffers e declarado mais abaixo; a seta adia a leitura para a hora do
+     clique, em vez de estourar no render por ler um const que ainda nao nasceu. */
+  const ctx = { update, updateItem, removeFrom, funnels, setTab, clearOffers: () => clearOffers() };
 
   /* ---------- criar e apagar ---------- */
 
@@ -360,6 +378,15 @@ function Clients() {
   };
 
   /* ---------- Merlin: preparar reuniao ---------- */
+
+  /* limpar as ofertas antigas é uma decisão, não uma faxina: só acontece
+     quando a pessoa diz que já as levou para o funil, e desfaz. */
+  const clearOffers = () => {
+    if (!doc) return;
+    const before = doc.offers;
+    update((d) => { d.offers = []; });
+    notify("limpei as ofertas antigas", () => update((d) => { d.offers = before; }));
+  };
 
   const askMeeting = async () => {
     if (!doc || thinking) return;
@@ -501,9 +528,8 @@ function Panel({ doc, tab, ctx, vault, thinking, onBack, onDelete, onMeeting }) 
     tab === "goals" ? <Goals doc={doc} ctx={ctx} /> :
     tab === "backlog" ? <Backlog doc={doc} ctx={ctx} /> :
     tab === "journal" ? <Journal doc={doc} ctx={ctx} /> :
-    tab === "offers" ? <Offers doc={doc} ctx={ctx} /> :
     tab === "vault" ? <Vault doc={doc} ctx={ctx} masterKey={vault.key} openDialog={vault.open} lock={vault.lock} /> :
-    <Dashboard doc={doc} setTab={ctx.setTab} />;
+    <Dashboard doc={doc} setTab={ctx.setTab} onClearOffers={ctx.clearOffers} />;
   return (
     <div id="client-panel">
       <div className="panel-head">
@@ -527,7 +553,7 @@ function Panel({ doc, tab, ctx, vault, thinking, onBack, onDelete, onMeeting }) 
 }
 
 /* ---------- aba: painel (resumo) ---------- */
-function Dashboard({ doc, setTab }) {
+function Dashboard({ doc, setTab, onClearOffers }) {
   /* prazo ordena, mas não é ingresso. antes o painel só listava o que tinha
      data, e um cliente recém-criado por modelo — que nasce com objetivos e
      backlog sem prazo (templates.js, buildClient) — aterrissava numa tela
@@ -541,6 +567,7 @@ function Dashboard({ doc, setTab }) {
   return (
     <>
       <div className="grid">
+        <FirstSteps doc={doc} setTab={setTab} />
         <div className="col-6 block">
           <p className="heading"><span className="t-mono">objetivos com prazo</span></p>
           {goalsDue.length
@@ -553,6 +580,24 @@ function Dashboard({ doc, setTab }) {
             ? <ul className="list">{backlogDue.map((b) => <li key={b.id} className="line"><span className="name">{b.text}</span><span className="measure">{dateLabel(b.due)}</span></li>)}</ul>
             : <p className="empty">nada no backlog com prazo</p>}
         </div>
+        {!!doc.offers.length && (
+          <div className="col-6 block">
+            <p className="heading">
+              <span className="t-mono">ofertas cadastradas aqui antes</span>
+              <button className="pill pill--mini" type="button" onClick={onClearOffers}>já movi, pode limpar</button>
+            </p>
+            <ul className="list">
+              {doc.offers.map((o) => (
+                <li key={o.id} className="line">
+                  <span className="name">{o.name}</span>
+                  <span className="measure">{o.price ? brl(o.price) : "—"}</span>
+                </li>))}
+            </ul>
+            <p className="note">Oferta agora mora no funil, junto da promessa, da garantia e da
+            escada — e a pauta da reunião passou a ler de lá. Estas continuam guardadas até você
+            mandar limpar.</p>
+          </div>
+        )}
         <div className="col-6 block">
           <p className="heading"><span className="t-mono">canais incompletos</span></p>
           {incomplete.length
@@ -595,10 +640,68 @@ function MoneyInput({ value, onChange, ...rest }) {
     onChange={(e) => { setText(e.currentTarget.value); onChange(parseMoney(e.currentTarget.value)); }} />;
 }
 
+/* ---------- os primeiros passos ----------
+   o que fazer depois de criar um cliente era uma pergunta sem resposta: a tela
+   abria em sete abas vazias e cabia a quem chegou adivinhar por onde começar.
+   este bloco responde, e some sozinho — de duas formas, porque só uma não
+   bastaria.
+
+   por CONTEÚDO: cada passo desaparece quando é dado.
+   por IDADE: o bloco inteiro só existe na primeira semana do cliente. sem
+   isso, "ainda não tem contato" seria verdade para sempre num cliente de
+   meses que nunca teve um — e o bloco nasceria na base inteira no dia em que
+   este código subisse, em vez de acompanhar quem está começando. */
+const FRESH_DAYS = 7;
+
+function FirstSteps({ doc, setTab }) {
+  const age = Date.now() - (doc.createdAt || 0);
+  if (age > FRESH_DAYS * 86400000) return null;
+  const steps = [
+    { id: "channels", done: doc.channels.length > 0, tab: "channels",
+      label: "diga onde esse cliente vende",
+      note: "cada canal nasce com o checklist do tipo dele — o que precisa existir antes de qualquer campanha" },
+    { id: "goals", done: doc.goals.length > 0, tab: "goals",
+      label: "escreva o que ele precisa alcançar",
+      note: "um objetivo, com o número que diz se aconteceu" },
+    { id: "backlog", done: doc.backlog.length > 0, tab: "backlog",
+      label: "liste o que está travando agora",
+      note: "daqui as coisas são puxadas para o seu dia, uma por vez" },
+    { id: "journal", done: doc.journal.length > 0, tab: "journal",
+      label: "registre a primeira conversa",
+      note: "é do diário que a pauta da próxima reunião sai pronta" }
+  ];
+  const left = steps.filter((s) => !s.done);
+  if (!left.length) return null;
+  return (
+    <div className="col-12 block first-steps">
+      <p className="heading">
+        <span className="t-mono">por onde começar</span>
+        <span className="t-mono t-mute">{steps.length - left.length} de {steps.length}</span>
+      </p>
+      <div className="first-steps__grid">
+        {steps.map((s) => (
+          <button key={s.id} className={"first-step" + (s.done ? " is-done" : "")} type="button"
+                  onClick={() => setTab(s.tab)}>
+            <span className="mark" aria-hidden="true">{icon("check")}</span>
+            <span className="first-step__text">
+              <b>{s.label}</b>
+              <small>{s.note}</small>
+            </span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 /* ---------- aba: ficha ---------- */
 function Profile({ doc, ctx }) {
   const { update, updateItem, removeFrom } = ctx;
   const contactsOf = (d) => d.contacts, linksOf = (d) => d.links;
+  /* "+ contato" e "+ link" empurravam uma linha VAZIA de campos para dentro da
+     lista. quem clicasse sem querer ficava com um contato fantasma que só some
+     se for apagado — e a regra da casa é que criar é sempre botão e caixa. */
+  const [adding, setAdding] = useState("");
   return (
     <div className="grid">
       <div className="col-6 block column">
@@ -631,7 +734,7 @@ function Profile({ doc, ctx }) {
         <textarea className="textarea" id="f-extras" value={doc.contract.extras} onChange={(e) => update((d) => { d.contract.extras = e.currentTarget.value; })} />
       </div>
       <div className="col-6 block">
-        <p className="heading"><span className="t-mono">contatos</span><button className="pill pill--mini" type="button" id="add-contact" onClick={() => update((d) => { d.contacts.push({ id: newId(), name: "", role: "", whatsapp: "", email: "" }); })}>+ contato</button></p>
+        <p className="heading"><span className="t-mono">contatos</span><button className="pill pill--mini" type="button" id="add-contact" onClick={() => setAdding("contact")}>+ contato</button></p>
         <div id="contact-list" className="column">
           {doc.contacts.length ? doc.contacts.map((k) => (
             <div key={k.id} className="editable-line" data-id={k.id}>
@@ -644,7 +747,7 @@ function Profile({ doc, ctx }) {
         </div>
       </div>
       <div className="col-6 block">
-        <p className="heading"><span className="t-mono">links</span><button className="pill pill--mini" type="button" id="add-link" onClick={() => update((d) => { d.links.push({ id: newId(), label: "", url: "" }); })}>+ link</button></p>
+        <p className="heading"><span className="t-mono">links</span><button className="pill pill--mini" type="button" id="add-link" onClick={() => setAdding("link")}>+ link</button></p>
         <div id="link-list" className="column">
           {doc.links.length ? doc.links.map((k) => (
             <div key={k.id} className="editable-line" data-id={k.id}>
@@ -654,7 +757,47 @@ function Profile({ doc, ctx }) {
             </div>)) : <p className="empty">nenhum link ainda</p>}
         </div>
       </div>
+      {adding === "contact" && (
+        <ContactForm onClose={() => setAdding("")}
+          onAdd={(k) => update((d) => { d.contacts.push(k); })} />
+      )}
+      {adding === "link" && (
+        <LinkForm onClose={() => setAdding("")}
+          onAdd={(k) => update((d) => { d.links.push(k); })} />
+      )}
     </div>
+  );
+}
+
+function ContactForm({ onClose, onAdd }) {
+  const [v, bind] = useFields({ name: "", role: "", whatsapp: "", email: "" });
+  const submit = () => {
+    const name = v.name.trim();
+    if (!name) { notify("o contato precisa de um nome"); return false; }
+    onAdd({ id: newId(), name, role: v.role.trim(), whatsapp: v.whatsapp.trim(), email: v.email.trim() });
+  };
+  return (
+    <Form title="novo contato" submit="adicionar" onSubmit={submit} onClose={onClose}>
+      <Field label="nome" full><input className="input" required maxLength="80" {...bind("name")} /></Field>
+      <Field label="papel"><input className="input" maxLength="60" placeholder="quem é essa pessoa ali dentro" {...bind("role")} /></Field>
+      <Field label="whatsapp"><input className="input" maxLength="40" inputMode="tel" {...bind("whatsapp")} /></Field>
+      <Field label="e-mail" full><input className="input" type="email" maxLength="120" {...bind("email")} /></Field>
+    </Form>
+  );
+}
+
+function LinkForm({ onClose, onAdd }) {
+  const [v, bind] = useFields({ label: "", url: "" });
+  const submit = () => {
+    const label = v.label.trim(), url = v.url.trim();
+    if (!label && !url) { notify("o link precisa de um rótulo ou de um endereço"); return false; }
+    onAdd({ id: newId(), label: label || url, url });
+  };
+  return (
+    <Form title="novo link" submit="adicionar" onSubmit={submit} onClose={onClose}>
+      <Field label="rótulo" full><input className="input" required maxLength="60" placeholder="painel do ML, drive, contrato…" {...bind("label")} /></Field>
+      <Field label="endereço" full><input className="input" type="url" maxLength="500" placeholder="https://…" {...bind("url")} /></Field>
+    </Form>
   );
 }
 
@@ -960,57 +1103,6 @@ function JournalForm({ onClose, onAdd }) {
       <Field label="tipo" full><select className="select" {...bind("type")}>{JOURNAL_TYPES.map((t) => <option key={t} value={t}>{JOURNAL_LABEL[t]}</option>)}</select></Field>
       <Field label="o que aconteceu" full><textarea className="textarea" required placeholder="markdown simples vale" {...bind("text")} /></Field>
     </Form>
-  );
-}
-
-/* ---------- aba: ofertas ---------- */
-function Offers({ doc, ctx }) {
-  const [form, setForm] = useState(false);
-  return (
-    <>
-      <TabBar label="ofertas" button="oferta" id="add-offer" onAdd={() => setForm(true)} />
-      <div className="column" id="offer-list">
-        {doc.offers.length
-          ? doc.offers.map((o) => <Offer key={o.id} o={o} ctx={ctx} />)
-          : <p className="empty">nenhuma oferta cadastrada</p>}
-      </div>
-      {form && <OfferForm onClose={() => setForm(false)} onAdd={(offer) => ctx.update((d) => { d.offers.push(offer); })} />}
-    </>
-  );
-}
-
-function OfferForm({ onClose, onAdd }) {
-  const [v, bind] = useFields({ name: "", price: "", type: OFFER_TYPES[0] });
-  const submit = () => {
-    const name = v.name.trim();
-    if (!name) { notify("a oferta precisa de um nome"); return false; }
-    onAdd({ id: newId(), name, price: parseMoney(v.price), type: v.type, description: "", checkout: "" });
-  };
-  return (
-    <Form title="nova oferta" submit="adicionar" onSubmit={submit} onClose={onClose}>
-      <Field label="nome" full><input className="input" required maxLength="120" {...bind("name")} /></Field>
-      <Field label="preço"><input className="input input--num" inputMode="decimal" placeholder="0,00" {...bind("price")} /></Field>
-      <Field label="tipo"><select className="select" {...bind("type")}>{OFFER_TYPES.map((t) => <option key={t} value={t}>{OFFER_LABEL[t]}</option>)}</select></Field>
-    </Form>
-  );
-}
-
-function Offer({ o, ctx }) {
-  const { updateItem, removeFrom } = ctx;
-  const offersOf = (d) => d.offers;
-  return (
-    <div className="block block--flat" data-id={o.id}>
-      <div className="item-head">
-        <input className="input" value={o.name} onChange={(e) => updateItem(offersOf, o.id, (x) => { x.name = e.currentTarget.value; })} />
-        <select className="select" value={o.type} onChange={(e) => updateItem(offersOf, o.id, (x) => { x.type = e.currentTarget.value; })}>
-          {OFFER_TYPES.map((t) => <option key={t} value={t}>{OFFER_LABEL[t]}</option>)}
-        </select>
-        <MoneyInput value={o.price} onChange={(v) => updateItem(offersOf, o.id, (x) => { x.price = v; })} />
-        <button className="action" type="button" aria-label="Remover oferta" onClick={() => removeFrom(offersOf, o.id, "oferta removida")}>{icon("trash")}</button>
-      </div>
-      <textarea className="textarea mt2" placeholder="descrição" value={o.description} onChange={(e) => updateItem(offersOf, o.id, (x) => { x.description = e.currentTarget.value; })} />
-      <input className="input mt2" placeholder="link de checkout (Stripe)" value={o.checkout} onChange={(e) => updateItem(offersOf, o.id, (x) => { x.checkout = e.currentTarget.value; })} />
-    </div>
   );
 }
 
