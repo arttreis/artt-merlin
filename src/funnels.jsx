@@ -2124,12 +2124,13 @@ function FunnelList({ funnels }) {
           text="Cada modelo já traz as etapas na ordem, quem liga em quem e a taxa média esperada em cada passagem — o suficiente para você comparar o seu número com o que costuma acontecer. Tudo editável depois, e o “+” cria um em branco."
           groups={funnelGroups().map((g) => ({
             ...g,
-            items: g.items.map((t) => ({ ...t, summary: t.summary, line: funnelChain(t).join(" → ") }))
+            items: g.items.map((t) => ({ ...t, summary: t.summary, hint: funnelChain(t).join(" → ") }))
           }))}
           onPick={(t) => setForm({ template: t.id })}
           onBlank={() => setForm(true)}
           note="Nenhum parece com ele?"
-          blankLabel="começar em branco" />
+          blankLabel="começar em branco"
+          dense />
       )}
       {form && <FunnelForm funnels={funnels} preset={form === true ? null : form} onClose={() => setForm(false)} />}
     </main>

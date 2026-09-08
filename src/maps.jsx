@@ -890,12 +890,13 @@ function MapList({ maps }) {
           text="Cada modelo abre com os galhos de primeiro nível já escritos — o esqueleto de um assunto, para você mexer em vez de encarar um nó sozinho no meio da tela. O “+” cria um em branco."
           groups={mapGroups().map((g) => ({
             ...g,
-            items: g.items.map((t) => ({ ...t, line: mapBranches(t).join(" · ") }))
+            items: g.items.map((t) => ({ ...t, summary: mapBranches(t).join(" · "), hint: t.summary }))
           }))}
           onPick={(t) => setForm({ template: t.id })}
           onBlank={() => setForm(true)}
           note="Nenhum serve?"
-          blankLabel="começar em branco" />
+          blankLabel="começar em branco"
+          dense />
       )}
       {form && <MapForm maps={maps} preset={form === true ? null : form} onClose={() => setForm(false)} />}
     </main>

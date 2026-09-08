@@ -1,138 +1,314 @@
 /* merlin · o CSS desta pagina
-   sai do <style> do HTML para ca porque o Vite injeta o CSS do bundle no fim
-   do <head>, depois do <style> — o que invertia quem vence empate de
-   especificidade. importado logo depois do base.css, a ordem volta a ser a de
-   sempre: primeiro o comum, depois o da pagina. */
+   o comum vive numa camada de cascata (@layer base, no shell.css); o que e da
+   pagina fica fora dela e ganha todo empate, independente da ordem em que as
+   folhas chegam no <head>. */
 
-/* ---------- o alto: a saudacao e o campo ----------
-   a pagina inicial de um navegador tem o campo no meio e nada em volta dele.
-   e o que fazemos aqui: a coluna e estreita de proposito (o resto da pagina e
-   larga), para o campo ficar no centro optico em vez de atravessar a tela. */
-.hm-hero{
-  max-width:640px;margin:clamp(8px,6vh,64px) auto clamp(28px,6vh,56px);
-  text-align:center;
-}
-.hm-when{
-  margin:0 0 10px;font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-30);
-}
-.hm-hero h1{
-  margin:0;font-size:clamp(26px,4.6vw,40px);font-weight:600;letter-spacing:-.035em;line-height:1.05;color:var(--ink);
-}
-/* a frase do dia sai da MESMA conta da barra do dia. ela e o unico numero da
-   pagina que muda sozinho, e por isso e a unica que fica em tinta cheia. */
-.hm-headline{
-  margin:10px 0 0;font-size:14.5px;line-height:1.45;color:var(--ink-50);
-}
+/* ---------- a coluna ----------
+   larga o suficiente para o bento respirar, e centrada: o relogio e o campo
+   sao o eixo da pagina, e tudo se pendura neles. */
+.hm{max-width:1080px;margin:0 auto}
 
-.hm-capture{margin-top:clamp(18px,3vh,28px)}
+/* ---------- o alto ---------- */
+.hm-top{
+  display:flex;align-items:center;justify-content:space-between;gap:var(--pd2);
+  margin-bottom:clamp(18px,5vh,52px);
+}
+.hm-hello{
+  display:inline-flex;align-items:center;height:32px;padding:0 14px;
+  border-radius:var(--br-pill);background:var(--surface);border:1px solid var(--line);
+  font-size:13px;color:var(--ink-70);
+}
+.hm-me{
+  display:inline-flex;align-items:center;gap:9px;height:32px;padding:0 12px 0 4px;
+  border-radius:var(--br-pill);background:var(--surface);border:1px solid var(--line);
+  font-size:12px;color:var(--ink-30);transition:border-color var(--t),color var(--t);
+}
+.hm-me:hover{border-color:var(--ink-30);color:var(--ink-70)}
+.hm-me__av{
+  width:24px;height:24px;border-radius:50%;display:grid;place-items:center;flex:none;
+  background:var(--green);color:var(--on-green);font-weight:600;font-size:11px;
+}
+.hm-me__av.is-out{background:var(--fill-hover);color:var(--ink-50)}
+
+/* ---------- o relogio ----------
+   o maior elemento da tela, de proposito: e a unica coisa aqui que muda
+   sozinha, e a pagina inteira e sobre o tempo passar. */
+.hm-clock{text-align:center;margin-bottom:clamp(16px,3vh,28px)}
+.hm-time{
+  margin:0;font-family:var(--mono);font-weight:500;
+  font-size:clamp(56px,10vw,116px);line-height:.94;letter-spacing:-.05em;color:var(--ink);
+  font-variant-numeric:tabular-nums;
+}
+/* os dois pontos piscam devagar: o unico movimento de uma tela parada */
+.hm-time i{font-style:normal;color:var(--ink-30);animation:hm-blink 2s steps(1,end) infinite}
+@keyframes hm-blink{0%,60%{opacity:1}61%,100%{opacity:.25}}
+@media (prefers-reduced-motion:reduce){.hm-time i{animation:none}}
+.hm-date{margin:6px 0 0;font-size:13.5px;color:var(--ink-30)}
+
+/* ---------- o campo ---------- */
+.hm-capture{max-width:620px;margin:0 auto clamp(22px,5vh,44px)}
 .hm-capture__field{
-  display:flex;align-items:center;gap:10px;
-  padding:0 16px;height:52px;border-radius:var(--br-pill);
-  background:var(--surface);border:1px solid var(--line);
-  box-shadow:var(--sombra);
-  transition:border-color var(--t),background var(--t);
+  display:flex;align-items:center;gap:11px;
+  padding:0 8px 0 17px;height:54px;border-radius:var(--br-pill);
+  background:var(--surface);border:1px solid var(--line);box-shadow:var(--sombra);
+  transition:border-color var(--t),box-shadow var(--t);
 }
-.hm-capture__field:focus-within{border-color:var(--ink-30);background:var(--surface-2,var(--surface))}
-.hm-capture__field svg{width:16px;height:16px;flex:none;color:var(--ink-30)}
+.hm-capture__field:focus-within{border-color:var(--ink-30);box-shadow:var(--sombra-2)}
+.hm-capture__field > svg{width:16px;height:16px;flex:none;color:var(--ink-30)}
 .hm-capture__field input{
   flex:1 1 auto;min-width:0;background:none;border:0;outline:none;
   font-size:15px;color:var(--ink);
 }
 .hm-capture__field input::placeholder{color:var(--ink-30)}
-/* a previa: diz para onde o Enter vai mandar, antes de mandar. sem ela o
-   mesmo campo teria dois destinos invisiveis. */
-.hm-ghost{
-  margin:10px 0 0;font-size:12.5px;line-height:1.4;color:var(--ink-30);
-}
+.hm-capture__field kbd{flex:none;opacity:0;transition:opacity var(--t)}
+.hm-capture__field:focus-within kbd{opacity:1}
+.hm-ghost{margin:11px 0 0;text-align:center;font-size:12.5px;line-height:1.4;color:var(--ink-30)}
 .hm-ghost b{color:var(--ink-70);font-weight:500}
 
-/* ---------- os atalhos ----------
-   o "speed dial": um ladrilho por modulo, e cada um diz o numero que faria
-   voce abrir aquilo. sem isso seriam nove links iguais, que e exatamente o
-   que a barra de navegacao ja e. */
-.hm-dial{
+/* ---------- o bento ----------
+   quatro colunas, e os blocos ocupam pedacos DIFERENTES dela. e a diferenca
+   entre um bento e uma grade de cartoes iguais: o dia e alto porque tem um
+   numero grande e uma fila; a citacao e larga porque e uma frase. */
+/* os blocos ESTICAM ate a altura da linha: com align-items:start, o favorito
+   (curto) deixava um buraco do tamanho da grade de atalhos ao lado dele, e a
+   pagina parecia inacabada em vez de arejada. */
+.hm-bento{
   display:grid;gap:var(--pd2);
-  grid-template-columns:repeat(auto-fill,minmax(196px,1fr));
+  grid-template-columns:repeat(4,minmax(0,1fr));
 }
-.hm-tile{
-  display:flex;flex-direction:column;gap:3px;
-  padding:16px;border-radius:var(--br);
-  background:var(--surface);border:1px solid var(--line);
-  box-shadow:var(--sombra);
-  transition:border-color var(--t),background var(--t),transform var(--t);
+.bx{
+  position:relative;display:flex;flex-direction:column;
+  padding:16px 17px;border-radius:var(--br);
+  background:var(--surface);border:1px solid var(--line);box-shadow:var(--sombra);
+  grid-column:span 2;min-width:0;
 }
-.hm-tile:hover{border-color:var(--ink-30);transform:translateY(-1px)}
-.hm-tile__icon{
-  display:grid;place-items:center;width:32px;height:32px;margin-bottom:8px;
-  border-radius:var(--br3);background:var(--fill);color:var(--ink-50);
-  transition:color var(--t),background var(--t);
+.bx__head{
+  display:flex;align-items:center;justify-content:space-between;gap:10px;
+  margin:0 0 12px;color:var(--ink-30);
 }
-.hm-tile:hover .hm-tile__icon{color:var(--green-ink);background:var(--fill-hover)}
-.hm-tile__icon svg{width:17px;height:17px}
-.hm-tile b{font-size:14px;font-weight:600;letter-spacing:-.02em;color:var(--ink)}
-.hm-tile__line{font-size:12.5px;color:var(--ink-30);line-height:1.35}
+.bx__aside{font-size:11px;color:var(--ink-30);transition:color var(--t)}
+a.bx__aside:hover{color:var(--ink-70)}
+.bx__add{
+  width:22px;height:22px;display:grid;place-items:center;border-radius:var(--br2);
+  color:var(--ink-30);transition:color var(--t),background var(--t);
+}
+.bx__add:hover{color:var(--ink);background:var(--fill-hover)}
+.bx__add svg{width:13px;height:13px}
+.bx__empty{margin:0;padding:10px 0 4px;font-size:12.5px;color:var(--ink-30)}
 
-/* ---------- o rodape ---------- */
-.hm-foot{
-  margin:clamp(28px,6vh,56px) 0 0;text-align:center;
-  font-size:12px;color:var(--ink-30);
+/* o dia: alto, com o numero grande e a barra */
+.bx--day{grid-column:span 2;grid-row:span 2}
+.bx__big{
+  margin:0 0 14px;font-family:var(--mono);font-weight:500;
+  font-size:clamp(30px,4vw,44px);line-height:1;letter-spacing:-.04em;color:var(--green-ink);
 }
-.hm-foot a{color:var(--ink-50);text-decoration:underline;text-underline-offset:3px}
-.hm-foot a:hover{color:var(--ink)}
-
-/* ---------- a apresentacao ----------
-   quatro cartoes, nao quatro passos: nada aqui exige um gesto para revelar o
-   proximo. quem quiser ler dois e fechar, leu o que precisava. */
-.tour{display:flex;flex-direction:column;gap:var(--pd2)}
-.tour section{
-  padding:13px 15px;border-radius:var(--br3);
-  background:var(--fill);border:1px solid var(--line-soft);
+.bx__big.is-over{color:var(--ink)}
+.bx__big small{
+  display:block;margin-top:7px;font-family:var(--sans);font-size:12.5px;
+  font-weight:400;letter-spacing:0;color:var(--ink-30);
 }
-.tour b{display:block;margin-bottom:4px;font-size:13.5px;font-weight:600;color:var(--ink)}
-.tour p{margin:0;font-size:13px;line-height:1.5;color:var(--ink-50)}
+/* a barra do dia em miniatura: o que ja passou, o que esta prometido, a sobra */
+.bx__track{height:7px;border-radius:100px;background:var(--fill-hover);overflow:hidden;display:flex;margin-bottom:14px}
+.bx__used{background:repeating-linear-gradient(135deg,var(--line) 0 3px,transparent 3px 6px)}
+.bx__busy{background:var(--green)}
+.bx__queue{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:1px;flex:1 1 auto}
+.bx__queue li{display:flex;align-items:center;gap:9px;padding:6px 0;min-width:0}
+.bx__queue b{flex:1 1 auto;min-width:0;font-size:13px;font-weight:400;color:var(--ink-70);overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.bx__queue .t-mono{flex:none;font-size:10.5px;color:var(--ink-30)}
+.bx__dot{width:5px;height:5px;border-radius:50%;background:var(--green);flex:none;opacity:.65}
+.bx__none{color:var(--ink-30);font-size:12.5px}
+.bx__more{margin:8px 0 0;font-size:10px;color:var(--ink-30)}
+a.bx--day{transition:border-color var(--t)}
+a.bx--day:hover{border-color:var(--ink-30)}
 
-@media (max-width:640px){
-  .hm-dial{grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:var(--pd3)}
-  .hm-tile{padding:13px}
+/* os atalhos: grade de icones, nao lista de frases */
+.bx--quick{grid-column:span 2}
+.quick{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+.quick__item{
+  position:relative;display:flex;flex-direction:column;align-items:center;gap:7px;
+  padding:12px 6px 10px;border-radius:var(--br3);
+  color:var(--ink-50);transition:background var(--t),color var(--t);
+}
+.quick__item:hover{background:var(--fill);color:var(--ink)}
+.quick__icon{
+  display:grid;place-items:center;width:34px;height:34px;border-radius:11px;
+  background:var(--fill);border:1px solid var(--line-soft);color:var(--ink-70);
+  transition:border-color var(--t),color var(--t);
+}
+.quick__item:hover .quick__icon{border-color:var(--ink-30);color:var(--green-ink)}
+.quick__icon svg{width:16px;height:16px}
+.quick__name{font-size:11px;letter-spacing:-.01em}
+/* a bolinha diz que ha algo esperando ali, sem gastar uma frase */
+.quick__badge{
+  position:absolute;top:8px;right:calc(50% - 24px);
+  min-width:16px;height:16px;padding:0 4px;border-radius:100px;
+  background:var(--green);color:var(--on-green);
+  font-family:var(--mono);font-size:9.5px;font-style:normal;
+  display:grid;place-items:center;
 }
 
-/* ---------- a faixa: notas e favoritos ----------
-   duas colunas entre o campo e os atalhos. e o que a start page de navegador
-   tem e a nossa nao tinha: o que se consulta e o que se guarda, sem sair da
-   tela. nenhuma das duas e reservatorio novo — as notas sao a mesma colecao
-   de notes.html, e favorito nao e trabalho de ninguem. */
-.hm-band{display:grid;gap:var(--pd2);grid-template-columns:repeat(auto-fit,minmax(300px,1fr));margin-bottom:var(--pd2)}
-.hm-strip{padding:var(--pd)}
-.hm-strip .list{gap:2px}
-.hm-strip .line{padding:6px 6px 6px 10px;background:none;border-color:transparent}
-.hm-strip .line:hover{background:var(--fill)}
-.hm-strip .name{font-size:13px}
-.hm-strip .empty{padding:var(--pd2) 0;font-size:12.5px}
-.hm-strip__form{margin-top:8px}
-.hm-strip__form input{
+/* favoritos: marca com a inicial, nome e dominio */
+.favs{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:1px}
+.favs li{display:flex;align-items:center;gap:10px;padding:5px 4px;border-radius:var(--br2);min-width:0;transition:background var(--t)}
+.favs li:hover{background:var(--fill)}
+.favs__mark{
+  flex:none;width:26px;height:26px;border-radius:9px;display:grid;place-items:center;
+  background:var(--fill-hover);color:var(--ink-50);font-size:11px;
+}
+.favs li > a{flex:1 1 auto;min-width:0;display:flex;align-items:baseline;gap:8px}
+.favs b{font-size:13px;font-weight:400;color:var(--ink);overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.favs small{flex:none;font-size:11px;color:var(--ink-30)}
+.favs__edit{
+  flex:none;width:22px;height:22px;display:grid;place-items:center;border-radius:var(--br2);
+  color:var(--ink-30);opacity:0;transition:opacity var(--t),color var(--t);
+}
+.favs li:hover .favs__edit,.favs li:focus-within .favs__edit{opacity:1}
+.favs__edit:hover{color:var(--ink)}
+.favs__edit svg{width:12px;height:12px}
+@media (hover:none){.favs__edit{opacity:1}}
+
+/* notas */
+.notes-mini{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:1px;flex:1 1 auto}
+.notes-mini a{display:block;padding:6px 4px;border-radius:var(--br2);font-size:13px;color:var(--ink-70);
+  overflow:hidden;white-space:nowrap;text-overflow:ellipsis;transition:background var(--t),color var(--t)}
+.notes-mini a:hover{background:var(--fill);color:var(--ink)}
+.notes-mini__form{margin-top:10px}
+.notes-mini__form input{
   width:100%;background:var(--fill);border:1px solid var(--line-soft);
   border-radius:var(--br-pill);padding:7px 13px;font-size:12.5px;color:var(--ink);
 }
-.hm-strip__form input:focus{outline:none;border-color:var(--ink-30);background:var(--fill-hover)}
-.hm-strip__form input::placeholder{color:var(--ink-30)}
+.notes-mini__form input:focus{outline:none;border-color:var(--ink-30);background:var(--fill-hover)}
+.notes-mini__form input::placeholder{color:var(--ink-30)}
 
-/* a marca do favorito e a INICIAL, nao um favicon: pedir o icone a um servico
-   de terceiro entregaria a ele a lista de tudo que voce guarda, e o produto
-   inteiro e feito sobre o contrario. */
-.hm-fav__mark{
-  flex:0 0 auto;width:24px;height:24px;border-radius:var(--br2);
-  display:grid;place-items:center;background:var(--fill-hover);
-  font-size:11px;color:var(--ink-50);
+/* a citacao: larga, tipo serifado, sem preenchimento de cartao — ela e o
+   respiro entre os blocos, e mais um cartao cheio seria mais do mesmo */
+.bx--quote{
+  grid-column:span 2;background:none;border-style:dashed;box-shadow:none;
+  justify-content:center;padding:20px 22px;
 }
-.hm-fav .name{display:flex;align-items:baseline;gap:8px;min-width:0}
-.hm-fav .name small{font-size:11px;color:var(--ink-30);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.hm-fav .action:disabled{opacity:.25;cursor:default}
-.hm-fav .action:disabled:hover{background:none;color:var(--ink-30)}
+.quote__mark{
+  font-family:"Instrument Serif",Georgia,serif;font-size:44px;line-height:.6;
+  color:var(--green-ink);opacity:.5;
+}
+.quote__text{
+  margin:6px 0 0;font-family:"Instrument Serif",Georgia,serif;
+  font-size:clamp(17px,2.1vw,22px);line-height:1.35;letter-spacing:-.01em;color:var(--ink);
+}
+.quote__who{margin:10px 0 0;font-size:10px;color:var(--ink-30)}
 
-/* ---------- a landing ----------
-   o primeiro quadro de quem nunca esteve aqui: duas colunas, um cartao grande
-   a esquerda, uma acao a direita, muito respiro. a forma e a do anexo; a
-   promessa e a nossa — nao ha fila de espera porque nao ha fila. */
+.hm-foot{margin:clamp(22px,5vh,44px) 0 0;text-align:center;font-size:12px;color:var(--ink-30)}
+.hm-foot a{color:var(--ink-30);text-decoration:underline;text-underline-offset:3px}
+.hm-foot a:hover{color:var(--ink-70)}
+
+@media (max-width:900px){
+  .hm-bento{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .bx,.bx--day,.bx--quick,.bx--quote{grid-column:span 2;grid-row:auto}
+}
+
+/* ================================================================
+   a apresentacao
+   ================================================================
+   um passo de cada vez, com o desenho em cima e o rodape dizendo onde voce
+   esta. quatro cartoes de texto empilhados numa caixa eram quatro paragrafos
+   que ninguem le ate o fim. */
+.tour{
+  position:fixed;inset:0;z-index:90;display:grid;place-items:center;padding:20px;
+  background:color-mix(in srgb,var(--bg) 92%,transparent);backdrop-filter:blur(6px);
+}
+.tour__box{
+  position:relative;width:min(420px,100%);
+  border-radius:calc(var(--br) * 1.3);overflow:hidden;
+  background:var(--surface);border:1px solid var(--line);box-shadow:var(--sombra-2);
+  display:flex;flex-direction:column;
+}
+.tour__skip{
+  position:absolute;top:14px;right:16px;z-index:2;
+  font-size:12px;color:var(--ink-30);transition:color var(--t);
+}
+.tour__skip:hover{color:var(--ink)}
+/* o desenho: um palco com um pedaco de tela de verdade dentro */
+.tour__art{
+  height:230px;display:grid;place-items:center;padding:24px;
+  background:
+    radial-gradient(90% 70% at 50% 0%,color-mix(in srgb,var(--green) 14%,transparent),transparent 70%),
+    var(--surface-2);
+  border-bottom:1px solid var(--line-soft);
+}
+.tour__words{padding:22px 24px 6px}
+.tour__words h2{margin:0;font-size:20px;font-weight:600;letter-spacing:-.03em;color:var(--ink)}
+.tour__words p{margin:9px 0 0;font-size:13.5px;line-height:1.55;color:var(--ink-50)}
+.tour__foot{display:flex;align-items:center;justify-content:space-between;gap:var(--pd2);padding:18px 24px 22px}
+.tour__dots{display:flex;gap:6px;align-items:center}
+.tour__dots i{width:6px;height:6px;border-radius:50%;background:var(--line);transition:background var(--t),width var(--t)}
+.tour__dots i.is-on{width:18px;border-radius:100px;background:var(--green)}
+.tour__next{
+  height:40px;padding:0 22px;border-radius:var(--br-pill);
+  background:var(--ink);color:var(--bg);font-size:13.5px;font-weight:500;
+  transition:filter var(--t);
+}
+.tour__next:hover{filter:brightness(1.15)}
+
+/* os desenhos, feitos de pedacos do proprio produto */
+.ta{width:100%;max-width:280px;font-size:11px}
+.ta--day .ta__big{
+  margin:0;font-family:var(--mono);font-size:30px;font-weight:500;letter-spacing:-.03em;color:var(--green-ink);
+}
+.ta--day .ta__big small{display:block;font-family:var(--sans);font-size:11px;color:var(--ink-30);margin-top:3px}
+.ta__bar{height:6px;border-radius:100px;background:var(--fill-hover);margin:12px 0 14px;overflow:hidden}
+.ta__bar i{display:block;height:100%;background:var(--green);border-radius:100px}
+.ta__row{
+  display:flex;align-items:center;gap:9px;padding:7px 10px;margin-bottom:5px;
+  border-radius:var(--br2);background:var(--surface);border:1px solid var(--line-soft);
+}
+.ta__row b{flex:1 1 auto;font-weight:400;color:var(--ink-70);overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.ta__min{font-family:var(--mono);font-size:10px;color:var(--ink-30)}
+.ta__mark{width:15px;height:15px;border-radius:5px;border:1px solid var(--line);flex:none}
+
+.ta--pull{display:flex;flex-direction:column;align-items:center;gap:10px}
+.ta__card{
+  width:100%;padding:12px 14px;border-radius:var(--br3);
+  background:var(--surface);border:1px solid var(--line-soft);color:var(--ink);
+}
+.ta__card small{display:block;margin-top:3px;font-size:10px;color:var(--ink-30)}
+.ta__card--ask{border-color:color-mix(in srgb,var(--green) 45%,transparent);color:var(--green-ink)}
+.ta__arrow{display:grid;place-items:center;width:26px;height:26px;border-radius:50%;background:var(--green);color:var(--on-green)}
+.ta__arrow svg{width:13px;height:13px}
+
+.ta--form{display:flex;flex-direction:column;align-items:center;gap:12px}
+.ta__plus{
+  display:grid;place-items:center;width:30px;height:30px;border-radius:50%;
+  background:var(--green);color:var(--on-green);
+}
+.ta__plus svg{width:15px;height:15px}
+.ta__dialog{
+  width:100%;padding:14px;border-radius:var(--br3);
+  background:var(--surface);border:1px solid var(--line);box-shadow:var(--sombra-2);
+}
+.ta__dialog b{display:block;margin-bottom:10px;font-size:12px;color:var(--ink)}
+.ta__field{display:block;height:24px;border-radius:var(--br2);background:var(--fill);margin-bottom:7px}
+.ta__btn{
+  display:inline-flex;align-items:center;height:24px;padding:0 14px;border-radius:var(--br-pill);
+  background:var(--green);color:var(--on-green);font-size:10.5px;
+}
+
+.ta--mine{display:flex;align-items:center;justify-content:center;gap:12px;position:relative}
+.ta__device{
+  display:grid;place-items:center;width:52px;height:52px;border-radius:15px;
+  background:var(--surface);border:1px solid var(--line);color:var(--ink-50);
+}
+.ta__device svg{width:20px;height:20px}
+.ta__link{width:34px;height:1px;background:repeating-linear-gradient(90deg,var(--green) 0 4px,transparent 4px 8px)}
+.ta__seal{
+  position:absolute;bottom:-26px;left:50%;transform:translateX(-50%);
+  margin:0;font-size:9.5px;color:var(--green-ink);
+}
+
+/* ================================================================
+   a landing
+   ================================================================
+   duas colunas, um cartao grande a esquerda, uma acao a direita, muito
+   respiro. a forma e a do anexo; a promessa e a nossa — nao ha fila de espera
+   porque nao ha fila. */
 html.bare .sb,html.bare .sb__mobile,html.bare .sb__scrim{display:none}
 html.bare.merlin body{margin-left:0}
 html.bare .page{max-width:none;padding:0}
@@ -145,7 +321,6 @@ html.bare body::before,html.bare body::after{opacity:0}
 }
 @media (max-width:900px){.lg{grid-template-columns:1fr;min-height:auto;padding-top:clamp(28px,8vh,64px)}}
 
-/* o cartao: gradiente frio, o logotipo em cima, a frase embaixo */
 .lg__art{
   position:relative;overflow:hidden;isolation:isolate;
   border-radius:calc(var(--br) * 1.4);padding:clamp(22px,3vw,34px);
@@ -174,12 +349,9 @@ html.bare body::before,html.bare body::after{opacity:0}
   margin:0;font-size:clamp(30px,4.4vw,52px);font-weight:600;
   letter-spacing:-.04em;line-height:1.04;color:var(--ink);
 }
-/* a palavra em serifa e a mesma familia que a marca da casa ja carrega em
-   toda pagina: nao custa um arquivo a mais e da o respiro do anexo. */
 .lg__art h1 em{font-family:"Instrument Serif",Georgia,serif;font-style:italic;font-weight:400;letter-spacing:-.02em}
 .lg__sub{margin:16px 0 0;max-width:46ch;font-size:14px;line-height:1.55;color:var(--ink-50)}
 
-/* a porta */
 .lg__door{max-width:420px;justify-self:center;width:100%}
 .lg__door h2{margin:0;font-size:clamp(26px,3.4vw,36px);font-weight:600;letter-spacing:-.035em;color:var(--ink)}
 .lg__lead{margin:12px 0 22px;font-size:14px;line-height:1.55;color:var(--ink-50)}

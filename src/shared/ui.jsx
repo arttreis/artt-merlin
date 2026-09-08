@@ -277,9 +277,9 @@ export function TemplatePicker({ groups, empty, value, onChange, id }) {
    `groups` é [{ key, label, items: [{ id, name, summary, line }] }] — a
    mesma forma que os grupos de modelo de funil e mapa já têm. `onPick`
    recebe o item inteiro, não só o id: quem oferece é quem sabe construir. */
-export function EmptyStart({ title, text, groups, note, onPick, onBlank, blankLabel, picked }) {
+export function EmptyStart({ title, text, groups, note, onPick, onBlank, blankLabel, picked, dense }) {
   return (
-    <section className="start">
+    <section className={"start" + (dense ? " start--dense" : "")}>
       <h2 className="start__title">{title}</h2>
       {text && <p className="start__text">{text}</p>}
       {groups.map((g) => (
@@ -288,7 +288,7 @@ export function EmptyStart({ title, text, groups, note, onPick, onBlank, blankLa
           <div className="start__grid">
             {g.items.map((it) => (
               <button key={it.id} className={"start__card" + (picked && picked(it) ? " is-on" : "")} type="button"
-                      onClick={() => onPick(it)}>
+                      title={it.hint || it.summary || it.name} onClick={() => onPick(it)}>
                 <b>{it.name}</b>
                 {it.summary && <span className="start__summary">{it.summary}</span>}
                 {it.line && <span className="start__line t-mono">{it.line}</span>}
