@@ -8,15 +8,21 @@ Vite; o build sai em `server/site/`. O que é comum vive aqui:
   (via `shell.css`), e os componentes: `.block`, `.pill`, `.chip`, `.badge`, `.input`,
   `.line`, `.table`, `.dialog`, `.notice`, `.meter`, `.bar`, `.tabs`, `.grid`/`.col-*`.
 - `core.js` — os **dados**: tema, sidebar, sessão/nuvem, coleções sincronizadas, clientes,
-  caixa de entrada do dia, aviso com desfazer, markdown. **JavaScript puro, sem React**: dá
-  para testar sem navegador. Não desenha tela de módulo.
+  caixa de entrada do dia, aviso com desfazer, markdown, arquivos (R2) e o registro do que o
+  merlin faz em cada tela. **JavaScript puro, sem React**: dá para testar sem navegador. Não
+  desenha tela de módulo.
+- `day.js` — o **documento do dia e a conta dele**: `loadDay()`, `budget(doc)`, `pendingOf`,
+  `fmt`/`longFmt`/`clock`. Saiu de dentro do `day.jsx` quando o início passou a dizer quanto
+  ainda cabe hoje: a sobra tem que ser a mesma nas duas telas, e duas cópias da mesma conta é
+  como ela deixa de ser. Sem React e sem pixel — entra um documento, sai um número.
 - `icons.jsx` — os SVGs comuns como elementos React. `icon("plus")` devolve um deles.
 - `ui.jsx` — a **tela**: hooks que ligam a página às coleções, componentes comuns e a
   **casca** (sidebar, busca, tema, nuvem, entrar, aviso). É o que uma página importa para
   desenhar. Ele se registra no core com `setShellRenderer`, e é por isso que `initPage(id)` —
   que vem do core — já monta a casca.
 - `templates.js` — os **modelos**: o vocabulário de canal (tipos, rótulos e o checklist de
-  cada um), 39 funis prontos e 19 mapas prontos, com `buildFunnel(tpl)` e `buildMap(tpl, nome)`
+  cada um), 39 funis, 19 mapas, 9 tipos de negócio (cliente), 5 esqueletos de mês (financeiro)
+  e 15 sugestões de hábito — com `buildFunnel`, `buildMap`, `buildClient` e `buildFinance`
   para virarem documento. Dado puro, sem React. Ver "Modelos", abaixo.
 - `funnel-layout.js` — onde cada etapa do funil fica no palco (camadas da esquerda para a
   direita). Mora fora da página porque duas telas criam funil: a lista de funis e o canal do
@@ -24,6 +30,26 @@ Vite; o build sai em `server/site/`. O que é comum vive aqui:
 
 Identificadores, chaves, campos e classes são em inglês; texto de tela e comentários, em
 português. O dicionário completo está em [`MIGRATION.md`](../MIGRATION.md).
+
+## Tela vazia oferece (`EmptyStart`)
+
+Clientes, financeiro e hábitos não dizem "nada aqui": mostram uma grade de modelos agrupados,
+e escolher um já monta o documento. É um componente só porque era um problema só — a primeira
+tela não ensinava nada. Recebe `groups` na mesma forma dos modelos de funil e mapa
+(`[{ key, label, items: [{ id, name, summary, line }] }]`) e devolve o item inteiro no
+`onPick`: quem oferece é quem sabe construir.
+
+## O que o merlin faz aqui (`setMerlinAsks`)
+
+Cada página registra, num efeito, a lista do que o conselheiro faz nela. A casca mostra a lista
+num item da barra. Duas formas:
+
+```js
+{ id: "week", label: "ler a semana", note: "…", run: askSummary }   // roda agora
+{ id: "expand", label: "ramificar uma ideia", where: "abra uma ideia" } // precisa de um alvo
+```
+
+O que precisa de alvo **não finge que roda**: diz onde está o botão que escolhe o alvo.
 
 ## Esqueleto de uma página
 
@@ -147,6 +173,8 @@ archive, arrowLeft, chevronLeft, chevronRight, unfold`.
 - `remove(id)` → grava um túmulo `{id, deleted:true}` e devolve o doc anterior (para desfazer
   com `save(before)`).
 - `onChange(fn)` → chama `fn(origin)` a cada mudança. `useCollection` já assina por você.
+- `pending()` → tem documento gravado aqui que ainda não subiu. Quem sai do navegador pergunta
+  antes de apagar o que é local; nenhuma tela precisa disso.
 - Nunca escreva no `localStorage` por conta própria. A chave `merlin:<type>` é do core.
 - A coleção é uma só por tipo. Se o core já a abriu (ele abre `clients` em
   `initPage`), chamar `collection(type, {normalize})` de novo entrega o normalizador à
@@ -246,3 +274,11 @@ toca no documento do dia. O aviso já é mostrado pelo core.
 - Minimalismo antes de tudo: sem filtros, sem formulário aberto na tela, um botão "+" por
   coisa que se cria. A busca global da sidebar substitui qualquer filtro por nome.
 - Comentários no código explicam **por quê**, não o quê, como no `index.html`.
+- **Cor nova sai de token, nunca de hex na regra.** São duas marcas agora (`:root` é o Merlin,
+  `html.gl` é a Guessless), e um `#2EE86B` escrito à mão numa página não troca junto — vira um
+  verde solto no meio do azul da casa. Se faltar um token, crie no `shell.css` para as duas.
+- **Toda chave nova do `localStorage` começa com `merlin:`.** Não é estilo: o guarda de
+  identidade varre por esse prefixo e apaga tudo que encontra quando o e-mail da sessão muda.
+  Chave fora do padrão é dado de uma pessoa que fica no navegador da outra. As três exceções
+  (`merlin:who`, `merlin:theme`, `merlin:sidebar`) estão listadas em `KEPT`, no `core.js`, e
+  são preferência, não dado. O teste é `node src/shared/test.mjs`, e ele roda no `deploy`.

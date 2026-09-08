@@ -105,6 +105,9 @@ export const debounce = (fn, ms) => { let t; return (...a) => { clearTimeout(t);
 /* ---------- tema ---------- */
 
 const THEME_KEY = "merlin:theme";
+/* aqui em cima, junto do tema, porque as duas chaves sao lidas antes da
+   primeira pintura — a marca vive na secao de identidade, mais abaixo. */
+const BRAND_KEY = "merlin:brand";
 
 export function currentTheme() {
   return document.documentElement.classList.contains("light") ? "light" : "dark";
@@ -112,7 +115,12 @@ export function currentTheme() {
 export function applyTheme(which) {
   document.documentElement.classList.toggle("light", which === "light");
   const meta = document.querySelector('meta[name="theme-color"]');
-  if (meta) meta.content = which === "light" ? "#f2f2f0" : "#0d0d0d";
+  if (!meta) return;
+  /* a barra do navegador acompanha o fundo, e o fundo depende da marca:
+     #0A0A0A e o preto da casa, #0d0d0d o do Merlin. */
+  const gl = document.documentElement.classList.contains("gl");
+  if (which === "light") meta.content = gl ? "#f7f7f5" : "#f2f2f0";
+  else meta.content = gl ? "#0A0A0A" : "#0d0d0d";
 }
 export function savedTheme() {
   try { return localStorage.getItem(THEME_KEY) || ""; } catch (e) { return ""; }
@@ -127,19 +135,57 @@ export function toggleTheme() {
   applyTheme(next);
   try { localStorage.setItem(THEME_KEY, next); } catch (e) {}
 }
-/* aplica antes da primeira pintura, para nao piscar */
-initTheme();
+/* escolher explicitamente, com uma terceira opcao que o interruptor nao tinha
+   como dizer: "" e seguir o sistema — que e o padrao de quem nunca escolheu, e
+   ate agora era um estado sem volta (o primeiro clique no interruptor saia
+   dele para sempre). */
+export function setTheme(which) {
+  const v = which === "light" || which === "dark" ? which : "";
+  try { v ? localStorage.setItem(THEME_KEY, v) : localStorage.removeItem(THEME_KEY); } catch (e) {}
+  initTheme();
+}
 
+/* ---------- o que a pessoa ja viu ----------
+   uma lista de marcas no navegador, nao no documento: "ja vi a apresentacao"
+   e fato deste aparelho e desta pessoa, nao dado do sistema — nao vale subir
+   para a nuvem nem viajar entre aparelhos. esquecer e um gesto do perfil. */
+const SEEN_KEY = "merlin:seen";
+const seenList = () => {
+  try { const v = JSON.parse(localStorage.getItem(SEEN_KEY) || "[]"); return Array.isArray(v) ? v : []; }
+  catch (e) { return []; }
+};
+export const seen = (key) => seenList().includes(key);
+export function markSeen(key) {
+  if (seen(key)) return;
+  try { localStorage.setItem(SEEN_KEY, JSON.stringify(seenList().concat([key]).slice(-40))); } catch (e) {}
+}
+export function forgetSeen(key) {
+  try { localStorage.setItem(SEEN_KEY, JSON.stringify(seenList().filter((k) => k !== key))); } catch (e) {}
+}
 /* a sidebar empurra o conteudo via html.merlin (shell.css). a classe entra
    aqui, no import, para o layout ja nascer certo; e o estado recolhida vem
    junto, do localStorage. */
 document.documentElement.classList.add("merlin");
 try { if (localStorage.getItem("merlin:sidebar") === "closed") document.documentElement.classList.add("sidebar-closed"); } catch (e) {}
 
+/* a marca tambem entra no <head> de cada pagina, antes da primeira pintura;
+   aqui e a rede para quem carregar o core sem aquele trecho (uma pagina solta
+   no servidor de desenvolvimento, por exemplo). o modulo carrega depois do
+   <head>, entao sozinho ele pisca. */
+try {
+  const b = localStorage.getItem(BRAND_KEY);
+  if (b && /^[a-z]{2,12}$/.test(b)) document.documentElement.classList.add(b);
+} catch (e) {}
+
+/* aplica antes da primeira pintura, para nao piscar. depois da marca de
+   proposito: a cor da barra do navegador sai do fundo, e o fundo e dela. */
+initTheme();
+
 /* ---------- navegacao ---------- */
 
 export const PAGES = [
-  { id: "day", label: "dia", href: "index.html" },
+  { id: "home", label: "início", href: "index.html" },
+  { id: "day", label: "dia", href: "day.html" },
   { id: "week", label: "semana", href: "week.html" },
   { id: "ideas", label: "ideias", href: "ideas.html" },
   { id: "clients", label: "clientes", href: "clients.html" },
@@ -209,6 +255,77 @@ export function closeNotice() { clearTimeout(noticeTimer); notice = null; emitNo
 export const currentNotice = () => notice;
 export function onNotice(fn) { noticeListeners.add(fn); return () => noticeListeners.delete(fn); }
 
+/* ---------- de quem e este navegador ----------
+   as chaves do localStorage nao tem dono: `merlin:ideas` e `merlin:ideas`
+   para quem quer que esteja na frente da tela. enquanto o sistema era de uma
+   pessoa isso nao custava nada. num time custa: quem entrasse depois de um
+   colega no mesmo navegador subiria os documentos dele para a propria conta
+   na primeira sincronizacao, e ninguem descobriria pelo caminho.
+
+   a regra e uma linha: o navegador guarda o Merlin de UMA pessoa. quando a
+   identidade muda, o que era do outro sai antes de qualquer sincronizacao.
+   preferencia nao e dado e atravessa — tema e sidebar ficam. */
+
+const WHO_KEY = "merlin:who";
+/* o que atravessa uma troca de pessoa: preferência, nunca dado. o dono e a
+   marca NÃO estão aqui de propósito — são reescritos logo depois da varredura,
+   e sair leva os dois embora junto com o resto. */
+const KEPT = [THEME_KEY, "merlin:sidebar"];
+
+/* ---------- a marca ----------
+   quem entra por um e-mail da casa vê o Merlin com a identidade da Guessless.
+   é só pele: tokens de cor e fonte (`html.gl`, no shell.css) e a marca na
+   barra. nenhuma tela muda de comportamento, e nenhum dado sabe que existe
+   marca — trocar de e-mail troca a pele, não o produto.
+
+   fica no localStorage, e não numa resposta do servidor, porque a classe tem
+   que estar no <html> ANTES da primeira pintura: o <head> de cada página lê
+   esta chave junto com o tema. saber a marca só depois do /me faria a tela
+   piscar na identidade errada a cada carregamento. */
+const BRANDS = { "@guessless.com.br": "gl" };
+const brandOf = (email) => {
+  const at = String(email || "").indexOf("@");
+  return at < 0 ? "" : BRANDS[String(email).slice(at).toLowerCase()] || "";
+};
+export const currentBrand = () => { try { return localStorage.getItem(BRAND_KEY) || ""; } catch (e) { return ""; } };
+
+/* varrer as chaves em vez de listar os tipos e de proposito: o modulo que
+   alguem escrever amanha ja nasce sendo apagado aqui, e esquecer de incluir
+   um tipo numa lista seria exatamente o vazamento que isto existe para
+   impedir. remover dentro do laco pularia chaves — por isso a lista antes. */
+function wipeLocal() {
+  try {
+    const doomed = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && k.startsWith("merlin:") && !KEPT.includes(k)) doomed.push(k);
+    }
+    doomed.forEach((k) => localStorage.removeItem(k));
+  } catch (e) {}
+}
+
+const whoIsHere = () => { try { return localStorage.getItem(WHO_KEY) || ""; } catch (e) { return ""; } };
+
+/* diz que este navegador passa a ser de `email`. devolve true quando teve que
+   apagar — e ai quem chamou recarrega a pagina, porque a tela ja desenhada e
+   as colecoes em memoria continuam sendo da outra pessoa. */
+function adoptIdentity(email) {
+  const who = whoIsHere();
+  /* sem dono anterior e o primeiro login deste navegador: o que foi feito
+     solto aqui e de quem esta entrando, e sobe junto — que e o que sempre
+     aconteceu e continua certo. */
+  const changed = !!who && who !== email;
+  if (changed) wipeLocal();
+  /* depois da varredura, nunca antes: quem anota o dono primeiro o perde na
+     limpeza. a marca vai junto para que o recarregamento ja pinte certo — sem
+     ela, a pessoa da casa veria um quadro de Merlin antes do proprio Merlin. */
+  try {
+    localStorage.setItem(WHO_KEY, email);
+    localStorage.setItem(BRAND_KEY, brandOf(email));
+  } catch (e) {}
+  return changed;
+}
+
 /* ---------- sessao e nuvem ---------- */
 
 const API = "/api";
@@ -240,6 +357,17 @@ const collections = new Map();
 const cloudListeners = new Set();
 const statusListeners = new Set();
 
+/* ha trabalho aqui que ainda nao chegou la? as colecoes sabem pela fila de
+   sujos; o dia nao guarda fila — ele reenvia no proximo toque —, entao o
+   estado da nuvem responde por ele: offline ou erro e "pode haver coisa aqui
+   que la nao tem". e uma pergunta cautelosa de proposito: quem erra para o
+   lado do sim so deixa dado num navegador, e quem erra para o lado do nao
+   apaga trabalho. */
+function anyPending() {
+  if (cloud.status === "offline" || cloud.status === "error") return true;
+  return [...collections.values()].some((c) => c.pending());
+}
+
 export const cloud = {
   signedIn: false,
   email: "",
@@ -263,6 +391,11 @@ export const cloud = {
       this.signedIn = !!(r.ok && r.body.signedIn);
       this.email = this.signedIn ? String(r.body.email || "") : "";
     } catch (e) { this.signedIn = false; this.email = ""; }
+    /* antes de qualquer sincronizacao: se este navegador era de outra pessoa,
+       o que ficou aqui sai agora — senao a primeira subida levaria os
+       documentos dela para esta conta. recarregar e a forma honesta de
+       continuar: a tela ja desenhada ainda e a do outro. */
+    if (this.signedIn && adoptIdentity(this.email)) { location.reload(); return; }
     this.setStatus(this.signedIn ? "synced" : "local");
     this.emit();
     if (this.signedIn) await this.syncAll();
@@ -279,8 +412,17 @@ export const cloud = {
   async signOut() {
     await api("/sign-out", { method: "POST" }).catch(() => {});
     this.signedIn = false; this.email = "";
+    /* sair de um computador dividido tem que nao deixar nada para tras — o
+       colega que abrir o navegador depois nao deve ler o seu dia. o que ainda
+       nao subiu segura a limpeza: perder trabalho e pior que deixar dado na
+       maquina, e a proxima pessoa a entrar apaga isso de qualquer jeito. */
+    const held = anyPending();
+    /* a varredura leva o dono e a marca junto: nao estao em KEPT */
+    if (!held) wipeLocal();
     this.setStatus("local");
     this.emit();
+    if (held) { notify("saí, mas deixei o que ainda não tinha subido neste navegador"); return; }
+    location.reload();
   }
 };
 
@@ -302,7 +444,11 @@ export const signIn = {
     if (!/^[^@\s]+@[^@\s.]+\.[^@\s]+$/.test(email)) return { ok: false, message: "esse e-mail não parece certo" };
     const r = await api("/code", { method: "POST", body: JSON.stringify({ email }) }).catch(() => null);
     if (!r || !r.ok) return { ok: false, message: (r && r.body.error) || "não consegui mandar o código" };
-    return { ok: true, email, message: "mandei um código de 6 dígitos para " + email };
+    /* "mandei" era mentira metade das vezes: o servidor responde igual para
+       quem pode e para quem nao pode entrar — e o que impede descobrir quem
+       tem conta testando enderecos —, entao a tela nao sabe se saiu e-mail.
+       esta frase e verdadeira nos dois casos e continua sem entregar nada. */
+    return { ok: true, email, message: "se " + email + " puder entrar, o código de 6 dígitos chega em alguns segundos" };
   },
   /* troca o codigo por sessao. em caso de sucesso ja sincroniza tudo. */
   async submitCode(email, raw) {
@@ -312,6 +458,10 @@ export const signIn = {
     if (!r || !r.ok) return { ok: false, message: (r && r.body.error) || "código inválido" };
     cloud.signedIn = true;
     cloud.email = String(r.body.email || email);
+    /* entrou outra pessoa neste navegador: o que era da anterior sai, e a
+       pagina recomeca do zero baixando o que e desta. nada do que viria
+       depois faz sentido numa tela que ja nao e mais dela. */
+    if (adoptIdentity(cloud.email)) { location.reload(); return { ok: true, message: "" }; }
     this.hide();
     cloud.setStatus("synced");
     cloud.emit();
@@ -321,6 +471,89 @@ export const signIn = {
 };
 export const openSignIn = () => signIn.show();
 export const closeSignIn = () => signIn.hide();
+
+
+
+/* ---------- o merlin: o que ele sabe fazer, e onde ----------
+   as dez tarefas do conselheiro existiam ha tempo, cada uma atras de um
+   icone de faisca — e a mesma faisca queria dizer "ramificar" nas ideias,
+   "sugerir" no mapa e "da pra fazer com Claude?" no dia. quem nunca clicou
+   nao tinha como saber que qualquer uma delas existia.
+
+   aqui elas ganham um lugar. cada pagina registra o que o merlin faz nela; a
+   casca mostra a lista e chama de volta. o registro e de tela, nao de
+   documento: some ao recarregar, e a pagina o refaz.
+
+     { id, label, note, run() }        — roda agora, sem alvo
+     { id, label, note, where }        — precisa de um alvo; `where` diz onde
+                                         esta o botao que o escolhe */
+let merlinAsks = [];
+const askListeners = new Set();
+export function setMerlinAsks(list) {
+  merlinAsks = Array.isArray(list) ? list : [];
+  askListeners.forEach((f) => { try { f(merlinAsks); } catch (e) { console.error(e); } });
+}
+export const currentAsks = () => merlinAsks;
+export function onMerlinAsks(fn) { askListeners.add(fn); return () => askListeners.delete(fn); }
+
+/* a caixa do merlin: quem abre e a casca, e qualquer tela pode pedir */
+let merlinOpen = false;
+const openListeners = new Set();
+export function openMerlin(v = true) {
+  merlinOpen = !!v;
+  openListeners.forEach((f) => { try { f(merlinOpen); } catch (e) { console.error(e); } });
+}
+export const merlinIsOpen = () => merlinOpen;
+export function onMerlinOpen(fn) { openListeners.add(fn); return () => openListeners.delete(fn); }
+
+/* ---------- arquivos ----------
+   um print colado numa ideia nao entra no documento: ele subiria e desceria
+   inteiro a cada sincronizacao, e uma captura de tela pesa mais que o modulo
+   todo. o binario vai para o R2 pelo worker, e o documento guarda so o
+   bilhete — {id, name, type, size}.
+
+   consequencia honesta: anexo so existe para quem entrou. sem sessao nao ha
+   onde guardar, e inventar um deposito local seria prometer sincronizacao
+   que nao aconteceria. a tela diz isso em vez de falhar em silencio. */
+
+export const FILE_TYPES = ["image/png", "image/jpeg", "image/webp", "image/gif", "application/pdf"];
+export const FILE_MAX = 8 * 1024 * 1024;
+
+/* o endereco do arquivo. e uma rota do worker, nao uma URL do bucket: o
+   bucket nao e publico, e e o worker quem confere de quem e o arquivo. */
+export const fileUrl = (id) => API + "/files/" + encodeURIComponent(id);
+
+export const isImage = (type) => String(type || "").startsWith("image/");
+
+/* devolve o bilhete ({id, name, type, size}) ou lanca com a razao em
+   portugues — quem chama mostra a frase e segue. */
+export async function uploadFile(file) {
+  if (!cloud.signedIn) throw new Error("entre para anexar — o arquivo precisa de onde morar");
+  if (!FILE_TYPES.includes(file.type)) throw new Error("só imagem ou PDF");
+  if (file.size > FILE_MAX) throw new Error("o arquivo passa de 8MB");
+  const r = await fetch(API + "/files", {
+    method: "POST",
+    credentials: "same-origin",
+    headers: {
+      /* cabecalho e ASCII: o nome vai codificado para "captura de tela.png"
+         com acento chegar inteiro do outro lado */
+      "content-type": "application/octet-stream",
+      "x-file-type": file.type,
+      "x-file-name": encodeURIComponent(file.name || "")
+    },
+    body: file
+  });
+  const body = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(body.error || "não consegui subir o arquivo");
+  return { ...body, at: Date.now() };
+}
+
+export async function deleteFile(id) {
+  if (!cloud.signedIn) return;
+  try { await fetch(API + "/files/" + encodeURIComponent(id), { method: "DELETE", credentials: "same-origin" }); }
+  catch (e) { /* o bilhete ja saiu do documento; um objeto orfao no bucket
+                 nao quebra nada e nao vale travar a tela por ele */ }
+}
 
 /* ---------- colecoes ----------
    uma colecao e um conjunto de documentos do mesmo tipo, cada um com id e
@@ -418,6 +651,9 @@ export function collection(type, options = {}) {
     },
     onChange(fn) { listeners.add(fn); return () => listeners.delete(fn); },
     hasDownloaded() { return downloaded; },
+    /* documento gravado aqui que ainda nao subiu. quem sai do navegador
+       pergunta antes de apagar o que e local. */
+    pending() { return data.dirty.length > 0; },
     async sync() {
       if (!cloud.signedIn || syncing) return;
       syncing = true;

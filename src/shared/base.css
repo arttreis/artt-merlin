@@ -16,7 +16,9 @@ body{
   -webkit-font-smoothing:antialiased;
   min-height:100dvh;
 }
-::selection{background:var(--green);color:#0d0d0d}
+/* a tinta sobre o destaque é token porque muda com a marca: escura sobre o
+   verde do Merlin, branca sobre o azul da casa. */
+::selection{background:var(--green);color:var(--on-green)}
 a{color:inherit;text-decoration:none}
 button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer}
 input,select,textarea{font:inherit;color:inherit}
@@ -256,3 +258,54 @@ kbd{font-family:var(--mono);font-size:10.5px;padding:1px 6px;border-radius:5px;b
   .pill--mini.pill--icon{min-width:30px}
   .dialog__close{width:36px;height:36px}
 }
+
+/* ---------- a tela vazia que oferece (EmptyStart do ui.jsx) ----------
+   nao e um "estado vazio" no sentido de aviso: e a primeira tela util do
+   modulo. por isso ocupa o lugar da lista inteira em vez de ser uma frase
+   cinza no meio dela. */
+.start{max-width:900px;margin:0 auto;padding:clamp(12px,3vh,28px) 0}
+.start__title{margin:0;font-size:clamp(18px,2.4vw,23px);font-weight:600;letter-spacing:-.03em;color:var(--ink)}
+.start__text{margin:8px 0 0;font-size:13.5px;line-height:1.5;color:var(--ink-50);max-width:62ch}
+.start__group{margin:var(--pd) 0 8px;font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-30)}
+.start__grid{display:grid;gap:var(--pd2);grid-template-columns:repeat(auto-fill,minmax(232px,1fr))}
+.start__card{
+  display:flex;flex-direction:column;gap:4px;text-align:left;
+  padding:13px 15px;border-radius:var(--br3);
+  background:var(--fill);border:1px solid var(--line-soft);
+  transition:background var(--t),border-color var(--t);
+}
+.start__card:hover{background:var(--fill-hover);border-color:var(--line)}
+.start__card.is-on{
+  border-color:color-mix(in srgb,var(--green) 40%,transparent);
+  background:color-mix(in srgb,var(--green) 10%,transparent);
+}
+.start__card b{font-size:13.5px;font-weight:600;letter-spacing:-.01em;color:var(--ink)}
+.start__summary{font-size:12.5px;line-height:1.4;color:var(--ink-50)}
+.start__line{font-size:10.5px;letter-spacing:.04em;color:var(--ink-30)}
+.start__foot{margin:var(--pd) 0 0;font-size:12.5px;color:var(--ink-30)}
+.start__foot .link{background:none;border:0;padding:0;cursor:pointer}
+
+/* ---------- a caixa do merlin ----------
+   a lista do que ele faz nesta tela. nao e um chat: e o inventario de dez
+   tarefas que existiam escondidas atras de icones de faisca com significados
+   diferentes em cada pagina. */
+.mk-note{margin:0 0 var(--pd2);font-size:12.5px;color:var(--ink-50)}
+.mk-list{display:flex;flex-direction:column;gap:6px}
+.mk-item{
+  display:flex;align-items:flex-start;gap:11px;width:100%;text-align:left;
+  padding:11px 13px;border-radius:var(--br3);
+  background:var(--fill);border:1px solid var(--line-soft);
+  transition:background var(--t),border-color var(--t);
+}
+.mk-item:hover:not(.is-static):not(:disabled){background:var(--fill-hover);border-color:var(--line)}
+.mk-item:disabled{opacity:.55;cursor:default}
+/* o que precisa de um alvo nao finge que roda: fica apagado e diz onde
+   escolher o alvo */
+.mk-item.is-static{background:none;border-style:dashed;cursor:default}
+.mk-item.is-static .mk-item__icon{opacity:.5}
+.mk-item__icon{flex:none;display:grid;place-items:center;width:26px;height:26px;border-radius:var(--br2);background:var(--fill-hover);color:var(--green-ink)}
+.mk-item__icon svg{width:13px;height:13px}
+.mk-item__text{display:flex;flex-direction:column;gap:2px;min-width:0}
+.mk-item__text b{font-size:13px;font-weight:500;color:var(--ink)}
+.mk-item__text small{font-size:12px;line-height:1.4;color:var(--ink-30)}
+.mk-group{margin:var(--pd) 0 8px;font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-30)}

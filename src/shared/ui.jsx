@@ -19,9 +19,10 @@ import {
   collection, cloud, clients, listClients, clientName, md, brl, parseMoney,
   api, notify, sendToDay,
   PAGES, CLOUD_STATUS, search, signIn, currentNotice, onNotice, closeNotice,
-  toggleTheme, toggleSidebar, setShellRenderer
+  toggleSidebar, setShellRenderer, currentBrand,
+  currentAsks, onMerlinAsks, openMerlin, merlinIsOpen, onMerlinOpen
 } from "./core.js";
-import { LOGO, ICONS, NAV_ICONS, icon } from "./icons.jsx";
+import { LOGO, GL_LOGO, GL_MARK, ICONS, NAV_ICONS, icon } from "./icons.jsx";
 
 /* o CSS entra pela pagina, nao por aqui: base.css ja puxa o shell.css na
    ordem certa, e o dia carrega so o shell. */
@@ -264,6 +265,54 @@ export function TemplatePicker({ groups, empty, value, onChange, id }) {
   );
 }
 
+/* ---------- a tela vazia que começa por você ----------
+   o mesmo gesto em clientes, hábitos e financeiro: em vez de uma frase
+   dizendo "nada aqui, crie o primeiro", a tela vazia OFERECE — modelos de
+   negócio, hábitos sugeridos, o esqueleto de um mês.
+
+   por que é um componente só: os três onboardings pedidos eram o mesmo
+   problema (a primeira tela não ensina nada), e três telas de boas-vindas
+   diferentes seriam três coisas para manter e três vocabulários para
+   aprender. o que muda entre eles é a lista; o gesto é um.
+
+   `groups` é [{ key, label, items: [{ id, name, summary, line }] }] — a
+   mesma forma que os grupos de modelo de funil e mapa já têm. `onPick`
+   recebe o item inteiro, não só o id: quem oferece é quem sabe construir. */
+export function EmptyStart({ title, text, groups, note, onPick, onBlank, blankLabel, picked }) {
+  return (
+    <section className="start">
+      <h2 className="start__title">{title}</h2>
+      {text && <p className="start__text">{text}</p>}
+      {groups.map((g) => (
+        <Fragment key={g.key}>
+          <p className="start__group t-mono">{g.label}</p>
+          <div className="start__grid">
+            {g.items.map((it) => (
+              <button key={it.id} className={"start__card" + (picked && picked(it) ? " is-on" : "")} type="button"
+                      onClick={() => onPick(it)}>
+                <b>{it.name}</b>
+                {it.summary && <span className="start__summary">{it.summary}</span>}
+                {it.line && <span className="start__line t-mono">{it.line}</span>}
+              </button>
+            ))}
+          </div>
+        </Fragment>
+      ))}
+      {(note || onBlank) && (
+        <p className="start__foot">
+          {note}
+          {onBlank && (
+            <>
+              {note ? " " : null}
+              <button className="link" type="button" onClick={onBlank}>{blankLabel || "começar do zero"}</button>
+            </>
+          )}
+        </p>
+      )}
+    </section>
+  );
+}
+
 /* o numero grande com legenda (.meter do base.css) */
 export function Meter({ label, value, ...rest }) {
   return <div className="meter"><span className={"num" + (cx(rest) ? " " + cx(rest) : "")}>{value}</span><span className="legend">{label}</span></div>;
@@ -368,7 +417,8 @@ export function DelegateDialog({ answer, onClose, onBuild }) {
     onClose();
   };
   return (
-    <Dialog title="dá pra fazer com Claude?" sub={answer.title} wide label="O que o Claude faz desta demanda" onClose={onClose}
+    <Dialog title={"“" + answer.title + "”"} wide label="O que o Claude faz desta demanda" onClose={onClose}
+        sub="o Merlin leu esta demanda e diz se dá para fazer com o Claude, com o quê, e o que continua sendo seu. ele só responde — nada aqui muda a tarefa nem a duração."
         actions={<>
           <button className="pill" type="button" onClick={onClose}>fechar</button>
           {!!answer.setup && <button className="pill pill--green" type="button" id="build-btn" onClick={build}>montar no dia</button>}
@@ -504,6 +554,12 @@ function SignInDialog() {
     setBusy(false);
     if (!r.ok) setMessage(r.message);
   };
+  /* voltar para o e-mail. sem isto, digitar o endereço errado era um beco sem
+     saída: o servidor responde igual para quem pode e para quem não pode
+     entrar (é o que impede descobrir quem tem conta testando endereços), então
+     o código que nunca vem parece um código atrasado. o endereço fica no campo
+     para ser corrigido, não apagado — quase sempre o erro é uma letra. */
+  const changeEmail = () => { setStep("email"); setCode(""); setMessage(""); };
 
   return (
     <div className="dialog" id="signin" role="dialog" aria-modal="true" aria-label="Entrar"
@@ -530,6 +586,9 @@ function SignInDialog() {
           </form>
         )}
         <p className="signin-message" id="signin-message" role="status" aria-live="polite">{message}</p>
+        {step === "code" && (
+          <button className="signin-back" type="button" onClick={changeEmail}>usar outro e-mail</button>
+        )}
       </div>
     </div>
   );
@@ -548,12 +607,77 @@ function Notice() {
   );
 }
 
+/* ---------- a caixa do merlin ----------
+   o "assistente" não é um chat: é a lista do que o Merlin sabe fazer aqui,
+   dita em palavras. as dez tarefas já existiam — o que faltava era um lugar
+   onde elas fossem visíveis sem ter que descobrir um ícone de faísca por
+   tentativa. o que precisa de um alvo (uma tarefa, uma ideia, um cliente)
+   diz onde está o botão que escolhe o alvo, em vez de fingir que roda. */
+function MerlinPanel({ onClose }) {
+  const [asks, setAsks] = useState(currentAsks);
+  const [busy, setBusy] = useState("");
+  const c = useCloud();
+  useEffect(() => onMerlinAsks(setAsks), []);
+
+  const run = async (a) => {
+    if (busy || !a.run) return;
+    setBusy(a.id);
+    try { await a.run(); onClose(); }
+    finally { setBusy(""); }
+  };
+
+  const ready = asks.filter((a) => a.run);
+  const needTarget = asks.filter((a) => !a.run);
+
+  return (
+    <Dialog title="o merlin" wide label="O que o Merlin faz aqui" onClose={onClose}
+        sub="o que ele sabe fazer nesta tela. ele responde — nunca grava nada por conta própria."
+        actions={<button className="pill" type="button" onClick={onClose}>fechar</button>}>
+      {!c.signedIn && (
+        <p className="mk-note">Entre para usar o Merlin: a chave é do servidor, e ele só responde a quem tem sessão.</p>
+      )}
+      {!asks.length && <p className="empty">Nesta tela ele ainda não tem o que fazer.</p>}
+      {!!ready.length && (
+        <div className="mk-list">
+          {ready.map((a) => (
+            <button key={a.id} className="mk-item" type="button" disabled={!!busy} onClick={() => run(a)}>
+              <span className="mk-item__icon">{ICONS.spark}</span>
+              <span className="mk-item__text">
+                <b>{busy === a.id ? "pensando…" : a.label}</b>
+                {a.note && <small>{a.note}</small>}
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
+      {!!needTarget.length && (
+        <>
+          <p className="mk-group t-mono">precisa que você escolha um</p>
+          <div className="mk-list">
+            {needTarget.map((a) => (
+              <div key={a.id} className="mk-item is-static">
+                <span className="mk-item__icon">{ICONS.spark}</span>
+                <span className="mk-item__text">
+                  <b>{a.label}</b>
+                  {a.where && <small>{a.where}</small>}
+                </span>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+    </Dialog>
+  );
+}
+
 /* ---------- a casca inteira ---------- */
 function Shell({ page }) {
   const [drawer, setDrawer] = useState(false);
   const [, setClosed] = useState(() => document.documentElement.classList.contains("sidebar-closed"));
   const [signInOpen, setSignInOpen] = useState(signIn.open);
+  const [merlin, setMerlin] = useState(merlinIsOpen);
   useEffect(() => signIn.onChange((s) => setSignInOpen(s.open)), []);
+  useEffect(() => onMerlinOpen(setMerlin), []);
   useRootClass("sidebar-open", drawer);
 
   const fold = () => { toggleSidebar(); setClosed(document.documentElement.classList.contains("sidebar-closed")); };
@@ -562,16 +686,32 @@ function Shell({ page }) {
     if (e.key === "Escape") setDrawer(false);
   });
 
+/* a marca na barra. o Merlin e o simbolo mais a palavra; a casa e o proprio
+   logotipo da Guessless com "merlin" de sub-rotulo, que e o lockup que ela ja
+   usa nos documentos ([GUESSLESS] docs). recolhida, o logotipo de 116px nao
+   cabe: entra o isotipo, que existe exatamente para esse tamanho. os dois vao
+   no DOM e o CSS escolhe — o mesmo jeito que a palavra "merlin" ja somia. */
+function Brand() {
+  if (currentBrand() !== "gl") {
+    return <a className="sb__logo" href="index.html" aria-label="Merlin">{LOGO}<b>merlin</b></a>;
+  }
+  return (
+    <a className="sb__logo sb__logo--gl" href="index.html" aria-label="Merlin, da Guessless">
+      {GL_MARK}{GL_LOGO}<span className="sb__sub">merlin</span>
+    </a>
+  );
+}
+
   return (
     <>
       <div className="sb__mobile">
         <button type="button" id="sb-open" aria-label="Abrir a navegação" onClick={() => setDrawer((d) => !d)}>{NAV_ICONS.menu}</button>
-        <a className="sb__logo" href="index.html" aria-label="Merlin">{LOGO}<b>merlin</b></a>
+        <Brand />
       </div>
       <div className="sb__scrim" onClick={() => setDrawer(false)} />
       <aside className="sb" aria-label="Navegação">
         <div className="sb__top">
-          <a className="sb__logo" href="index.html" aria-label="Merlin">{LOGO}<b>merlin</b></a>
+          <Brand />
           <button className="sb__fold" type="button" id="sb-fold" title="Recolher (Ctrl+B)" aria-label="Recolher a barra" onClick={fold}>{NAV_ICONS.fold}</button>
         </div>
         <SearchBox onNavigate={() => setDrawer(false)} />
@@ -585,20 +725,28 @@ function Shell({ page }) {
           ))}
         </ul>
         <div className="sb__sep" />
+        {/* o tema morava aqui, solto, ao lado de nada. virou uma linha do
+            perfil — que e onde moram as coisas que sao da PESSOA e nao do
+            sistema: a identidade, a janela do dia, a aparencia. */}
         <ul className="sb__list">
           <li>
-            <button className="sb__item sb__theme" type="button" id="theme" aria-label="Alternar tema claro/escuro" title="tema" onClick={toggleTheme}>
-              <span style={{ display: "flex", alignItems: "center", gap: "10px" }}>{NAV_ICONS.theme}<span>tema</span></span>
-              {/* o interruptor: a bolinha desliza e, do lado vazio, fica o
-                  icone do modo ativo — lua no escuro, sol no claro */}
-              <span className="knob" aria-hidden="true">{NAV_ICONS.sun}{NAV_ICONS.moon}<span className="knob__dot" /></span>
+            {/* o merlin nao e uma pagina: e o que ele faz NESTA. por isso um
+                botao que abre a caixa, e nao um link que troca de tela. */}
+            <button className="sb__item" type="button" title="o que o merlin faz aqui" onClick={() => openMerlin(true)}>
+              {ICONS.spark}<span>merlin</span>
             </button>
+          </li>
+          <li>
+            <a className="sb__item" href="profile.html" title="perfil" aria-current={page === "profile" ? "page" : undefined}>
+              {NAV_ICONS.profile}<span>perfil</span>
+            </a>
           </li>
         </ul>
         <div className="sb__spacer" />
         <CloudCard />
       </aside>
       {signInOpen && <SignInDialog />}
+      {merlin && <MerlinPanel onClose={() => openMerlin(false)} />}
       <Notice />
     </>
   );
