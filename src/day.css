@@ -1,43 +1,15 @@
 /* merlin · o CSS desta pagina
-   sai do <style> do HTML para ca porque o Vite injeta o CSS do bundle no fim
-   do <head>, depois do <style> — o que invertia quem vence empate de
-   especificidade. importado logo depois do base.css, a ordem volta a ser a de
-   sempre: primeiro o comum, depois o da pagina. */
+   o comum vive numa camada de cascata (@layer base, no shell.css); o que e da
+   pagina fica fora dela e ganha todo empate, independente da ordem em que as
+   folhas chegam no <head>. */
 
-/* ---------------------------------------------------------------
-   design system arttreis.com.br — lado escuro dos tokens, repetido aqui
-   para a pagina continuar inteira sozinha. o lado claro (html.light) e a
-   barra vem de shared/shell.css. a unica adicao e --br3 (12px),
-   um passo intermediario entre --br2 e --br para os ladrilhos de 44px.
-   --------------------------------------------------------------- */
-:root{
-  --pd:16px; --pd2:8px; --pd3:4px;
-  --br:16px; --br2:8px; --br3:12px; --br-pill:100px;
-
-  --bg:#0d0d0d;
-  --surface:#141414;
-  --surface-2:#1b1b1b;
-
-  --ink:#f2f2f2;
-  --ink-70:rgba(242,242,242,.7);
-  --ink-50:rgba(242,242,242,.5);
-  --ink-30:rgba(242,242,242,.32);
-
-  --line:rgba(242,242,242,.13);
-  --line-soft:rgba(242,242,242,.07);
-  --fill:rgba(242,242,242,.05);
-  --fill-hover:rgba(242,242,242,.1);
-  --scrim:rgba(13,13,13,.62);
-
-  --green:#2EE86B;
-  --green-glow:rgba(46,232,107,.3);
-  --on-green:#0d0d0d;
-
-  --sans:"Sora",system-ui,-apple-system,sans-serif;
-  --mono:"JetBrains Mono",ui-monospace,monospace;
-  --ease:cubic-bezier(.16,1,.3,1);
-  --t:220ms var(--ease);
-}
+/* os tokens moram no shell.css, que o dia carrega. este arquivo tinha uma
+   copia deles — sobra de quando o dia era um HTML solto e precisava se bastar.
+   ela era inofensiva enquanto tudo era uma folha so (o :root perdia de
+   html.light e html.gl por especificidade), e virou bug no dia em que o comum
+   entrou numa camada de cascata: regra SEM camada ganha de regra EM camada, e
+   o dia passou a ficar preso no escuro do Merlin — sem tema claro e sem a
+   marca da casa, sozinho entre as onze telas. */
 
 /* o reset mora na casca (shell.css), que o dia carrega. o que fica aqui e so
    o que e do dia mesmo: o corpo que centraliza o aparelho na tela. */

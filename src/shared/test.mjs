@@ -403,5 +403,46 @@ const dataLeft = () => globalThis.localStorage.keys().filter((k) => k in DATA);
 }
 
 
+{
+  /* ---- nenhum CSS de página redeclara um token do comum ----
+     este é o único teste do arquivo que lê o disco em vez de rodar o core, e
+     ele existe por um bug que passou despercebido por horas.
+
+     o `day.css` tinha uma cópia do `:root` inteiro — sobra de quando o dia era
+     um HTML solto e precisava se bastar. Enquanto tudo era uma folha só ela era
+     inofensiva: o `:root` (0,1,0) perdia de `html.light` e `html.gl` (0,1,1)
+     por especificidade. No dia em que o comum entrou numa camada de cascata a
+     conta virou — regra SEM camada ganha de regra EM camada, sempre — e o dia
+     ficou preso no escuro do Merlin, sem tema claro e sem a marca da casa,
+     sozinho entre as onze telas. E não dava para ver: quem usa o tema escuro
+     do Merlin, que é o padrão, não notava nada.
+
+     a regra que este teste protege é curta: token do sistema se declara num
+     lugar só, e esse lugar é o shell.css. */
+  const fs = await import("node:fs");
+  const path = await import("node:path");
+  const here = path.dirname(new URL(import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, "$1"));
+  const src = path.join(here, "..");
+
+  const tokensOf = (text) => new Set([...text.matchAll(/(--[a-z0-9-]+)\s*:/g)].map((m) => m[1]));
+  /* só o primeiro :root do shell — o que define o vocabulário do sistema */
+  const shell = fs.readFileSync(path.join(here, "shell.css"), "utf8");
+  const rootBlock = shell.slice(shell.indexOf(":root{"), shell.indexOf("}", shell.indexOf(":root{")));
+  const common = tokensOf(rootBlock);
+  check("o shell declara o vocabulário de tokens", common.size > 20, String(common.size));
+
+  const pages = fs.readdirSync(src).filter((f) => f.endsWith(".css"));
+  check("há CSS de página para conferir", pages.length >= 8, String(pages.length));
+  pages.forEach((file) => {
+    const text = fs.readFileSync(path.join(src, file), "utf8");
+    /* só o que está fora de qualquer bloco de componente: os :root e os
+       html.<marca>/html.light, que são onde token de sistema seria redeclarado */
+    const blocks = [...text.matchAll(/(?:^|\n)(:root|html\.[a-z]+)\s*\{([^}]*)\}/g)].map((m) => m[2]);
+    const clash = [...tokensOf(blocks.join("\n"))].filter((t) => common.has(t));
+    check(file + " não redeclara token do comum", clash.length === 0, clash.join(" "));
+  });
+}
+
+
 console.log("\n" + passed + " passaram, " + failures.length + " falharam");
 if (failures.length) { console.log("\nFALHAS:"); failures.forEach((f) => console.log("  - " + f)); process.exit(1); }
