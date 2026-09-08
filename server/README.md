@@ -7,10 +7,20 @@ O que ele faz: serve o site, diz quem é você (código de 6 dígitos por e-mail
 guarda um documento por dia (tabela `days`) e guarda os documentos dos outros
 módulos por tipo e id (tabela `docs`: ideas, clients, maps, funnels,
 finance, week). Ele **não** entende nada do que há dentro — só devolve e
-diz qual versão é mais nova.
+diz qual versão é mais nova. A quinta tabela, `advice`, existe só para que
+ninguém gaste sozinho a chave que é do time.
 
-É um sistema de uma pessoa: `OWNER_EMAILS` no `wrangler.toml` lista quem pode
-entrar. Outro e-mail recebe a mesma resposta de sucesso e nenhum código.
+`OWNER_EMAILS` no `wrangler.toml` lista quem pode entrar. Cada entrada é um
+endereço inteiro (`arthurcastilhos@gmail.com`) ou um domínio começado por `@`
+(`@guessless.com.br`), e é o domínio que abre o Merlin para o time sem um
+deploy por pessoa que entra. Outro e-mail recebe a mesma resposta de sucesso e
+nenhum código.
+
+**Entrar não é ver.** Quem entra ganha uma linha em `people` e um Merlin
+próprio: `days`, `docs` e `advice` são todas por `person`, e nenhuma consulta
+aqui cruza essa coluna. O domínio abre a porta da casa, não a gaveta de
+ninguém — e o teste `13d` existe para que isso não deixe de ser verdade sem
+alguém perceber.
 
 As páginas da raiz, a pasta `shared/` e a API saem do mesmo Worker, no mesmo domínio. Não é
 economia: é o que permite o cookie de sessão ser `SameSite=Lax`. Em domínios
@@ -30,7 +40,7 @@ npx wrangler d1 create artt-planner   # o nome do banco não mudou com o do prod
 
 Copie o `database_id` que aparece e cole em `wrangler.toml`. Depois crie as
 tabelas, em produção (o schema é idempotente: rodar de novo num banco que já
-existe só cria a tabela `docs` que faltava):
+existe só cria as tabelas que faltavam — hoje a `advice`):
 
 ```bash
 npx wrangler d1 execute artt-planner --remote --file schema.sql
@@ -58,6 +68,10 @@ O `ANTHROPIC_API_KEY` é do Merlin conselheiro (a rota `/api/merlin`, que sugere
 ramos no mapa mental e o que falta num funil). É opcional: sem ele a rota
 responde 503 e as telas dizem que falta a chave. A chave sai de
 console.anthropic.com; o modelo é o `claude-opus-5` e cada pedido custa centavos.
+
+Essa chave é **uma só para o time**, e por isso a rota tem teto: 30 conselhos
+por pessoa por hora, contados na tabela `advice`. Quem estourar espera; quem
+está ao lado não paga por isso. O número está em `ADVICE_PER_HOUR`, no worker.
 
 O `SESSION_SECRET` assina os cookies de sessão. Gere um forte e guarde:
 
@@ -153,8 +167,28 @@ discordando em silêncio. Não é merge por tarefa: se você editar nos dois
 computadores ao mesmo tempo, offline, um dos lados perde o intervalo. Para uso
 sequencial (manhã em casa, tarde no escritório) isso não acontece.
 
+**O domínio abre a porta, não a gaveta.** `@guessless.com.br` em `OWNER_EMAILS`
+deixa o time entrar sem um deploy por pessoa, e cada endereço vira uma linha em
+`people` com um Merlin próprio. O isolamento não é regra de tela nem convenção:
+é a coluna `person` em toda tabela e o `sub` do JWT em toda consulta. Nada no
+servidor sabe ler o dado de dois donos ao mesmo tempo — nem se alguém pedir.
+
+**O navegador tem dono, e ele é do cliente.** O servidor não consegue impedir
+que duas pessoas dividam um Chrome: as chaves do `localStorage` não sabem de
+quem são, e quem entrasse depois de um colega subiria os documentos dele para
+a própria conta. Isso se resolve no `core.js` (`merlin:who`), não aqui — mas
+está anotado neste arquivo porque é a metade da promessa que o servidor faz e
+não consegue cumprir sozinho.
+
 ## O que custa
 
 Nada, nesta escala. D1 e Workers têm tier gratuito folgado (100 mil
 requisições/dia), e o Resend entrega 3 mil e-mails/mês de graça — um dia inteiro
-de uso são alguns KB e alguns logins por mês.
+de uso são alguns KB e alguns logins por mês. Um time de dez pessoas multiplica
+isso por dez e continua não chegando perto: a sessão dura 90 dias, então são
+poucos e-mails por pessoa por trimestre.
+
+A conta que **não** é gratuita é a da Anthropic, e é a única que cresce com o
+time: cada conselho é um pedido ao Opus. O teto de `ADVICE_PER_HOUR` limita o
+estrago de um acidente, não o uso normal — se o gasto incomodar, o lugar de
+olhar é console.anthropic.com, e o de mexer é aqui.

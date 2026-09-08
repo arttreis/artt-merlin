@@ -1,9 +1,13 @@
 -- merlin · o banco
 --
--- quatro tabelas e nenhuma a mais. o produto guarda um documento por dia por
--- pessoa; o resto aqui existe so para saber quem e voce sem pedir senha.
+-- cinco tabelas e nenhuma a mais. o produto guarda um documento por dia por
+-- pessoa; o resto aqui existe so para saber quem e voce sem pedir senha e
+-- para que ninguem gaste sozinho a chave que e do time.
 
 -- quem usa. o e-mail e a identidade: nao ha nome, nem perfil, nem foto.
+-- cada linha aqui e um Merlin inteiro e separado: nenhuma consulta do worker
+-- cruza o `person` que veio da sessao, entao duas pessoas na mesma casa nao
+-- se veem. o time nao compartilha dado — compartilha a porta de entrada.
 CREATE TABLE IF NOT EXISTS people (
   id          TEXT PRIMARY KEY,          -- uuid
   email       TEXT NOT NULL UNIQUE,      -- sempre normalizado em minusculas
@@ -14,7 +18,7 @@ CREATE TABLE IF NOT EXISTS people (
 -- quem ler o banco nao consegue entrar na conta de ninguem.
 -- nada apaga a linha vencida, e esta certo assim: entrar confere o
 -- expires_at na hora, e o limite por e-mail so conta as nao vencidas.
--- num sistema de duas pessoas a tabela cresce algumas dezenas por ano.
+-- num time de uma dezena de pessoas a tabela cresce algumas centenas por ano.
 CREATE TABLE IF NOT EXISTS codes (
   hash        TEXT PRIMARY KEY,          -- sha-256 de (codigo + email)
   email       TEXT NOT NULL,
@@ -53,3 +57,17 @@ CREATE TABLE IF NOT EXISTS docs (
   FOREIGN KEY (person) REFERENCES people(id) ON DELETE CASCADE
 );
 CREATE INDEX IF NOT EXISTS docs_person_type_v ON docs(person, type, v);
+
+-- quantos conselhos cada pessoa ja pediu na hora corrente. a chave da
+-- Anthropic e uma so para o time inteiro: sem esta conta, uma pessoa sozinha
+-- gasta o mes de todo mundo, e ninguem descobre antes da fatura.
+-- a hora e epoch ms dividido por 3.600.000, entao a linha da hora que passou
+-- nunca mais e lida. ninguem apaga, e esta certo assim: sao poucas linhas por
+-- pessoa por dia, e apagar custaria uma escrita a mais em toda chamada.
+CREATE TABLE IF NOT EXISTS advice (
+  person  TEXT NOT NULL,
+  hour    INTEGER NOT NULL,         -- epoch ms / 3600000
+  n       INTEGER NOT NULL,
+  PRIMARY KEY (person, hour),
+  FOREIGN KEY (person) REFERENCES people(id) ON DELETE CASCADE
+);

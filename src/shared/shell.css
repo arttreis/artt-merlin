@@ -38,6 +38,11 @@
 
   --sans:"Sora",system-ui,-apple-system,sans-serif;
   --mono:"JetBrains Mono",ui-monospace,monospace;
+  /* o Merlin não separa display de corpo — a Sora faz os dois. os tokens
+     existem aqui mesmo assim: token que só vive dentro de uma marca é uma
+     armadilha, porque `var(--display)` escrito fora dela cai no vazio. */
+  --display:var(--sans);
+  --serif:Georgia,"Times New Roman",serif;
   --ease:cubic-bezier(.16,1,.3,1);
   --t:220ms var(--ease);
 
@@ -64,6 +69,78 @@ html.light{
   --glow-op:.12;
   color-scheme:light;
 }
+
+/* ---------- a marca da casa: Guessless ----------
+   o mesmo Merlin com a identidade da agência. É **só pele**: os tokens trocam
+   de valor e nenhum componente troca de regra — nenhuma tela se comporta
+   diferente por causa da marca. Quem entra por um e-mail @guessless.com.br vê
+   isto; todo o resto vê o Merlin.
+
+   A fonte de verdade é o design system dos documentos da casa
+   (docs.guessless.com.br/assets/dashboard.css): fundo #0A0A0A, DM Sans no
+   display, Manrope no corpo, Instrument Serif no itálico de ênfase, JetBrains
+   Mono nos rótulos — a mono é a mesma dos dois lados, e é por isso que a
+   troca não desmonta nada — e o azul #368DFF no destaque. O #0014FF que
+   aparece por aí não é a marca: o próprio CSS da casa anota isso.
+
+   O token de destaque ainda se chama `--green`. Ele nasceu quando havia uma
+   marca só e o destaque era, de fato, verde; aqui ele carrega o azul. São 174
+   ocorrências em 22 arquivos, e renomear para `--accent` merece um commit
+   próprio — está anotado na VISAO. */
+html.gl{
+  --bg:#0A0A0A;
+  --surface:#121212;
+  --surface-2:#1a1a1a;
+
+  --ink:#ffffff;
+  --ink-70:rgba(255,255,255,.68);
+  --ink-50:rgba(255,255,255,.55);
+  --ink-30:rgba(255,255,255,.35);
+
+  --line:rgba(255,255,255,.10);
+  --line-soft:rgba(255,255,255,.07);
+  --fill:rgba(255,255,255,.035);
+  --fill-hover:rgba(255,255,255,.08);
+  --scrim:rgba(10,10,10,.72);
+
+  --green:#368DFF;
+  --green-ink:#368DFF;
+  --green-glow:rgba(54,141,255,.22);
+  /* branco no azul, como o .btn--accent da casa — no verde era o inverso */
+  --on-green:#ffffff;
+
+  --sans:"Manrope",system-ui,-apple-system,sans-serif;
+  --display:"DM Sans",var(--sans);
+  --serif:"Instrument Serif",Georgia,serif;
+
+  /* o raio da casa é 14px; o do Merlin, 16px */
+  --br:14px;
+  --glow-op:.34;
+}
+html.gl.light{
+  --bg:#f7f7f5;
+  --surface:#ffffff;
+  --surface-2:#ececea;
+  --ink:#0A0A0A;
+  --ink-70:rgba(10,10,10,.7);
+  --ink-50:rgba(10,10,10,.55);
+  --ink-30:rgba(10,10,10,.4);
+  --line:rgba(10,10,10,.14);
+  --line-soft:rgba(10,10,10,.08);
+  --fill:rgba(10,10,10,.04);
+  --fill-hover:rgba(10,10,10,.08);
+  --scrim:rgba(247,247,245,.72);
+  /* o azul da casa em texto sobre branco fica em 3,5:1 — abaixo do mínimo de
+     leitura. o destaque de fundo continua #368DFF; só a tinta escurece. */
+  --green-ink:#1257C4;
+  --green-glow:rgba(54,141,255,.34);
+  --glow-op:.14;
+}
+/* o display da casa é DM Sans; o corpo, Manrope. no Merlin os dois são Sora,
+   então esta é a única regra que a marca acrescenta em vez de trocar. */
+html.gl h1,html.gl h2,html.gl h3,html.gl .sb__logo b{font-family:var(--display);letter-spacing:-.03em}
+/* os rótulos mono da casa são mais abertos que os do Merlin */
+html.gl .t-mono{letter-spacing:.14em}
 
 [hidden]{display:none !important}
 
@@ -93,6 +170,21 @@ html.merlin.sidebar-closed{--sidebar-w:var(--sidebar-min)}
 .sb__logo{display:flex;align-items:center;gap:10px;color:var(--ink);min-width:0}
 .sb__logo svg{width:22px;height:22px;flex:none;color:var(--green-ink)}
 .sb__logo b{font-weight:600;font-size:17px;letter-spacing:-.02em;white-space:nowrap}
+
+/* o lockup da casa: logotipo + "merlin" de sub-rótulo, do jeito que a
+   Guessless assina os próprios produtos ([GUESSLESS] docs). o isotipo só
+   aparece com a barra recolhida, onde os 116px do logotipo não cabem. */
+.sb__logo--gl{gap:0}
+.sb__logo--gl .gl-word{width:100px;height:auto;flex:none;color:var(--ink)}
+.sb__logo--gl .gl-mark{width:22px;height:22px;flex:none;border-radius:6px;display:none}
+.sb__sub{
+  font-family:var(--mono);font-size:11px;font-weight:500;
+  letter-spacing:.16em;text-transform:uppercase;color:var(--ink-30);
+  padding-left:10px;margin-left:10px;border-left:1px solid var(--line);
+  white-space:nowrap;
+}
+html.sidebar-closed .sb__logo--gl .gl-word,html.sidebar-closed .sb__sub{display:none}
+html.sidebar-closed .sb__logo--gl .gl-mark{display:block}
 .sb__fold{
   width:30px;height:30px;flex:none;display:grid;place-items:center;border-radius:var(--br2);
   color:var(--ink-30);transition:color var(--t),background var(--t);
@@ -290,6 +382,13 @@ html.light .knob__sun{opacity:1;transform:none}
   font-weight:500;font-size:13px;
 }
 .signin-message{margin:var(--pd2) 0 0;font-size:12.5px;color:var(--ink-50);min-height:1.2em}
+/* a saída da etapa do código: discreta, porque o caminho normal é digitar o
+   código — mas presente, porque errar o endereço não pode ser sem volta. */
+.signin-back{
+  margin:var(--pd3) 0 0;padding:0;font-size:12.5px;color:var(--ink-30);
+  text-decoration:underline;text-underline-offset:3px;transition:color var(--t);
+}
+.signin-back:hover{color:var(--ink-70)}
 
 /* ---------- selos ----------
    cliente, estagio, status: tudo que classifica sem ordenar. */
