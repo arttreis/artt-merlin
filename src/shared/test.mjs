@@ -326,5 +326,82 @@ const dataLeft = () => globalThis.localStorage.keys().filter((k) => k in DATA);
   }
 }
 
+{
+  /* ---- este navegador é novo? ----
+     a resposta decide se o início mostra a porta ou a casa, e errar para um
+     lado esconde o trabalho de quem já usa atrás de uma página de marketing.
+     errar para o outro é só não mostrar a porta — barato. por isso todos os
+     casos abaixo empurram para "não é novo". */
+  const col = (n) => {
+    const items = {};
+    for (let i = 0; i < n; i++) items["x" + i] = { v: 1, doc: { id: "x" + i } };
+    return JSON.stringify({ items, serverV: 0, dirty: [], refused: {} });
+  };
+
+  {
+    const { isNewHere } = await fresh({});
+    check("navegador vazio é novo", isNewHere());
+  }
+  {
+    const { isNewHere } = await fresh({ ...PREFS });
+    check("tema e sidebar não são trabalho", isNewHere());
+  }
+  {
+    /* o caso que mais custa errar: merlin:seen é escrito ao FECHAR a
+       apresentação. contá-lo faria a porta sumir para sempre no primeiro Esc
+       de quem acabou de chegar. */
+    const { isNewHere } = await fresh({ "merlin:seen": '["tour"]' });
+    check("ter fechado a apresentação não é trabalho", isNewHere());
+  }
+  {
+    const { isNewHere } = await fresh({ "merlin:notes": col(1) });
+    check("uma nota já não é novo", !isNewHere());
+  }
+  {
+    const { isNewHere } = await fresh({ "merlin:notes": col(0) });
+    check("coleção vazia continua novo", isNewHere());
+  }
+  {
+    const { isNewHere } = await fresh({ "merlin:day": '{"day":"2026-09-08","tasks":[{"title":"algo"}]}' });
+    check("uma tarefa no dia já não é novo", !isNewHere());
+  }
+  {
+    const { isNewHere } = await fresh({ "merlin:day": '{"day":"2026-09-08","tasks":[]}' });
+    check("dia sem tarefa continua novo", isNewHere());
+  }
+  {
+    const { isNewHere } = await fresh({ "merlin:inbox": '[{"title":"algo"}]' });
+    check("bilhete na caixa de entrada já não é novo", !isNewHere());
+  }
+  {
+    const { isNewHere } = await fresh({ "merlin:who": "arthur@exemplo.com" });
+    check("quem já entrou aqui não é novo", !isNewHere());
+  }
+  {
+    const { isNewHere } = await fresh({ "merlin:bookmarks": col(2) });
+    check("favoritos contam como trabalho", !isNewHere());
+  }
+  {
+    /* lixo no localStorage não pode derrubar a decisão */
+    const { isNewHere } = await fresh({ "merlin:notes": "{isso nao e json" });
+    check("chave corrompida não quebra a pergunta", isNewHere());
+  }
+
+  /* ---- o endereço de um favorito ----
+     ele vira href de um <a> e destino de um location.href na busca: um
+     "javascript:" que entrasse por aqui seria execução num clique. */
+  {
+    const { safeUrl, hostOf } = await fresh({ ...PREFS });
+    check("domínio pelado ganha https", safeUrl("mercadolivre.com.br") === "https://mercadolivre.com.br/", safeUrl("mercadolivre.com.br"));
+    check("http passa", safeUrl("http://x.com/a") === "http://x.com/a");
+    check("javascript: é recusado", safeUrl("javascript:alert(1)") === "", safeUrl("javascript:alert(1)"));
+    check("data: é recusado", safeUrl("data:text/html,<script>") === "");
+    check("vazio é vazio", safeUrl("   ") === "");
+    check("o host sai sem www", hostOf("https://www.mercadolivre.com.br/x") === "mercadolivre.com.br", hostOf("https://www.mercadolivre.com.br/x"));
+    check("host de lixo é vazio", hostOf("nada disso") === "");
+  }
+}
+
+
 console.log("\n" + passed + " passaram, " + failures.length + " falharam");
 if (failures.length) { console.log("\nFALHAS:"); failures.forEach((f) => console.log("  - " + f)); process.exit(1); }

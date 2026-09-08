@@ -24,7 +24,7 @@ está em [MIGRATION.md](MIGRATION.md).
 
 | página | o que é |
 | --- | --- |
-| `index.html` | o início: uma página inicial no sentido do navegador — um campo no meio e os atalhos embaixo, cada um dizendo o número que faria você abrir aquilo. |
+| `index.html` | o início: um campo no meio, as notas e os favoritos numa faixa, e os atalhos embaixo dizendo o número que faria você abrir cada um. Para quem nunca esteve aqui, é a porta — com o gesto de começar sem conta. |
 | `day.html` | o dia: a fila de hoje, a barra que se gasta, a sobra. O único lugar com minutos. |
 | `week.html` | a semana em colunas (seg a sex e fim de semana). |
 | `notes.html` | o que ainda não é tarefa, numa caixa de entrada: lista por dia à esquerda, a nota aberta à direita com corpo, estágio, checklist e histórico. |

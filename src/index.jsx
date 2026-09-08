@@ -12,13 +12,14 @@
 import "./shared/base.css";
 import "./index.css";
 import {
-  initPage, today, dateOf, mondayOf, addDays, brl,
-  sendToDay, parseMentions, parseDuration, clientName, seen, markSeen
+  initPage, today, dateOf, mondayOf, addDays, brl, newId, notify, signIn,
+  sendToDay, newNote, parseMentions, parseDuration, clientName, seen, markSeen,
+  isNewHere, safeUrl, hostOf
 } from "./shared/core.js";
 import { loadDay, budget, pendingOf, isStale, fmt, longFmt, clock } from "./shared/day.js";
-import { useState, useEffect } from "react";
-import { mount, useCollection, useCloud, useClients, Dialog, icon } from "./shared/ui.jsx";
-import { NAV_ICONS } from "./shared/icons.jsx";
+import { useState, useEffect, useLayoutEffect } from "react";
+import { mount, useCollection, useCloud, useClients, Dialog, Form, Field, useFields, icon } from "./shared/ui.jsx";
+import { NAV_ICONS, LOGO } from "./shared/icons.jsx";
 
 initPage("home");
 
@@ -176,6 +177,157 @@ function Capture() {
   );
 }
 
+/* ---------- a faixa: as notas e os favoritos ----------
+   o que a start page de navegador tem e a nossa não tinha: as coisas que se
+   consulta e se guarda, sem sair da tela. duas colunas, e nenhuma delas é um
+   reservatório novo — as notas são a mesma coleção de notes.html, e favorito
+   não é trabalho de ninguém: é um lugar aonde se vai. */
+
+function NoteStrip({ notes }) {
+  const live = notes.all()
+    .filter((n) => n.stage !== "archived")
+    .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0))
+    .slice(0, 5);
+  const [text, setText] = useState("");
+  const add = (e) => {
+    e.preventDefault();
+    const m = parseMentions(text);
+    const title = m.title.trim();
+    if (!title) return;
+    newNote({ title, client: m.client || "" });
+    setText("");
+  };
+  return (
+    <section className="block hm-strip">
+      <p className="heading">
+        <span className="t-mono">notas</span>
+        <a className="link" href="notes.html">todas</a>
+      </p>
+      {live.length
+        ? <ul className="list">
+            {live.map((n) => (
+              <li key={n.id} className="line">
+                <a className="name" href={"notes.html#" + encodeURIComponent(n.id)}>{n.title || "sem título"}</a>
+              </li>))}
+          </ul>
+        : <p className="empty">Nada guardado ainda. O que não é tarefa cabe aqui.</p>}
+      {/* escrever aqui grava a nota na hora: sem duração ela não custa minuto
+          nenhum, então nunca precisou passar pelo dia. */}
+      <form className="hm-strip__form" autoComplete="off" onSubmit={add}>
+        <input maxLength="300" placeholder="uma nota…" aria-label="Nova nota"
+               value={text} onChange={(e) => setText(e.currentTarget.value)} />
+      </form>
+    </section>
+  );
+}
+
+function BookmarkStrip({ bookmarks }) {
+  const [form, setForm] = useState(null);   // { id } | null
+  const list = bookmarks.all().sort((a, b) => (a.order || 0) - (b.order || 0));
+  const move = (i, delta) => {
+    const j = i + delta;
+    if (j < 0 || j >= list.length) return;
+    const a = list[i], b = list[j];
+    bookmarks.saveMany([{ ...a, order: b.order || j, updatedAt: Date.now() }, { ...b, order: a.order || i, updatedAt: Date.now() }]);
+  };
+  return (
+    <section className="block hm-strip">
+      <p className="heading">
+        <span className="t-mono">favoritos</span>
+        <button className="pill pill--mini" type="button" onClick={() => setForm({ id: "" })}>{icon("plus")}site</button>
+      </p>
+      {list.length
+        ? <ul className="list">
+            {list.map((k, i) => (
+              <li key={k.id} className="line hm-fav">
+                {/* a marca é a inicial, não um favicon: pedir o ícone a um
+                    serviço de terceiro entregaria a ele a lista de tudo que
+                    você guarda, e o produto inteiro é feito sobre o contrário. */}
+                <span className="hm-fav__mark t-mono" aria-hidden="true">{(k.name || hostOf(k.url) || "?").trim()[0].toUpperCase()}</span>
+                <a className="name" href={k.url} target="_blank" rel="noreferrer">
+                  {k.name || hostOf(k.url)}
+                  <small>{hostOf(k.url)}</small>
+                </a>
+                <span className="row-actions">
+                  <button className="action" type="button" title="subir" disabled={i === 0} onClick={() => move(i, -1)}>{icon("chevronUp")}</button>
+                  <button className="action" type="button" title="descer" disabled={i === list.length - 1} onClick={() => move(i, 1)}>{icon("chevronDown")}</button>
+                  <button className="action" type="button" title="editar" onClick={() => setForm({ id: k.id })}>{icon("pencil")}</button>
+                </span>
+              </li>))}
+          </ul>
+        : <p className="empty">Nenhum site guardado. O “+” guarda o primeiro.</p>}
+      {form && <BookmarkForm bookmarks={bookmarks} id={form.id} count={list.length} onClose={() => setForm(null)} />}
+    </section>
+  );
+}
+
+function BookmarkForm({ bookmarks, id, count, onClose }) {
+  const k = id ? bookmarks.get(id) : null;
+  const [v, bind] = useFields({ name: k ? k.name : "", url: k ? k.url : "" });
+  const submit = () => {
+    const url = safeUrl(v.url);
+    if (!url) { notify("preciso de um endereço que dê para abrir"); return false; }
+    const now = Date.now();
+    bookmarks.save(k
+      ? { ...k, name: v.name.trim().slice(0, 60), url, updatedAt: now }
+      : { id: newId(), name: v.name.trim().slice(0, 60), url, order: count, createdAt: now, updatedAt: now });
+  };
+  const remove = () => {
+    const before = bookmarks.remove(id);
+    if (before) notify("favorito apagado", () => bookmarks.save(before));
+  };
+  return (
+    <Form title={k ? "editar favorito" : "novo favorito"} submit="guardar"
+          remove={k ? "apagar" : ""} onRemove={k ? remove : null}
+          onSubmit={submit} onClose={onClose}>
+      <Field label="nome" full><input className="input" maxLength="60" placeholder="como você chama esse lugar" {...bind("name")} /></Field>
+      <Field label="endereço" full><input className="input" required maxLength="500" placeholder="mercadolivre.com.br" {...bind("url")} /></Field>
+    </Form>
+  );
+}
+
+/* ---------- a landing ----------
+   o primeiro quadro de quem nunca esteve aqui. o anexo acertou a forma —
+   duas colunas, um cartão grande à esquerda, uma ação à direita, muito
+   respiro — e a promessa é que muda: não há fila de espera, porque não há
+   fila. o Merlin já funciona inteiro sem conta, e é isso que a porta diz.
+
+   ela não é uma rota: é um estado do próprio início. sem URL nova, sem
+   redirect, e sem jeito de prender numa página de marketing quem já tem
+   trabalho guardado — `isNewHere()` responde isso antes da primeira pintura. */
+function Landing({ onGuest }) {
+  return (
+    <div className="lg">
+      <div className="lg__art">
+        <span className="lg__logo">{LOGO}<b>merlin</b></span>
+        <div className="lg__grade" aria-hidden="true" />
+        <div className="lg__words">
+          <p className="lg__badge"><i />um sistema de uma pessoa só</p>
+          <h1>o dia é o único lugar com <em>minutos</em></h1>
+          <p className="lg__sub">
+            Tudo o mais — as notas, a semana, os clientes, os funis, o dinheiro — é
+            reservatório sem hora. O trabalho entra no seu dia quando você puxa, e
+            pagando o pedágio da duração. É por isso que o número grande é confiável.
+          </p>
+        </div>
+      </div>
+
+      <div className="lg__door">
+        <h2>comece agora</h2>
+        <p className="lg__lead">Sem cadastro, sem cartão, sem espera. O Merlin nasce
+        neste navegador e é seu no primeiro clique.</p>
+        <button className="lg__cta" type="button" onClick={onGuest}>abrir o meu Merlin</button>
+        <p className="lg__fine">Fica só aqui. Nada sobe para lugar nenhum enquanto você não entrar.</p>
+        <div className="lg__or"><span>já tem acesso?</span></div>
+        <button className="lg__ghost" type="button" onClick={() => signIn.show()}>
+          entrar com e-mail
+        </button>
+        <p className="lg__fine">Um código de seis dígitos, sem senha para decorar.</p>
+      </div>
+    </div>
+  );
+}
+
 function Home() {
   const c = useCloud();
   useClients();
@@ -187,6 +339,7 @@ function Home() {
   const habits = useCollection("habits");
   const plans = useCollection("plans");
   const clientsCol = useCollection("clients");
+  const bookmarks = useCollection("bookmarks");
 
   /* o dia não é coleção: é um documento no navegador. relemos no evento de
      storage (outra aba) e a cada minuto, que é o passo do relógio da barra. */
@@ -256,6 +409,11 @@ function Home() {
         <Capture />
       </section>
 
+      <section className="hm-band">
+        <NoteStrip notes={notes} />
+        <BookmarkStrip bookmarks={bookmarks} />
+      </section>
+
       <section className="hm-dial">
         {TILES.map((tile) => (
           <a key={tile.id} className="hm-tile" href={tile.href}>
@@ -279,4 +437,21 @@ function Home() {
   );
 }
 
-mount(<Home />, "app");
+/* ---------- qual dos dois quadros ----------
+   decidido de forma SÍNCRONA, aqui no módulo, antes do mount: esperar o
+   servidor dizer quem é você faria a página nascer vazia e se corrigir depois,
+   e o Merlin funciona inteiro sem conexão.
+
+   `bare` na raiz tira a barra de navegação. tira a BARRA, não a casca: o
+   diálogo de entrar mora dentro dela, e é ele que a landing abre. */
+function Root() {
+  const [bare, setBare] = useState(isNewHere);
+  useLayoutEffect(() => { document.documentElement.classList.toggle("bare", bare); }, [bare]);
+  /* "abrir o meu Merlin" não cria conta nem grava nada: só diz que a porta já
+     foi atravessada. o recibo mora no mesmo merlin:seen do resto. */
+  const enter = () => { markSeen("landing"); setBare(false); };
+  if (bare && !seen("landing")) return <Landing onGuest={enter} />;
+  return <Home />;
+}
+
+mount(<Root />, "app");

@@ -95,3 +95,110 @@
   .hm-dial{grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:var(--pd3)}
   .hm-tile{padding:13px}
 }
+
+/* ---------- a faixa: notas e favoritos ----------
+   duas colunas entre o campo e os atalhos. e o que a start page de navegador
+   tem e a nossa nao tinha: o que se consulta e o que se guarda, sem sair da
+   tela. nenhuma das duas e reservatorio novo — as notas sao a mesma colecao
+   de notes.html, e favorito nao e trabalho de ninguem. */
+.hm-band{display:grid;gap:var(--pd2);grid-template-columns:repeat(auto-fit,minmax(300px,1fr));margin-bottom:var(--pd2)}
+.hm-strip{padding:var(--pd)}
+.hm-strip .list{gap:2px}
+.hm-strip .line{padding:6px 6px 6px 10px;background:none;border-color:transparent}
+.hm-strip .line:hover{background:var(--fill)}
+.hm-strip .name{font-size:13px}
+.hm-strip .empty{padding:var(--pd2) 0;font-size:12.5px}
+.hm-strip__form{margin-top:8px}
+.hm-strip__form input{
+  width:100%;background:var(--fill);border:1px solid var(--line-soft);
+  border-radius:var(--br-pill);padding:7px 13px;font-size:12.5px;color:var(--ink);
+}
+.hm-strip__form input:focus{outline:none;border-color:var(--ink-30);background:var(--fill-hover)}
+.hm-strip__form input::placeholder{color:var(--ink-30)}
+
+/* a marca do favorito e a INICIAL, nao um favicon: pedir o icone a um servico
+   de terceiro entregaria a ele a lista de tudo que voce guarda, e o produto
+   inteiro e feito sobre o contrario. */
+.hm-fav__mark{
+  flex:0 0 auto;width:24px;height:24px;border-radius:var(--br2);
+  display:grid;place-items:center;background:var(--fill-hover);
+  font-size:11px;color:var(--ink-50);
+}
+.hm-fav .name{display:flex;align-items:baseline;gap:8px;min-width:0}
+.hm-fav .name small{font-size:11px;color:var(--ink-30);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hm-fav .action:disabled{opacity:.25;cursor:default}
+.hm-fav .action:disabled:hover{background:none;color:var(--ink-30)}
+
+/* ---------- a landing ----------
+   o primeiro quadro de quem nunca esteve aqui: duas colunas, um cartao grande
+   a esquerda, uma acao a direita, muito respiro. a forma e a do anexo; a
+   promessa e a nossa — nao ha fila de espera porque nao ha fila. */
+html.bare .sb,html.bare .sb__mobile,html.bare .sb__scrim{display:none}
+html.bare.merlin body{margin-left:0}
+html.bare .page{max-width:none;padding:0}
+html.bare body::before,html.bare body::after{opacity:0}
+
+.lg{
+  min-height:100dvh;display:grid;align-items:center;gap:clamp(24px,5vw,72px);
+  grid-template-columns:minmax(0,1.05fr) minmax(0,.95fr);
+  padding:clamp(20px,4vw,56px);max-width:1240px;margin:0 auto;
+}
+@media (max-width:900px){.lg{grid-template-columns:1fr;min-height:auto;padding-top:clamp(28px,8vh,64px)}}
+
+/* o cartao: gradiente frio, o logotipo em cima, a frase embaixo */
+.lg__art{
+  position:relative;overflow:hidden;isolation:isolate;
+  border-radius:calc(var(--br) * 1.4);padding:clamp(22px,3vw,34px);
+  min-height:min(70vh,560px);display:flex;flex-direction:column;justify-content:space-between;
+  background:var(--surface);border:1px solid var(--line);box-shadow:var(--sombra-2);
+}
+/* a grade e o verde da casa em vez do azul do anexo: o design system tem um
+   acento so, e trocar de cor na porta seria prometer outro produto. */
+.lg__grade{
+  position:absolute;inset:0;z-index:-1;
+  background:
+    radial-gradient(120% 80% at 12% 0%,color-mix(in srgb,var(--green) 30%,transparent),transparent 60%),
+    repeating-linear-gradient(90deg,color-mix(in srgb,var(--green) 9%,transparent) 0 2px,transparent 2px 9px);
+  -webkit-mask-image:linear-gradient(180deg,#000,transparent 78%);
+  mask-image:linear-gradient(180deg,#000,transparent 78%);
+}
+.lg__logo{display:inline-flex;align-items:center;gap:9px;font-weight:600;font-size:15px;color:var(--ink)}
+.lg__logo svg{width:19px;height:19px;color:var(--green)}
+.lg__words{margin-top:auto}
+.lg__badge{
+  display:flex;align-items:center;gap:7px;margin:0 0 14px;
+  font-family:var(--mono);font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-50);
+}
+.lg__badge i{width:6px;height:6px;border-radius:50%;background:var(--green);flex:none}
+.lg__art h1{
+  margin:0;font-size:clamp(30px,4.4vw,52px);font-weight:600;
+  letter-spacing:-.04em;line-height:1.04;color:var(--ink);
+}
+/* a palavra em serifa e a mesma familia que a marca da casa ja carrega em
+   toda pagina: nao custa um arquivo a mais e da o respiro do anexo. */
+.lg__art h1 em{font-family:"Instrument Serif",Georgia,serif;font-style:italic;font-weight:400;letter-spacing:-.02em}
+.lg__sub{margin:16px 0 0;max-width:46ch;font-size:14px;line-height:1.55;color:var(--ink-50)}
+
+/* a porta */
+.lg__door{max-width:420px;justify-self:center;width:100%}
+.lg__door h2{margin:0;font-size:clamp(26px,3.4vw,36px);font-weight:600;letter-spacing:-.035em;color:var(--ink)}
+.lg__lead{margin:12px 0 22px;font-size:14px;line-height:1.55;color:var(--ink-50)}
+.lg__cta{
+  width:100%;height:48px;border-radius:var(--br-pill);
+  background:var(--green);color:var(--on-green);font-size:14.5px;font-weight:500;
+  transition:filter var(--t);
+}
+.lg__cta:hover{filter:brightness(1.08)}
+.lg__ghost{
+  width:100%;height:44px;border-radius:var(--br-pill);
+  background:var(--fill);border:1px solid var(--line);color:var(--ink);font-size:13.5px;
+  transition:background var(--t),border-color var(--t);
+}
+.lg__ghost:hover{background:var(--fill-hover);border-color:var(--ink-30)}
+.lg__fine{margin:10px 0 0;font-size:12px;color:var(--ink-30);text-align:center}
+.lg__or{position:relative;margin:26px 0 14px;text-align:center}
+.lg__or::before{content:"";position:absolute;left:0;right:0;top:50%;height:1px;background:var(--line-soft)}
+.lg__or span{
+  position:relative;padding:0 12px;background:var(--bg);
+  font-family:var(--mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-30);
+}

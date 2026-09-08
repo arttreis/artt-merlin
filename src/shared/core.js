@@ -209,6 +209,7 @@ export function toggleSidebar() {
    cartoes da semana, mapas, funis, lancamentos, habitos e objetivos. nao e indice: e um filtro
    sobre o que ja esta em memoria, e por isso e instantaneo. */
 const SEARCH_SOURCES = [
+  { type: "bookmarks", label: "site", field: "name", href: (d) => d.url },
   { type: "notes", label: "nota", field: "title", href: (d) => "notes.html#" + encodeURIComponent(d.id) },
   { type: "clients", label: "cliente", field: "name", href: (d) => "clients.html#" + encodeURIComponent(d.id) },
   { type: "week", label: "semana", field: "title", href: () => "week.html", filter: (d) => !d.done },
@@ -760,7 +761,7 @@ document.addEventListener("visibilitychange", () => {
    nao baixou espera a proxima sincronizacao, e a marca de "feito" so e
    gravada quando todas fecharam. depois disso ela nunca mais faz nada. */
 const FRONTS_PURGED = "merlin:fronts-removed";
-const PURGE_TYPES = ["notes", "clients", "week", "maps", "funnels", "finance", "habits", "plans"];
+const PURGE_TYPES = ["notes", "clients", "week", "maps", "funnels", "finance", "habits", "plans", "bookmarks"];
 function stripFront(value) {
   if (Array.isArray(value)) return value.map(stripFront).some(Boolean);
   if (!value || typeof value !== "object") return false;
@@ -798,6 +799,55 @@ export function purgeFronts() {
      depois que nao ha mais o que tirar. */
   if (!cloud.signedIn) return;
   try { localStorage.setItem(FRONTS_PURGED, String(Date.now())); } catch (e) {}
+}
+
+/* um endereço que dá para abrir. domínio pelado ganha https; protocolo que
+   não seja http(s) é recusado — não existe caminho para um "javascript:"
+   entrar por um campo de texto e virar navegação num clique. */
+export function safeUrl(raw) {
+  const t = String(raw || "").trim();
+  if (!t) return "";
+  const withScheme = /^[a-z][a-z0-9+.-]*:/i.test(t) ? t : "https://" + t;
+  try {
+    const u = new URL(withScheme);
+    if (u.protocol !== "http:" && u.protocol !== "https:") return "";
+    return u.href;
+  } catch (e) { return ""; }
+}
+/* o host, para a linha de baixo do ladrilho: "youtube.com", sem o www */
+export function hostOf(url) {
+  try { return new URL(url).hostname.replace(/^www\./, ""); } catch (e) { return ""; }
+}
+
+/* ---------- este navegador é novo? ----------
+   a pergunta que decide se o inicio mostra a porta ou a casa. tres coisas
+   importam nela, e todas foram aprendidas errando:
+
+   e SINCRONA. a tentacao e perguntar ao servidor quem e voce antes de decidir,
+   mas o Merlin funciona inteiro sem conexao — e uma tela que espera a rede
+   para saber se existe nasce vazia e se corrige depois, o que e pior que
+   nascer certa. tudo que ela le esta no localStorage.
+
+   e uma lista de INCLUSAO, nunca de exclusao. listar o que ignorar significa
+   que toda chave nova de estado de tela (`merlin:notes:view`, o zoom de um
+   mapa, a tira de fantasmas do funil) precisa ser lembrada por quem a criar —
+   e quem esquecer faz a porta sumir para quem nunca entrou. aqui so contam as
+   colecoes que guardam trabalho, o documento do dia e a caixa de entrada.
+
+   `merlin:seen` NAO conta, e este e o caso que mais custa se errar: ele e
+   escrito ao fechar a apresentacao, entao conta-lo faria a porta sumir para
+   sempre no primeiro Esc de quem acabou de chegar. */
+export function isNewHere() {
+  if (whoIsHere()) return false;                       /* ja entrou aqui alguma vez */
+  const has = (key, count) => {
+    let raw = null;
+    try { raw = JSON.parse(localStorage.getItem(key)); } catch (e) { return false; }
+    return !!raw && count(raw) > 0;
+  };
+  if (PURGE_TYPES.some((t) => has("merlin:" + t, (d) => Object.keys(d.items || {}).length))) return false;
+  if (has("merlin:day", (d) => (d.tasks || []).length)) return false;
+  if (has("merlin:inbox", (d) => (Array.isArray(d) ? d.length : 0))) return false;
+  return true;
 }
 
 /* ---------- ideias viraram notas ----------
