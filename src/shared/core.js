@@ -585,6 +585,38 @@ export async function deleteFile(id) {
                  nao quebra nada e nao vale travar a tela por ele */ }
 }
 
+/* ---------- o link publico ----------
+   um mapa ou um funil que da para mandar para o cliente. o servidor guarda o
+   endereco do documento, e nao uma copia dele: o link mostra a versao de
+   agora, e por isso "revogar" e a unica forma de fechar a porta.
+
+   o endereco do link e montado aqui, e nao no servidor, porque quem sabe em
+   que dominio o Merlin esta aberto e o navegador. */
+
+export const shareUrl = (token) => location.origin + "/share.html#" + token;
+
+export async function shareOf(type, id) {
+  const r = await api("/share?type=" + encodeURIComponent(type) + "&id=" + encodeURIComponent(id), { method: "GET" });
+  return r.ok ? (r.body.share || null) : null;
+}
+export async function share(type, id) {
+  const r = await api("/share", { method: "POST", body: JSON.stringify({ type, id }) });
+  if (r.ok) return r.body.share;
+  throw new Error((r.body && r.body.error) || "não consegui criar o link");
+}
+export async function unshare(type, id) {
+  const r = await api("/share?type=" + encodeURIComponent(type) + "&id=" + encodeURIComponent(id), { method: "DELETE" });
+  return r.ok;
+}
+/* a leitura publica nao passa pelo api(): ela nao manda credencial nenhuma, e
+   e essa a diferenca entre ela e todas as outras chamadas deste arquivo. */
+export async function readShared(token) {
+  const r = await fetch(API + "/shared/" + encodeURIComponent(token), { headers: { accept: "application/json" } });
+  const body = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(body.error || "esse link não existe");
+  return body;
+}
+
 /* ---------- colecoes ----------
    uma colecao e um conjunto de documentos do mesmo tipo, cada um com id e
    carimbo v. mora em localStorage (merlin:<tipo>) e sobe para /api/docs.
