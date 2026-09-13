@@ -614,11 +614,11 @@ function SignInDialog() {
          onClick={(e) => { if (e.target === e.currentTarget) signIn.hide(); }}>
       <div className="dialog__box">
         <button className="dialog__close" type="button" id="signin-close" aria-label="Fechar" onClick={() => signIn.hide()}>{icon("x")}</button>
-        <p className="dialog__title">Levar o Merlin para outros aparelhos</p>
+        <p className="dialog__title">levar o merlin para outros aparelhos</p>
         {step === "email" ? (
           <form id="form-email" autoComplete="on" onSubmit={sendCode}>
             <div id="signin-email">
-              <p className="dialog__sub">Sem senha: mando um código de 6 dígitos.</p>
+              <p className="dialog__sub">sem senha: mando um código de seis dígitos.</p>
               <input ref={emailRef} className="signin-input" id="email-input" type="email" inputMode="email" autoComplete="email"
                      placeholder="seu@email.com" aria-label="Seu e-mail" value={email} onChange={(e) => setEmail(e.currentTarget.value)} />
               <button className="signin-button" type="submit" disabled={busy}>mandar código</button>
@@ -628,7 +628,7 @@ function SignInDialog() {
           <form id="form-code" autoComplete="off" onSubmit={enter}>
             <div id="signin-code-step">
               <input ref={codeRef} className="signin-input signin-code" id="code-input" inputMode="numeric" autoComplete="one-time-code"
-                     maxLength="6" placeholder="000000" aria-label="Código de 6 dígitos" value={code} onChange={(e) => setCode(e.currentTarget.value)} />
+                     maxLength="6" placeholder="000000" aria-label="Código de seis dígitos" value={code} onChange={(e) => setCode(e.currentTarget.value)} />
               <button className="signin-button" type="submit" disabled={busy}>entrar</button>
             </div>
           </form>

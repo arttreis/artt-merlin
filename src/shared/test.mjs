@@ -327,6 +327,79 @@ const dataLeft = () => globalThis.localStorage.keys().filter((k) => k in DATA);
 }
 
 {
+  /* ---- a junção do dia com a semana ----
+     é a migração mais arriscada que este sistema já fez: duas coleções viram
+     uma, e o que estava dos dois lados era, às vezes, a MESMA tarefa — o
+     cartão da semana e a cópia dele que o "puxar" tinha criado no dia. juntar
+     errado significa ou perder trabalho ou duplicar cada tarefa puxada.
+
+     mergeInto é função pura de propósito: ela é o único lugar onde essa
+     decisão mora, e dá para prová-la sem navegador nenhum. */
+  const load = async () => {
+    globalThis.localStorage = makeStorage({});
+    return import("./tasks.js?n=" + (++n));
+  };
+  const entry = (id, doc, v) => ({ v, doc: { id, ...doc } });
+
+  {
+    const { mergeInto } = await load();
+    const r = mergeInto([entry("c1", { title: "gravar", day: "2026-09-08", min: 90, order: 3 }, 111)], []);
+    check("o cartão vira tarefa com a data dele", r.adopted[0].date === "2026-09-08", r.adopted[0].date);
+    check("e preserva o carimbo, que é o que protege dois aparelhos", r.adopted[0].v === 111, String(r.adopted[0].v));
+    check("nada do dia foi inventado", r.saved.length === 0, String(r.saved.length));
+  }
+
+  {
+    /* o fim de semana era UMA coluna com a data da segunda: sábado é a
+       primeira data real que aquela coluna representava. */
+    const { mergeInto } = await load();
+    const r = mergeInto([entry("c1", { title: "feira", day: "weekend:2026-09-07" }, 1)], []);
+    check("o fim de semana vira sábado", r.adopted[0].date === "2026-09-12", r.adopted[0].date);
+  }
+
+  {
+    /* o caso que motivou tudo: a tarefa do dia que veio de um cartão não pode
+       virar uma segunda tarefa. ela devolve ao cartão o que aprendeu. */
+    const { mergeInto } = await load();
+    const day = { day: "2026-09-09", tasks: [{ id: "t1", title: "gravar", min: 45, done: true, origin: { type: "week", id: "c1" } }] };
+    const r = mergeInto([entry("c1", { title: "gravar", day: "2026-09-08", min: 0 }, 1)], [day]);
+    check("a cópia não vira uma segunda tarefa", r.saved.length === 0, String(r.saved.length));
+    check("o cartão herda a data em que foi puxada", r.adopted[0].date === "2026-09-09", r.adopted[0].date);
+    check("o cartão herda a duração que o pedágio cobrou", r.adopted[0].min === 45, String(r.adopted[0].min));
+    check("e herda a conclusão", r.adopted[0].done === true);
+  }
+
+  {
+    /* tarefa escrita direto no dia não tem cartão nenhum: ela vira tarefa, e
+       a posição na fila vira o campo `order` — era ela a prioridade. */
+    const { mergeInto } = await load();
+    const day = { day: "2026-09-09", tasks: [{ id: "a", title: "primeira" }, { id: "b", title: "segunda" }] };
+    const r = mergeInto([], [day]);
+    check("a tarefa do dia vira tarefa", r.saved.length === 2, String(r.saved.length));
+    check("a ordem da fila vira o campo order", r.saved[0].order === 0 && r.saved[1].order === 1);
+    check("com a data do documento", r.saved[0].date === "2026-09-09", r.saved[0].date);
+  }
+
+  {
+    /* dois aparelhos: cada um tem o seu merlin:day, e os dois são lidos. sem
+       isso, migrar num navegador deixaria para trás a fila que ficou no outro. */
+    const { mergeInto } = await load();
+    const r = mergeInto([], [
+      { day: "2026-09-08", tasks: [{ id: "a", title: "de ontem" }] },
+      { day: "2026-09-09", tasks: [{ id: "b", title: "de hoje" }] }
+    ]);
+    check("os dias de todos os aparelhos entram", r.saved.length === 2, String(r.saved.length));
+  }
+
+  {
+    /* o túmulo de um cartão apagado não pode ressuscitar como tarefa */
+    const { mergeInto } = await load();
+    const r = mergeInto([entry("c1", { deleted: true }, 9), entry("c2", { title: "" }, 9)], []);
+    check("cartão apagado não volta", r.adopted.length === 0, String(r.adopted.length));
+  }
+}
+
+{
   /* ---- este navegador é novo? ----
      a resposta decide se o início mostra a porta ou a casa, e errar para um
      lado esconde o trabalho de quem já usa atrás de uma página de marketing.

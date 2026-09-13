@@ -3,7 +3,7 @@
 import worker from "./worker.js";
 
 /* ---- D1 falso: entende so as consultas que o worker faz ---- */
-const db = { people: [], codes: [], days: [], docs: [], advice: [] };
+const db = { people: [], codes: [], days: [], docs: [], advice: [], shares: [] };
 let sentEmails = [];
 
 function prepare(sql) {
@@ -77,6 +77,29 @@ function run(sql, a, mode) {
   }
   if (s.startsWith("SELECT doc, v FROM docs")) {
     return db.docs.find(d => d.person === a[0] && d.type === a[1] && d.id === a[2]) || null;
+  }
+  if (s.startsWith("SELECT id FROM docs")) {
+    return db.docs.find(d => d.person === a[0] && d.type === a[1] && d.id === a[2]) || null;
+  }
+  if (s.startsWith("SELECT token, at FROM shares")) {
+    return db.shares.find(x => x.person === a[0] && x.type === a[1] && x.id === a[2]) || null;
+  }
+  if (s.startsWith("INSERT INTO shares")) {
+    db.shares.push({ token: a[0], person: a[1], type: a[2], id: a[3], at: a[4] });
+    return { meta: { changes: 1 } };
+  }
+  if (s.startsWith("DELETE FROM shares")) {
+    const before = db.shares.length;
+    db.shares = db.shares.filter(x => !(x.person === a[0] && x.type === a[1] && x.id === a[2]));
+    return { meta: { changes: before - db.shares.length } };
+  }
+  /* o JOIN da leitura publica: e ele que garante que o link so alcanca o
+     documento daquela pessoa, daquele tipo, daquele id. */
+  if (s.startsWith("SELECT s.type AS type, d.doc AS doc FROM shares s")) {
+    const sh = db.shares.find(x => x.token === a[0]);
+    if (!sh) return null;
+    const doc = db.docs.find(d => d.person === sh.person && d.type === sh.type && d.id === sh.id);
+    return doc ? { type: sh.type, doc: doc.doc } : null;
   }
   if (s.startsWith("SELECT n FROM advice")) {
     return db.advice.find(x => x.person === a[0] && x.hour === a[1]) || null;
@@ -466,6 +489,53 @@ r = await worker.fetch(new Request("https://x.com/api/files", {
   method: "POST", headers: { "content-type": "application/octet-stream", "x-file-type": "image/png", cookie }, body: png
 }), noBucket);
 check("sem bucket, a rota avisa em vez de quebrar", r.status === 503, String(r.status));
+
+/* ---- 13.5 o link publico ----
+   e a unica porta sem sessao deste servidor. o que os casos abaixo protegem:
+   ela nao alcanca tipo que nao seja mapa ou funil, nao alcanca documento de
+   outra pessoa, e para de alcancar no instante em que o link e revogado. */
+r = await call("POST", "/docs", { type: "maps", id: "m1", v: 10, doc: { id: "m1", name: "mapa do lançamento" } }, cookie);
+check("mapa sobe para poder ser compartilhado", r.status === 200, String(r.status));
+
+r = await call("GET", "/share?type=maps&id=m1", null, cookie);
+body = await r.json();
+check("antes de compartilhar, não há link", body.share === null);
+
+r = await call("POST", "/share", { type: "maps", id: "m1" }, cookie);
+body = await r.json();
+const shareToken = body.share && body.share.token;
+check("compartilhar devolve um token", /^[A-Za-z0-9_-]{22}$/.test(shareToken || ""), String(shareToken));
+
+r = await call("POST", "/share", { type: "maps", id: "m1" }, cookie);
+body = await r.json();
+check("pedir de novo devolve o MESMO link", body.share.token === shareToken);
+
+/* a leitura publica: sem cookie nenhum */
+r = await call("GET", "/shared/" + shareToken);
+body = await r.json();
+check("o link abre sem sessão", r.status === 200 && body.doc.name === "mapa do lançamento", String(r.status));
+check("e diz de que tipo é", body.type === "maps");
+
+r = await call("GET", "/shared/naoexisteesse22charsx");
+check("token inventado é 404", r.status === 404, String(r.status));
+
+r = await call("POST", "/share", { type: "clients", id: "c1" }, cookie);
+check("cliente não se compartilha", r.status === 400, String(r.status));
+
+r = await call("POST", "/share", { type: "maps", id: "naoexiste" }, cookie);
+check("documento que não subiu não vira link", r.status === 404, String(r.status));
+
+/* outra pessoa nao alcanca o documento pelo id: o link e por (pessoa, tipo, id) */
+r = await call("POST", "/share", { type: "maps", id: "m1" }, otherCookie);
+check("outra conta não cria link para documento alheio", r.status === 404, String(r.status));
+
+r = await call("DELETE", "/share?type=maps&id=m1", null, cookie);
+check("revogar responde ok", r.status === 200, String(r.status));
+r = await call("GET", "/shared/" + shareToken);
+check("revogado, o link morre na hora", r.status === 404, String(r.status));
+
+r = await call("GET", "/shared/" + shareToken, null, cookie);
+check("nem com sessão o link revogado volta", r.status === 404, String(r.status));
 
 /* ---- 14. o site sai do mesmo worker que a api ---- */
 const raw = (path) => worker.fetch(new Request("https://x.com" + path), env);

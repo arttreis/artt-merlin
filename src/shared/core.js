@@ -58,6 +58,14 @@ export function mondayOf(day) {
   d.setDate(d.getDate() - ((dow + 6) % 7));
   return dayOf(d);
 }
+/* domingo da semana que contem `day`: e onde a semana do calendario comeca.
+   o mondayOf fica para o que ja GRAVOU semana pela segunda (o periodo dos
+   planos, a contagem dos habitos) — trocar ali mudaria a chave de dado salvo. */
+export function sundayOf(day) {
+  const d = dateOf(day);
+  d.setDate(d.getDate() - d.getDay());
+  return dayOf(d);
+}
 
 /* dinheiro em centavos, para nunca somar float */
 export const brl = (cents, sign) => {
@@ -236,8 +244,10 @@ initTheme();
 
 export const PAGES = [
   { id: "home", label: "início", href: "index.html" },
-  { id: "day", label: "dia", href: "day.html" },
-  { id: "week", label: "semana", href: "week.html" },
+  /* o dia e a semana eram dois itens porque eram duas paginas. viraram duas
+     visoes de uma so, e dois itens levando ao mesmo lugar seriam duas portas
+     para a mesma sala. */
+  { id: "calendar", label: "calendário", href: "calendar.html" },
   { id: "notes", label: "notas", href: "notes.html" },
   { id: "clients", label: "clientes", href: "clients.html" },
   { id: "funnels", label: "funis", href: "funnels.html" },
@@ -263,7 +273,7 @@ const SEARCH_SOURCES = [
   { type: "bookmarks", label: "site", field: "name", href: (d) => d.url },
   { type: "notes", label: "nota", field: "title", href: (d) => "notes.html#" + encodeURIComponent(d.id) },
   { type: "clients", label: "cliente", field: "name", href: (d) => "clients.html#" + encodeURIComponent(d.id) },
-  { type: "week", label: "semana", field: "title", href: () => "week.html", filter: (d) => !d.done },
+  { type: "tasks", label: "tarefa", field: "title", href: (d) => "calendar.html#" + encodeURIComponent(d.date || ""), filter: (d) => !d.done },
   { type: "maps", label: "mapa", field: "name", href: (d) => "maps.html#" + encodeURIComponent(d.id) },
   { type: "funnels", label: "funil", field: "name", href: (d) => "funnels.html#" + encodeURIComponent(d.id) },
   { type: "finance", label: "R$", field: "name", href: () => "finance.html", filter: (d) => d.type === "entry" || d.type === "fixed" || d.type === "debt" || d.type === "card" },
@@ -812,7 +822,7 @@ document.addEventListener("visibilitychange", () => {
    nao baixou espera a proxima sincronizacao, e a marca de "feito" so e
    gravada quando todas fecharam. depois disso ela nunca mais faz nada. */
 const FRONTS_PURGED = "merlin:fronts-removed";
-const PURGE_TYPES = ["notes", "clients", "week", "maps", "funnels", "finance", "habits", "plans", "bookmarks"];
+const PURGE_TYPES = ["notes", "clients", "tasks", "week", "maps", "funnels", "finance", "habits", "plans", "bookmarks"];
 function stripFront(value) {
   if (Array.isArray(value)) return value.map(stripFront).some(Boolean);
   if (!value || typeof value !== "object") return false;
@@ -929,6 +939,42 @@ export function migrateNotes(complete) {
      abertura, e repetir nao custa: o adopt recusa carimbo que nao seja maior. */
   if (!complete || (cloud.signedIn && !from.hasDownloaded())) return;
   try { localStorage.setItem(NOTES_MIGRATED, String(old.length)); } catch (e) {}
+}
+
+/* ---------- preferencias ----------
+   o que e da PESSOA e nao de um documento: a janela do dia e quanto vale uma
+   tarefa que chegou sem duracao.
+
+   por que uma colecao e nao uma chave solta no localStorage: preferencia
+   tambem viaja. a janela do dia estava DENTRO do documento do dia, e isso
+   fazia dela um dado de hoje — mudar o horario de trabalho num aparelho nao
+   chegava no outro ate o dia inteiro subir, e um dia velho baixando por cima
+   trazia a janela velha junto. como colecao ela sincroniza como todo o resto,
+   com o mesmo carimbo e a mesma regra de quem esta na frente.
+
+   um documento so, de id "config" — a mesma forma do sal do cofre. */
+
+const PREFS_ID = "config";
+export const DEFAULT_PREFS = { dayStart: 540, dayEnd: 1140, guess: 30 };
+export const prefsStore = () => collection("prefs");
+
+const inRange = (v, lo, hi, fallback) =>
+  Number.isFinite(+v) && +v >= lo && +v <= hi ? Math.round(+v) : fallback;
+
+/* le sempre validado: documento vindo do disco ou da nuvem nao e confiavel so
+   por ter chegado, e uma janela invertida (fim antes do comeco) faria a barra
+   do dia nascer com largura negativa. */
+export function readPrefs() {
+  const d = prefsStore().get(PREFS_ID) || {};
+  const dayStart = inRange(d.dayStart, 0, 1440, DEFAULT_PREFS.dayStart);
+  let dayEnd = inRange(d.dayEnd, 0, 1440, DEFAULT_PREFS.dayEnd);
+  if (dayEnd <= dayStart) dayEnd = Math.min(dayStart + 600, 1440);
+  return { dayStart, dayEnd, guess: inRange(d.guess, 5, 240, DEFAULT_PREFS.guess) };
+}
+
+export function savePrefs(patch) {
+  const cur = prefsStore().get(PREFS_ID) || { id: PREFS_ID, createdAt: Date.now() };
+  return prefsStore().save({ ...cur, ...patch, id: PREFS_ID, updatedAt: Date.now() });
 }
 
 /* clientes: o indice leve que os outros modulos usam para selo e escolha.
@@ -1058,6 +1104,7 @@ export function setShellRenderer(fn) { renderShell = fn; }
 export function initPage(id) {
   if (renderShell) renderShell(id);
   clients();
+  prefsStore();   /* a janela do dia sai daqui, e o dia pinta antes da nuvem */
   /* a mudanca de nome roda ANTES da primeira pintura. o que ja esta neste
      navegador nao depende de rede, e esperar o /me responder faz a tela nascer
      vazia e se corrigir sozinha um instante depois — pior que nascer certa. e

@@ -7,6 +7,7 @@ import {
   initPage, newId, today, dayOf, dateOf, addDays, mondayOf, monthLabel, dateLabel, notify, api, clientName
 } from "./shared/core.js";
 import { useState, useEffect } from "react";
+import { newTask, normalize as normalizeTask } from "./shared/tasks.js";
 import {
   mount, useCollection, useClients, useKeydown, isTyping,
   useFields, Form, Field, Dialog, Markdown, ClientBadge, clientOptionList, icon
@@ -91,7 +92,10 @@ function normalize(d) {
 /* ---------- a pagina ---------- */
 function Plans() {
   const plans = useCollection("plans", { normalize });
-  const week = useCollection("week");
+  /* o objetivo da semana vira TAREFA, e nao mais "cartao da semana": desde
+     que o dia e a semana viraram duas visoes da mesma colecao, cartao deixou
+     de ser uma categoria de coisa. */
+  const tasks = useCollection("tasks", { normalize: normalizeTask });
   useClients();
   const t = today();
   const [periods, setPeriods] = useState(() => ({ quarter: periodOf("quarter", t), month: periodOf("month", t), week: periodOf("week", t) }));
@@ -131,17 +135,17 @@ function Plans() {
     const childKind = kind === "quarter" ? "month" : "week";
     setForm({ kind: childKind, period: childPeriod(kind, periods[kind]), parent: g.id, prefill: { text: g.text, client: g.client } });
   };
-  /* puxar para a semana: vira cartao no quadro da semana, e dali entra no dia
-     pelo gesto de sempre. o cartao lembra de onde veio (origin). */
+  /* puxar para a semana: vira uma tarefa com data, que aparece na coluna
+     daquele dia e na fila do dia quando a data for hoje. sem duracao — o
+     pedagio de minutos e cobrado quando ela entra em hoje, e nao aqui. */
   const pullToWeek = (g) => {
     const monday = periods.week;
-    const day = mondayOf(t) === monday ? (dateOf(t).getDay() === 0 || dateOf(t).getDay() === 6 ? "weekend:" + monday : t) : monday;
-    const now = Date.now();
-    const card = { id: newId(), title: g.text, day, client: g.client, min: 0, done: false, recurring: false, order: now, createdAt: now, updatedAt: now, origin: { type: "plan", id: g.id } };
-    week.save(card);
+    const date = mondayOf(t) === monday ? t : monday;
+    const task = newTask({ title: g.text, date, client: g.client, origin: { type: "plan", id: g.id } });
+    tasks.save(task);
     const doc = docOf("week");
-    saveGoals("week", doc.period, doc.goals.map((x) => x.id === g.id ? { ...x, card: card.id } : x));
-    notify("virou cartão da semana", () => { week.remove(card.id); saveGoals("week", doc.period, doc.goals.map((x) => x.id === g.id ? { ...x, card: "" } : x)); });
+    saveGoals("week", doc.period, doc.goals.map((x) => x.id === g.id ? { ...x, card: task.id } : x));
+    notify("virou tarefa da semana", () => { tasks.remove(task.id); saveGoals("week", doc.period, doc.goals.map((x) => x.id === g.id ? { ...x, card: "" } : x)); });
   };
   const saveReview = (kind, review) => {
     const doc = docOf(kind);
@@ -154,7 +158,9 @@ function Plans() {
     const doc = docOf(kind);
     const lines = doc.goals.map((g) =>
       [g.text, clientName(g.client) || null, g.done ? "feito" : "aberto"].filter(Boolean).join(" · "));
-    const weekDone = kind === "week" ? week.all().filter((c) => c.done && (c.day === doc.period || (c.day.startsWith("weekend:") ? c.day.slice(8) === doc.period : mondayOf(c.day) === doc.period))).map((c) => c.title) : [];
+    const weekDone = kind === "week"
+      ? tasks.all().filter((x) => x.done && mondayOf(x.date) === doc.period).map((x) => x.title)
+      : [];
     const r = await api("/merlin", { method: "POST", body: JSON.stringify({ task: "review", context: { kind: KINDS.find((k) => k.id === kind).label, period: periodLabel(kind, doc.period), goals: lines, weekDone, review: doc.review } }) }).catch(() => null);
     if (!r) { notify("não consegui falar com o Merlin"); return; }
     if (r.ok) setSummary({ title: "o merlin revisa " + (kind === "week" ? "a semana" : kind === "month" ? "o mês" : "o trimestre"), text: r.body.text || "" });

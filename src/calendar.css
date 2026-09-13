@@ -1,56 +1,24 @@
-/* merlin · o CSS desta pagina
+/* merlin · o CSS do calendario
+   as tres visoes (dia, semana, mes) numa folha so, porque sao uma tela so.
+   o que era day.css e week.css veio para ca quando as duas paginas viraram
+   duas visoes da mesma colecao.
+
    o comum vive numa camada de cascata (@layer base, no shell.css); o que e da
    pagina fica fora dela e ganha todo empate, independente da ordem em que as
-   folhas chegam no <head>. */
+   folhas chegam no <head>.
 
-/* os tokens moram no shell.css, que o dia carrega. este arquivo tinha uma
-   copia deles — sobra de quando o dia era um HTML solto e precisava se bastar.
-   ela era inofensiva enquanto tudo era uma folha so (o :root perdia de
-   html.light e html.gl por especificidade), e virou bug no dia em que o comum
-   entrou numa camada de cascata: regra SEM camada ganha de regra EM camada, e
-   o dia passou a ficar preso no escuro do Merlin — sem tema claro e sem a
-   marca da casa, sozinho entre as onze telas. */
+   por que ".dayv " na frente de .pill, .chip, .action, .block, .empty e
+   .note: o dia era a unica tela que NAO carregava o base.css, e por isso
+   tinha as proprias versoes dessas classes. aqui elas dividem a folha com as
+   do comum — e as do comum sao as que os dialogos e os formularios usam.
+   sem o escopo, o botao de "cancelar" de qualquer caixa desta pagina viraria
+   a pilula pequena e transparente que o dia usa no editor de janela. */
 
-/* o reset mora na casca (shell.css), que o dia carrega. o que fica aqui e so
-   o que e do dia mesmo: o corpo que centraliza o aparelho na tela. */
-body{
-  display:grid;place-items:center;
-  /* a barra do merlin flutua no topo: o corpo reserva a altura dela */
-  padding:calc(var(--nav-h) + clamp(16px,4vh,48px)) clamp(12px,3vw,40px) clamp(24px,7vh,88px);
-}
-
-/* rotulo mono, o .t-mono do sistema */
-.t-mono{
-  font-family:var(--mono);font-size:11px;font-weight:400;
-  letter-spacing:.08em;text-transform:uppercase;
-}
-
-/* a raiz do preact ocupa o body inteiro e repete a grade que ele tinha:
-   e nela que o aparelho e os trilhos do bento se arrumam */
-#app{display:grid;place-items:center;width:100%;align-self:stretch;justify-self:stretch}
-
-/* ---------- a luz ----------
-   o mesmo movimento do .funil do arttreis.com.br: um radial largo de
-   --green-glow ancorado fora da tela, em opacidade baixa. a luz entra pela
-   esquerda e morre antes de chegar do outro lado — o preto para de ser
-   chapado sem virar cenario. */
-body::before{
-  content:"";position:fixed;inset:0;pointer-events:none;z-index:0;
-  background:radial-gradient(104% 78% at 22% 6%,var(--green-glow),transparent 64%);
-  opacity:var(--glow-op);
-}
-/* a grade de 28px do sistema, mascarada onde a luz bate: da textura ao fundo
-   e some sozinha no escuro. e a mesma de .work__media no site. */
-body::after{
-  content:"";position:fixed;inset:0;pointer-events:none;z-index:0;
-  background-image:
-    linear-gradient(var(--line-soft) 1px,transparent 1px),
-    linear-gradient(90deg,var(--line-soft) 1px,transparent 1px);
-  background-size:28px 28px;
-  -webkit-mask-image:radial-gradient(84% 68% at 22% 6%,#000,transparent 76%);
-  mask-image:radial-gradient(84% 68% at 22% 6%,#000,transparent 76%);
-  opacity:.42;
-}
+/* ---------- a visao do dia ----------
+   era o #app da pagina do dia, que centrava o aparelho na tela inteira. agora
+   e uma das tres visoes, e por isso a centragem mora nela e nao no corpo: as
+   outras duas ocupam a largura toda e nao querem ser centradas em nada. */
+.dayv{display:grid;place-items:center;width:100%}
 
 /* ---------- o aparelho ---------- */
 .device{
@@ -148,7 +116,9 @@ body::after{
   height:6px;min-width:18px;margin-top:var(--pd3);border-radius:3px;
   background:repeating-linear-gradient(45deg,var(--ink-30) 0 3px,transparent 3px 6px);
 }
-.note{
+/* track__note, e nao .note: com o nome da linha da caixa de notas, o
+   alinhamento a direita daqui empurrava o titulo de toda nota para a direita. */
+.dayv .track__note{
   display:block;margin-top:var(--pd2);text-align:right;
   color:var(--ink-30);min-height:15px;font-size:10px;
 }
@@ -167,14 +137,14 @@ body::after{
   display:flex;justify-content:space-between;align-items:center;gap:var(--pd);
 }
 /* .pill do sistema */
-.pill{
+.dayv .pill{
   display:inline-flex;align-items:center;gap:7px;height:26px;padding:0 14px;
   font-size:12.5px;color:var(--ink-70);
   background:var(--fill);border:1px solid var(--line);border-radius:var(--br-pill);
   transition:background var(--t),color var(--t);
 }
-.pill:hover{background:var(--fill-hover);color:var(--ink)}
-.pill svg{width:11px;height:11px;transition:transform var(--t)}
+.dayv .pill:hover{background:var(--fill-hover);color:var(--ink)}
+.dayv .pill svg{width:11px;height:11px;transition:transform var(--t)}
 
 /* ---------- lista ---------- */
 .queue{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:var(--pd2)}
@@ -243,15 +213,15 @@ body::after{
 
 .actions{flex:0 0 auto;display:flex;align-items:center;gap:2px;opacity:0;transition:opacity var(--t)}
 .task:hover .actions,.task:focus-within .actions{opacity:1}
-.action{
+.dayv .action{
   width:30px;height:30px;display:grid;place-items:center;border-radius:var(--br2);
   color:var(--ink-30);transition:color var(--t),background var(--t);
 }
-.action:hover{color:var(--ink);background:var(--fill-hover)}
+.dayv .action:hover{color:var(--ink);background:var(--fill-hover)}
 /* o vinculo do ClickUp e o unico .action que e <a>: sem isto ele viria azul e
    sublinhado, fora do sistema */
-a.action{color:var(--ink-30);text-decoration:none}
-.action svg{width:15px;height:15px}
+.dayv a.action{color:var(--ink-30);text-decoration:none}
+.dayv .action svg{width:15px;height:15px}
 /* ---------- a fila e de outro dia ----------
    nao e erro nem alarme: e um fato com duas saidas. por isso tinta neutra e
    nenhum vermelho — o sistema nao tem um, e isso aqui nao pediria. */
@@ -267,7 +237,7 @@ a.action{color:var(--ink-30);text-decoration:none}
 .stale__actions{display:flex;gap:var(--pd2);flex-wrap:wrap}
 
 /* ---------- dia vazio ---------- */
-.empty{padding:var(--pd3) 0}
+.dayv .empty{padding:var(--pd3) 0}
 .empty__sub{margin:0 0 var(--pd);font-size:13.5px;color:var(--ink-50)}
 .examples{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:var(--pd2)}
 .examples li{
@@ -345,7 +315,7 @@ a.action{color:var(--ink-30);text-decoration:none}
 /* ---------- os chips de duracao ----------
    toda tarefa tem duracao: quando o texto nao traz uma, ela e perguntada aqui
    antes de a tarefa existir. e um passo, nao um erro — dai a tinta neutra. */
-.chips{
+.dayv .chips{
   margin:0 var(--pd3) var(--pd2);padding:10px 12px;
   background:var(--surface-2);border:1px solid var(--line);border-radius:var(--br);
 }
@@ -355,15 +325,15 @@ a.action{color:var(--ink-30);text-decoration:none}
 }
 .chips__text b{color:var(--ink-70);font-weight:500}
 .chips__row{display:flex;gap:6px;flex-wrap:wrap}
-.chip{
+.dayv .chip{
   height:30px;padding:0 13px;border-radius:var(--br-pill);
   background:var(--fill);border:1px solid var(--line);
   font-family:var(--mono);font-size:11.5px;color:var(--ink-70);
   transition:background var(--t),color var(--t),border-color var(--t);
 }
-.chip:hover{background:var(--fill-hover);color:var(--ink)}
-.chip[data-fits="no"]{color:var(--ink-30)}
-.chip--other{font-family:var(--sans);font-size:12px;color:var(--ink-50)}
+.dayv .chip:hover{background:var(--fill-hover);color:var(--ink)}
+.dayv .chip[data-fits="no"]{color:var(--ink-30)}
+.dayv .chip--other{font-family:var(--sans);font-size:12px;color:var(--ink-50)}
 
 .entry{
   display:flex;align-items:center;gap:var(--pd2);
@@ -420,7 +390,7 @@ a.action{color:var(--ink-30);text-decoration:none}
 
 /* o ladrilho dos blocos novos: mesma superficie e mesma sombra do aparelho,
    um raio abaixo — o dia continua sendo o objeto principal da tela. */
-.block{
+.dayv .block{
   position:relative;
   background:var(--surface);border:1px solid var(--line);
   border-radius:var(--br);padding:calc(var(--pd) * 1.25);
@@ -438,17 +408,17 @@ a.action{color:var(--ink-30);text-decoration:none}
 @container (max-width: 320px){.note__pull span{display:none}.note__pull{padding:0 7px}}
 .notes__note{margin:0 0 var(--pd2);font-size:12px;color:var(--ink-30)}
 .notes__empty{margin:0 0 var(--pd2);font-size:13px;color:var(--ink-30)}
-.note-list{list-style:none;margin:0 0 var(--pd2);padding:0;display:flex;flex-direction:column;gap:var(--pd3)}
-.note{
+.dayv .note-list{list-style:none;margin:0 0 var(--pd2);padding:0;display:flex;flex-direction:column;gap:var(--pd3)}
+.dayv .note{
   display:flex;align-items:center;gap:var(--pd2);padding:6px 6px 6px 12px;
   border-radius:var(--br2);background:var(--fill);border:1px solid var(--line-soft);
 }
-.note .note__name{
+.dayv .note .note__name{
   flex:1 1 auto;min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;
   font-size:13px;color:var(--ink-70);
 }
-.note .note__actions{flex:0 0 auto;display:flex;align-items:center;gap:2px;opacity:0;transition:opacity var(--t)}
-.note:hover .note__actions,.note:focus-within .note__actions{opacity:1}
+.dayv .note .note__actions{flex:0 0 auto;display:flex;align-items:center;gap:2px;opacity:0;transition:opacity var(--t)}
+.dayv .note:hover .note__actions,.dayv .note:focus-within .note__actions{opacity:1}
 .note__action{
   width:26px;height:26px;display:grid;place-items:center;border-radius:var(--br2);
   color:var(--ink-30);transition:color var(--t),background var(--t);
@@ -466,11 +436,11 @@ a.action{color:var(--ink-30);text-decoration:none}
 .note__pull svg{width:13px;height:13px;flex:none}
 /* sem hover no toque, as acoes ficam sempre visiveis */
 @media (hover:none){.note .note__actions{opacity:1}}
-.note-form input{
+.dayv .note-form input{
   width:100%;background:var(--fill);border:1px solid var(--line);
   border-radius:var(--br-pill);padding:8px 14px;font-size:13px;color:var(--ink);
 }
-.note-form input::placeholder{color:var(--ink-30)}
+.dayv .note-form input::placeholder{color:var(--ink-30)}
 
 /* ---------- matriz de eisenhower ----------
    ela e um instrumento do medidor, nao um painel ao lado dele: por isso a
@@ -531,7 +501,7 @@ a.action{color:var(--ink-30);text-decoration:none}
    com um so, medindo 1200 de janela, o dia rolava 28px na horizontal a 1360
    com a barra aberta: a grade ligava antes de caber. */
 @media (min-width:1392px){
-  #app{
+  .dayv{
     /* o aparelho fica na coluna do meio, no tamanho que sempre teve.
        os trilhos so existem se tiverem bloco dentro. */
     grid-template-columns:minmax(272px,340px) 496px minmax(300px,380px);
@@ -547,7 +517,7 @@ a.action{color:var(--ink-30);text-decoration:none}
 }
 /* com a barra recolhida sobram 184px a mais, e os trilhos cabem bem antes */
 @media (min-width:1208px){
-  html.sidebar-closed #app{
+  html.sidebar-closed .dayv{
     grid-template-columns:minmax(272px,340px) 496px minmax(300px,380px);
     justify-content:center;
     align-items:start;
@@ -560,8 +530,11 @@ a.action{color:var(--ink-30);text-decoration:none}
 }
 
 @media (max-width:480px){
-  body{padding:var(--nav-h) 0 0}
-  .device{max-width:none;height:calc(100dvh - var(--nav-h));border-radius:0;border:0;box-shadow:none}
+  /* o aparelho encosta nas bordas, e quem abre espaco e a visao — nao o
+     corpo, que agora e o mesmo das outras dez telas */
+  html.cal-day .page{padding-left:0;padding-right:0;padding-bottom:0}
+  html.cal-day .calbar{padding:0 var(--pd2)}
+  .device{max-width:none;height:calc(100dvh - var(--nav-h) - 96px);border-radius:0;border-left:0;border-right:0;box-shadow:none}
   .top{padding-top:max(18px,env(safe-area-inset-top))}
   .composer{padding-bottom:max(var(--pd),env(safe-area-inset-bottom))}
   .headline{font-size:27px}
@@ -570,10 +543,254 @@ a.action{color:var(--ink-30);text-decoration:none}
   .actions{opacity:1}
   .task{gap:10px;padding:10px}
   .mark{width:40px;height:40px}
-  .action{width:28px;height:28px}
+  .dayv .action{width:28px;height:28px}
   .examples li{gap:10px;padding:10px}
   .examples .examples__mark{width:40px;height:40px}
 }
 @media (prefers-reduced-motion:reduce){
   *{transition-duration:.01ms !important;animation-duration:.01ms !important}
 }
+
+
+/* ================================================================
+   a visao da semana (era o week.css)
+   ================================================================ */
+/* merlin · o CSS desta pagina
+   sai do <style> do HTML para ca porque o Vite injeta o CSS do bundle no fim
+   do <head>, depois do <style> — o que invertia quem vence empate de
+   especificidade. importado logo depois do base.css, a ordem volta a ser a de
+   sempre: primeiro o comum, depois o da pagina. */
+
+/* ---------- faixa "ficou de tras" ----------
+   nao e erro nem alarme, e um fato com duas saidas: por isso a mesma tinta
+   neutra que o resto do sistema usa para isso, sem vermelho. */
+.behind{
+  display:flex;align-items:center;justify-content:space-between;gap:var(--pd);flex-wrap:wrap;
+  margin:0 0 var(--pd);padding:12px var(--pd);
+  background:var(--surface);border:1px solid var(--line);border-radius:var(--br3);
+}
+.behind__text{margin:0;font-size:13px;color:var(--ink-70)}
+.behind__text b{color:var(--ink);font-weight:600}
+.behind__actions{display:flex;gap:var(--pd2);flex-wrap:wrap}
+
+/* ---------- o quadro ----------
+   rola por dentro do proprio wrapper: e assim que o body nunca ganha uma
+   barra horizontal, no celular ou com a janela estreita. */
+.board-scroll{overflow-x:auto;overflow-y:hidden;padding-bottom:6px;margin:0 -2px}
+/* as colunas tem TODAS a mesma altura, e a altura e a do quadro — nao a do
+   dia mais cheio. isso nao e estetica: a coluna inteira e a area de soltar, e
+   uma area que media o conteudo dava um alvo de dois dedos numa terca vazia. */
+.board{display:flex;align-items:stretch;gap:var(--pd2);padding:0 2px;min-height:clamp(340px,58vh,660px)}
+.day-column{
+  flex:0 0 230px;width:230px;
+  display:flex;flex-direction:column;
+  background:var(--surface);border:1px solid var(--line-soft);border-radius:var(--br3);
+  transition:border-color var(--t),background var(--t);
+}
+/* a partir daqui as seis colunas cabem sem cortar: vira grade que preenche a
+   largura inteira, e o rolar horizontal do celular/notebook estreito some. */
+/* eram seis colunas (seg a sex mais o fim de semana num cartao so) e viraram
+   sete, porque sabado e domingo passaram a ser dois dias como os outros. a
+   grade so liga quando as sete cabem: abaixo disso o quadro rola por dentro,
+   que e o que o .board-scroll existe para fazer. */
+@media (min-width:1240px){
+  .board{display:grid;grid-template-columns:repeat(7,minmax(0,1fr))}
+  .day-column{flex:none;width:auto}
+}
+/* hoje se destaca por borda, nao por cor de fundo: o quadro inteiro continua
+   sendo lido de relance, e o dia certo salta so um pouco */
+.day-column.is-today{border-color:var(--ink-30)}
+.day-column.is-target{border-color:var(--green);background:var(--fill)}
+/* o cabecalho da coluna tem o nome do dia, os minutos abertos e o "+" que
+   abre a caixa de novo cartao ja naquele dia — nenhum campo solto embaixo */
+.day-column__head{display:flex;align-items:flex-start;justify-content:space-between;gap:6px;padding:10px 8px 8px 12px;border-bottom:1px solid var(--line-soft)}
+/* o nome do dia virou botao: clicar nele abre aquele dia na visao do dia.
+   e o atalho que faz a semana e o dia serem a mesma coisa, e nao duas. */
+.day-column__day{
+  margin:0;padding:0;background:none;border:0;cursor:pointer;text-align:left;
+  font-size:13px;font-weight:600;letter-spacing:-.01em;color:var(--ink);
+  transition:color var(--t);
+}
+.day-column__day:hover{color:var(--green-ink)}
+.day-column.is-today .day-column__day{color:var(--green-ink)}
+.day-column__min{margin:2px 0 0}
+.day-column__add{width:24px;height:24px;flex:0 0 auto}
+.day-column__add svg{width:14px;height:14px}
+.day-column__body{flex:1 1 auto;min-height:60px;padding:8px;display:flex;flex-direction:column;gap:10px}
+
+.day-column__list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:4px;min-height:6px}
+
+/* ---------- as finalizadas da coluna ----------
+   descem para o pe da coluna e ficam fechadas: o que resta do dia nao divide
+   espaco com o que ja saiu da frente. abrir e por conta de quem pergunta. */
+.day-column__done{margin-top:auto;padding-top:8px;display:flex;flex-direction:column;gap:4px}
+.day-column__done[data-open="no"] .day-column__list{display:none}
+.day-column__done[data-open="no"] .day-column__toggle svg{transform:rotate(-90deg)}
+.day-column__toggle{
+  display:flex;align-items:center;gap:5px;width:100%;
+  margin:0;padding:3px 4px;background:none;border:0;border-radius:var(--br2);
+  cursor:pointer;text-align:left;
+  font-family:var(--mono);font-size:10px;letter-spacing:.06em;
+  color:var(--ink-50);transition:color var(--t),background var(--t);
+}
+.day-column__toggle:hover{color:var(--ink);background:var(--fill)}
+.day-column__toggle svg{width:10px;height:10px;flex:0 0 auto;transition:transform var(--t)}
+.day-column__done .card{opacity:.7}
+
+/* ---------- cartao ---------- */
+.card{
+  display:flex;align-items:center;gap:6px;min-width:0;
+  padding:6px 7px;border-radius:var(--br2);
+  background:var(--fill);border:1px solid var(--line-soft);
+  cursor:grab;transition:background var(--t),border-color var(--t),opacity var(--t);
+}
+.card:hover,.card:focus-within{background:var(--fill-hover)}
+.card.is-dragging{opacity:.4}
+.card.is-done{cursor:default}
+/* a caixa de marcar e a do sistema (.mark, no shell.css); aqui so o tamanho
+   que o cartao pede — a coluna tem 230px e 22px comeria o titulo. */
+.card__check{width:18px;height:18px;border-radius:6px}
+.card__check svg{width:10px;height:10px}
+.card__title{
+  flex:1 1 auto;min-width:0;font-size:12.5px;color:var(--ink);cursor:text;
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;white-space:normal;
+}
+.card.is-done .card__title{color:var(--ink-30);text-decoration:line-through}
+.card__title-input{
+  flex:1 1 auto;min-width:0;background:var(--fill-hover);
+  border:1px solid var(--green-glow);border-radius:4px;padding:1px 5px;
+  font-size:12.5px;color:var(--ink);
+}
+.card .badge{height:17px;padding:0 6px;font-size:9px}
+.card__min{font-size:10.5px}
+.card__recurring{flex:0 0 auto;display:flex;color:var(--ink-30)}
+.card__recurring svg{width:11px;height:11px}
+/* as acoes so existem no hover: fora dele nao ocupam largura, senao o
+   titulo perde espaco numa coluna que ja e estreita */
+.card{position:relative}
+.card__actions{position:absolute;right:4px;top:50%;transform:translateY(-50%);display:flex;align-items:center;gap:0;opacity:0;pointer-events:none;background:var(--surface-2);border-radius:var(--br2);padding:0 2px;transition:opacity var(--t)}
+.card:hover .card__actions,.card:focus-within .card__actions{opacity:1;pointer-events:auto}
+.card__actions .action{width:22px;height:22px}
+.card__actions .action svg{width:12px;height:12px}
+@media (hover:none){.card__actions{opacity:1;pointer-events:auto;position:static;transform:none;background:none}}
+
+/* ---------- botao e dialogo do merlin ---------- */
+.merlin-btn__icon{display:flex;width:13px;height:13px;color:var(--green-ink)}
+.merlin-btn__icon svg{width:100%;height:100%}
+#merlin-btn:disabled{opacity:.6;cursor:default}
+
+@media (max-width:640px){
+  .day-column{flex-basis:78vw;width:78vw}
+}
+
+/* o rodape do cartao: os selos e a duracao numa linha propria. enquanto tudo
+   dividia uma linha so, as acoes que flutuam sobre o canto direito no hover
+   cobriam a duracao — a mao que ia clicar nela encontrava a lixeira. */
+.card{flex-wrap:wrap}
+.card__foot{flex:1 1 100%;display:flex;align-items:center;gap:6px;padding-left:26px;min-width:0}
+.card__foot:empty{display:none}
+
+/* ================================================================
+   a barra do calendario
+   ================================================================
+   um lugar so para as tres perguntas que qualquer visao de calendario
+   responde: que periodo e este, como eu ando por ele, e de que jeito eu
+   quero ver. ela fica FORA da visao porque nao pertence a nenhuma das tres —
+   trocar de visao nao pode mover a navegacao de lugar.
+   ================================================================ */
+.calbar{
+  display:flex;align-items:center;gap:var(--pd2);flex-wrap:wrap;
+  margin:0 0 var(--pd);
+}
+.calbar__title{margin:0;font-size:clamp(19px,2.4vw,25px);font-weight:600;letter-spacing:-.03em;color:var(--ink)}
+.calbar__sub{margin:2px 0 0;font-size:12.5px;color:var(--ink-30)}
+.calbar__nav{display:flex;align-items:center;gap:2px}
+.calbar__gap{flex:1 1 auto}
+/* o seletor de visao: tres pilulas coladas, e a ativa acesa. e um interruptor
+   de tres posicoes, nao tres botoes — por isso a moldura em volta das tres. */
+.calview{
+  display:inline-flex;padding:2px;gap:2px;
+  background:var(--fill);border:1px solid var(--line-soft);border-radius:var(--br-pill);
+}
+.calview button{
+  height:28px;padding:0 13px;border-radius:var(--br-pill);border:0;background:none;
+  font-size:12.5px;color:var(--ink-30);cursor:pointer;
+  transition:background var(--t),color var(--t);
+}
+.calview button:hover{color:var(--ink-70)}
+.calview button[aria-pressed="true"]{background:var(--surface);color:var(--ink);box-shadow:var(--sombra)}
+
+/* ================================================================
+   a visao do mes
+   ================================================================
+   uma grade de sete colunas. ela nao promete que cabe — nenhuma celula tem
+   minuto, e e de proposito: so o dia tem minutos, e um mes que somasse horas
+   estaria prometendo capacidade para trinta dias de uma vez.
+
+   o que a celula diz e QUANTO ha, nao QUANTO DEMORA: os primeiros titulos, e
+   o resto virando um numero. clicar no numero do dia abre aquele dia.
+   ================================================================ */
+.month{
+  display:grid;grid-template-columns:repeat(7,minmax(0,1fr));
+  gap:1px;background:var(--line-soft);
+  border:1px solid var(--line-soft);border-radius:var(--br3);overflow:hidden;
+}
+.month__head{
+  background:var(--surface);padding:7px 10px;
+  font-family:var(--mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-30);
+}
+.month__cell{
+  background:var(--bg);min-height:104px;padding:6px 7px;
+  display:flex;flex-direction:column;gap:3px;
+  /* filho de grade nao encolhe abaixo do conteudo sem isto, e um titulo longo
+     empurrava a celula inteira para fora da coluna */
+  min-width:0;
+  transition:background var(--t);
+}
+.month__cell.is-out{background:var(--surface);opacity:.55}
+.month__cell.is-today{background:color-mix(in srgb,var(--green) 7%,var(--bg))}
+.month__cell.is-over{background:var(--fill-hover)}
+.month__day{
+  display:flex;align-items:center;justify-content:space-between;gap:6px;
+  background:none;border:0;padding:0;cursor:pointer;font-family:var(--mono);
+  font-size:11px;color:var(--ink-30);
+}
+.month__day:hover{color:var(--ink)}
+.month__cell.is-today .month__day{color:var(--green-ink)}
+.month__n{font-size:11px}
+.month__count{font-size:9.5px;opacity:.7}
+.month__item{
+  display:block;width:100%;max-width:100%;min-width:0;text-align:left;
+  padding:3px 5px 3px 12px;border-radius:6px;border:0;cursor:grab;position:relative;
+  background:var(--fill);color:var(--ink-70);font-size:11.5px;line-height:1.35;
+  overflow:hidden;white-space:nowrap;text-overflow:ellipsis;
+}
+/* a bolinha e absoluta porque num flex ela disputava largura com o titulo, e
+   quem perdia era o titulo — que e a unica coisa que a celula existe para dizer */
+.month__item i{position:absolute;left:4px;top:calc(50% - 2.5px)}
+.month__item:hover{background:var(--fill-hover);color:var(--ink)}
+.month__item.is-done{color:var(--ink-30);text-decoration:line-through}
+.month__item.is-reserved{background:none;border:1px dashed var(--line);color:var(--ink-30)}
+.month__item i{width:5px;height:5px;border-radius:50%;background:var(--green)}
+.month__item.is-done i{background:var(--ink-30)}
+.month__more{
+  background:none;border:0;padding:2px 5px;cursor:pointer;text-align:left;
+  font-family:var(--mono);font-size:9.5px;color:var(--ink-30);
+}
+.month__more:hover{color:var(--ink)}
+@media (max-width:720px){
+  .month__cell{min-height:74px;padding:4px}
+  .month__item{font-size:10.5px;padding:2px 4px}
+}
+
+/* ---------- o que ficou para tras ----------
+   a mesma faixa nas tres visoes: era a "fila de ontem" do dia e os
+   "atrasados" da semana, que eram a mesma pergunta sobre duas listas. */
+.late{
+  display:flex;align-items:center;justify-content:space-between;gap:var(--pd);flex-wrap:wrap;
+  margin:0 0 var(--pd);padding:11px var(--pd);
+  background:var(--surface);border:1px solid var(--line);border-radius:var(--br3);
+}
+.late__text{margin:0;font-size:13px;color:var(--ink-70)}
+.late__text b{color:var(--ink);font-weight:600}
+.late__actions{display:flex;gap:var(--pd2);flex-wrap:wrap}

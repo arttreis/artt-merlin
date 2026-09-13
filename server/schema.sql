@@ -71,3 +71,28 @@ CREATE TABLE IF NOT EXISTS advice (
   PRIMARY KEY (person, hour),
   FOREIGN KEY (person) REFERENCES people(id) ON DELETE CASCADE
 );
+
+-- o link publico de um mapa ou de um funil. e a UNICA porta deste servidor que
+-- responde sem sessao, e por isso ela e a mais estreita de todas: uma linha
+-- aqui autoriza a leitura de UM documento, de UM tipo, de UMA pessoa.
+--
+-- o que a linha guarda nao e o documento, e o endereco dele: o link mostra a
+-- versao de agora, e nao a de quando foi criado. e a expectativa de quem manda
+-- um funil para o cliente e continua mexendo nele — e o preco e que o que voce
+-- escrever ali depois tambem fica publico. apagar a linha corta o acesso na
+-- hora, e e por isso que revogar e uma linha de SQL e nao uma expiracao.
+--
+-- o token e o segredo inteiro: 16 bytes aleatorios em base64url. nao ha
+-- adivinhacao possivel, e nao ha enumeracao — a chave primaria e ele, e nao
+-- um numero em sequencia.
+CREATE TABLE IF NOT EXISTS shares (
+  token   TEXT PRIMARY KEY,        -- 22 caracteres base64url
+  person  TEXT NOT NULL,
+  type    TEXT NOT NULL,           -- 'maps' ou 'funnels', e mais nada
+  id      TEXT NOT NULL,           -- o id do documento
+  at      INTEGER NOT NULL,        -- epoch ms de quando o link nasceu
+  UNIQUE (person, type, id),
+  FOREIGN KEY (person) REFERENCES people(id) ON DELETE CASCADE
+);
+-- "este documento ja tem link?" e a pergunta que a tela faz ao abrir
+CREATE INDEX IF NOT EXISTS shares_person ON shares(person, type, id);

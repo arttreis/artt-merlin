@@ -25,8 +25,7 @@ está em [MIGRATION.md](MIGRATION.md).
 | página | o que é |
 | --- | --- |
 | `index.html` | o início: um campo no meio, as notas e os favoritos numa faixa, e os atalhos embaixo dizendo o número que faria você abrir cada um. Para quem nunca esteve aqui, é a porta — com o gesto de começar sem conta. |
-| `day.html` | o dia: a fila de hoje, a barra que se gasta, a sobra. O único lugar com minutos. |
-| `week.html` | a semana em colunas (seg a sex e fim de semana). |
+| `calendar.html` | o calendário: **uma** coleção de tarefas com data, e três jeitos de olhar para ela. O **dia** é a fila de hoje, com a barra que se gasta e a sobra — o único lugar com minutos. A **semana** são sete colunas. O **mês** é a grade. `day.html` e `week.html` continuam existindo e encaminham para cá. |
 | `notes.html` | o que ainda não é tarefa, numa caixa de entrada: lista por dia à esquerda, a nota aberta à direita com corpo, estágio, checklist e histórico. |
 | `clients.html` | clientes com canais (Mercado Livre, Shopee, TikTok Shop…), backlog, diário, objetivos, ficha e cofre. Um cliente novo abre com os primeiros passos. |
 | `funnels.html` | funil como grafo com tipos de nó, vazão por etapa, criativos, automações, ofertas e gatilhos. |
@@ -46,7 +45,9 @@ com os vencimentos e as categorias, hábitos com frequência já escolhida. É o
 três, porque era o mesmo problema: a primeira tela não ensinava nada.
 
 O princípio que amarra tudo: **só o dia tem minutos**. Todo o resto é reservatório sem hora,
-e entra no dia pelo gesto de puxar, pagando o pedágio da duração.
+e entra no dia pelo gesto de puxar, pagando o pedágio da duração. Isso continua valendo depois
+de o dia e a semana virarem uma coleção só: a tarefa tem uma data em qualquer visão, mas é a
+visão do dia que faz conta com duração, cobra o pedágio e desenha a barra.
 
 Em `server/` há o Worker (Cloudflare + D1 + R2 + Resend) que leva tudo para outros aparelhos e só
 aceita quem está em `OWNER_EMAILS` — endereços soltos ou o domínio inteiro da Guessless. Sem
@@ -63,6 +64,22 @@ endereço, o custo e o código — nunca o dia, o cliente nem o financeiro.
 casa (`html.gl` no [shell.css](src/shared/shell.css): fundo `#0A0A0A`, DM Sans, Manrope, o azul
 `#368DFF`, o logotipo da Guessless com `merlin` de sub-rótulo); qualquer outro vê o Merlin. É
 só pele — nenhuma tela muda de comportamento e nenhum dado sabe que ela existe.
+
+## O dia, a semana e o mês
+
+Até 09/09/2026 eram duas páginas e **duas coleções**: o dia era um documento com a fila de hoje
+e a semana era uma coleção de cartões com data. O cartão virava tarefa do dia pelo gesto de
+puxar, que criava uma *segunda* coisa e deixava um fio (`inDay`) para as duas se reconciliarem —
+nos dois sentidos, em todo caminho.
+
+Hoje há **uma coleção** (`tasks`, em [`src/shared/tasks.js`](src/shared/tasks.js)) e três visões
+dela. "Sincronizar o dia com a semana" deixou de ser trabalho do código porque deixou de existir
+a pergunta: concluir na semana é concluir no dia, porque é a mesma tarefa.
+
+A junção rodou uma vez por navegador, preservando o carimbo `v` de cada cartão e lendo também os
+documentos de dia que estavam no servidor — inclusive os dos outros aparelhos. A tarefa do dia
+que tinha vindo de um cartão não virou uma segunda tarefa: ela devolveu ao cartão a data, a
+duração e a conclusão que aprendeu, e saiu. Nada foi apagado do outro lado.
 
 ## O dia
 
@@ -86,9 +103,9 @@ Quando o dia acaba com coisa aberta, o produto não troca de assunto: continua d
 não cabe, agora qualificado por **passou das 19:00**. Em tom neutro — é um fato, não uma
 acusação.
 
-A fila é sempre de um dia só, e ela sabe de qual. Se você abrir e a fila for de ontem, isso
-é dito na cara — com a escolha de trazer o que ficou aberto ou fechar o dia como ele ficou.
-Nada rola sozinho.
+A fila é sempre de um dia só, e ela sabe de qual: a data é um campo da tarefa. O que ficou
+aberto em dias anteriores aparece numa faixa em todas as três visões — com a escolha de trazer
+para hoje ou fechar como ficou. Nada rola sozinho.
 
 ## Design system
 
@@ -137,7 +154,9 @@ título vira reserva com um `-` na frente:
 
 | Atalho | O que faz |
 | --- | --- |
-| `/` | foca o campo de nova tarefa |
+| `/` | foca o campo de nova tarefa (na visão do dia) |
+| `n` | nova tarefa (na semana e no mês) |
+| `Alt` + `←` `→` | anda no tempo: um dia, uma semana ou um mês, conforme a visão |
 | `Enter` | conclui a tarefa em foco |
 | `Alt` + `↑` `↓` | reordena |
 | `Delete` | exclui (com desfazer) |
@@ -149,7 +168,7 @@ desfazer — e ele empilha: desfazer duas vezes volta duas ações, na ordem inv
 
 ## Onde ficam os dados
 
-Em `localStorage`, na chave `merlin:day` (os outros módulos usam `merlin:<tipo>`), no seu próprio navegador. Duas abas abertas se
+Em `localStorage`, uma chave por coleção (`merlin:tasks`, `merlin:notes`, `merlin:clients`…), no seu próprio navegador. Duas abas abertas se
 conversam pelo evento `storage` em vez de uma sobrescrever a outra.
 
 ### Levar o mesmo dia para outros aparelhos

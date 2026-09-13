@@ -445,7 +445,7 @@ function NoteItem({ d, active, actions }) {
 function Board({ items, onDrop, onOpen }) {
   const [dragging, setDragging] = useState(null);
   const [over, setOver] = useState("");
-  if (!items.length) return <section className="board-col"><p className="list-empty">Nada aqui. Escreve na lista o que ainda não é tarefa.</p></section>;
+  if (!items.length) return <section className="board-col"><p className="list-empty">Nada aqui. Escreva na lista o que ainda não é tarefa.</p></section>;
   return (
     <section className="board-col">
       <div className="board">

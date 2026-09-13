@@ -418,6 +418,100 @@ async function uploadDoc(req, env, person) {
   }, 409);
 }
 
+/* ---------- o link publico ----------
+   um mapa ou um funil que da para mandar para o cliente. e a unica coisa neste
+   servidor que sai sem sessao, entao ela e a mais estreita de todas:
+
+   - so dois tipos. "shares" nao e uma porta generica para a tabela docs: o
+     cliente, o financeiro e o cofre nao tem link e nao vao ter, e a lista
+     fechada aqui e o que garante isso mesmo que um dia alguem mande outro
+     tipo no corpo do pedido.
+   - o token e o segredo inteiro, e ele so aparece para quem esta na sessao
+     que o criou.
+   - a leitura publica devolve o documento COMO ELE ESTA. quem compartilha
+     continua editando, e o link acompanha — e por isso revogar existe.
+
+   nao ha expiracao: um link que morre sozinho e um link que morre no meio de
+   uma conversa com o cliente. quem decide quando acaba e quem criou. */
+
+const SHARE_TYPES = ["maps", "funnels"];
+const SHARE_TOKEN = /^[A-Za-z0-9_-]{22}$/;
+
+function newShareToken() {
+  const bytes = crypto.getRandomValues(new Uint8Array(16));
+  let bin = "";
+  bytes.forEach((b) => { bin += String.fromCharCode(b); });
+  return btoa(bin).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+
+/* devolve o link que ja existe, ou nada. e o que a tela pergunta ao abrir um
+   mapa: "isto ja esta publico?" — e a resposta muda o que o botao diz. */
+async function readShare(req, env, person) {
+  const url = new URL(req.url);
+  const type = String(url.searchParams.get("type") || "");
+  const id = String(url.searchParams.get("id") || "");
+  if (!SHARE_TYPES.includes(type) || !DOC_ID.test(id)) return fail("não dá para compartilhar isso");
+  const row = await env.DB.prepare(
+    "SELECT token, at FROM shares WHERE person = ? AND type = ? AND id = ?"
+  ).bind(person, type, id).first();
+  return json({ share: row ? { token: row.token, at: row.at } : null });
+}
+
+/* criar e idempotente: pedir duas vezes devolve o mesmo token. um botao que
+   gerasse um link novo a cada clique deixaria links velhos vivos por ai sem
+   ninguem saber quantos. */
+async function createShare(req, env, person) {
+  const body = await req.json().catch(() => null);
+  const type = String(body && body.type || "");
+  const id = String(body && body.id || "");
+  if (!SHARE_TYPES.includes(type) || !DOC_ID.test(id)) return fail("não dá para compartilhar isso");
+
+  /* o documento precisa existir NESTA conta: sem isto, um id chutado criaria
+     um link para um documento de outra pessoa. */
+  const doc = await env.DB.prepare(
+    "SELECT id FROM docs WHERE person = ? AND type = ? AND id = ?"
+  ).bind(person, type, id).first();
+  if (!doc) return fail("esse documento ainda não subiu para a nuvem", 404);
+
+  const existing = await env.DB.prepare(
+    "SELECT token, at FROM shares WHERE person = ? AND type = ? AND id = ?"
+  ).bind(person, type, id).first();
+  if (existing) return json({ share: { token: existing.token, at: existing.at } });
+
+  const token = newShareToken();
+  const at = Date.now();
+  await env.DB.prepare(
+    "INSERT INTO shares (token, person, type, id, at) VALUES (?, ?, ?, ?, ?)"
+  ).bind(token, person, type, id, at).run();
+  return json({ share: { token, at } });
+}
+
+async function deleteShare(req, env, person) {
+  const url = new URL(req.url);
+  const type = String(url.searchParams.get("type") || "");
+  const id = String(url.searchParams.get("id") || "");
+  if (!SHARE_TYPES.includes(type) || !DOC_ID.test(id)) return fail("não dá para compartilhar isso");
+  await env.DB.prepare("DELETE FROM shares WHERE person = ? AND type = ? AND id = ?")
+    .bind(person, type, id).run();
+  return json({ ok: true });
+}
+
+/* a leitura publica. sem sessao, e de proposito: o token E a credencial.
+   o que sai daqui e o documento e mais nada — nem o e-mail de quem
+   compartilhou, nem o id da pessoa, nem que outros documentos existem. */
+async function readShared(env, token) {
+  if (!SHARE_TOKEN.test(token)) return fail("esse link não existe", 404);
+  const row = await env.DB.prepare(
+    "SELECT s.type AS type, d.doc AS doc FROM shares s " +
+    "JOIN docs d ON d.person = s.person AND d.type = s.type AND d.id = s.id " +
+    "WHERE s.token = ?"
+  ).bind(token).first();
+  if (!row) return fail("esse link não existe", 404);
+  const doc = JSON.parse(row.doc);
+  if (doc && doc.deleted) return fail("esse link não existe", 404);
+  return json({ type: row.type, doc });
+}
+
 /* ---------- arquivos (R2) ----------
    um print colado numa ideia não cabe no documento: ele sobe e desce inteiro
    a cada sincronização, e uma captura de tela pesa mais que o módulo todo.
@@ -785,11 +879,21 @@ export default {
       /* /files/<id> e a unica rota com caminho variavel: separamos o id aqui
          para o resto do roteamento continuar comparando strings inteiras */
       const fileMatch = route.match(/^\/files\/([^/]+)$/);
-      const base = fileMatch ? "/files/:id" : route;
+      const shareMatch = route.match(/^\/shared\/([^/]+)$/);
+      const base = fileMatch ? "/files/:id" : (shareMatch ? "/shared/:token" : route);
+
+      /* a leitura publica vem ANTES do guarda de sessao, e e a unica que vem:
+         o token e a credencial dela. deixar esta linha abaixo do 401 seria
+         pedir login para ver um link que existe justamente para quem nao tem
+         conta nenhuma. */
+      if (base === "/shared/:token") {
+        if (req.method !== "GET") return fail("método não serve aqui", 405);
+        return await readShared(env, decodeURIComponent(shareMatch[1]));
+      }
 
       /* rota que nao existe e 404 antes de ser 401: pedir login para um
          caminho inexistente mente sobre a causa do erro */
-      if (base !== "/days" && base !== "/docs" && base !== "/merlin"
+      if (base !== "/days" && base !== "/docs" && base !== "/merlin" && base !== "/share"
           && base !== "/files" && base !== "/files/:id") return fail("não existe", 404);
 
       /* daqui pra baixo, so quem entrou */
@@ -803,6 +907,12 @@ export default {
       if (route === "/docs") {
         if (req.method === "GET") return await downloadDocs(req, env, person);
         if (req.method === "POST") return await uploadDoc(req, env, person);
+        return fail("método não serve aqui", 405);
+      }
+      if (route === "/share") {
+        if (req.method === "GET") return await readShare(req, env, person);
+        if (req.method === "POST") return await createShare(req, env, person);
+        if (req.method === "DELETE") return await deleteShare(req, env, person);
         return fail("método não serve aqui", 405);
       }
       if (base === "/files") {

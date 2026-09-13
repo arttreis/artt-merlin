@@ -10,10 +10,16 @@ Vite; o build sai em `server/site/`. O que é comum vive aqui:
 - `core.js` — os **dados**: tema, sidebar, sessão/nuvem, coleções sincronizadas, clientes,
   caixa de entrada do dia, aviso com desfazer, markdown e arquivos (R2). **JavaScript puro, sem
   React**: dá para testar sem navegador. Não desenha tela de módulo.
-- `day.js` — o **documento do dia e a conta dele**: `loadDay()`, `budget(doc)`, `pendingOf`,
-  `fmt`/`longFmt`/`clock`. Saiu de dentro do `day.jsx` quando o início passou a dizer quanto
-  ainda cabe hoje: a sobra tem que ser a mesma nas duas telas, e duas cópias da mesma conta é
-  como ela deixa de ser. Sem React e sem pixel — entra um documento, sai um número.
+- `day.js` — a **conta do dia**: `budget(doc)`, `pendingOf`, `costOf`, `fmt`/`longFmt`/`clock`.
+  Saiu de dentro do `day.jsx` quando o início passou a dizer quanto ainda cabe hoje: a sobra tem
+  que ser a mesma nas duas telas, e duas cópias da mesma conta é como ela deixa de ser. Ele
+  também era o dono do documento do dia até 09/09/2026; essa parte morreu quando o dia virou uma
+  consulta por data. Sem React e sem pixel — entra `{tasks, start, end}`, sai um número.
+- `tasks.js` — as **tarefas**: uma coleção só para o que tem data, e as três perguntas que as
+  três visões do calendário fazem (`onDate`, `inRange`, `overdue`). É aqui que mora a junção do
+  documento do dia com a coleção da semana (`mergeInto`, `migrateTasks`), que é função pura de
+  propósito: ela é a decisão mais arriscada que este sistema já tomou, e dá para prová-la sem
+  navegador.
 - `icons.jsx` — os SVGs comuns como elementos React. `icon("plus")` devolve um deles.
 - `ui.jsx` — a **tela**: hooks que ligam a página às coleções, componentes comuns e a
   **casca** (sidebar, busca, tema, nuvem, entrar, aviso). É o que uma página importa para
@@ -128,7 +134,7 @@ vezes numa montagem (esvaziar a caixa de entrada, gerar a recorrência da semana
 
 | o quê | para quê |
 | --- | --- |
-| `initPage(id)` | sidebar, clientes, sessão. `id` é `day, week, ideas, clients, funnels, maps, finance` |
+| `initPage(id)` | sidebar, clientes, preferências, sessão. `id` é `home, calendar, notes, clients, funnels, maps, finance, habits, plans, profile` |
 | `collection(type, {normalize})` | fora de componente; dentro use `useCollection` |
 | `newId()`, `today()`, `dayOf(date)`, `isDay(v)`, `dateOf(day)`, `addDays(day, n)`, `mondayOf(day)` | datas como `YYYY-MM-DD` |
 | `dateLabel(day, withYear?)`, `weekdayOf(day)`, `monthLabel("YYYY-MM")` | rótulos |
@@ -204,7 +210,7 @@ Um documento é um objeto JSON plano. Coloque nele o que o módulo precisa, mas 
 | --- | --- | --- |
 | `clients` | clients.html | `{id, name, status, channels:[{id, type, name, items:[{id, text, done}]}], goals:[…], backlog:[…], journal:[…], contract:{…}, contacts:[…], links:[…], offers:[…]}` |
 | `notes` | notes.html | `{id, title, body, stage, client, steps:[{id, text, done}], files:[{id, name, type, size}], outputs:[{type, id, at}], history:[{type:'stage'\|'step', …, at}]}` |
-| `week` | week.html | `{id, title, day ('YYYY-MM-DD' ou 'weekend:YYYY-MM-DD' da segunda), client, min, done, recurring}` |
+| `tasks` | calendar.html | `{id, title, date ('YYYY-MM-DD'), min, done, reserved, client, order, recurring, origin}` — o dia, a semana e o mês são três visões dela |
 | `maps` | maps.html | `{id, name, root:{id, title, note, color, collapsed, children:[…]}, client, idea, funnel}` |
 | `funnels` | funnels.html | `{id, name, client, channel, nodes:[{id, type, title, x, y, fields:{}, number}], edges:[{from, to}], creatives:[…], automations:[…], offers:[…], triggers:[…], snapshots:[…]}` |
 | `finance` | finance.html | vários docs: `{id, type:'entry'|'fixed'|'card'|'debt'|'config', …}` (`card` é uma compra parcelada: `{name, card, total, installments, start:'YYYY-MM', dayOfMonth}`) |
@@ -214,7 +220,9 @@ Um documento é um objeto JSON plano. Coloque nele o que o módulo precisa, mas 
 
 Ligações entre módulos são **por id**, nunca por cópia. Para abrir outra página num item:
 `clients.html#<id>`, `maps.html#<id>`, `funnels.html#<id>`, `notes.html#<id>`. Cada
-página lê o hash (`useHash()`) e abre o item, se existir.
+página lê o hash (`useHash()`) e abre o item, se existir. O calendário é a exceção: o hash dele
+é uma visão (`#day`, `#week`, `#month`) ou uma data (`#2026-09-09`), porque o que se abre lá é
+um período e não um documento.
 
 ## Criar é um botão e uma caixa
 

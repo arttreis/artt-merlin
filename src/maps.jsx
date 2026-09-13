@@ -886,7 +886,7 @@ function MapList({ maps }) {
           sozinho que eles existiam. */}
       {!all.length && (
         <EmptyStart
-          title="de que o primeiro mapa é?"
+          title="de que tipo é o primeiro mapa?"
           text="Cada modelo abre com os galhos de primeiro nível já escritos — o esqueleto de um assunto, para você mexer em vez de encarar um nó sozinho no meio da tela. O “+” cria um em branco."
           groups={mapGroups().map((g) => ({
             ...g,
@@ -1284,7 +1284,7 @@ function Editor({ id, maps }) {
     try { r = await api("/merlin", { method: "POST", body: JSON.stringify({ task: "branches", context: suggestionContext(d, nid) }) }); }
     catch (e) { r = null; }
     thinkingRef.current = false; setThinking(false);
-    if (!r) { notify("não consegui falar com o merlin agora"); return; }
+    if (!r) { notify("não consegui falar com o Merlin agora"); return; }
     if (r.status === 401) { notify("entre para usar o Merlin"); return; }
     if (r.status === 503) { notify((r.body && r.body.error) || "faltou configurar a chave do Merlin"); return; }
     if (!r.ok) { notify((r.body && r.body.error) || "o Merlin não respondeu"); return; }

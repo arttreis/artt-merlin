@@ -1,0 +1,82 @@
+/* merlin · o CSS da página compartilhada
+   o comum vive numa camada de cascata (@layer base, no shell.css); o que é da
+   página fica fora dela e ganha todo empate.
+
+   o palco é o do editor — as pílulas do mapa vêm do maps.css, os cartões do
+   funil do funnels.css. o que mora aqui é só o que a leitura muda: a tela
+   inteira sem barra de navegação, a barra de cima com o nome, os botões de
+   vista e o painel que abre ao tocar num nó. nada de alça, porta ou fantasma:
+   quem recebe o link não liga etapa nenhuma. */
+
+.shv{position:fixed;inset:0;overflow:hidden;background:var(--bg)}
+.shv-stage{position:absolute;inset:0;overflow:hidden;touch-action:none;user-select:none;-webkit-user-select:none;cursor:grab}
+.shv-stage.is-panning{cursor:grabbing}
+.shv-stage > svg{position:absolute;inset:0;display:block;width:100%;height:100%;cursor:inherit}
+.shv-stage--map{background:var(--mp-canvas)}
+
+/* sem a mão de quem edita: o ponteiro é de clique, não de arrasto, e as
+   partes que só servem para ligar e mover somem */
+.shv .mp-node,.shv .node{cursor:pointer}
+.shv .node-handle,.shv .node-port{display:none}
+.shv .edge-hit{cursor:inherit}
+.shv .edge:hover .edge-line{stroke:var(--ink-30)}
+
+/* ---------- a barra de cima ---------- */
+.shv-top{
+  position:absolute;top:12px;left:12px;z-index:8;max-width:calc(100vw - 24px);
+  display:flex;align-items:center;gap:10px;padding:7px 14px 7px 10px;border-radius:var(--br3);
+}
+.shv-mark{display:grid;place-items:center;width:26px;height:26px;flex:none;color:var(--green)}
+.shv-mark svg{width:17px;height:17px}
+.shv-top .sep{width:1px;height:22px;background:var(--line-soft);flex:none}
+.shv-title{min-width:0;display:flex;flex-direction:column}
+.shv-title h1{
+  margin:0;font-size:14px;font-weight:600;letter-spacing:-.02em;line-height:1.3;color:var(--ink);
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+.shv-title .t-mono{font-size:9.5px;letter-spacing:.06em;color:var(--ink-30)}
+
+/* ---------- a vista ---------- */
+.shv-zoom{
+  position:absolute;right:12px;bottom:14px;z-index:8;
+  display:flex;align-items:center;gap:2px;padding:5px;border-radius:var(--br-pill);
+}
+.shv-zoom .action{width:32px;height:32px;border-radius:var(--br-pill)}
+.shv-zoom .action svg{width:15px;height:15px}
+.shv-zoom .sep{width:1px;height:18px;background:var(--line-soft);margin:0 3px}
+
+/* ---------- o painel de leitura ---------- */
+.shv-reader{
+  position:absolute;top:12px;right:12px;bottom:66px;z-index:9;width:320px;max-width:calc(100vw - 24px);
+  display:flex;flex-direction:column;border-radius:var(--br);overflow:hidden;
+}
+.shv-reader__top{display:flex;align-items:flex-start;gap:10px;padding:12px 10px 10px 14px;border-bottom:1px solid var(--line-soft)}
+.shv-reader__top > div{flex:1 1 auto;min-width:0}
+.shv-reader__top .t-mono{display:block;font-size:9.5px;letter-spacing:.06em;color:var(--ink-30);margin-bottom:2px}
+.shv-reader__top h2{margin:0;font-size:14px;font-weight:600;letter-spacing:-.01em;line-height:1.35;color:var(--ink)}
+.shv-reader__body{flex:1 1 auto;min-height:0;overflow-y:auto;padding:12px 14px 16px;scrollbar-width:thin;user-select:text;-webkit-user-select:text}
+.shv-note{font-size:13px;line-height:1.55;color:var(--ink-70)}
+.shv-note p{margin:0 0 8px}
+.shv-link{margin:0 0 10px;font-size:12.5px;word-break:break-all}
+.shv-number{display:flex;align-items:baseline;gap:10px;margin:0}
+.shv-number b{font-size:22px;font-weight:500;letter-spacing:-.02em;color:var(--ink)}
+.shv-number span{font-size:12px;color:var(--ink-30)}
+.shv-fields{margin:12px 0 0;display:flex;flex-direction:column;gap:6px}
+.shv-fields div{display:flex;gap:10px;font-size:12.5px}
+.shv-fields dt{flex:0 0 40%;color:var(--ink-30)}
+.shv-fields dd{margin:0;flex:1 1 auto;min-width:0;color:var(--ink-70);overflow-wrap:anywhere}
+.shv-rate{margin-left:auto;font-size:11px;color:var(--ink-30)}
+.shv-empty{position:absolute;inset:0;display:grid;place-items:center;margin:0}
+
+/* no celular o painel vira gaveta de baixo, e o mapa continua visível em cima */
+@media (max-width:600px){
+  .shv-reader{top:auto;left:12px;width:auto;height:min(52dvh,420px);bottom:66px}
+}
+
+/* ---------- abrindo, e o link que não existe mais ---------- */
+.sh{max-width:760px;margin:0 auto;padding:clamp(28px,7vh,72px) clamp(18px,5vw,32px)}
+.sh__mark{display:inline-flex;align-items:center;gap:8px;font-weight:600;font-size:13px;color:var(--ink-30)}
+.sh__mark svg{width:16px;height:16px;color:var(--green)}
+.sh--gone{text-align:center;display:flex;flex-direction:column;align-items:center;gap:var(--pd2);padding-top:clamp(60px,18vh,160px)}
+.sh--gone h1{margin:var(--pd2) 0 0;font-size:clamp(22px,4vw,30px);font-weight:600;letter-spacing:-.03em;color:var(--ink)}
+.sh--gone p{margin:0;max-width:44ch;font-size:13.5px;line-height:1.55;color:var(--ink-30)}

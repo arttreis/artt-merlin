@@ -1271,7 +1271,7 @@ function Editor({ id, funnels }) {
       .filter((s) => NODE_TYPES[s.nodeType])
       .slice(0, MAX_GHOSTS)
       .map((s) => ({ type: s.nodeType, title: s.title || "", note: s.note || "" }));
-    if (!list.length) { notify("o Merlin ficou na mesma ideia da gramática"); return; }
+    if (!list.length) { notify("o Merlin não viu por onde continuar"); return; }
     setMerlinGhosts({ from: node.id, list });
   };
 
@@ -1919,7 +1919,7 @@ function Dock({ doc, drawer, onToggle }) {
 function SnapshotForm({ onSave, onClose }) {
   const [v, bind] = useFields({ label: "retrato de " + dateLabel(today(), true) });
   return (
-    <Form title="novo retrato" sub="guarda o número atual de cada etapa para comparar depois." submit="salvar retrato" onClose={onClose} onSubmit={() => { onSave(v.label); }}>
+    <Form title="novo retrato" sub="guarda o número atual de cada etapa para comparar depois" submit="salvar retrato" onClose={onClose} onSubmit={() => { onSave(v.label); }}>
       <div className="full"><input className="input" maxLength="80" placeholder="rótulo (ex.: antes da campanha de black friday)" {...bind("label")} /></div>
     </Form>
   );
@@ -1933,7 +1933,7 @@ function SuggestionsDialog({ list, onAdd, onClose }) {
     .map(([type, label]) => ({ type, label, items: list.map((s, i) => [s, i]).filter(([s]) => s.type === type) }))
     .filter((g) => g.items.length);
   return (
-    <Dialog title="o Merlin sugere" sub="olhou o funil como está e achou isto — desmarque o que não serve." wide onClose={onClose}
+    <Dialog title="o Merlin sugere" sub="olhou o funil como está e achou isto — desmarque o que não serve" wide onClose={onClose}
         actions={<>
           <button className="pill" type="button" onClick={onClose}>descartar</button>
           <button className="pill pill--green" type="button" id="add-suggestions" disabled={!n} onClick={() => onAdd(list.filter((s, i) => checked[i]))}>adicionar {n}</button></>}>

@@ -17,18 +17,17 @@
 import "./shared/base.css";
 import "./index.css";
 import {
-  initPage, today, dateOf, mondayOf, addDays, newId, notify, signIn,
+  initPage, today, dateOf, sundayOf, addDays, newId, notify, signIn,
   sendToDay, newNote, parseMentions, readDuration, clientName, seen, markSeen,
-  isNewHere, safeUrl, hostOf
+  isNewHere, safeUrl, hostOf, readPrefs
 } from "./shared/core.js";
-import { loadDay, budget, pendingOf, isStale, costOf, fmt, longFmt, clock } from "./shared/day.js";
+import { budget, pendingOf, costOf, fmt, longFmt, clock } from "./shared/day.js";
+import { normalize as normalizeTask, dayDoc, overdue } from "./shared/tasks.js";
 import { useState, useEffect, useLayoutEffect } from "react";
 import { mount, useCollection, useCloud, useClients, Form, Field, useFields, icon } from "./shared/ui.jsx";
 import { NAV_ICONS, LOGO } from "./shared/icons.jsx";
 
 initPage("home");
-
-const WEEKEND = "weekend:";
 
 /* ---------- a hora do dia, em palavra ---------- */
 function greeting() {
@@ -195,7 +194,7 @@ function Capture() {
     <form className="hm-capture" autoComplete="off" onSubmit={submit}>
       <label className="hm-capture__field">
         {icon("plus")}
-        <input id="hm-field" maxLength="300" placeholder="escreve o que apareceu…" aria-label="Escreva uma tarefa ou uma nota"
+        <input id="hm-field" maxLength="300" placeholder="escreva o que apareceu…" aria-label="Escreva uma tarefa ou uma nota"
                value={text} onChange={(e) => setText(e.currentTarget.value)} />
         <kbd>enter</kbd>
       </label>
@@ -215,15 +214,18 @@ function Capture() {
 
 /* o dia, no bloco alto: o número grande e a barra que se gasta. é o mesmo
    budget() da tela do dia — uma sobra calculada de dois jeitos seriam duas
-   verdades sobre o mesmo dia, e a que aparece primeiro vence. */
-function DayBlock({ doc }) {
+   verdades sobre o mesmo dia, e a que aparece primeiro vence.
+
+   "outro dia" morreu junto com o documento do dia: a fila de hoje é sempre a
+   de hoje, porque hoje é uma consulta por data e não um estado guardado. o
+   que ficou para trás tem lugar próprio, e é o calendário quem o mostra. */
+function DayBlock({ doc, late }) {
   const b = budget(doc);
   const open = pendingOf(doc);
-  const stale = isStale(doc);
   const used = b.window ? Math.min(100, Math.round(((b.elapsed + b.liveReserve) / b.window) * 100)) : 0;
   const busy = b.window ? Math.max(0, Math.min(100 - used, Math.round((b.committed / b.window) * 100))) : 0;
   return (
-    <a className="bx bx--day" href="day.html">
+    <a className="bx bx--day" href="calendar.html#day">
       <p className="bx__head">
         <span className="t-mono">o dia</span>
         <span className="t-mono bx__aside">{clock(doc.start)}–{clock(doc.end)}</span>
@@ -232,14 +234,12 @@ function DayBlock({ doc }) {
           de fechar. sem ele o bloco dizia "— além do que cabe" às 20h com a
           fila vazia, porque a sobra e o estouro são ambos zero quando a janela
           acabou. o dia não estourou: ele terminou. */}
-      {stale
-        ? <p className="bx__big is-over">outro dia<small>a fila aberta não é de hoje</small></p>
-        : b.overtime
-          ? <p className="bx__big is-over">{clock(doc.end)}<small>{open.length ? "passou, e ainda há fila" : "passou. o dia fechou."}</small></p>
-          : <p className={"bx__big" + (b.slack > 0 ? "" : " is-over")}>
-              {b.slack > 0 ? fmt(b.slack) : fmt(b.overflow)}
-              <small>{b.slack > 0 ? "ainda cabe" : "além do que cabe"}</small>
-            </p>}
+      {b.overtime
+        ? <p className="bx__big is-over">{clock(doc.end)}<small>{open.length ? "passou, e ainda há fila" : "passou. o dia fechou."}</small></p>
+        : <p className={"bx__big" + (b.slack > 0 ? "" : " is-over")}>
+            {b.slack > 0 ? fmt(b.slack) : fmt(b.overflow)}
+            <small>{b.slack > 0 ? "ainda cabe" : "além do que cabe"}</small>
+          </p>}
       <div className="bx__track" aria-hidden="true">
         <i className="bx__used" style={{ width: used + "%" }} />
         <i className="bx__busy" style={{ width: busy + "%" }} />
@@ -254,6 +254,7 @@ function DayBlock({ doc }) {
         {!open.length && <li className="bx__none">nada na fila</li>}
       </ul>
       {open.length > 4 && <p className="bx__more t-mono">e mais {open.length - 4}</p>}
+      {late > 0 && <p className="bx__more t-mono">{late + (late === 1 ? " de antes de hoje" : " abertas de antes de hoje")}</p>}
     </a>
   );
 }
@@ -262,13 +263,12 @@ function DayBlock({ doc }) {
    não uma frase embaixo do nome: nove frases era o que fazia a home parecer
    um relatório em vez de um lugar de onde se parte. */
 const QUICK = [
-  { id: "day", label: "dia", href: "day.html", n: "dayOpen" },
-  { id: "week", label: "semana", href: "week.html", n: "weekOpen" },
+  { id: "calendar", label: "calendário", href: "calendar.html", n: "dayOpen" },
   { id: "notes", label: "notas", href: "notes.html", n: "notes" },
   { id: "clients", label: "clientes", href: "clients.html", n: "clients" },
   { id: "funnels", label: "funis", href: "funnels.html", n: "funnels" },
   { id: "maps", label: "mapas", href: "maps.html", n: "maps" },
-  { id: "finance", label: "grana", href: "finance.html", n: "" },
+  { id: "finance", label: "financeiro", href: "finance.html", n: "" },
   { id: "habits", label: "hábitos", href: "habits.html", n: "habits" },
   { id: "plans", label: "planos", href: "plans.html", n: "goals" }
 ];
@@ -426,7 +426,7 @@ function Landing({ onGuest }) {
 function Home() {
   const c = useCloud();
   useClients();
-  const week = useCollection("week");
+  const tasks = useCollection("tasks", { normalize: normalizeTask });
   const notes = useCollection("notes");
   const funnels = useCollection("funnels");
   const maps = useCollection("maps");
@@ -435,15 +435,13 @@ function Home() {
   const clientsCol = useCollection("clients");
   const bookmarks = useCollection("bookmarks");
 
-  /* o dia não é coleção: é um documento no navegador. relemos no evento de
-     storage (outra aba) e a cada 30s, que é o passo do relógio da barra. */
-  const [dayDoc, setDayDoc] = useState(loadDay);
+  /* o dia virou uma consulta na coleção de tarefas: a coleção já avisa quando
+     muda (outra aba, nuvem), então aqui só resta o relógio — a barra se gasta
+     sozinha, e é ele quem redesenha. */
   const [, tick] = useState(0);
   useEffect(() => {
-    const f = (e) => { if (!e || e.key === "merlin:day") setDayDoc(loadDay()); };
-    window.addEventListener("storage", f);
-    const t = setInterval(() => { setDayDoc(loadDay()); tick((n) => n + 1); }, 30000);
-    return () => { window.removeEventListener("storage", f); clearInterval(t); };
+    const t = setInterval(() => tick((n) => n + 1), 30000);
+    return () => clearInterval(t);
   }, []);
 
   const [tour, setTour] = useState(() => !seen("tour") || location.hash === "#apresentacao");
@@ -462,11 +460,14 @@ function Home() {
   }, []);
 
   const t = today();
-  const monday = mondayOf(t);
-  const weekDays = new Set(Array.from({ length: 7 }, (_, i) => addDays(monday, i)).concat([WEEKEND + monday]));
+  const weekStart = sundayOf(t);
+  const weekDays = new Set(Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)));
+  const allTasks = tasks.all();
+  const today_ = dayDoc(allTasks, t, readPrefs());
+  const late = overdue(allTasks, t).length;
   const counts = {
-    dayOpen: pendingOf(dayDoc).length,
-    weekOpen: week.all().filter((x) => !x.done && weekDays.has(x.day)).length,
+    dayOpen: pendingOf(today_).length,
+    weekOpen: allTasks.filter((x) => !x.done && weekDays.has(x.date)).length,
     notes: notes.all().filter((n) => n.stage !== "archived").length,
     clients: clientsCol.all().filter((x) => x.status !== "closed").length,
     funnels: funnels.all().length,
@@ -498,7 +499,7 @@ function Home() {
       <section className="hm-bento">
         <FavBlock bookmarks={bookmarks} />
         <QuickBlock counts={counts} />
-        <DayBlock doc={dayDoc} />
+        <DayBlock doc={today_} late={late} />
         <NoteBlock notes={notes} />
         <QuoteBlock />
       </section>

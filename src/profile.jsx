@@ -22,7 +22,7 @@ initPage("profile");
 const KINDS = [
   { type: "notes", one: "nota", many: "notas", href: "notes.html" },
   { type: "clients", one: "cliente", many: "clientes", href: "clients.html" },
-  { type: "week", one: "cartão", many: "cartões", href: "week.html" },
+  { type: "tasks", one: "tarefa", many: "tarefas", href: "calendar.html" },
   { type: "funnels", one: "funil", many: "funis", href: "funnels.html" },
   { type: "maps", one: "mapa", many: "mapas", href: "maps.html" },
   { type: "finance", one: "lançamento", many: "lançamentos", href: "finance.html" },

@@ -192,3 +192,31 @@ A conta que **não** é gratuita é a da Anthropic, e é a única que cresce com
 time: cada conselho é um pedido ao Opus. O teto de `ADVICE_PER_HOUR` limita o
 estrago de um acidente, não o uso normal — se o gasto incomodar, o lugar de
 olhar é console.anthropic.com, e o de mexer é aqui.
+
+## O link público
+
+`share.html#<token>` abre a leitura de um mapa ou de um funil sem conta nenhuma. É a única rota
+deste worker que responde sem sessão, e por isso ela é a mais estreita:
+
+- só dois tipos (`maps`, `funnels`). A lista é fechada no código — cliente, financeiro e cofre
+  não têm link e não vão ter.
+- o token são 16 bytes aleatórios em base64url, e ele **é** a credencial: não há enumeração
+  porque ele é a chave primária, e não há adivinhação.
+- a linha guarda o *endereço* do documento, e não uma cópia dele: o link mostra a versão de
+  agora. Quem compartilha continua editando, e o cliente vê o que for escrito depois — é por
+  isso que revogar existe, e é por isso que a caixa diz isso em voz alta.
+- não há expiração. Um link que morre sozinho é um link que morre no meio de uma conversa com o
+  cliente; quem decide quando acaba é quem criou.
+
+A tabela `shares` entra pelo mesmo `schema.sql`. Um banco que já existe precisa dela antes do
+próximo deploy:
+
+```bash
+npx wrangler d1 execute artt-planner --remote --file=schema.sql
+```
+
+(`artt-planner` é o `database_name` do `wrangler.toml`, e não o nome do produto: o recurso na
+Cloudflare nunca foi renomeado porque renomear criaria um banco vazio ao lado. O worker o
+alcança pelo binding `DB`.)
+
+(o arquivo é todo `CREATE TABLE IF NOT EXISTS`, então rodá-lo de novo não mexe no que já está lá.)
