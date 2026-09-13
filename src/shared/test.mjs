@@ -516,6 +516,64 @@ const dataLeft = () => globalThis.localStorage.keys().filter((k) => k in DATA);
   });
 }
 
+{
+  /* ---- o mapa mental colado em mermaid ----
+     o texto vem de uma conversa com IA, e a IA é criativa: conversa em volta,
+     cerca, parêntese no meio da frase, duas raízes, flowchart no lugar de
+     mindmap. cada caso abaixo é uma resposta que já se viu na prática. */
+  const { parseMermaid, toMermaid } = await import("./mermaid.js");
+  const titles = (n) => [n.title].concat(n.children.map(titles));
+  const shape = (n) => n.title + "(" + n.children.map(shape).join(",") + ")";
+  const error = (text) => { try { parseMermaid(text); return ""; } catch (e) { return e.message; } };
+
+  {
+    const r = parseMermaid("Claro! Aqui está:\n\n```mermaid\nmindmap\n  root((Lançamento 🚀))\n    Fase 1 (semana 1)\n      Pesquisa: público\n    id2[Oferta \"principal\"]\n      ::icon(fa fa-book)\n      Preço\n      :::urgent\n    id3(\"`**Canais** de\n    venda`\")\n\t\tInstagram\n```\n\nQuer ajustar?");
+    check("mermaid: resposta de IA vira a árvore certa", shape(r.root) === "Lançamento 🚀(Fase 1 (semana 1)(Pesquisa: público()),Oferta \"principal\"(Preço()),Canais de venda(Instagram()))", shape(r.root));
+    check("mermaid: o nome vem da raiz", r.name === "Lançamento 🚀" && r.kind === "mindmap" && r.count === 7 && r.dropped === 0);
+    check("mermaid: o primeiro nível ganha as cores dos modelos", r.root.children.map((c) => c.color).join() === "1,2,3" && r.root.children[0].children[0].color === 0);
+    check("mermaid: nó nasce sem id (quem dá é o normalize)", !("id" in r.root));
+  }
+  {
+    const r = parseMermaid("---\ntitle: Meu mapa\n---\nmindmap\n  a\n  b\n    c");
+    check("mermaid: título do front matter e duas raízes embrulhadas", r.name === "Meu mapa" && shape(r.root) === "Meu mapa(a(),b(c()))", shape(r.root));
+    const shapes = parseMermaid("mindmap\n  r((a))\n    b[b]\n    c(c)\n    d))d((\n    e)e(\n    f{{f}}\n    \"g #quot;x#quot;\"");
+    check("mermaid: todas as formas perdem a moldura", titles(shapes.root).join("|") === "a|b|c|d|e|f|g \"x\"", titles(shapes.root).join("|"));
+  }
+  {
+    const r = parseMermaid("graph TD;\n  A[Início] --> B{Decisão?}\n  B -->|Sim| C(OK) & D([Talvez])\n  B -- não --> E\n  subgraph S [grupo]\n  E --> A\n  end\n  click C \"https://x.com\"\n  classDef x fill:#f00\n  A:::x");
+    check("mermaid: flowchart vira árvore a partir de cima, com ciclo", r.kind === "flowchart" && shape(r.root) === "Início(Decisão?(OK(),Talvez(),E()))", shape(r.root));
+    check("mermaid: click com url vira link", r.root.children[0].children[0].link === "https://x.com");
+    const proto = parseMermaid("graph TD\n__proto__ --> constructor");
+    check("mermaid: id de protótipo é só um nome", shape(proto.root) === "__proto__(constructor())" && ({}).constructor === Object);
+  }
+  check("mermaid: outro diagrama diz qual é", /sequenceDiagram/.test(error("sequenceDiagram\n A->>B: oi")));
+  check("mermaid: texto sem diagrama é recusado", /não achei/.test(error("oi, tudo bem?")));
+  check("mermaid: flowchart quebrado diz a linha", /^linha 2/.test(error("graph TD\nA -->")));
+  {
+    const tree = { title: "raiz (x) [y] {z}", children: [
+      { title: 'a "b" #1 &amp; <br> `c` ::icon(x) :::k %% nada', children: [{ title: "", children: [] }] },
+      { title: "Fase 1 (semana 1)", children: [{ title: "é ção 🚀 ))((", children: [] }] }
+    ] };
+    const back = parseMermaid(toMermaid(tree)).root;
+    check("mermaid: exportar e importar devolve a mesma árvore", JSON.stringify(titles(back)) === JSON.stringify(titles(tree)), JSON.stringify(titles(back)));
+  }
+  {
+    const wide = "mindmap\n  r\n" + Array.from({ length: 5000 }, (_, i) => "    n" + i).join("\n");
+    const r = parseMermaid(wide);
+    check("mermaid: teto de 3000 nós conta o que ficou de fora", r.count === 3000 && r.dropped === 2001, r.count + "/" + r.dropped);
+    check("mermaid: mapa grande abre com o terceiro nível fechado", parseMermaid("mindmap\n  r\n" + Array.from({ length: 200 }, (_, i) => "    a" + i + "\n      b" + i + "\n        c" + i).join("\n")).root.children[0].children[0].collapsed === true);
+    let deep = "mindmap\n"; for (let i = 0; i < 1500; i++) deep += " ".repeat(i + 1) + "n\n";
+    const d = parseMermaid(deep);
+    check("mermaid: profundidade para em 60 sem estourar a pilha", d.count === 60 && d.dropped === 1440, d.count + "/" + d.dropped);
+    let chain = "graph TD\n"; for (let i = 0; i < 5000; i++) chain += "n" + i + " --> n" + (i + 1) + "\n";
+    check("mermaid: corrente longa de flowchart também para", parseMermaid(chain).count === 60);
+    check("mermaid: mapa que não cabe num documento é recusado", /grande demais/.test(error("mindmap\n  r\n" + Array.from({ length: 3000 }, (_, i) => "    n" + i + "x".repeat(290)).join("\n"))));
+    const t0 = Date.now();
+    error("graph TD\nA -- " + " ".repeat(50000)); error("graph TD\nA" + "-".repeat(50000)); error("mindmap\n  " + "((".repeat(20000));
+    check("mermaid: linha maliciosa não trava o leitor", Date.now() - t0 < 500, (Date.now() - t0) + "ms");
+  }
+}
+
 
 console.log("\n" + passed + " passaram, " + failures.length + " falharam");
 if (failures.length) { console.log("\nFALHAS:"); failures.forEach((f) => console.log("  - " + f)); process.exit(1); }

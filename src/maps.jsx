@@ -11,6 +11,7 @@ import {
   Form, Field, Dialog, Markdown, TemplatePicker, EmptyStart, icon
 } from "./shared/ui.jsx";
 import { MAP_TEMPLATES, mapGroups, mapBranches, buildMap } from "./shared/templates.js";
+import { parseMermaid, toMermaid } from "./shared/mermaid.js";
 
 initPage("maps");
 
@@ -842,8 +843,19 @@ function MapList({ maps }) {
   useClients();
   const notes = useCollection("notes"), funnels = useCollection("funnels");
   const [form, setForm] = useState(false);
+  const [importing, setImporting] = useState(false);
   const [renaming, setRenaming] = useState(null);
   const all = maps.all().sort((a, b) => b.updatedAt - a.updatedAt);
+
+  /* o mapa colado nasce como qualquer outro: passa pelo normalize, que é
+     quem dá id a cada nó, e abre direto no editor */
+  const importMap = ({ name, root }) => {
+    const now = Date.now();
+    const doc = normalize({ id: newId(), name, root, client: "", idea: "", funnel: "", createdAt: now, updatedAt: now });
+    maps.save(doc);
+    notify("mapa importado");
+    location.hash = doc.id;
+  };
 
   const duplicate = (id) => {
     const m = maps.get(id);
@@ -862,17 +874,21 @@ function MapList({ maps }) {
     notify("mapa apagado", () => maps.save(before));
   };
 
-  /* n abre um mapa novo; no editor, "n" e a nota do no */
+  /* n abre um mapa novo e i cola um mermaid; no editor, "n" e a nota do no */
   useKeydown((e) => {
-    if (e.key !== "n" || e.ctrlKey || e.metaKey || e.altKey || form || isTyping()) return;
-    e.preventDefault(); setForm(true);
+    if ((e.key !== "n" && e.key !== "i") || e.ctrlKey || e.metaKey || e.altKey || form || importing || isTyping()) return;
+    e.preventDefault();
+    if (e.key === "n") setForm(true); else setImporting(true);
   });
 
   return (
     <main className="page">
       <div className="header">
         <div><h1>mapas</h1><p className="sub">mapas mentais com layout automático — teclado para escrever, arrastar para reorganizar</p></div>
-        <div className="actions"><button className="pill pill--green" type="button" id="new-map" title="novo mapa (n)" onClick={() => setForm(true)}>{icon("plus")}mapa</button></div>
+        <div className="actions">
+          <button className="pill" type="button" id="import-map" title="colar um mapa em mermaid (i)" onClick={() => setImporting(true)}>{icon("code")}mermaid</button>
+          <button className="pill pill--green" type="button" id="new-map" title="novo mapa (n)" onClick={() => setForm(true)}>{icon("plus")}mapa</button>
+        </div>
       </div>
       <ul className="list mp-list" id="map-list">
         {all.map((m) => (
@@ -898,7 +914,12 @@ function MapList({ maps }) {
           blankLabel="começar em branco"
           dense />
       )}
+      {!all.length && (
+        <p className="mp-import-hint">o mapa já existe numa conversa com uma IA?{" "}
+          <button className="link" type="button" onClick={() => setImporting(true)}>cole o mermaid dele</button></p>
+      )}
       {form && <MapForm maps={maps} preset={form === true ? null : form} onClose={() => setForm(false)} />}
+      {importing && <MermaidDialog onImport={importMap} onClose={() => setImporting(false)} />}
     </main>
   );
 }
@@ -994,6 +1015,81 @@ function MapForm({ maps, preset, onClose }) {
   );
 }
 
+/* ---------- colar mermaid ----------
+   o mapa vem de uma conversa com IA: a pessoa cola a resposta inteira (a
+   cerca ```mermaid e a conversa em volta não atrapalham) e vê na hora o que
+   vai virar mapa, antes de gravar. a prévia lê com um respiro curto enquanto
+   se digita, mas colar lê na hora — é o gesto principal. `branch` é o modo
+   de dentro do editor: sem nome, e o resultado vira ramo do nó selecionado.
+   quem grava lê o texto de novo no submit, e não a prévia: a prévia pode
+   estar um respiro atrás do que está no campo. */
+const MERMAID_SAMPLE = "mindmap\n  root((lançamento))\n    público\n    oferta\n      preço\n    canais";
+
+function MermaidDialog({ branch, onImport, onClose }) {
+  const [text, setText] = useState("");
+  const [read, setRead] = useState("");
+  const [name, setName] = useState(null); // null = segue o nome que o mermaid sugere
+  const [fileError, setFileError] = useState("");
+  useEffect(() => {
+    if (text === read) return;
+    const t = setTimeout(() => setRead(text), 150);
+    return () => clearTimeout(t);
+  }, [text, read]);
+  const preview = useMemo(() => {
+    if (!read.trim()) return null;
+    try { return { value: parseMermaid(read) }; } catch (e) { return { error: e.message }; }
+  }, [read]);
+  const value = preview && preview.value;
+  const shownName = name != null ? name : value ? value.name : "";
+
+  const change = (next, now) => { setText(next); setFileError(""); if (now) setRead(next); };
+  /* soltar um .mmd/.md em cima do campo traz o texto dele para dentro */
+  const dropFile = (e) => {
+    const file = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+    if (!file) return;
+    e.preventDefault();
+    if (file.size > 2000000) { setFileError("arquivo grande demais para ser um mapa"); return; }
+    file.text().then((t) => change(t, true), () => setFileError("não consegui ler esse arquivo"));
+  };
+  const submit = () => {
+    let parsed;
+    try { parsed = parseMermaid(text); } catch (e) { setRead(text); return false; }
+    return onImport({ name: (shownName.trim() || parsed.name).slice(0, 120), root: parsed.root });
+  };
+  const branches = value ? value.root.children.map((c) => c.title || "(sem título)") : [];
+
+  return (
+    <Form title={branch ? "colar mermaid como ramo" : "colar mermaid"} wide
+          sub={branch ? "o mapa colado vira um ramo do nó selecionado" : "cole o que a IA respondeu — a conversa em volta do código não atrapalha"}
+          submit={branch ? "pendurar no nó" : "importar e abrir"} onSubmit={submit} onClose={onClose}>
+      <div className="full">
+        <label className="field-label" htmlFor="mp-mermaid">mermaid</label>
+        <textarea className="textarea mp-mermaid" id="mp-mermaid" spellCheck="false" placeholder={MERMAID_SAMPLE} value={text}
+          onChange={(e) => change(e.currentTarget.value, false)}
+          onPaste={(e) => { const el = e.currentTarget; setTimeout(() => change(el.value, true), 0); }}
+          onDragOver={(e) => { if (e.dataTransfer && [...e.dataTransfer.types].includes("Files")) e.preventDefault(); }}
+          onDrop={dropFile}
+          onKeyDown={(e) => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); e.currentTarget.form.requestSubmit(); } }} />
+      </div>
+      {(fileError || (preview && preview.error)) && <p className="full mp-mermaid-error" role="alert">{fileError || preview.error}</p>}
+      {value && !fileError && (
+        <div className="full mp-mermaid-preview">
+          {!branch && <>
+            <label className="field-label" htmlFor="mp-mermaid-name">nome</label>
+            <input className="input" id="mp-mermaid-name" maxLength="120" value={shownName} onChange={(e) => setName(e.currentTarget.value)} />
+          </>}
+          <p className="mp-mermaid-sum">
+            <span className="t-mono">{value.count + (value.count === 1 ? " nó" : " nós")}</span>
+            {value.kind === "flowchart" && <span>era um flowchart — virou árvore a partir do nó de cima</span>}
+            {value.dropped > 0 && <span>{value.dropped + (value.dropped === 1 ? " nó ficou" : " nós ficaram")} de fora — o mapa passava do limite</span>}
+          </p>
+          {branches.length > 0 && <p className="tpl-chain">{branches.slice(0, 8).join(" · ") + (branches.length > 8 ? " · +" + (branches.length - 8) : "")}</p>}
+        </div>
+      )}
+    </Form>
+  );
+}
+
 /* ---------- o editor ----------
    o documento aberto mora em estado, imutavel: toda mudanca clona, altera a
    copia e grava com atraso de 400ms. o historico de desfazer guarda as
@@ -1008,6 +1104,7 @@ function Editor({ id, maps }) {
   const [panelOpen, setPanelOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [importing, setImporting] = useState(false);
   const [suggestions, setSuggestions] = useState(null); // { targetId, list } | null
   const [thinking, setThinking] = useState(false);
   const [fontsReady, setFontsReady] = useState(false);
@@ -1378,6 +1475,35 @@ function Editor({ id, maps }) {
     })(doc.root, 0);
     download(new Blob([lines.join("\n") + "\n"], { type: "text/markdown;charset=utf-8" }), (doc.name || "mapa") + ".md");
   };
+  const exportMermaid = () => {
+    download(new Blob([toMermaid(doc.root)], { type: "text/plain;charset=utf-8" }), (doc.name || "mapa") + ".mmd");
+  };
+
+  /* colar mermaid como ramo: a raiz colada vira o ultimo filho do no
+     selecionado, num passo so do desfazer. as cores que o leitor deu ao
+     primeiro nivel saem — dentro de um mapa, o ramo herda a cor de onde foi
+     pendurado; so pendurado direto na raiz ele ganha a cor da vez. */
+  const graftMermaid = ({ root }) => {
+    const d0 = docRef.current;
+    const targetId = selectedId && findNode(d0.root, selectedId) ? selectedId : d0.root.id;
+    const branch = normalizeNode(root);
+    const stack = [branch];
+    while (stack.length) { const n = stack.pop(); n.color = 0; stack.push(...n.children); }
+    if (JSON.stringify(d0).length + JSON.stringify(branch).length > 900000) { notify("o mapa ficaria grande demais com esse ramo"); return false; }
+    const ok = mutate((d) => {
+      const f = findNode(d.root, targetId);
+      if (!f) return false;
+      f.node.children = f.node.children || [];
+      if (!f.parent) branch.color = (f.node.children.length % 6) + 1;
+      f.node.children.push(branch);
+      f.node.collapsed = false;
+    });
+    if (!ok) return false;
+    setSuggestions(null);
+    setSelectedId(branch.id);
+    engine.frameNodeNext(branch.id);
+    notify("ramo importado");
+  };
 
   /* o motor le daqui, sempre a versao deste render */
   handlers.current = {
@@ -1389,6 +1515,9 @@ function Editor({ id, maps }) {
   /* ---- teclado ---- */
   useKeydown((e) => {
     if (isTyping()) { if (e.key === "Escape") document.activeElement.blur(); return; }
+    /* com a caixa de colar aberta, uma letra solta (foco num botao dela) nao
+       pode comecar a editar um no escondido atras */
+    if (importing) return;
     /* a tira de fantasmas está no palco, não numa caixa por cima: Esc é o
        jeito de dispensá-la sem aceitar nenhum, e vem antes de tudo */
     if (suggestions && e.key === "Escape") { e.preventDefault(); setSuggestions(null); return; }
@@ -1470,10 +1599,13 @@ function Editor({ id, maps }) {
           <div className="mp-menu">
             <button className="pill" type="button" onClick={() => { setMenuOpen(false); exportPng(); }}>exportar png</button>
             <button className="pill" type="button" onClick={() => { setMenuOpen(false); exportOutline(); }}>exportar outline</button>
+            <button className="pill" type="button" onClick={() => { setMenuOpen(false); exportMermaid(); }}>exportar mermaid</button>
+            <button className="pill" type="button" onClick={() => { setMenuOpen(false); setImporting(true); }}>colar mermaid como ramo</button>
             <button className="pill" type="button" onClick={() => { setMenuOpen(false); setHelpOpen(true); }}>atalhos do teclado</button>
           </div>
         </Dialog>
       )}
+      {importing && <MermaidDialog branch onImport={graftMermaid} onClose={() => setImporting(false)} />}
       {helpOpen && <HelpDialog onClose={() => setHelpOpen(false)} />}
       {suggestions && <p className="mp-ghost-hint" id="mp-ghost-hint">clique num ramo tracejado para ficar com ele · <kbd>Esc</kbd> dispensa</p>}
     </>

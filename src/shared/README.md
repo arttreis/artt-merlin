@@ -32,6 +32,11 @@ Vite; o build sai em `server/site/`. O que é comum vive aqui:
 - `funnel-layout.js` — onde cada etapa do funil fica no palco (camadas da esquerda para a
   direita). Mora fora da página porque duas telas criam funil: a lista de funis e o canal do
   cliente.
+- `mermaid.js` — o **mapa mental em mermaid**: `parseMermaid(text)` lê o que uma IA devolve
+  (`mindmap`, ou `graph`/`flowchart` como plano B, com cerca e conversa em volta) e devolve
+  `{name, root, kind, count, dropped}` — nós sem id, que o `normalizeNode` do `maps.jsx` completa;
+  `toMermaid(root)` faz o caminho de volta. Puro, testado no `test.mjs`. Tetos: 3000 nós,
+  60 níveis e o documento abaixo de 1MB.
 
 Identificadores, chaves, campos e classes são em inglês; texto de tela e comentários, em
 português. O dicionário completo está em [`MIGRATION.md`](../MIGRATION.md).
