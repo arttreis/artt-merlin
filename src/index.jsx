@@ -87,25 +87,39 @@ function quoteOfDay() {
 
 /* ---------- a apresentação ----------
    um passo de cada vez, com o rodapé mostrando onde você está e o "pular"
-   sempre à mão. quatro cartões empilhados numa caixa eram quatro parágrafos
-   que ninguém lê até o fim — e cada passo agora tem um desenho feito de
-   pedaços do próprio produto, porque um ícone genérico não ensina nada. */
+   sempre à mão. cada passo tem um desenho feito de pedaços do próprio produto,
+   porque um ícone genérico não ensina nada.
+
+   reescrita em 13/09/2026: a de antes era de quando o Merlin tinha o dia, a
+   semana e as ideias. falava em "cartão da semana" e "puxar com pedágio" —
+   coisas que não existem mais — e não dizia uma palavra sobre calendário,
+   rotina, clientes ou financeiro. são seis passos, um por família de telas,
+   na ordem em que alguém usa: o tempo, o que vira tempo, quem paga, o dinheiro
+   e os hábitos, e por fim os gestos que valem em todo lugar. */
 const TOUR = [
   {
-    title: "só o dia tem minutos",
-    text: "O dia é uma fila com duração obrigatória, e a barra do topo se gasta sozinha com o relógio. Todo o resto do sistema é reservatório sem hora."
+    title: "o calendário é o seu tempo",
+    text: "Tudo que tem data é tarefa e mora num lugar só, visto como dia, semana ou mês. Só o dia faz conta de minutos: a barra se gasta com o relógio e avisa quando não cabe."
   },
   {
-    title: "nada entra sozinho",
-    text: "Nota, cartão da semana, objetivo, item de backlog: nada vira tarefa por conta própria. Vira quando você puxa — e puxar cobra o pedágio da duração."
+    title: "a semana de sempre se monta sozinha",
+    text: "O que se repete — almoço, academia, a reunião de segunda — fica na rotina e vira tarefa sozinho quando a semana abre. Mudou a rotina, muda o que ninguém mexeu."
   },
   {
-    title: "criar é sempre o mesmo gesto",
-    text: "Em toda tela, o “+” abre uma caixa com os campos. Nenhuma lista tem formulário aberto no meio e nenhuma tela tem filtro: a busca acha qualquer coisa pelo nome."
+    title: "o que ainda não é tarefa",
+    text: "Ideia vira nota, com checklist; meta vira objetivo do trimestre, do mês ou da semana. Quando chega a hora, um botão transforma em tarefa, com dia e duração."
   },
   {
-    title: "o que é seu fica seu",
-    text: "Tudo mora primeiro no seu navegador. Entrando com seu e-mail, o mesmo Merlin aparece em qualquer aparelho — e cada endereço tem um Merlin inteiro e separado."
+    title: "de quem chega a quem paga",
+    text: "A prospecção é o quadro de quem ainda não fechou; fechou, vira cliente, com tudo que se soube no caminho. Conteúdo, funis e mapas ajudam a atrair e a explicar."
+  },
+  {
+    title: "dinheiro e hábitos, sem se enganar",
+    text: "No financeiro, cheio é o que aconteceu e tracejado é o que você previu; fixos e parcelas chegam como sugestão e só contam depois de lançados. Nos hábitos, uma marca por dia."
+  },
+  {
+    title: "o mesmo jeito em toda tela",
+    text: "O “+” cria, Ctrl K acha qualquer coisa pelo nome e o ✦ chama o Merlin onde ele ajuda. Tudo mora no seu navegador; entrando com o e-mail, o mesmo Merlin aparece em qualquer aparelho."
   }
 ];
 
@@ -113,61 +127,120 @@ function Tour({ onClose }) {
   const [i, setI] = useState(0);
   const last = i === TOUR.length - 1;
   const step = TOUR[i];
+  const go = (n) => setI(Math.max(0, Math.min(TOUR.length - 1, n)));
+  /* setas andam, Esc pula — quem lê com a mão no teclado não precisa do mouse */
+  useEffect(() => {
+    const f = (e) => {
+      if (e.key === "ArrowRight") { e.preventDefault(); last ? onClose() : go(i + 1); }
+      else if (e.key === "ArrowLeft") { e.preventDefault(); go(i - 1); }
+      else if (e.key === "Escape") { e.preventDefault(); onClose(); }
+    };
+    window.addEventListener("keydown", f);
+    return () => window.removeEventListener("keydown", f);
+  }, [i, last, onClose]);
   return (
     <div className="tour" role="dialog" aria-modal="true" aria-label="Apresentação do Merlin">
       <div className="tour__box">
         <button className="tour__skip" type="button" onClick={onClose}>pular</button>
         <div className="tour__art"><TourArt step={i} /></div>
-        <div className="tour__words">
+        <div className="tour__words" aria-live="polite">
+          <p className="tour__count">{i + 1} de {TOUR.length}</p>
           <h2>{step.title}</h2>
           <p>{step.text}</p>
         </div>
         <div className="tour__foot">
-          <span className="tour__dots" aria-hidden="true">
-            {TOUR.map((s, n) => <i key={s.title} className={n === i ? "is-on" : ""} />)}
+          <span className="tour__dots">
+            {TOUR.map((s, n) => (
+              <button key={s.title} type="button" className={n === i ? "is-on" : ""}
+                      aria-label={"passo " + (n + 1) + ": " + s.title} aria-current={n === i ? "step" : undefined}
+                      onClick={() => go(n)}><i /></button>
+            ))}
           </span>
-          <button className="tour__next" type="button" onClick={() => (last ? onClose() : setI(i + 1))}>
-            {last ? "começar" : "continuar"}
-          </button>
+          <span className="tour__nav">
+            {i > 0 && <button className="tour__back" type="button" onClick={() => go(i - 1)}>voltar</button>}
+            <button className="tour__next" type="button" onClick={() => (last ? onClose() : go(i + 1))}>
+              {last ? "começar" : "continuar"}
+            </button>
+          </span>
         </div>
       </div>
     </div>
   );
 }
 
-/* o desenho de cada passo: pedaços de tela de verdade, em miniatura */
+/* o desenho de cada passo: pedaços de tela de verdade, em miniatura, e cada
+   um com a forma do que ensina — uma grade, um fluxo, um quadro, uma barra */
 function TourArt({ step }) {
   if (step === 0) return (
-    <div className="ta ta--day" aria-hidden="true">
-      <p className="ta__big">2h40<small>de sobra</small></p>
-      <div className="ta__bar"><i style={{ width: "58%" }} /></div>
-      <div className="ta__row"><span className="ta__mark" /><b>gravar o vídeo</b><span className="ta__min">1h30</span></div>
-      <div className="ta__row"><span className="ta__mark" /><b>revisar a proposta</b><span className="ta__min">45m</span></div>
+    <div className="ta ta--cal" aria-hidden="true">
+      <div className="ta__tabs"><span>dia</span><span className="is-on">semana</span><span>mês</span></div>
+      <div className="ta__week">
+        {["seg", "ter", "qua", "qui", "sex"].map((d, n) => (
+          <div key={d} className="ta__col">
+            <small>{d}</small>
+            {n === 0 && <i className="ta__blk" style={{ height: 30 }} />}
+            {n === 1 && <><i className="ta__blk ta__blk--soft" style={{ height: 16 }} /><i className="ta__blk" style={{ height: 22 }} /></>}
+            {n === 2 && <i className="ta__blk ta__blk--meet" style={{ height: 20, marginTop: 12 }} />}
+            {n === 3 && <i className="ta__blk" style={{ height: 40 }} />}
+            {n === 4 && <i className="ta__blk ta__blk--soft" style={{ height: 18, marginTop: 20 }} />}
+          </div>
+        ))}
+      </div>
+      <div className="ta__daybar"><b>2h40</b><span className="ta__bar"><i style={{ width: "58%" }} /></span><small>ainda cabe hoje</small></div>
     </div>
   );
   if (step === 1) return (
-    <div className="ta ta--pull" aria-hidden="true">
-      <div className="ta__card">frete grátis no ML<small>uma nota</small></div>
-      <span className="ta__arrow">{icon("clock")}</span>
-      <div className="ta__card ta__card--ask">quanto custa?<small>45m</small></div>
+    <div className="ta ta--routine" aria-hidden="true">
+      <div className="ta__rblock"><b>almoço</b><small>seg a sex · 12h · 1h</small></div>
+      <span className="ta__arrow">{icon("arrow")}</span>
+      <div className="ta__rdays">
+        {["seg", "ter", "qua", "qui", "sex"].map((d) => <span key={d}><small>{d}</small><i /></span>)}
+      </div>
     </div>
   );
   if (step === 2) return (
-    <div className="ta ta--form" aria-hidden="true">
-      <span className="ta__plus">{icon("plus")}</span>
-      <div className="ta__dialog">
-        <b>novo cliente</b>
-        <span className="ta__field" /><span className="ta__field" />
-        <span className="ta__btn">criar</span>
+    <div className="ta ta--pull" aria-hidden="true">
+      <div className="ta__card">
+        <b>site da Lirie</b>
+        <span className="ta__check is-done">trocar a foto do hero</span>
+        <span className="ta__check">revisar os textos</span>
+      </div>
+      <span className="ta__arrow">{icon("task")}</span>
+      <div className="ta__card ta__card--task"><b>revisar os textos</b><small>qui · 45m</small></div>
+    </div>
+  );
+  if (step === 3) return (
+    <div className="ta ta--pipe" aria-hidden="true">
+      <div className="ta__stages">
+        <div><small>lead</small><i /><i /></div>
+        <div><small>proposta</small><i className="is-hot" /></div>
+        <div className="is-won"><small>cliente</small><i /></div>
+      </div>
+      <div className="ta__chips"><span>{NAV_ICONS.content}conteúdo</span><span>{NAV_ICONS.funnels}funis</span><span>{NAV_ICONS.maps}mapas</span></div>
+    </div>
+  );
+  if (step === 4) return (
+    <div className="ta ta--money" aria-hidden="true">
+      <p className="ta__money"><small>na conta</small><b>R$ 3.210</b></p>
+      <span className="ta__split"><i style={{ width: "46%" }} /><em style={{ width: "30%" }} /></span>
+      <p className="ta__legend"><i className="is-real" />aconteceu <i className="is-forecast" />previsto</p>
+      <div className="ta__habits">
+        {[1, 1, 0, 1, 1, 1, 0, 1, 1, 0, 1, 1].map((on, n) => <i key={n} className={on ? "is-on" : ""} />)}
       </div>
     </div>
   );
   return (
-    <div className="ta ta--mine" aria-hidden="true">
-      <span className="ta__device">{NAV_ICONS.home}</span>
-      <span className="ta__link" />
-      <span className="ta__device">{NAV_ICONS.day}</span>
-      <p className="ta__seal t-mono">só seu</p>
+    <div className="ta ta--keys" aria-hidden="true">
+      <div className="ta__keyrow">
+        <span className="ta__key ta__key--plus">{icon("plus")}</span>
+        <span className="ta__key"><kbd>ctrl</kbd><kbd>k</kbd></span>
+        <span className="ta__key ta__key--spark">{icon("spark")}</span>
+      </div>
+      <div className="ta__sync">
+        <span className="ta__device">{NAV_ICONS.home}</span>
+        <span className="ta__link" />
+        <span className="ta__device">{NAV_ICONS.calendar}</span>
+      </div>
     </div>
   );
 }

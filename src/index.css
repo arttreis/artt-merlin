@@ -234,13 +234,19 @@ a.bx--day:hover{border-color:var(--ink-30)}
     var(--surface-2);
   border-bottom:1px solid var(--line-soft);
 }
-.tour__words{padding:22px 24px 6px}
+.tour__words{padding:20px 24px 6px;min-height:136px}
+.tour__count{margin:0 0 6px !important;font-size:11.5px !important;color:var(--ink-30) !important}
 .tour__words h2{margin:0;font-size:20px;font-weight:600;letter-spacing:-.03em;color:var(--ink)}
 .tour__words p{margin:9px 0 0;font-size:13.5px;line-height:1.55;color:var(--ink-50)}
-.tour__foot{display:flex;align-items:center;justify-content:space-between;gap:var(--pd2);padding:18px 24px 22px}
-.tour__dots{display:flex;gap:6px;align-items:center}
-.tour__dots i{width:6px;height:6px;border-radius:50%;background:var(--line);transition:background var(--t),width var(--t)}
-.tour__dots i.is-on{width:18px;border-radius:100px;background:var(--green)}
+.tour__foot{display:flex;align-items:center;justify-content:space-between;gap:var(--pd2);padding:16px 24px 22px}
+.tour__dots{display:flex;gap:2px;align-items:center}
+.tour__dots button{display:grid;place-items:center;height:20px;padding:0 2px;background:none;border:0;cursor:pointer}
+.tour__dots i{display:block;width:6px;height:6px;border-radius:50%;background:var(--line);transition:background var(--t),width var(--t)}
+.tour__dots button:hover i{background:var(--ink-30)}
+.tour__dots button.is-on i{width:18px;border-radius:100px;background:var(--green)}
+.tour__nav{display:flex;align-items:center;gap:6px}
+.tour__back{height:40px;padding:0 14px;border-radius:var(--br-pill);font-size:13px;color:var(--ink-50);transition:color var(--t)}
+.tour__back:hover{color:var(--ink)}
 .tour__next{
   height:40px;padding:0 22px;border-radius:var(--br-pill);
   background:var(--ink);color:var(--bg);font-size:13.5px;font-weight:500;
@@ -249,59 +255,86 @@ a.bx--day:hover{border-color:var(--ink-30)}
 .tour__next:hover{filter:brightness(1.15)}
 
 /* os desenhos, feitos de pedacos do proprio produto */
-.ta{width:100%;max-width:280px;font-size:11px}
-.ta--day .ta__big{
-  margin:0;font-family:var(--mono);font-size:30px;font-weight:500;letter-spacing:-.03em;color:var(--green-ink);
-}
-.ta--day .ta__big small{display:block;font-family:var(--sans);font-size:11px;color:var(--ink-30);margin-top:3px}
-.ta__bar{height:6px;border-radius:100px;background:var(--fill-hover);margin:12px 0 14px;overflow:hidden}
+.ta{width:100%;max-width:290px;font-size:11px;color:var(--ink-70)}
+.ta small{font-size:10px;color:var(--ink-30)}
+.ta__bar{display:block;height:5px;border-radius:100px;background:var(--fill-hover);overflow:hidden}
 .ta__bar i{display:block;height:100%;background:var(--green);border-radius:100px}
-.ta__row{
-  display:flex;align-items:center;gap:9px;padding:7px 10px;margin-bottom:5px;
-  border-radius:var(--br2);background:var(--surface);border:1px solid var(--line-soft);
-}
-.ta__row b{flex:1 1 auto;font-weight:400;color:var(--ink-70);overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
-.ta__min{font-family:var(--mono);font-size:10px;color:var(--ink-30)}
-.ta__mark{width:15px;height:15px;border-radius:5px;border:1px solid var(--line);flex:none}
-
-.ta--pull{display:flex;flex-direction:column;align-items:center;gap:10px}
-.ta__card{
-  width:100%;padding:12px 14px;border-radius:var(--br3);
-  background:var(--surface);border:1px solid var(--line-soft);color:var(--ink);
-}
-.ta__card small{display:block;margin-top:3px;font-size:10px;color:var(--ink-30)}
-.ta__card--ask{border-color:color-mix(in srgb,var(--green) 45%,transparent);color:var(--green-ink)}
-.ta__arrow{display:grid;place-items:center;width:26px;height:26px;border-radius:50%;background:var(--green);color:var(--on-green)}
+.ta__arrow{display:grid;place-items:center;width:26px;height:26px;border-radius:50%;background:var(--green);color:var(--on-green);flex:none}
 .ta__arrow svg{width:13px;height:13px}
 
-.ta--form{display:flex;flex-direction:column;align-items:center;gap:12px}
-.ta__plus{
-  display:grid;place-items:center;width:30px;height:30px;border-radius:50%;
-  background:var(--green);color:var(--on-green);
-}
-.ta__plus svg{width:15px;height:15px}
-.ta__dialog{
-  width:100%;padding:14px;border-radius:var(--br3);
-  background:var(--surface);border:1px solid var(--line);box-shadow:var(--sombra-2);
-}
-.ta__dialog b{display:block;margin-bottom:10px;font-size:12px;color:var(--ink)}
-.ta__field{display:block;height:24px;border-radius:var(--br2);background:var(--fill);margin-bottom:7px}
-.ta__btn{
-  display:inline-flex;align-items:center;height:24px;padding:0 14px;border-radius:var(--br-pill);
-  background:var(--green);color:var(--on-green);font-size:10.5px;
-}
+/* 1 · o calendario: as tres visoes, uma semana e a barra do dia */
+.ta__tabs{display:flex;gap:4px;margin-bottom:10px}
+.ta__tabs span{padding:3px 9px;border-radius:100px;border:1px solid var(--line-soft);font-size:10px;color:var(--ink-30)}
+.ta__tabs span.is-on{color:var(--ink);border-color:var(--line);background:var(--fill-hover)}
+.ta__week{display:grid;grid-template-columns:repeat(5,1fr);gap:4px;height:92px}
+.ta__col{display:flex;flex-direction:column;gap:3px;padding:4px;border-radius:7px;background:var(--fill)}
+.ta__col small{font-size:9px;text-align:center}
+.ta__blk{display:block;border-radius:4px;background:color-mix(in srgb,var(--green) 55%,transparent)}
+.ta__blk--soft{background:transparent;border:1px dashed var(--ink-30)}
+.ta__blk--meet{background:var(--ink-30)}
+.ta__daybar{display:grid;grid-template-columns:auto 1fr;align-items:center;gap:4px 10px;margin-top:10px}
+.ta__daybar b{font-family:var(--mono);font-size:16px;font-weight:500;color:var(--green-ink)}
+.ta__daybar small{grid-column:1 / -1}
 
-.ta--mine{display:flex;align-items:center;justify-content:center;gap:12px;position:relative}
-.ta__device{
-  display:grid;place-items:center;width:52px;height:52px;border-radius:15px;
-  background:var(--surface);border:1px solid var(--line);color:var(--ink-50);
-}
-.ta__device svg{width:20px;height:20px}
+/* 2 · a rotina: um bloco vira cinco dias */
+.ta--routine{display:flex;flex-direction:column;align-items:center;gap:10px}
+.ta__rblock{width:70%;padding:9px 12px;border-radius:var(--br3);border:1px solid var(--line);background:var(--surface);text-align:center}
+.ta__rblock b{display:block;font-size:12px;color:var(--ink);font-weight:600}
+.ta__rdays{display:grid;grid-template-columns:repeat(5,1fr);gap:5px;width:100%}
+.ta__rdays span{display:flex;flex-direction:column;align-items:center;gap:4px;padding:6px 0;border-radius:7px;background:var(--fill)}
+.ta__rdays i{display:block;width:70%;height:16px;border-radius:4px;background:color-mix(in srgb,var(--green) 55%,transparent)}
+.ta--routine .ta__arrow svg{transform:rotate(90deg)}
+
+/* 3 · nota com checklist vira tarefa */
+.ta--pull{display:flex;flex-direction:column;align-items:center;gap:8px}
+.ta__card{width:100%;padding:10px 12px;border-radius:var(--br3);background:var(--surface);border:1px solid var(--line-soft);color:var(--ink)}
+.ta__card b{display:block;font-size:12px;font-weight:600;margin-bottom:5px}
+.ta__card small{display:block;margin-top:2px}
+.ta__check{display:flex;align-items:center;gap:7px;margin-top:4px;font-size:10.5px;color:var(--ink-70)}
+.ta__check::before{content:"";width:11px;height:11px;border-radius:3px;border:1px solid var(--line);flex:none}
+.ta__check.is-done{color:var(--ink-30);text-decoration:line-through}
+.ta__check.is-done::before{background:var(--green);border-color:var(--green)}
+.ta__card--task{border-color:color-mix(in srgb,var(--green) 45%,transparent)}
+.ta__card--task b{margin:0}
+
+/* 4 · o quadro da prospeccao e o que atrai */
+.ta__stages{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.ta__stages div{display:flex;flex-direction:column;gap:5px;min-height:92px;padding:6px;border-radius:8px;background:var(--fill)}
+.ta__stages i{display:block;height:20px;border-radius:5px;background:var(--surface);border:1px solid var(--line-soft)}
+.ta__stages i.is-hot{border-color:var(--ink-30)}
+.ta__stages .is-won{background:color-mix(in srgb,var(--green) 12%,transparent)}
+.ta__stages .is-won i{border-color:color-mix(in srgb,var(--green) 55%,transparent)}
+.ta__chips{display:flex;justify-content:center;gap:6px;margin-top:10px}
+.ta__chips span{display:inline-flex;align-items:center;gap:5px;padding:3px 9px 3px 7px;border-radius:100px;border:1px solid var(--line-soft);font-size:10px;color:var(--ink-50)}
+.ta__chips svg{width:11px;height:11px}
+
+/* 5 · o dinheiro em dois tempos e a grade dos habitos */
+.ta__money{margin:0 0 8px;display:flex;align-items:baseline;justify-content:space-between}
+.ta__money b{font-family:var(--mono);font-size:20px;font-weight:500;color:var(--ink)}
+.ta__split{display:flex;height:7px;border-radius:100px;background:var(--fill-hover);overflow:hidden}
+.ta__split i{display:block;background:var(--green)}
+.ta__split em{display:block;background:repeating-linear-gradient(135deg,var(--ink-30) 0 2px,transparent 2px 5px)}
+.ta__legend{display:flex;align-items:center;gap:5px;margin:7px 0 14px;font-size:10px;color:var(--ink-30)}
+.ta__legend i{display:inline-block;width:12px;height:5px;border-radius:100px}
+.ta__legend i + i,.ta__legend i:not(:first-child){margin-left:6px}
+.ta__legend .is-real{background:var(--green)}
+.ta__legend .is-forecast{border:1px dashed var(--ink-30)}
+.ta__habits{display:grid;grid-template-columns:repeat(12,1fr);gap:4px}
+.ta__habits i{display:block;aspect-ratio:1;border-radius:4px;border:1px solid var(--line)}
+.ta__habits i.is-on{background:var(--green);border-color:var(--green)}
+
+/* 6 · os gestos e os aparelhos */
+.ta--keys{display:flex;flex-direction:column;align-items:center;gap:22px}
+.ta__keyrow{display:flex;align-items:center;gap:10px}
+.ta__key{display:inline-flex;align-items:center;gap:4px;height:38px;min-width:38px;padding:0 10px;justify-content:center;border-radius:11px;background:var(--surface);border:1px solid var(--line);color:var(--ink-70)}
+.ta__key svg{width:15px;height:15px}
+.ta__key--plus{background:var(--green);border-color:var(--green);color:var(--on-green)}
+.ta__key--spark{color:var(--green-ink)}
+.ta__key kbd{font-size:10px}
+.ta__sync{display:flex;align-items:center;gap:12px}
+.ta__device{display:grid;place-items:center;width:42px;height:42px;border-radius:12px;background:var(--surface);border:1px solid var(--line);color:var(--ink-50)}
+.ta__device svg{width:18px;height:18px}
 .ta__link{width:34px;height:1px;background:repeating-linear-gradient(90deg,var(--green) 0 4px,transparent 4px 8px)}
-.ta__seal{
-  position:absolute;bottom:-26px;left:50%;transform:translateX(-50%);
-  margin:0;font-size:9.5px;color:var(--green-ink);
-}
 
 /* ================================================================
    a landing
