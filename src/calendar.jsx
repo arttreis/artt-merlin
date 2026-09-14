@@ -33,7 +33,6 @@ import {
 import {
   normalize, onDate, inRange, overdue, dayDoc, topOrder, newTask, migrateTasks, layoutDay, readClock
 } from "./shared/tasks.js";
-import { normalize as normalizeBlock, copyRoutine } from "./shared/routine.js";
 import { useHourScale } from "./shared/hour-scale.js";
 import {
   pendingOf, doneOf, reservesOf, costOf, guessMin, budget, fmt, longFmt, clock
@@ -225,7 +224,6 @@ const ORIGIN_LABEL = { note: "nota", habit: "hábito", client: "cliente", plan: 
    ================================================================ */
 function Calendar() {
   const store = useCollection("tasks", { normalize });
-  const routineCol = useCollection("routine", { normalize: normalizeBlock });
   const notesCol = useCollection("notes", { normalize: normalizeNote });
   /* o conteudo com dia de ir ao ar: so leitura aqui. a peca nao e tarefa (nao
      tem duracao, nao se conclui no dia) — ela aparece como marca do dia, e o
@@ -265,7 +263,10 @@ function Calendar() {
   const trackRef = useRef(null);
   const focusAfter = useRef(null);
 
-  const all = store.all();
+  /* as copias da rotina nao aparecem no calendario (o Arthur, 14/09/2026:
+     "no calendario nao pode estar as coisas das rotinas"). elas continuam
+     gravadas; o calendario so nao as mostra nem as conta. */
+  const all = store.all().filter((t) => !(t.origin && t.origin.type === "routine"));
 
   /* ---------- as agendas ----------
      so vale esconder o que ainda tem botao para voltar: cliente encerrado
@@ -742,17 +743,8 @@ function Calendar() {
     migrateTasks(true);
     return cloud.onChange(() => migrateTasks(true));
   }, []);
-  /* a rotina: os blocos moram em routine.html, e o calendario os copia para
-     a semana aberta (quem decide o que copiar e o shared/routine.js). de novo
-     a cada mudanca: a volta da nuvem e o que destrava a primeira copia, e um
-     bloco criado em outra aba tem que chegar sem recarregar. a segunda
-     passada nao acha nada — a semana ja esta marcada. */
-  useEffect(() => {
-    const run = () => copyRoutine(routineCol, store, weekStart);
-    run();
-    const offs = [store.onChange(run), routineCol.onChange(run), cloud.onStatus(run)];
-    return () => offs.forEach((off) => off());
-  }, [weekStart, store]);
+  /* a rotina: o calendario copiava os blocos para a semana aberta. saiu em
+     14/09/2026, junto com as copias da tela — ver o filtro do `all`. */
   useEffect(() => {
     const f = (e) => { if (e.key === "merlin:inbox") emptyInbox(); };
     window.addEventListener("storage", f);

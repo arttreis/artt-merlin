@@ -95,8 +95,11 @@
 .wk__block.is-done{opacity:.55}
 .wk__block.is-done .wk__text b{text-decoration:line-through}
 .wk__block.is-dragging{opacity:.35}
-.wk__check{width:15px;height:15px;flex:0 0 auto;margin-top:1px;border-radius:5px}
-.wk__check svg{width:9px;height:9px}
+/* com o bloco na frente: este arquivo e dividido entre o calendario e a
+   rotina, e no build ele pode carregar ANTES do calendar.css — cuja .mark de
+   44px ganhava pela ordem e inchava a caixa (14/09/2026) */
+.wk__block .wk__check{width:15px;height:15px;flex:0 0 auto;margin-top:1px;border-radius:5px}
+.wk__block .wk__check svg{width:9px;height:9px}
 .wk__icon{display:flex;flex:0 0 auto;margin-top:1px;color:var(--ink-30)}
 .wk__icon svg{width:12px;height:12px}
 .wk__text{display:flex;flex-direction:column;min-width:0}
