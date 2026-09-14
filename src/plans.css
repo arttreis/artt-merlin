@@ -77,4 +77,3 @@
 .review{display:flex;flex-direction:column;gap:var(--pd2)}
 .review .textarea{min-height:56px;font-size:13px}
 .review .field-label{margin-bottom:4px}
-#merlin-btn:disabled,.merlin-btn:disabled{opacity:.6;cursor:default}

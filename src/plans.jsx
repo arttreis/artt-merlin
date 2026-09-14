@@ -320,8 +320,10 @@ function ReviewDialog({ kind, doc, onSave, onAsk, onClose }) {
     <Dialog title={"revisão · " + periodLabel(kind.id, doc.period)} wide label="Revisão do período" onClose={close}
         sub="o que foi, o que não foi e o que muda — três frases, não um relatório"
         actions={<>
-          <button className="pill merlin-btn" type="button" disabled={thinking || !doc.goals.length} onClick={ask}>
-            {icon("spark")}{thinking ? "pensando…" : "revisar com o merlin"}
+          <button className={"pill pill--icon merlin-btn" + (thinking ? " is-thinking" : "")} type="button"
+                  disabled={thinking || !doc.goals.length} onClick={ask}
+                  title={thinking ? "pensando…" : "revisar com o merlin"} aria-label="revisar com o merlin">
+            <span className="merlin-btn__icon" aria-hidden="true">{icon("spark")}</span>
           </button>
           <button className="pill pill--green" type="button" onClick={close}>guardar</button>
         </>}>
