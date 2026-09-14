@@ -9,10 +9,14 @@
    resto das horas existe, mas é madrugada. */
 .wk{
   --wk-gutter:52px;
+  /* dom e sab mais estreitos que os dias uteis (14/09/2026): a semana e a
+     rotina comecam no domingo, entao sao a primeira e a ultima coluna */
+  --wk-cols:var(--wk-gutter) minmax(56px,.55fr) repeat(5,minmax(96px,1fr)) minmax(56px,.55fr);
+  --wk-min:calc(var(--wk-gutter) + 2 * 56px + 5 * 96px);
   display:flex;flex-direction:column;min-width:0;
   background:var(--surface);border:1px solid var(--line-soft);border-radius:var(--br3);overflow:hidden;
 }
-.wk__head,.wk__body{display:grid;grid-template-columns:var(--wk-gutter) repeat(7,minmax(96px,1fr))}
+.wk__head,.wk__body{display:grid;grid-template-columns:var(--wk-cols)}
 .wk__head{border-bottom:1px solid var(--line-soft);background:var(--surface)}
 .wk__corner{border-right:1px solid var(--line-soft)}
 .wk__day{padding:8px 8px 7px;min-width:0;border-right:1px solid var(--line-soft);text-align:center}
@@ -30,14 +34,17 @@
 .wk__sum span{overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
 .wk__sum-meet{color:var(--ink-50)}
 
-.wk__scroll{position:relative;overflow:auto;max-height:calc(100dvh - var(--nav-h) - 170px);min-height:380px;background:var(--bg)}
+/* altura fixa, e nao so teto: a regua das horas (shared/hour-scale.js) mede
+   este espaco pra decidir quanto cada hora ativa ocupa. com max-height a
+   grade encolheria junto e a medida andaria em circulo */
+.wk__scroll{position:relative;overflow:auto;height:calc(100dvh - var(--nav-h) - 170px);min-height:380px;background:var(--bg)}
 /* o cabecalho mora dentro da rolagem, grudado no topo: fora dela, rolar para
    o lado no celular desalinhava os dias das colunas */
 .wk__head{position:sticky;top:0;z-index:6}
 /* a coluna de horas gruda na esquerda pelo mesmo motivo */
 .wk__corner,.wk__hours{position:sticky;left:0;z-index:5;background:var(--surface)}
-.wk__body{position:relative;min-width:calc(var(--wk-gutter) + 7 * 96px)}
-.wk__head{min-width:calc(var(--wk-gutter) + 7 * 96px)}
+.wk__body{position:relative;min-width:var(--wk-min)}
+.wk__head{min-width:var(--wk-min)}
 .wk__hours{position:relative;border-right:1px solid var(--line-soft)}
 .wk__hours span{
   position:absolute;right:8px;transform:translateY(-50%);
@@ -45,13 +52,15 @@
 }
 .wk__lane{
   position:relative;min-width:0;border-right:1px solid var(--line-soft);cursor:cell;
+  /* as linhas das horas vem prontas da regua (--wk-lines), porque as horas
+     nao tem mais a mesma altura */
   background:
-    repeating-linear-gradient(to bottom,var(--line-soft) 0 1px,transparent 1px 44px),
+    var(--wk-lines),
     linear-gradient(to bottom,transparent var(--win-from),var(--surface) var(--win-from),var(--surface) var(--win-to),transparent var(--win-to));
 }
 .wk__lane:last-child{border-right:0}
 .wk__lane.is-today{background:
-    repeating-linear-gradient(to bottom,var(--line-soft) 0 1px,transparent 1px 44px),
+    var(--wk-lines),
     linear-gradient(to bottom,transparent var(--win-from),color-mix(in srgb,var(--green) 5%,var(--surface)) var(--win-from),color-mix(in srgb,var(--green) 5%,var(--surface)) var(--win-to),transparent var(--win-to))}
 .wk__now{position:absolute;left:0;right:0;height:2px;background:var(--green);pointer-events:none;z-index:3}
 .wk__now::before{content:"";position:absolute;left:-4px;top:-3px;width:8px;height:8px;border-radius:50%;background:var(--green)}
@@ -107,7 +116,9 @@
 .wk__drop span{position:absolute;left:6px;top:3px;font-size:9.5px;color:var(--green-ink)}
 
 @media (max-width:640px){
-  .wk{--wk-gutter:40px}
-  .wk__head,.wk__body{grid-template-columns:var(--wk-gutter) repeat(7,minmax(84px,1fr))}
-  .wk__body,.wk__head{min-width:calc(var(--wk-gutter) + 7 * 84px)}
+  .wk{
+    --wk-gutter:40px;
+    --wk-cols:var(--wk-gutter) minmax(56px,.55fr) repeat(5,minmax(84px,1fr)) minmax(56px,.55fr);
+    --wk-min:calc(var(--wk-gutter) + 2 * 56px + 5 * 84px);
+  }
 }

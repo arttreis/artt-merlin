@@ -6,7 +6,7 @@
    de hoje e onde o olho confere se a rotina bate com o dia que esta vivendo */
 .rt__dayname{display:block;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-50);padding:4px 0 2px}
 .rt .wk__day.is-today .rt__dayname{color:var(--green-ink)}
-.rt .wk__scroll{max-height:calc(100dvh - var(--nav-h) - 150px)}
+.rt .wk__scroll{height:calc(100dvh - var(--nav-h) - 150px)}
 
 /* ---------- a caixa do bloco ---------- */
 .rt-form__when{display:grid;gap:var(--pd2);grid-template-columns:1fr 1fr}

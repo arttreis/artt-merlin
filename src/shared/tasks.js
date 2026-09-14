@@ -153,9 +153,14 @@ export function layoutDay(list, opts) {
   const fixed = list.filter((t) => t.at != null)
     .map((t) => ({ t, from: t.at, to: Math.min(MINUTES, t.at + len(t)), fixed: true }))
     .sort((a, b) => a.from - b.from);
-  const loose = list.filter((t) => t.at == null);
+  /* a copia da rotina sem hora vai pro FIM da fila, depois das tarefas: o
+     Arthur, em 14/09/2026, "os itens de rotina nao podem invadir o
+     planejamento do dia". com hora ela continua na hora dela. */
+  const fromRoutine = (t) => !!(t.origin && t.origin.type === "routine");
+  const loose = list.filter((t) => t.at == null && !fromRoutine(t));
   const flow = loose.filter((t) => t.reserved)
-    .concat(loose.filter((t) => !t.reserved && t.done), loose.filter((t) => !t.reserved && !t.done));
+    .concat(loose.filter((t) => !t.reserved && t.done), loose.filter((t) => !t.reserved && !t.done),
+      list.filter((t) => t.at == null && fromRoutine(t)));
 
   const blocks = fixed.slice();
   let cursor = start;

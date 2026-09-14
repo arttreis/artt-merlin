@@ -34,6 +34,7 @@ import {
   normalize, onDate, inRange, overdue, dayDoc, topOrder, newTask, migrateTasks, layoutDay, readClock
 } from "./shared/tasks.js";
 import { normalize as normalizeBlock, copyRoutine } from "./shared/routine.js";
+import { useHourScale } from "./shared/hour-scale.js";
 import {
   pendingOf, doneOf, reservesOf, costOf, guessMin, budget, fmt, longFmt, clock
 } from "./shared/day.js";
@@ -206,7 +207,8 @@ const CopyIcon = () => (
 
 const CHIPS = [15, 30, 60, 120];
 const UNDO_DEPTH = 12;
-const VIEWS = [["day", "dia"], ["week", "semana"], ["month", "mês"]];
+/* o mes saiu em 14/09/2026: a semana ja responde onde as coisas estao */
+const VIEWS = [["day", "dia"], ["week", "semana"]];
 const VIEW_KEY = "merlin:calendar:view";
 const readView = () => {
   try { const v = localStorage.getItem(VIEW_KEY); return VIEWS.some(([id]) => id === v) ? v : "day"; }
@@ -249,7 +251,6 @@ function Calendar() {
   const [form, setForm] = useState(null);       /* a caixa de tarefa (semana/mes) */
   const [summary, setSummary] = useState(null);
   const [thinking, setThinking] = useState(false);
-  const [target, setTarget] = useState("");     /* a data sob o arrasto */
   const [editing, setEditing] = useState(null);
   const [hidden, setHidden] = useState(readHidden);   /* as agendas desligadas: "" e a pessoal */
   const [side, setSide] = useState(readSide);
@@ -729,33 +730,7 @@ function Calendar() {
     e.dataTransfer.setData("text/plain", t.id);
     requestAnimationFrame(() => setDragging(t.id));
   };
-  const onDragEnd = () => { dragId.current = null; setDragging(null); setTarget(""); };
-  const onDropOn = (e, date) => {
-    e.preventDefault();
-    setTarget("");
-    const original = dragId.current && store.get(dragId.current);
-    dragId.current = null;
-    if (!original) return;
-    const card = e.target.closest && e.target.closest(".card");
-    const siblings = store.all()
-      .filter((t) => t.date === date && t.id !== original.id && !t.done)
-      .sort((a, b) => a.order - b.order || a.createdAt - b.createdAt);
-    let order;
-    if (card && card.dataset.id !== original.id) {
-      const idx = siblings.findIndex((t) => t.id === card.dataset.id);
-      const r = card.getBoundingClientRect();
-      const before = e.clientY < r.top + r.height / 2;
-      const pos = idx < 0 ? siblings.length : (before ? idx : idx + 1);
-      const prev = siblings[pos - 1], next = siblings[pos];
-      order = prev && next ? (prev.order + next.order) / 2
-        : prev ? prev.order + 1
-        : next ? next.order - 1
-        : 0;
-    } else {
-      order = siblings.length ? siblings[siblings.length - 1].order + 1 : Date.now();
-    }
-    setDate(original.id, date, order);
-  };
+  const onDragEnd = () => { dragId.current = null; setDragging(null); };
 
   /* ---------- efeitos ---------- */
 
@@ -826,12 +801,10 @@ function Calendar() {
   });
 
   /* ---------- andar no tempo ----------
-     o passo e o da visao: um dia, uma semana, um mes. e sempre a mesma seta. */
+     o passo e o da visao: um dia ou uma semana. e sempre a mesma seta. */
   const shift = (n) => setAnchor((a) => {
     if (view === "day") return addDays(a, n);
-    if (view === "week") return addDays(a, n * 7);
-    const d = dateOf(a);
-    return dayOf(new Date(d.getFullYear(), d.getMonth() + n, 1));
+    return addDays(a, n * 7);
   });
 
   const askDelegate = (t) => delegate.ask({
@@ -846,12 +819,8 @@ function Calendar() {
     onDragStart, onDragEnd, save, duplicate, copy: copyTask
   };
 
-  const period = view === "day" ? dateStamp(anchor).toLowerCase()
-    : view === "week" ? weekRange(weekStart)
-    : monthLabel(monthOf(anchor));
-  const isNow = view === "day" ? anchor === today()
-    : view === "week" ? weekStart === sundayOf(today())
-    : monthOf(anchor) === monthOf(today());
+  const period = view === "day" ? dateStamp(anchor).toLowerCase() : weekRange(weekStart);
+  const isNow = view === "day" ? anchor === today() : weekStart === sundayOf(today());
 
   return (
     <>
@@ -876,8 +845,10 @@ function Calendar() {
           ))}
         </div>
         {view === "week" && (
-          <button className="pill" type="button" id="merlin-btn" disabled={thinking} onClick={askSummary}>
-            {icon("spark")}<span>{thinking ? "pensando…" : "resumir com o merlin"}</span>
+          <button className={"pill pill--icon merlin-btn" + (thinking ? " is-thinking" : "")} type="button" id="merlin-btn"
+                  disabled={thinking} onClick={askSummary}
+                  title={thinking ? "pensando…" : "resumir com o merlin"} aria-label="resumir com o merlin">
+            <span className="merlin-btn__icon" aria-hidden="true">{icon("spark")}</span>
           </button>
         )}
         {view !== "day" && (
@@ -922,11 +893,6 @@ function Calendar() {
               <WeekGrid all={visible} pieces={pieces} weekStart={weekStart} prefs={prefs} actions={actions}
                 onNew={(date, at) => setForm({ id: "", date, at })} onOpenDay={(date) => { setAnchor(date); chooseView("day"); }}
                 onMove={moveTo} />
-            )}
-            {view === "month" && (
-              <MonthView all={visible} pieces={pieces} month={monthOf(anchor)} target={target} actions={actions}
-                onNew={(date) => setForm({ id: "", date })} onOpenDay={(date) => { setAnchor(date); chooseView("day"); }}
-                onEnter={setTarget} onLeave={(d) => setTarget((cur) => (cur === d ? "" : cur))} onDrop={onDropOn} />
             )}
           </div>
         </div>
@@ -1424,7 +1390,6 @@ function NotesBox({ notes, onCreate, onPull, onRemove }) {
 
    arrastar um bloco grava o dia e a hora onde ele caiu; puxar a borda de
    baixo muda a duracao. clicar num espaco vazio cria ali. */
-const HOUR_H = 44;
 const SNAP = 15;
 const snap = (min) => Math.round(min / SNAP) * SNAP;
 const clampMin = (min) => Math.max(0, Math.min(1440 - SNAP, min));
@@ -1436,14 +1401,15 @@ function WeekGrid({ all, pieces = [], weekStart, prefs, actions, onNew, onOpenDa
   const scrollRef = useRef(null);
   const grab = useRef(null);
   const [drop, setDrop] = useState(null);
+  const sc = useHourScale(scrollRef, prefs.dayStart, prefs.dayEnd);
 
   /* abre na hora em que o dia comeca, com uma hora de folga acima: a
      madrugada existe, mas nao e onde se olha primeiro */
   useLayoutEffect(() => {
-    if (scrollRef.current) scrollRef.current.scrollTop = Math.max(0, (prefs.dayStart / 60 - 1) * HOUR_H);
+    if (scrollRef.current) scrollRef.current.scrollTop = Math.max(0, sc.y(prefs.dayStart - 60));
   }, [weekStart]);
 
-  const minuteAt = (lane, clientY) => (clientY - lane.getBoundingClientRect().top) / HOUR_H * 60;
+  const minuteAt = (lane, clientY) => sc.minute(clientY - lane.getBoundingClientRect().top);
 
   return (
     <div className="wk">
@@ -1469,16 +1435,16 @@ function WeekGrid({ all, pieces = [], weekStart, prefs, actions, onNew, onOpenDa
           );
         })}
       </div>
-        <div className="wk__body" style={{ height: 24 * HOUR_H }}>
+        <div className="wk__body" style={{ height: sc.height, "--wk-lines": sc.lines }}>
           <div className="wk__hours" aria-hidden="true">
-            {Array.from({ length: 24 }, (_, h) => <span key={h} style={{ top: h * HOUR_H }}>{h ? String(h).padStart(2, "0") + ":00" : ""}</span>)}
+            {Array.from({ length: 24 }, (_, h) => <span key={h} style={{ top: sc.y(h * 60) }}>{h ? String(h).padStart(2, "0") + ":00" : ""}</span>)}
           </div>
           {days.map((day) => {
             const blocks = layoutDay(onDate(all, day), { start: prefs.dayStart, guess: guessMin() });
             const isToday = day === t;
             return (
               <div key={day} className={"wk__lane" + (isToday ? " is-today" : "")} data-day={day}
-                   style={{ "--win-from": (prefs.dayStart / 60 * HOUR_H) + "px", "--win-to": (prefs.dayEnd / 60 * HOUR_H) + "px" }}
+                   style={{ "--win-from": sc.y(prefs.dayStart) + "px", "--win-to": sc.y(prefs.dayEnd) + "px" }}
                    onClick={(e) => { if (e.target === e.currentTarget) onNew(day, clampMin(Math.floor(minuteAt(e.currentTarget, e.clientY) / 30) * 30)); }}
                    onDragOver={(e) => {
                      if (!grab.current) return;
@@ -1496,19 +1462,19 @@ function WeekGrid({ all, pieces = [], weekStart, prefs, actions, onNew, onOpenDa
                      onMove(g.id, day, clampMin(snap(minuteAt(e.currentTarget, e.clientY) - g.offset)));
                    }}>
                 {blocks.map((b) => (
-                  <WeekBlock key={b.t.id} b={b} actions={actions}
+                  <WeekBlock key={b.t.id} b={b} sc={sc} actions={actions}
                     onGrab={(e) => {
                       const r = e.currentTarget.getBoundingClientRect();
-                      grab.current = { id: b.t.id, offset: (e.clientY - r.top) / HOUR_H * 60, len: b.to - b.from };
+                      grab.current = { id: b.t.id, offset: sc.minute(sc.y(b.from) + e.clientY - r.top) - b.from, len: b.to - b.from };
                     }}
                     onRelease={() => { grab.current = null; setDrop(null); }} />
                 ))}
                 {drop && drop.day === day && (
-                  <div className="wk__drop" style={{ top: drop.from / 60 * HOUR_H, height: drop.len / 60 * HOUR_H - 2 }}>
+                  <div className="wk__drop" style={{ top: sc.y(drop.from), height: sc.y(drop.from + drop.len) - sc.y(drop.from) - 2 }}>
                     <span className="t-mono">{clock(drop.from)}</span>
                   </div>
                 )}
-                {isToday && <div className="wk__now" style={{ top: nowMinutes() / 60 * HOUR_H }} aria-hidden="true" />}
+                {isToday && <div className="wk__now" style={{ top: sc.y(nowMinutes()) }} aria-hidden="true" />}
               </div>
             );
           })}
@@ -1520,11 +1486,11 @@ function WeekGrid({ all, pieces = [], weekStart, prefs, actions, onNew, onOpenDa
 
 /* um bloco da grade. a borda de baixo e a alca de duracao: arrastar para
    baixo aumenta, para cima diminui, de quinze em quinze minutos. */
-function WeekBlock({ b, actions, onGrab, onRelease }) {
+function WeekBlock({ b, sc, actions, onGrab, onRelease }) {
   const x = b.t;
   const [resize, setResize] = useState(null);
   const to = resize ? resize.to : b.to;
-  const height = Math.max(14, (to - b.from) / 60 * HOUR_H - 2);
+  const height = Math.max(14, sc.y(to) - sc.y(b.from) - 2);
   const short = height < 34;
   const time = (b.fixed ? "" : "~") + clock(b.from) + (short ? "" : "–" + clock(to));
   /* o nome do cliente em cima, na cor dele, so quando sobra altura: num bloco
@@ -1538,7 +1504,7 @@ function WeekBlock({ b, actions, onGrab, onRelease }) {
     const y0 = e.clientY, base = b.to;
     let last = base;
     const move = (ev) => {
-      last = Math.max(b.from + SNAP, Math.min(1440, b.from + snap(base - b.from + (ev.clientY - y0) / HOUR_H * 60)));
+      last = Math.max(b.from + SNAP, Math.min(1440, b.from + snap(sc.minute(sc.y(base) + ev.clientY - y0) - b.from)));
       setResize({ to: last });
     };
     const up = () => {
@@ -1555,7 +1521,7 @@ function WeekBlock({ b, actions, onGrab, onRelease }) {
     <div className={"wk__block" + (x.reserved ? " is-reserved" : " is-task") + (x.done ? " is-done" : "") + (b.fixed ? "" : " is-loose") + (short ? " is-short" : "") + (b.cols > 1 ? " is-narrow" : "") + (actions.dragging === x.id ? " is-dragging" : "")}
          data-task={x.id} tabIndex="0" draggable={resize ? "false" : "true"}
          title={(client ? client + " · " : "") + x.title + " · " + time + (b.fixed ? "" : " (na fila, sem horário)")}
-         style={{ ...agendaStyle(x.client), top: b.from / 60 * HOUR_H, height, left: "calc(" + (b.col / b.cols * 100) + "% + 2px)", width: "calc(" + (100 / b.cols) + "% - 4px)" }}
+         style={{ ...agendaStyle(x.client), top: sc.y(b.from), height, left: "calc(" + (b.col / b.cols * 100) + "% + 2px)", width: "calc(" + (100 / b.cols) + "% - 4px)" }}
          onDragStart={(e) => { onGrab(e); actions.onDragStart(e, x); }}
          onDragEnd={() => { onRelease(); actions.onDragEnd(); }}
          onClick={(e) => { if (!e.target.closest("button")) actions.edit(x.id); }}
@@ -1574,19 +1540,6 @@ function WeekBlock({ b, actions, onGrab, onRelease }) {
   );
 }
 
-/* ================================================================
-   a visao do mes
-   ================================================================
-   a unica das tres que nao existia. ela nao faz conta nenhuma de propósito:
-   um mes que somasse horas estaria prometendo capacidade para trinta dias de
-   uma vez, e a promessa do produto e sobre UM dia. aqui o que se ve e onde as
-   coisas estao — e o gesto que ela da e mudar isso de lugar.
-
-   reunioes e pausas moram numa faixa propria, acima das tarefas: elas nao
-   sao o que voce tem para fazer, sao o que tira tempo de fazer, e na mesma
-   lista disputavam as tres vagas da celula com o trabalho. */
-const MONTH_MAX = 3;
-
 /* a peca de conteudo que vai ao ar naquele dia: um link para ela, com o play
    no lugar da bolinha. publicada fica apagada, como tarefa feita. */
 const PLAY = <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5.5v13l10.5-6.5z" /></svg>;
@@ -1595,62 +1548,6 @@ function PieceMark({ p }) {
     <a className={"piece-mark" + (p.stage === "published" ? " is-done" : "")} href={"content.html#" + encodeURIComponent(p.id)} title={"conteúdo: " + p.title}>
       {PLAY}<span>{p.title}</span>
     </a>
-  );
-}
-
-function MonthView({ all, pieces = [], month, target, actions, onNew, onOpenDay, onEnter, onLeave, onDrop }) {
-  const weeks = monthGrid(month);
-  const t = today();
-  const item = (x) => (
-    <button key={x.id} type="button" draggable="true" data-id={x.id} data-task={x.id}
-            className={"month__item" + (x.done ? " is-done" : "") + (x.reserved ? " is-reserved" : "")}
-            style={agendaStyle(x.client)}
-            title={(x.client ? clientName(x.client) + " · " : "") + x.title + (x.at != null ? " · " + clock(x.at) : "") + (x.min ? " · " + fmt(x.min) : "")}
-            onDragStart={(e) => actions.onDragStart(e, x)} onDragEnd={actions.onDragEnd}
-            onClick={() => actions.edit(x.id)}>
-      {x.reserved ? <span className="month__clock" aria-hidden="true">{icon("clock")}</span> : <i aria-hidden="true" />}
-      {x.at != null && <span className="month__at t-mono">{clock(x.at)}</span>}
-      <span className="month__title">{x.title}</span>
-    </button>
-  );
-  return (
-    <div className="month">
-      {WEEKDAYS.map((w) => <div key={w} className="month__head">{w}</div>)}
-      {weeks.map((week) => week.map((day) => {
-        const list = onDate(all, day);
-        const meetings = list.filter((x) => x.reserved).sort((a, b) => (a.at ?? 9999) - (b.at ?? 9999));
-        const work = list.filter((x) => !x.reserved);
-        const out = monthOf(day) !== month;
-        const openWork = work.filter((x) => !x.done).length;
-        return (
-          <div key={day} data-day={day}
-               className={"month__cell" + (out ? " is-out" : "") + (day === t ? " is-today" : "") + (target === day ? " is-over" : "")}
-               onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = "move"; }}
-               onDragEnter={() => onEnter(day)}
-               onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget)) onLeave(day); }}
-               onDrop={(e) => onDrop(e, day)}
-               onDoubleClick={(e) => { if (e.target === e.currentTarget) onNew(day); }}>
-            <button className="month__day" type="button" title={"abrir " + dateLabel(day)} onClick={() => onOpenDay(day)}>
-              <span className="month__n">{dayNumber(day)}</span>
-              {work.length > 0 && <span className="month__count">{openWork || "✓"}</span>}
-            </button>
-            {pieces.filter((p) => p.date === day).map((p) => <PieceMark key={p.id} p={p} />)}
-            {meetings.length > 0 && (
-              <div className="month__meetings">
-                {meetings.slice(0, 2).map(item)}
-                {meetings.length > 2 && <button className="month__more" type="button" onClick={() => onOpenDay(day)}>{"+" + (meetings.length - 2) + " reuniões"}</button>}
-              </div>
-            )}
-            {work.slice(0, MONTH_MAX).map(item)}
-            {work.length > MONTH_MAX && (
-              <button className="month__more" type="button" onClick={() => onOpenDay(day)}>
-                {"e mais " + (work.length - MONTH_MAX)}
-              </button>
-            )}
-          </div>
-        );
-      }))}
-    </div>
   );
 }
 

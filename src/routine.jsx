@@ -23,13 +23,13 @@ import {
 import { normalize as normalizeTask, layoutDay, readClock } from "./shared/tasks.js";
 import { normalize, newBlock, propagate, orphansOf, copyRoutine } from "./shared/routine.js";
 import { clock, fmt, guessMin } from "./shared/day.js";
+import { useHourScale } from "./shared/hour-scale.js";
 import { ROUTINE_SUGGESTIONS, routineGroups } from "./shared/templates.js";
 
 initPage("routine");
 
 const WEEKDAYS = ["dom", "seg", "ter", "qua", "qui", "sex", "sáb"];
 const WEEKDAY_LONG = ["domingo", "segunda", "terça", "quarta", "quinta", "sexta", "sábado"];
-const HOUR_H = 44;
 const SNAP = 15;
 const snap = (min) => Math.round(min / SNAP) * SNAP;
 const clampMin = (min) => Math.max(0, Math.min(1440 - SNAP, min));
@@ -178,12 +178,13 @@ function RoutineGrid({ list, prefs, onNew, onEdit, onMove, onResize }) {
   const [drop, setDrop] = useState(null);
   const [dragging, setDragging] = useState("");
   const todayDow = new Date().getDay();
+  const sc = useHourScale(scrollRef, prefs.dayStart, prefs.dayEnd);
 
   useLayoutEffect(() => {
-    if (scrollRef.current) scrollRef.current.scrollTop = Math.max(0, (prefs.dayStart / 60 - 1) * HOUR_H);
+    if (scrollRef.current) scrollRef.current.scrollTop = Math.max(0, sc.y(prefs.dayStart - 60));
   }, []);
 
-  const minuteAt = (lane, clientY) => (clientY - lane.getBoundingClientRect().top) / HOUR_H * 60;
+  const minuteAt = (lane, clientY) => sc.minute(clientY - lane.getBoundingClientRect().top);
   const onDay = (d) => list.filter((b) => b.days.includes(d));
 
   return (
@@ -206,9 +207,9 @@ function RoutineGrid({ list, prefs, onNew, onEdit, onMove, onResize }) {
             );
           })}
         </div>
-        <div className="wk__body" style={{ height: 24 * HOUR_H }}>
+        <div className="wk__body" style={{ height: sc.height, "--wk-lines": sc.lines }}>
           <div className="wk__hours" aria-hidden="true">
-            {Array.from({ length: 24 }, (_, h) => <span key={h} style={{ top: h * HOUR_H }}>{h ? String(h).padStart(2, "0") + ":00" : ""}</span>)}
+            {Array.from({ length: 24 }, (_, h) => <span key={h} style={{ top: sc.y(h * 60) }}>{h ? String(h).padStart(2, "0") + ":00" : ""}</span>)}
           </div>
           {WEEKDAYS.map((_, d) => {
             /* o layoutDay e o da semana: quem tem hora fica na hora, o resto
@@ -216,7 +217,7 @@ function RoutineGrid({ list, prefs, onNew, onEdit, onMove, onResize }) {
             const laid = layoutDay(onDay(d).map((b) => ({ ...b, done: false, order: b.createdAt })), { start: prefs.dayStart, guess: guessMin() });
             return (
               <div key={d} className={"wk__lane" + (d === todayDow ? " is-today" : "")} aria-label={WEEKDAY_LONG[d]}
-                   style={{ "--win-from": (prefs.dayStart / 60 * HOUR_H) + "px", "--win-to": (prefs.dayEnd / 60 * HOUR_H) + "px" }}
+                   style={{ "--win-from": sc.y(prefs.dayStart) + "px", "--win-to": sc.y(prefs.dayEnd) + "px" }}
                    onClick={(e) => { if (e.target === e.currentTarget) onNew(d, clampMin(Math.floor(minuteAt(e.currentTarget, e.clientY) / 30) * 30)); }}
                    onDragOver={(e) => {
                      if (!grab.current) return;
@@ -234,12 +235,12 @@ function RoutineGrid({ list, prefs, onNew, onEdit, onMove, onResize }) {
                      onMove(g.b, g.day, d, clampMin(snap(minuteAt(e.currentTarget, e.clientY) - g.offset)));
                    }}>
                 {laid.map((x) => (
-                  <RoutineBlock key={x.t.id} x={x} dragging={dragging === x.t.id + ":" + d}
+                  <RoutineBlock key={x.t.id} x={x} sc={sc} dragging={dragging === x.t.id + ":" + d}
                     onEdit={() => onEdit(list.find((b) => b.id === x.t.id))}
                     onResize={(min) => onResize(list.find((b) => b.id === x.t.id), min)}
                     onGrab={(e) => {
                       const r = e.currentTarget.getBoundingClientRect();
-                      grab.current = { b: list.find((b) => b.id === x.t.id), day: d, offset: (e.clientY - r.top) / HOUR_H * 60, len: x.to - x.from };
+                      grab.current = { b: list.find((b) => b.id === x.t.id), day: d, offset: sc.minute(sc.y(x.from) + e.clientY - r.top) - x.from, len: x.to - x.from };
                       e.dataTransfer.effectAllowed = "move";
                       e.dataTransfer.setData("text/plain", x.t.title);
                       requestAnimationFrame(() => setDragging(x.t.id + ":" + d));
@@ -247,7 +248,7 @@ function RoutineGrid({ list, prefs, onNew, onEdit, onMove, onResize }) {
                     onRelease={() => { grab.current = null; setDrop(null); setDragging(""); }} />
                 ))}
                 {drop && drop.day === d && (
-                  <div className="wk__drop" style={{ top: drop.from / 60 * HOUR_H, height: drop.len / 60 * HOUR_H - 2 }}>
+                  <div className="wk__drop" style={{ top: sc.y(drop.from), height: sc.y(drop.from + drop.len) - sc.y(drop.from) - 2 }}>
                     <span className="t-mono">{clock(drop.from)}</span>
                   </div>
                 )}
@@ -261,11 +262,11 @@ function RoutineGrid({ list, prefs, onNew, onEdit, onMove, onResize }) {
 }
 
 /* um bloco da grade. a borda de baixo e a alca de duracao, como na semana */
-function RoutineBlock({ x, dragging, onEdit, onResize, onGrab, onRelease }) {
+function RoutineBlock({ x, sc, dragging, onEdit, onResize, onGrab, onRelease }) {
   const b = x.t;
   const [stretch, setStretch] = useState(null);
   const to = stretch != null ? stretch : x.to;
-  const height = Math.max(14, (to - x.from) / 60 * HOUR_H - 2);
+  const height = Math.max(14, sc.y(to) - sc.y(x.from) - 2);
   const short = height < 34;
   const time = (x.fixed ? "" : "~") + clock(x.from) + (short ? "" : "–" + clock(to));
   const many = b.days.length > 1;
@@ -276,7 +277,7 @@ function RoutineBlock({ x, dragging, onEdit, onResize, onGrab, onRelease }) {
     const y0 = e.clientY, base = x.to;
     let last = base;
     const onMove = (ev) => {
-      last = Math.max(x.from + SNAP, Math.min(1440, x.from + snap(base - x.from + (ev.clientY - y0) / HOUR_H * 60)));
+      last = Math.max(x.from + SNAP, Math.min(1440, x.from + snap(sc.minute(sc.y(base) + ev.clientY - y0) - x.from)));
       setStretch(last);
     };
     const up = () => {
@@ -293,7 +294,7 @@ function RoutineBlock({ x, dragging, onEdit, onResize, onGrab, onRelease }) {
     <div className={"wk__block" + (b.reserved ? " is-reserved" : " is-task") + (x.fixed ? "" : " is-loose") + (short ? " is-short" : "") + (x.cols > 1 ? " is-narrow" : "") + (dragging ? " is-dragging" : "")}
          tabIndex="0" draggable={stretch != null ? "false" : "true"}
          title={b.title + " · " + time + " · " + daysLabel(b.days) + (many ? " (mudar a hora muda todos os dias)" : "")}
-         style={{ top: x.from / 60 * HOUR_H, height, left: "calc(" + (x.col / x.cols * 100) + "% + 2px)", width: "calc(" + (100 / x.cols) + "% - 4px)" }}
+         style={{ top: sc.y(x.from), height, left: "calc(" + (x.col / x.cols * 100) + "% + 2px)", width: "calc(" + (100 / x.cols) + "% - 4px)" }}
          onDragStart={onGrab} onDragEnd={onRelease}
          onClick={onEdit}
          onKeyDown={(e) => { if (e.target === e.currentTarget && e.key === "Enter") { e.preventDefault(); onEdit(); } }}>

@@ -592,11 +592,6 @@
 .behind__text b{color:var(--ink);font-weight:600}
 .behind__actions{display:flex;gap:var(--pd2);flex-wrap:wrap}
 
-/* ---------- botao e dialogo do merlin ---------- */
-.merlin-btn__icon{display:flex;width:13px;height:13px;color:var(--green-ink)}
-.merlin-btn__icon svg{width:100%;height:100%}
-#merlin-btn:disabled{opacity:.6;cursor:default}
-
 
 /* ================================================================
    a barra do calendario
@@ -628,89 +623,6 @@
 .calview button:hover{color:var(--ink-70)}
 .calview button[aria-pressed="true"]{background:var(--surface);color:var(--ink);box-shadow:var(--sombra)}
 
-/* ================================================================
-   a visao do mes
-   ================================================================
-   uma grade de sete colunas. ela nao promete que cabe — nenhuma celula tem
-   minuto, e e de proposito: so o dia tem minutos, e um mes que somasse horas
-   estaria prometendo capacidade para trinta dias de uma vez.
-
-   o que a celula diz e QUANTO ha, nao QUANTO DEMORA: os primeiros titulos, e
-   o resto virando um numero. clicar no numero do dia abre aquele dia.
-   ================================================================ */
-.month{
-  display:grid;grid-template-columns:repeat(7,minmax(0,1fr));
-  gap:1px;background:var(--line-soft);
-  border:1px solid var(--line-soft);border-radius:var(--br3);overflow:hidden;
-}
-.month__head{
-  background:var(--surface);padding:7px 10px;
-  font-family:var(--mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-30);
-}
-.month__cell{
-  background:var(--bg);min-height:104px;padding:6px 7px;
-  display:flex;flex-direction:column;gap:3px;
-  /* filho de grade nao encolhe abaixo do conteudo sem isto, e um titulo longo
-     empurrava a celula inteira para fora da coluna */
-  min-width:0;
-  transition:background var(--t);
-}
-.month__cell.is-out{background:var(--surface);opacity:.55}
-.month__cell.is-today{background:color-mix(in srgb,var(--green) 7%,var(--bg))}
-.month__cell.is-over{background:var(--fill-hover)}
-.month__day{
-  display:flex;align-items:center;justify-content:space-between;gap:6px;
-  background:none;border:0;padding:0;cursor:pointer;font-family:var(--mono);
-  font-size:11px;color:var(--ink-30);
-}
-.month__day:hover{color:var(--ink)}
-.month__cell.is-today .month__day{color:var(--green-ink)}
-.month__n{font-size:11px}
-.month__count{font-size:9.5px;opacity:.7}
-.month__item{
-  display:flex;align-items:center;gap:4px;width:100%;max-width:100%;min-width:0;text-align:left;
-  padding:3px 5px 3px 12px;border-radius:6px;border:0;cursor:grab;position:relative;
-  background:var(--fill);color:var(--ink-70);font-size:11.5px;line-height:1.35;
-  overflow:hidden;white-space:nowrap;
-}
-.month__title{min-width:0;overflow:hidden;text-overflow:ellipsis}
-.month__at{flex:0 0 auto;font-size:9.5px;color:var(--ink-30)}
-/* reunioes e pausas: uma faixa propria no topo da celula, sem fundo e com o
-   relogio no lugar da bolinha. elas nao disputam as tres vagas das tarefas. */
-.month__meetings{display:flex;flex-direction:column;gap:1px;padding-bottom:3px;margin-bottom:1px;border-bottom:1px dashed var(--line-soft)}
-.month__meetings .month__more{padding-top:0}
-.month__clock{position:absolute;left:3px;top:calc(50% - 4.5px);display:flex;color:var(--ink-30)}
-.month__clock svg{width:9px;height:9px}
-/* a bolinha e absoluta porque num flex ela disputava largura com o titulo, e
-   quem perdia era o titulo — que e a unica coisa que a celula existe para dizer */
-.month__item i{position:absolute;left:4px;top:calc(50% - 2.5px)}
-.month__item:hover{background:var(--fill-hover);color:var(--ink)}
-.month__item.is-done{color:var(--ink-30);text-decoration:line-through}
-.month__item.is-reserved{background:none;color:var(--ink-50);padding-top:1px;padding-bottom:1px;font-size:10.5px}
-.month__item.is-reserved:hover{background:var(--fill)}
-.month__item i{width:6px;height:6px;border-radius:50%;background:var(--c,var(--green))}
-.month__item.is-done i{background:var(--ink-30)}
-.month__item.is-reserved .month__clock{color:var(--c,var(--ink-30))}
-/* conteudo que vai ao ar no dia: link, sem fundo, com o play verde */
-.piece-mark{
-  display:flex;align-items:center;gap:4px;min-width:0;padding:1px 5px 1px 3px;border-radius:6px;
-  font-size:10.5px;line-height:1.4;color:var(--ink-70);text-decoration:none;white-space:nowrap;
-}
-.piece-mark svg{width:9px;height:9px;flex:0 0 auto;color:var(--green-ink)}
-.piece-mark span{min-width:0;overflow:hidden;text-overflow:ellipsis}
-.piece-mark:hover{background:var(--fill);color:var(--ink)}
-.piece-mark.is-done{color:var(--ink-30);text-decoration:line-through}
-.piece-mark.is-done svg{color:var(--ink-30)}
-.wk__day .piece-mark{justify-content:center;margin-top:2px}
-.month__more{
-  background:none;border:0;padding:2px 5px;cursor:pointer;text-align:left;
-  font-family:var(--mono);font-size:9.5px;color:var(--ink-30);
-}
-.month__more:hover{color:var(--ink)}
-@media (max-width:720px){
-  .month__cell{min-height:74px;padding:4px}
-  .month__item{font-size:10.5px;padding:2px 4px}
-}
 
 /* ================================================================
    as agendas

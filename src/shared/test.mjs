@@ -404,6 +404,12 @@ const dataLeft = () => globalThis.localStorage.keys().filter((k) => k in DATA);
     const clash = layoutDay([t("x", { at: 600, min: 60 }), t("y", { at: 630, min: 60 })], { start: 540 });
     check("dois com hora sobrepostos dividem a largura", clash.every((b) => b.cols === 2) && clash[0].col !== clash[1].col);
     check("sem duração, ocupa o palpite", layoutDay([t("z", {})], { start: 540, guess: 40 })[0].to === 580);
+    const withRoutine = layoutDay([
+      t("daily", { min: 60, reserved: true, origin: { type: "routine", id: "r1" } }),
+      t("tarefa", { min: 30 })
+    ], { start: 540 });
+    const rAt = (id) => withRoutine.find((b) => b.t.id === id);
+    check("a rotina sem hora não invade a fila: a tarefa vem antes", rAt("tarefa").from === 540 && rAt("daily").from === 570, rAt("tarefa").from + "/" + rAt("daily").from);
 
     check("readClock: 9h30", readClock("9h30") === 570);
     check("readClock: 09:30", readClock("09:30") === 570);
