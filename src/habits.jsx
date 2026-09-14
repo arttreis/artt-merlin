@@ -9,7 +9,7 @@ import {
 import { useState } from "react";
 import {
   mount, useCollection, useKeydown, isTyping,
-  useFields, Form, Field, Dialog, Markdown, EmptyStart, icon
+  useFields, Form, Field, Dialog, Markdown, EmptyStart, PeriodNav, icon
 } from "./shared/ui.jsx";
 import { HABIT_SUGGESTIONS, habitGroups } from "./shared/templates.js";
 
@@ -102,19 +102,39 @@ function isExpected(h, day) {
   return false;
 }
 
-/* feitos e esperados no mes, ate hoje. para N por semana, o esperado de cada
-   semana e min(N, dias da semana que ja passaram dentro do mes). */
+/* feitos e esperados no mes, do dia 1 ate hoje (ou o mes inteiro, se ja
+   passou). para N por semana, o esperado de cada semana e min(N, dias da
+   semana que ja passaram dentro do mes).
+
+   corrigido em 13/09/2026, por dois erros que davam 60% para 3 marcas em
+   13 dias e 133% num habito de dias uteis:
+   - o esperado comecava na data de criacao do habito, e nao no dia 1: quem
+     cria no dia 9 tinha um "mes" de cinco dias;
+   - o feito contava marca em dia que nao era esperado (o sabado de um habito
+     de seg a sex), e passava do esperado.
+   agora so conta como feito a marca em dia esperado — e, no N por semana,
+   no maximo N por semana. o numero nunca passa de 100%. */
 function monthStats(h, ym) {
   const t = today();
-  const days = monthDays(ym).filter((d) => d <= t && d >= dayOf(new Date(h.createdAt)).slice(0, 10) || h.marks[d]);
-  const done = days.filter((d) => h.marks[d]).length;
-  let expected = 0;
+  const days = monthDays(ym).filter((d) => d <= t);
+  let done = 0, expected = 0;
   if (h.schedule.type === "perWeek") {
     const weeks = new Map();
-    days.forEach((d) => { const k = mondayOf(d); weeks.set(k, (weeks.get(k) || 0) + 1); });
-    weeks.forEach((n) => { expected += Math.min(h.schedule.times, n); });
+    days.forEach((d) => {
+      const k = mondayOf(d);
+      const w = weeks.get(k) || { n: 0, marks: 0 };
+      w.n++; if (h.marks[d]) w.marks++;
+      weeks.set(k, w);
+    });
+    weeks.forEach((w) => {
+      const goal = Math.min(h.schedule.times, w.n);
+      expected += goal;
+      done += Math.min(goal, w.marks);
+    });
   } else {
-    expected = days.filter((d) => isExpected(h, d)).length;
+    const due = days.filter((d) => isExpected(h, d));
+    expected = due.length;
+    done = due.filter((d) => h.marks[d]).length;
   }
   return { done, expected, rate: expected ? Math.round((done / expected) * 100) : 0 };
 }
@@ -209,17 +229,20 @@ function Habits() {
       <div className="header">
         <div>
           <h1>hábitos</h1>
-          <p className="sub">{monthLabel(month)}{totals.expected ? " · " + totals.done + " de " + totals.expected + " feitos" : ""}</p>
+          {totals.expected > 0 && <p className="sub">{totals.done + " de " + totals.expected + " feitos"}</p>}
         </div>
+        {/* eram seis pílulas escritas. o mês virou "‹ set 2026 ›", o merlin um
+            ícone, e "sugerir" mora dentro da caixa de criar (13/09/2026) */}
         <div className="actions">
-          <button className="pill" type="button" onClick={() => setMonth((m) => shiftMonth(m, -1))}>‹ mês anterior</button>
-          <button className="pill" type="button" onClick={() => setMonth(monthOf(today()))}>hoje</button>
-          <button className="pill" type="button" id="merlin-btn" disabled={thinking || !list.length} onClick={askSummary}>
+          {list.length > 0 && <PeriodNav label={monthLabel(month)} current={month === monthOf(t)}
+            prevLabel="mês anterior" nextLabel="próximo mês"
+            onPrev={() => setMonth((m) => shiftMonth(m, -1))} onNext={() => setMonth((m) => shiftMonth(m, 1))}
+            onToday={() => setMonth(monthOf(today()))} />}
+          {list.length > 0 && <button className={"pill pill--icon merlin-btn" + (thinking ? " is-thinking" : "")} type="button" id="merlin-btn"
+                  disabled={thinking || !list.length} onClick={askSummary}
+                  title={thinking ? "pensando…" : "ler o mês com o merlin"} aria-label="ler o mês com o merlin">
             <span className="merlin-btn__icon" aria-hidden="true">{icon("spark")}</span>
-            <span>{thinking ? "pensando…" : "ler o mês com o merlin"}</span>
-          </button>
-          <button className="pill" type="button" onClick={() => setMonth((m) => shiftMonth(m, 1))}>próximo ›</button>
-          <button className="pill" type="button" id="suggest-btn" onClick={() => setSuggesting(true)}>sugerir</button>
+          </button>}
           <button className="pill pill--green" type="button" title="novo hábito (n)" onClick={() => setForm({ id: "" })}>{icon("plus")}hábito</button>
         </div>
       </div>
@@ -249,7 +272,7 @@ function Habits() {
                     <span className="habit-day__weekday">{weekdayLetter(d)}</span>{dayNumber(d)}
                   </th>))}
                 <th className="num" title="dias seguidos">seq</th>
-                <th className="num" title="feitos ÷ esperados no mês">mês</th>
+                <th className="num" title="feitos ÷ dias esperados, do dia 1 até hoje">mês</th>
                 <th></th>
               </tr>
             </thead>
@@ -273,7 +296,8 @@ function Habits() {
             : <p className="empty">Você já tem todos os que eu sugeriria. O "+" cria qualquer outro.</p>}
         </Dialog>
       )}
-      {form && <HabitForm habits={habits} id={form.id} onClose={() => setForm(null)} onArchive={archive} />}
+      {form && <HabitForm habits={habits} id={form.id} onClose={() => setForm(null)} onArchive={archive}
+        onSuggest={list.length ? () => { setForm(null); setSuggesting(true); } : null} />}
       {summary != null && <MerlinDialog text={summary} onClose={() => setSummary(null)} />}
     </>
   );
@@ -301,7 +325,9 @@ function HabitRow({ h, days, today: t, onToggle, onEdit, onArchive, onPull }) {
                   onClick={() => onToggle(h, d)}>{h.marks[d] ? icon("check") : null}</button>
         </td>))}
       <td className={"num" + (streak > 0 ? " is-green" : "")}>{streak}</td>
-      <td className="num">{stats.expected ? stats.rate + "%" : "—"}</td>
+      <td className="num" title={stats.expected ? stats.done + " de " + stats.expected + " dias esperados até hoje" : "nenhum dia esperado ainda"}>
+        {stats.expected ? <>{stats.rate}%<small className="habit-frac">{stats.done}/{stats.expected}</small></> : "—"}
+      </td>
       <td className="habit-actions">
         <span className="row-actions">
           {h.min > 0 && !h.marks[t] && <button className="action" type="button" title="puxar para o dia" onClick={onPull}>{icon("clock")}</button>}
@@ -314,7 +340,7 @@ function HabitRow({ h, days, today: t, onToggle, onEdit, onArchive, onPull }) {
 }
 
 /* ---------- a caixa do habito: criar e editar sao a mesma ---------- */
-function HabitForm({ habits, id, onClose, onArchive }) {
+function HabitForm({ habits, id, onClose, onArchive, onSuggest }) {
   const h = id ? habits.get(id) : null;
   const [v, bind, set] = useFields({
     name: h ? h.name : "",
@@ -337,7 +363,8 @@ function HabitForm({ habits, id, onClose, onArchive }) {
     else habits.save({ id: newId(), name, schedule, min, color: +v.color, order: now, archived: false, marks: {}, createdAt: now, updatedAt: now });
   };
   return (
-    <Form title={h ? "hábito" : "novo hábito"} submit={h ? "salvar" : "criar"} remove={h ? "arquivar" : ""}
+    <Form title={h ? "hábito" : "novo hábito"} submit={h ? "salvar" : "criar"} remove={h ? "arquivar" : ""} removeIcon="archive"
+        aside={!h && onSuggest ? <button className="link" type="button" onClick={onSuggest}>ver sugestões</button> : null}
         onRemove={() => onArchive(h)} onClose={onClose} onSubmit={submit}>
       <Field label="nome" full><input className="input" maxLength="80" required placeholder="treino, leitura, água…" {...bind("name")} /></Field>
       <Field label="frequência">

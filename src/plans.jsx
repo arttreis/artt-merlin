@@ -193,20 +193,19 @@ function Plans() {
 
   const shift = (kind, n) => setPeriods((p) => ({ ...p, [kind]: shiftPeriod(kind, p[kind], n) }));
   const goToday = () => setPeriods({ quarter: periodOf("quarter", t), month: periodOf("month", t), week: periodOf("week", t) });
-  const openCount = (kind) => docOf(kind).goals.filter((g) => !g.done).length;
+  const allCurrent = KINDS.every((k) => periods[k.id] === periodOf(k.id, t));
 
   return (
     <>
       <div className="header">
         <div>
           <h1>planos</h1>
-          <p className="sub">{focus
-            ? "acesso: só o que tem parentesco com ele — Esc apaga"
-            : openCount("quarter") + " abertos no trimestre · " + openCount("month") + " no mês · " + openCount("week") + " na semana"}</p>
+          {/* a contagem de abertos saiu daqui: cada coluna já diz a dela, e o
+              "+ objetivo" do topo repetia o "+" de cada coluna (13/09/2026) */}
+          {focus && <p className="sub">aceso: só o que tem parentesco com ele — Esc apaga</p>}
         </div>
         <div className="actions">
-          <button className="pill" type="button" onClick={goToday}>hoje</button>
-          <button className="pill pill--green" type="button" title="novo objetivo da semana (n)" onClick={() => setForm({ kind: "week", period: periods.week })}>{icon("plus")}objetivo</button>
+          {!allCurrent && <button className="pill" type="button" onClick={goToday}>hoje</button>}
         </div>
       </div>
 
@@ -242,36 +241,31 @@ function Horizon({ kind, doc, period, today: t, childrenOf, parentOf, focus, onF
             {isCurrent && <i className="horizon__now" title="o período de agora" />}
             {periodLabel(kind.id, period)}
           </p>
+          {/* o nome do horizonte ("trimestre", "mês") saiu: o título já diz */}
           <p className="horizon__open">
-            <span className="t-mono">{kind.label}</span>
-            {periodSub(kind.id, period) ? " · " + periodSub(kind.id, period) : ""}
-            {" · "}
+            {periodSub(kind.id, period) ? periodSub(kind.id, period) + " · " : ""}
             {open ? open + (open === 1 ? " aberto" : " abertos") : (doc.goals.length ? "tudo feito" : "nada planejado")}
           </p>
         </div>
+        {/* criar e revisar moram na cabeça, como ícones, junto das setas: o pé
+            com duas pílulas escritas era uma faixa inteira para dois gestos */}
         <div className="horizon__nav">
-          <button className="action" type="button" title="anterior" onClick={() => onShift(-1)}>{icon("chevronLeft")}</button>
-          <button className="action" type="button" title="próximo" onClick={() => onShift(1)}>{icon("chevronRight")}</button>
+          <button className="action" type="button" title={kind.newLabel} aria-label={kind.newLabel} onClick={onNew}>{icon("plus")}</button>
+          <button className={"action" + (written ? " is-on" : "")} type="button" title={written ? "revisão escrita" : "revisão"} aria-label="revisão" onClick={onReview}>{icon("file")}</button>
+          <span className="horizon__sep" />
+          <button className="action" type="button" title="anterior" aria-label="anterior" onClick={() => onShift(-1)}>{icon("chevronLeft")}</button>
+          <button className="action" type="button" title="próximo" aria-label="próximo" onClick={() => onShift(1)}>{icon("chevronRight")}</button>
         </div>
       </div>
       <div className="horizon__body">
-        {!doc.goals.length && <p className="empty">{kind.id === "quarter" ? "O que este trimestre precisa entregar." : kind.id === "month" ? "Desdobre o trimestre, ou escreva direto." : "O que fecha esta semana. Daqui vira cartão."}</p>}
+        {/* vazio, a frase é o próprio botão de escrever o primeiro */}
+        {!doc.goals.length && <button className="horizon__empty" type="button" onClick={onNew}>{icon("plus")}{kind.id === "quarter" ? "o que este trimestre precisa entregar" : kind.id === "month" ? "desdobre o trimestre, ou escreva direto" : "o que fecha esta semana"}</button>}
         {!!goals.length && (
           <ul className="list">
             {goals.map((goal) => <Goal key={goal.id} g={goal} kind={kind.id} kids={childrenOf(goal.id)} parent={goal.parent ? parentOf(goal.parent) : null}
               shade={shade(goal.id)} focused={focus === goal.id} onFocus={onFocus}
               onToggle={onToggle} onEdit={onEdit} onRemove={onRemove} onUnfold={onUnfold} onPull={onPull} />)}
           </ul>)}
-      </div>
-      {/* o pé da coluna: as duas coisas que se faz com um horizonte. a revisão
-          era três campos abertos aqui dentro, sempre — nove caixas vazias na
-          tela para um gesto de fim de período. virou botão e caixa, como todo
-          o resto do sistema. */}
-      <div className="horizon__foot">
-        <button className="pill pill--mini" type="button" onClick={onNew}>{icon("plus")}{kind.newLabel}</button>
-        <button className={"pill pill--mini" + (written ? " is-on" : "")} type="button" onClick={onReview}>
-          {written ? "revisão escrita" : "revisão"}
-        </button>
       </div>
     </section>
   );

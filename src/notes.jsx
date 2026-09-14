@@ -14,20 +14,16 @@ import {
   useKeydown, isTyping, useFields, Form, Field, Dialog, Markdown, clientOptionList, icon
 } from "./shared/ui.jsx";
 import { TaskDialog } from "./shared/task-form.jsx";
+import { NAV_ICONS } from "./shared/icons.jsx";
 
 initPage("notes");   // monta a barra, carrega os clientes, retoma a sessao
 
 /* icones proprios: so esta pagina usa. a faisca e o gesto de pedir ajuda ao
-   Merlin; a caixa e arquivar (a de icons.jsx); a pessoa e "virar projeto de
-   cliente". */
+   Merlin. "virar projeto de cliente" usa o ícone de clientes da sidebar — o
+   mesmo desenho que leva para lá. */
 const SparkIcon = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
     <path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8L12 3z" /><path d="M19 15.5l.7 2 2 .7-2 .7-.7 2-.7-2-2-.7 2-.7.7-2z" />
-  </svg>
-);
-const PersonIcon = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-    <circle cx="12" cy="8" r="3.5" /><path d="M5 20a7 7 0 0114 0" />
   </svg>
 );
 const ListIcon = () => (
@@ -160,7 +156,10 @@ function Notes() {
   const [suggestions, setSuggestions] = useState(null);   // { targetId, items:[{type, title, note, checked}] } | null
   const [thinking, setThinking] = useState(false);
   const [panelSync, setPanelSync] = useState(0);          // sobe quando o painel deve reler o documento inteiro
-  const [sections, setSections] = useState({ steps: true, prints: true, activity: true });
+  /* doneSteps: os concluídos da checklist, dobrados numa linha no fim — fechados
+     por padrão, porque o que já foi feito não pode empurrar o que falta para
+     fora da tela */
+  const [sections, setSections] = useState({ steps: true, doneSteps: false, prints: true, activity: true });
   const [, tick] = useState(0);
   const listRef = useRef(null);
   const focusTitle = useRef(false);   // o painel que montar em seguida leva o foco para o titulo
@@ -589,7 +588,6 @@ function NotePanel({ note, notes, sync, thinking, focusTitle, sections, actions 
     wantBodyFocus.current = true;
     setViewing(false);
   };
-  const toggleViewing = () => { if (viewing) editBody(); else setViewing(true); };
 
   const onTitleInput = (e) => { const title = e.currentTarget.value; setDraft((v) => ({ ...v, title })); scheduleSave(); };
   const onBodyInput = (e) => { const body = e.currentTarget.value; setDraft((v) => ({ ...v, body })); scheduleSave(); };
@@ -612,15 +610,19 @@ function NotePanel({ note, notes, sync, thinking, focusTitle, sections, actions 
   };
   /* mover muda a SEQUENCIA, que e o que separa um passo a passo de uma lista
      de marcar: sem ordem, "o proximo" nao quer dizer nada. */
+  /* com os concluídos dobrados no fim, "subir" troca de lugar com o vizinho
+     VISÍVEL — o próximo do mesmo tipo (aberto com aberto, feito com feito).
+     trocar com um concluído escondido faria a seta parecer não funcionar. */
   const moveStep = (stepId, delta) => {
     const now = notes.get(note.id);
     if (!now) return;
     const i = now.steps.findIndex((s) => s.id === stepId);
-    const j = i + delta;
-    if (i < 0 || j < 0 || j >= now.steps.length) return;
+    if (i < 0) return;
+    let j = i + delta;
+    while (j >= 0 && j < now.steps.length && now.steps[j].done !== now.steps[i].done) j += delta;
+    if (j < 0 || j >= now.steps.length) return;
     const steps = now.steps.slice();
-    const [moved] = steps.splice(i, 1);
-    steps.splice(j, 0, moved);
+    [steps[i], steps[j]] = [steps[j], steps[i]];
     actions.save({ ...now, steps });
   };
   const editStep = (stepId, text) => {
@@ -652,16 +654,30 @@ function NotePanel({ note, notes, sync, thinking, focusTitle, sections, actions 
     notify("item apagado", () => { const again = notes.get(now.id); if (again) actions.save({ ...again, steps: before }); });
   };
 
+  /* a ordem gravada não muda: abertos e concluídos só são mostrados em dois
+     blocos. desmarcar um concluído devolve ele para a posição de antes. */
+  const openSteps = note.steps.filter((s) => !s.done);
+  const doneSteps = note.steps.filter((s) => s.done);
+  const renderStep = (s, i, count) => (
+    <Step key={s.id} step={s} current={s.id === nextStepId}
+          first={i === 0} last={i === count - 1}
+          onToggle={() => toggleStep(s.id)} onEdit={(t) => editStep(s.id, t)}
+          onMove={(d) => moveStep(s.id, d)} onPull={() => pullStep(s)} onRemove={() => removeStep(s.id)} />
+  );
+
   return (
     <section className="panel">
       <div className="panel__bar">
         <button className="action back-btn" type="button" title="voltar para a lista" aria-label="Voltar" onClick={actions.close}><BackIcon /></button>
-        <button className="pill" type="button" title="vira tarefa com dia (e duração, se quiser)" onClick={() => actions.pull(note)}>{icon("task")}<span>virar tarefa</span></button>
-        <button className="pill" type="button" aria-pressed={String(note.pinned)} title={note.pinned ? "tirar do topo da lista" : "fica no topo da lista"} onClick={() => actions.pin(notes.get(note.id) || note)}>{icon("pin")}<span>{note.pinned ? "fixada" : "fixar"}</span></button>
-        <button className="pill" type="button" title="abrir como mapa mental" onClick={() => actions.toMap(note)}>{icon("map")}<span>mapa</span></button>
-        <button className="pill" type="button" title="virar projeto de cliente" onClick={() => actions.toClient(note)}><PersonIcon /><span>cliente</span></button>
-        <span className="sep"></span>
-        <button className="pill" type="button" id="expand-btn" title="o Merlin lê a nota e sugere perguntas, caminhos e o que fazer" disabled={thinking} onClick={() => actions.expand(note)}><SparkIcon /><span>{thinking ? "pensando…" : "ramificar"}</span></button>
+        {/* as saídas da nota são ícones: o rótulo escrito de cada uma ocupava a
+            barra inteira para dizer o que o title já diz no ponteiro */}
+        <button className="action" type="button" title="virar tarefa (com dia e duração)" aria-label="Virar tarefa" onClick={() => actions.pull(note)}>{icon("task")}</button>
+        <button className="action" type="button" aria-pressed={String(note.pinned)} title={note.pinned ? "tirar do topo da lista" : "fixar no topo da lista"} aria-label={note.pinned ? "Desafixar" : "Fixar"} onClick={() => actions.pin(notes.get(note.id) || note)}>{icon("pin")}</button>
+        <button className="action" type="button" title="abrir como mapa mental" aria-label="Abrir como mapa mental" onClick={() => actions.toMap(note)}>{icon("map")}</button>
+        <button className="action" type="button" title="virar projeto de cliente" aria-label="Virar projeto de cliente" onClick={() => actions.toClient(note)}>{NAV_ICONS.clients}</button>
+        <button className={"action" + (thinking ? " is-thinking" : "")} type="button" id="expand-btn" disabled={thinking}
+                title={thinking ? "o Merlin está pensando…" : "ramificar: o Merlin lê a nota e sugere perguntas, caminhos e o que fazer"}
+                aria-label={thinking ? "Pensando" : "Ramificar"} onClick={() => actions.expand(note)}><SparkIcon /></button>
         <span className="spacer"></span>
         <span className={"saved" + (saved ? " is-visible" : "")} aria-live="polite">salvo</span>
         <span className="sep"></span>
@@ -674,19 +690,16 @@ function NotePanel({ note, notes, sync, thinking, focusTitle, sections, actions 
           <input ref={titleRef} className="title-input" maxLength="300" placeholder="título da nota" aria-label="Título da nota"
                  value={draft.title} onChange={onTitleInput}
                  onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); editBody(); } }} />
-          {/* a descrição agora tem rótulo, moldura e o gesto de editar ao lado
-              dela — não num canto da barra. o "ver formatado" só aparece quando
-              há o que formatar: oferecer a leitura de um texto que não existe é
-              a forma mais barata de confundir alguém. */}
+          {/* a descrição é texto corrido embaixo do título, sem rótulo nem caixa:
+              uma caixa grande vazia pesava mais que a própria nota. clicar no
+              texto formatado escreve; sair do campo volta a mostrar formatado
+              (markdown simples: **negrito**, - listas, # títulos). */}
           <div className={"body" + (viewing ? " is-reading" : "")}>
-            <p className="body__label">
-              <span className="t-mono">descrição</span>
-              {!!draft.body && <button className="link" type="button" onClick={toggleViewing}>{viewing ? "editar" : "ver formatado"}</button>}
-            </p>
-            <textarea ref={bodyRef} className="body-input" rows="3"
-                      placeholder="o que é essa nota. aceita markdown simples: **negrito**, - listas, # títulos."
+            <textarea ref={bodyRef} className="body-input" rows="1"
+                      placeholder="descrição"
                       aria-label="Descrição da nota"
-                      hidden={viewing} value={draft.body} onChange={onBodyInput}></textarea>
+                      hidden={viewing} value={draft.body} onChange={onBodyInput}
+                      onBlur={() => { if (draftRef.current.body.trim()) setViewing(true); }}></textarea>
             {viewing && (
               <div className="body-md" onClick={(e) => { if (e.target.closest("a")) return; editBody(); }}>
                 <Markdown text={draft.body} />
@@ -706,8 +719,6 @@ function NotePanel({ note, notes, sync, thinking, focusTitle, sections, actions 
             <span className="v"><select className="pill-select" aria-label="Cliente" value={clientValue} onChange={onClientChange}>{clientOptionList("sem cliente")}</select></span>
             <span className="k">criada</span>
             <span className="v"><span className="weak" title={stampLabel(note.createdAt)}>{longWhen(note.createdAt)}</span></span>
-            <span className="k">checklist</span>
-            <span className="v"><span className="t-mono">{total ? done + " de " + total : "vazia"}</span></span>
           </div>
 
           <div className={"section" + (sections.steps ? "" : " is-closed")}>
@@ -718,12 +729,20 @@ function NotePanel({ note, notes, sync, thinking, focusTitle, sections, actions 
               {total > 0 && <span className="bar"><i style={{ width: Math.round(100 * done / total) + "%" }}></i></span>}
             </div>
             <div className="section__body">
-              <div>{note.steps.map((s, i) => (
-                <Step key={s.id} step={s} current={s.id === nextStepId}
-                      first={i === 0} last={i === note.steps.length - 1}
-                      onToggle={() => toggleStep(s.id)} onEdit={(t) => editStep(s.id, t)}
-                      onMove={(d) => moveStep(s.id, d)} onPull={() => pullStep(s)} onRemove={() => removeStep(s.id)} />))}</div>
+              <div>{openSteps.map((s, i) => renderStep(s, i, openSteps.length))}</div>
               <NewStep onAdd={addStep} />
+              {/* os concluídos descem para o fim, dobrados: marcar um item tira
+                  ele do caminho em vez de deixá-lo riscado no meio da lista */}
+              {doneSteps.length > 0 && (
+                <div className={"done-steps" + (sections.doneSteps ? "" : " is-closed")}>
+                  <button className="done-steps__head" type="button" aria-expanded={String(sections.doneSteps)}
+                          onClick={() => actions.toggleSection("doneSteps")}>
+                    <ChevronIcon />
+                    <span>{doneSteps.length + (doneSteps.length === 1 ? " concluído" : " concluídos")}</span>
+                  </button>
+                  {sections.doneSteps && <div>{doneSteps.map((s, i) => renderStep(s, i, doneSteps.length))}</div>}
+                </div>
+              )}
             </div>
           </div>
 

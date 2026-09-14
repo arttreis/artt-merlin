@@ -20,7 +20,8 @@ import {
   collection, cloud, clients, listClients, clientName, md, brl, parseMoney,
   api, notify, sendToDay, formatMin, readDuration,
   PAGES, CLOUD_STATUS, search, signIn, currentNotice, onNotice, closeNotice,
-  toggleSidebar, setShellRenderer, currentBrand, share, shareOf, unshare, shareUrl
+  toggleSidebar, setShellRenderer, currentBrand, share, shareOf, unshare, shareUrl,
+  currentTheme, toggleTheme
 } from "./core.js";
 import { LOGO, GL_LOGO, GL_MARK, ICONS, NAV_ICONS, icon } from "./icons.jsx";
 
@@ -192,7 +193,7 @@ export function Dialog({ title, sub, wide, onClose, actions, label, children, ..
 /* o formulario em dialogo: todo "criar X" e "editar X" passa por aqui. os
    campos vem nos filhos (use <Field> e useFields); `onSubmit()` devolvendo
    false mantem a caixa aberta. o primeiro campo ganha foco ao abrir. */
-export function Form({ title, sub, wide, submit, remove, aside, onSubmit, onRemove, onClose, children }) {
+export function Form({ title, sub, wide, submit, remove, removeIcon, aside, onSubmit, onRemove, onClose, children }) {
   const ref = useRef(null);
   /* foco antes da pintura: a primeira tecla ja entra no campo certo */
   useLayoutEffect(() => {
@@ -215,7 +216,8 @@ export function Form({ title, sub, wide, submit, remove, aside, onSubmit, onRemo
         <div className="form-grid">{children}</div>
         <div className="dialog__actions">
           {(remove || aside) && <>
-            {remove && <button className="link" type="button" onClick={() => { if (onClose) onClose(); if (onRemove) onRemove(); }}>{remove}</button>}
+            {remove && <button className="dialog__remove" type="button" aria-label={remove} title={remove}
+                               onClick={() => { if (onClose) onClose(); if (onRemove) onRemove(); }}>{icon(removeIcon || "trash")}</button>}
             {aside}
             <span className="spacer" />
           </>}
@@ -555,13 +557,12 @@ export function DateField({ value, onChange, required, id, name, className, titl
   );
 }
 
-function DatePopover({ anchor, popRef, value, required, onPick, onClose }) {
-  const todayIso = isoOf(new Date());
-  const [focus, setFocus] = useState(value || todayIso);
+/* a caixinha que abre presa a um campo (calendário, dia do mês): a posição
+   embaixo dele, ou em cima se embaixo não couber; fora dela ou no Esc, fecha.
+   o Esc é ouvido na janela, em captura, antes do Esc da caixa de diálogo: sem
+   isso o Esc fecharia a caixa inteira junto com o calendário. */
+function usePopover(anchor, popRef, onClose) {
   const [pos, setPos] = useState(null);
-  const month = focus.slice(0, 7);
-
-  /* a posição: embaixo do campo, ou em cima se embaixo não couber */
   useLayoutEffect(() => {
     const place = () => {
       const r = anchor.current.getBoundingClientRect();
@@ -578,10 +579,6 @@ function DatePopover({ anchor, popRef, value, required, onPick, onClose }) {
     window.addEventListener("scroll", place, true);
     return () => { window.removeEventListener("resize", place); window.removeEventListener("scroll", place, true); };
   }, []);
-
-  /* fora dele, fecha. o Esc também — e ele é ouvido na janela, em captura,
-     antes do Esc da caixa de diálogo: sem isso o Esc fecharia a caixa inteira
-     junto com o calendário. */
   useEffect(() => {
     const down = (e) => {
       if (popRef.current && popRef.current.contains(e.target)) return;
@@ -593,6 +590,14 @@ function DatePopover({ anchor, popRef, value, required, onPick, onClose }) {
     window.addEventListener("keydown", key, true);
     return () => { document.removeEventListener("pointerdown", down, true); window.removeEventListener("keydown", key, true); };
   }, [onClose]);
+  return pos ? { left: pos.left, top: pos.top } : { visibility: "hidden" };
+}
+
+function DatePopover({ anchor, popRef, value, required, onPick, onClose }) {
+  const todayIso = isoOf(new Date());
+  const [focus, setFocus] = useState(value || todayIso);
+  const style = usePopover(anchor, popRef, onClose);
+  const month = focus.slice(0, 7);
 
   useEffect(() => {
     const b = popRef.current && popRef.current.querySelector('[data-iso="' + focus + '"]');
@@ -622,7 +627,7 @@ function DatePopover({ anchor, popRef, value, required, onPick, onClose }) {
 
   return createPortal(
     <div className="datepop" ref={popRef} role="dialog" aria-label="Escolher data" onKeyDown={onKey}
-         style={pos ? { left: pos.left, top: pos.top } : { visibility: "hidden" }}>
+         style={style}>
       <div className="datepop__head">
         <b>{MONTH_NAMES[first.getMonth()] + " de " + first.getFullYear()}</b>
         <button className="action" type="button" aria-label="Mês anterior" onClick={() => shiftMonth(-1)}>{icon("chevronLeft")}</button>
@@ -644,6 +649,84 @@ function DatePopover({ anchor, popRef, value, required, onPick, onClose }) {
       </div>
     </div>,
     document.body
+  );
+}
+
+/* ---------- o dia do mês ----------
+   o fixo e a dívida caem "todo dia 7". era um <input type=number> com as
+   setinhas do navegador; aqui é a mesma caixinha do calendário, só com os 31
+   números. `onChange` recebe o evento no formato do bind() do useFields, com o
+   valor em número (ou "" quando limpo). */
+export function DayOfMonthField({ value, onChange, name, required, id }) {
+  const [open, setOpen] = useState(false);
+  const wrapRef = useRef(null), popRef = useRef(null), btnRef = useRef(null);
+  const day = +value >= 1 && +value <= 31 ? +value : 0;
+  const pick = (d) => {
+    setOpen(false);
+    if (onChange) { const target = { value: d, name }; onChange({ target, currentTarget: target }); }
+    if (btnRef.current) btnRef.current.focus();
+  };
+  const onKey = (e) => {
+    const step = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -7, ArrowDown: 7 }[e.key];
+    if (!step || !popRef.current) return;
+    e.preventDefault();
+    const cur = +(document.activeElement && document.activeElement.dataset.day) || day || 1;
+    const next = popRef.current.querySelector('[data-day="' + Math.min(31, Math.max(1, cur + step)) + '"]');
+    if (next) next.focus();
+  };
+  useEffect(() => {
+    if (!open || !popRef.current) return;
+    const b = popRef.current.querySelector('[data-day="' + (day || 1) + '"]');
+    if (b) b.focus();
+  }, [open]);
+  return (
+    <span className="datefield" ref={wrapRef}>
+      <button ref={btnRef} id={id} type="button" className={"input domfield" + (day ? "" : " is-empty")}
+              aria-haspopup="dialog" aria-expanded={String(open)} onClick={() => setOpen((o) => !o)}>
+        <span>{day ? "todo dia " + day : "escolher o dia"}</span><CalendarIcon />
+      </button>
+      {open && createPortal(
+        <DomPopover anchor={wrapRef} popRef={popRef} day={day} required={required} onKey={onKey}
+                    onPick={pick} onClose={() => setOpen(false)} />,
+        document.body
+      )}
+    </span>
+  );
+}
+
+function DomPopover({ anchor, popRef, day, required, onKey, onPick, onClose }) {
+  const style = usePopover(anchor, popRef, onClose);
+  return (
+    <div className="datepop dompop" ref={popRef} role="dialog" aria-label="Escolher o dia do mês" onKeyDown={onKey} style={style}>
+      <div className="datepop__grid">
+        {Array.from({ length: 31 }, (_, i) => i + 1).map((d) => (
+          <button key={d} type="button" data-day={d} tabIndex={d === (day || 1) ? 0 : -1}
+                  className={"datepop__day" + (d === day ? " is-on" : "")} aria-pressed={String(d === day)}
+                  onClick={() => onPick(d)}>{d}</button>
+        ))}
+      </div>
+      {(!required || day > 28) && (
+        <div className="datepop__foot">
+          {!required && <button className="link" type="button" onClick={() => onPick("")}>limpar</button>}
+          <span className="spacer" />
+          {day > 28 && <span className="small weak">em mês mais curto, cai no último dia</span>}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ---------- o período ----------
+   "‹ set 2026 ›" com o "hoje" só quando se saiu do período atual. `onToday`
+   sem `current` é o jeito de dizer que já se está nele. */
+export function PeriodNav({ label, onPrev, onNext, onToday, current, prevLabel, nextLabel }) {
+  return (
+    <div className="period">
+      <button className="action" type="button" aria-label={prevLabel || "Anterior"} title={prevLabel || "anterior"} onClick={onPrev}>{icon("chevronLeft")}</button>
+      <span className="period__label">{label}</span>
+      <button className="action" type="button" aria-label={nextLabel || "Próximo"} title={nextLabel || "próximo"} onClick={onNext}>{icon("chevronRight")}</button>
+      {onToday && !current && <button className="pill pill--mini period__today" type="button" onClick={onToday}>hoje</button>}
+    </div>
   );
 }
 
@@ -901,41 +984,87 @@ function CloudCard({ page }) {
           <span className={"avatar" + (email ? "" : " is-out")} id="sb-avatar">{email ? email[0].toUpperCase() : "?"}</span>
           <span className="who"><b id="sb-name">{email ? email.split("@")[0] : "só você"}</b><span id="sb-email">{email || "sem sessão"}</span></span>
         </a>
+        <ThemeButton />
         {c.signedIn && <button type="button" id="cloud-signout" onClick={() => c.signOut()}>sair</button>}
       </div>
     </>
   );
 }
 
+/* claro ou escuro, a um clique, em toda tela. o interruptor tinha saído da
+   barra e morava só no perfil — trocar de tema pedia abrir outra página, e
+   com a pele da Guessless, que muda o fundo inteiro, isso aparecia mais
+   (13/09/2026). "seguir o sistema" continua sendo escolha do perfil. */
+function ThemeButton() {
+  const [theme, setThemeState] = useState(currentTheme);
+  const next = theme === "light" ? "escuro" : "claro";
+  return (
+    <button type="button" className="sb__mode" aria-label={"Mudar para o tema " + next} title={"tema " + next}
+            onClick={() => { toggleTheme(); setThemeState(currentTheme()); }}>
+      {theme === "light" ? MOON_ICON : SUN_ICON}
+    </button>
+  );
+}
+/* os desenhos próprios: os do NAV_ICONS carregam as classes do interruptor
+   (knob__sun/knob__moon), que são posicionadas por cima dele */
+const SUN_ICON = <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4M5.3 18.7l1.4-1.4M17.3 6.7l1.4-1.4"/></svg>;
+const MOON_ICON = <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/></svg>;
+
 /* ---------- a caixa de entrar ----------
    um passo de e-mail e um de codigo. quem faz as chamadas e o core; aqui so o
-   recado que ele devolve. */
+   recado que ele devolve.
+
+   o passo do codigo foi refeito em 13/09/2026: o titulo, o campo e a frase
+   "se voce puder entrar, o codigo chega" vinham nessa ordem — a explicacao
+   depois do botao, o endereco perdido no meio dela, e um "000000" no campo
+   que parecia codigo ja digitado. agora a frase vem antes, com o endereco em
+   destaque e o "trocar" ao lado dele; o codigo sao seis casas, e a sexta
+   digitada ja entra. */
+const RESEND_AFTER = 30;
+
 function SignInDialog() {
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
   const [step, setStep] = useState("email");
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
+  const [wait, setWait] = useState(0);
   const emailRef = useRef(null), codeRef = useRef(null);
   useLayoutEffect(() => { if (emailRef.current) emailRef.current.focus(); }, []);
   useEffect(() => { if (step === "code" && codeRef.current) codeRef.current.focus(); }, [step]);
+  useEffect(() => {
+    if (!wait) return;
+    const id = setTimeout(() => setWait((w) => Math.max(0, w - 1)), 1000);
+    return () => clearTimeout(id);
+  }, [wait]);
   useEscape(() => signIn.hide());
 
-  const sendCode = async (e) => {
-    e.preventDefault();
+  const request = async () => {
     if (busy) return;
-    setBusy(true); setMessage("mandando…");
+    setBusy(true); setMessage("");
     const r = await signIn.requestCode(email);
-    setBusy(false); setMessage(r.message);
-    if (r.ok) { setEmail(r.email); setCode(""); setStep("code"); }
-  };
-  const enter = async (e) => {
-    e.preventDefault();
-    if (busy) return;
-    setBusy(true); setMessage("conferindo…");
-    const r = await signIn.submitCode(email, code);
     setBusy(false);
-    if (!r.ok) setMessage(r.message);
+    if (r.ok) { setEmail(r.email); setCode(""); setStep("code"); setWait(RESEND_AFTER); }
+    else setMessage(r.message);
+  };
+  const sendCode = (e) => { e.preventDefault(); request(); };
+  const enter = async (value) => {
+    if (busy) return;
+    if (value.length !== 6) { setMessage("o código tem 6 dígitos"); return; }
+    setBusy(true); setMessage("");
+    const r = await signIn.submitCode(email, value);
+    setBusy(false);
+    if (!r.ok) {
+      setMessage(r.message);
+      setCode("");
+      setTimeout(() => { if (codeRef.current) codeRef.current.focus(); }, 0);
+    }
+  };
+  const typeCode = (text) => {
+    const digits = String(text).replace(/\D/g, "").slice(0, 6);
+    setCode(digits);
+    if (message) setMessage("");
+    if (digits.length === 6) enter(digits);
   };
   /* voltar para o e-mail. sem isto, digitar o endereço errado era um beco sem
      saída: o servidor responde igual para quem pode e para quem não pode
@@ -947,30 +1076,47 @@ function SignInDialog() {
   return (
     <div className="dialog" id="signin" role="dialog" aria-modal="true" aria-label="Entrar"
          onClick={(e) => { if (e.target === e.currentTarget) signIn.hide(); }}>
-      <div className="dialog__box">
+      <div className="dialog__box signin">
         <button className="dialog__close" type="button" id="signin-close" aria-label="Fechar" onClick={() => signIn.hide()}>{icon("x")}</button>
-        <p className="dialog__title">levar o merlin para outros aparelhos</p>
         {step === "email" ? (
           <form id="form-email" autoComplete="on" onSubmit={sendCode}>
-            <div id="signin-email">
-              <p className="dialog__sub">sem senha: mando um código de seis dígitos.</p>
-              <input ref={emailRef} className="signin-input" id="email-input" type="email" inputMode="email" autoComplete="email"
-                     placeholder="seu@email.com" aria-label="Seu e-mail" value={email} onChange={(e) => setEmail(e.currentTarget.value)} />
-              <button className="signin-button" type="submit" disabled={busy}>mandar código</button>
-            </div>
+            <p className="dialog__title">entrar</p>
+            <p className="dialog__sub">para levar o merlin a outros aparelhos. sem senha: mando um código de seis dígitos.</p>
+            <input ref={emailRef} className="input signin-input" id="email-input" type="email" inputMode="email" autoComplete="email"
+                   placeholder="seu@email.com" aria-label="Seu e-mail" value={email}
+                   onChange={(e) => { setEmail(e.currentTarget.value); if (message) setMessage(""); }} />
+            {message && <p className="signin-message is-error" role="alert">{message}</p>}
+            <button className="signin-button" type="submit" disabled={busy || !email.trim()}>{busy ? "mandando…" : "mandar código"}</button>
           </form>
         ) : (
-          <form id="form-code" autoComplete="off" onSubmit={enter}>
-            <div id="signin-code-step">
-              <input ref={codeRef} className="signin-input signin-code" id="code-input" inputMode="numeric" autoComplete="one-time-code"
-                     maxLength="6" placeholder="000000" aria-label="Código de seis dígitos" value={code} onChange={(e) => setCode(e.currentTarget.value)} />
-              <button className="signin-button" type="submit" disabled={busy}>entrar</button>
-            </div>
+          <form id="form-code" autoComplete="off" onSubmit={(e) => { e.preventDefault(); enter(code); }}>
+            <p className="dialog__title">confira seu e-mail</p>
+            <p className="dialog__sub">
+              se <b className="signin-email">{email}</b> puder entrar, o código chega em alguns segundos.{" "}
+              <button className="signin-link" type="button" onClick={changeEmail}>trocar e-mail</button>
+            </p>
+            {/* as seis casas são desenho: o campo de verdade é um só, por cima
+                delas, para colar e o preenchimento automático do celular
+                (one-time-code) continuarem funcionando */}
+            <label className={"otp" + (message ? " is-error" : "") + (busy ? " is-busy" : "")}>
+              <input ref={codeRef} className="otp__input" id="code-input" inputMode="numeric" autoComplete="one-time-code"
+                     maxLength="6" aria-label="Código de seis dígitos" value={code} disabled={busy}
+                     onChange={(e) => typeCode(e.currentTarget.value)} />
+              {Array.from({ length: 6 }, (_, i) => (
+                <span key={i} aria-hidden="true"
+                      className={"otp__cell" + (i === Math.min(code.length, 5) ? " is-at" : "") + (code[i] ? " is-filled" : "")}>{code[i] || ""}</span>
+              ))}
+            </label>
+            <p className={"signin-message" + (message ? " is-error" : "")} role="status" aria-live="polite">
+              {busy ? "conferindo…" : message}
+            </p>
+            <button className="signin-button" type="submit" disabled={busy || code.length !== 6}>{busy ? "conferindo…" : "entrar"}</button>
+            <p className="signin-foot">
+              {wait
+                ? <span>não chegou? dá para mandar de novo em {wait}s</span>
+                : <>não chegou? <button className="signin-link" type="button" disabled={busy} onClick={request}>mandar de novo</button></>}
+            </p>
           </form>
-        )}
-        <p className="signin-message" id="signin-message" role="status" aria-live="polite">{message}</p>
-        {step === "code" && (
-          <button className="signin-back" type="button" onClick={changeEmail}>usar outro e-mail</button>
         )}
       </div>
     </div>

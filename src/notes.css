@@ -15,12 +15,13 @@
 /* ---------- cabecalho fino ---------- */
 .top{
   flex:0 0 auto;display:flex;align-items:center;gap:var(--pd2);
-  height:56px;padding:0 var(--pd) 0 clamp(16px,2.5vw,28px);
+  height:64px;padding:0 var(--pd) 0 clamp(16px,2.5vw,28px);
   border-bottom:1px solid var(--line-soft);
 }
-.top h1{margin:0;font-size:18px;font-weight:600;letter-spacing:-.02em}
-.top .count{font-family:var(--mono);font-size:11px;color:var(--ink-30);letter-spacing:.06em}
-.top .count::before{content:"·";margin:0 8px;color:var(--ink-30)}
+/* o título no mesmo corpo do h1 das outras páginas (.header h1); a
+   contagem é legenda em sans, não rótulo técnico */
+.top h1{margin:0;font-size:clamp(22px,3vw,30px);font-weight:600;letter-spacing:-.03em;line-height:1}
+.top .count{align-self:center;margin-left:4px;font-size:13px;color:var(--ink-50);font-variant-numeric:tabular-nums}
 .top__new{margin-left:auto}
 .views{display:flex;gap:2px}
 
@@ -33,7 +34,7 @@
 .panel{flex:1 1 auto;min-width:0;display:flex;flex-direction:column}
 
 .list-col__scroll{flex:1 1 auto;min-height:0;overflow-y:auto;padding:4px 8px 24px}
-.group{margin:12px 6px 6px;font-family:var(--mono);font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-30)}
+.group{margin:12px 6px 6px;font-size:11.5px;font-weight:500;color:var(--ink-50)}
 .group:first-child{margin-top:8px}
 /* o rodape das arquivadas: mesmo rotulo dos dias, mas clicavel — e o unico
    lugar da tela que abre e fecha, porque arquivar precisa ter volta a vista */
@@ -53,17 +54,16 @@
   cursor:pointer;position:relative;transition:background var(--t);
 }
 .item:hover{background:var(--fill)}
+/* um destaque só: o fundo. a barra à esquerda somada ao contorno de foco
+   (as setas focam a linha) dava três marcas para dizer a mesma coisa. */
 .item.is-active{background:var(--fill-hover)}
-.item.is-active::before{
-  content:"";position:absolute;left:-8px;top:12px;bottom:12px;width:3px;border-radius:0 2px 2px 0;
-  background:var(--green);box-shadow:0 0 10px var(--green-glow);
-}
+.item:focus-visible{outline:none;background:var(--fill-hover)}
 .item__text{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:2px}
 .item__line1{display:flex;align-items:baseline;gap:8px}
 .item__title{flex:1 1 auto;min-width:0;font-size:13.5px;font-weight:500;color:var(--ink);overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
 .item__when{flex:0 0 auto;font-size:11.5px;color:var(--ink-30);white-space:nowrap;font-variant-numeric:tabular-nums}
 .item__preview{font-size:12.5px;color:var(--ink-50);overflow:hidden;white-space:nowrap;text-overflow:ellipsis;display:flex;align-items:center;gap:6px}
-.item__preview .stage{flex:0 0 auto;color:var(--ink-30);font-family:var(--mono);font-size:10px;letter-spacing:.06em;text-transform:uppercase}
+.item__preview .stage{flex:0 0 auto;color:var(--ink-50);font-size:11.5px;font-weight:500;font-variant-numeric:tabular-nums}
 .item__preview .stage.is-green{color:var(--green-ink)}
 .item__preview .phrase{min-width:0;overflow:hidden;text-overflow:ellipsis}
 /* a bolinha verde: nota que ainda e semente sem corpo nem passo — chegou e
@@ -94,8 +94,10 @@
   border-bottom:1px solid var(--line-soft);
 }
 .panel__bar .sep{width:1px;height:18px;background:var(--line-soft);margin:0 6px}
-.panel__bar .pill{height:28px;padding:0 10px;font-size:12px}
-.panel__bar .pill:disabled{opacity:.5;cursor:default}
+.panel__bar .action[aria-pressed="true"]{color:var(--green)}
+.panel__bar .action:disabled{cursor:default}
+/* ramificando: a faísca pulsa enquanto o Merlin pensa */
+.panel__bar .action.is-thinking{color:var(--green-ink);animation:print-wait .9s ease-in-out infinite alternate}
 .back-btn{display:none}
 .panel__scroll{flex:1 1 auto;min-height:0;overflow-y:auto;padding:clamp(16px,2.5vw,28px) clamp(16px,3vw,36px) 60px}
 .panel__body{max-width:760px}
@@ -108,11 +110,11 @@
 .title-input::placeholder{color:var(--ink-30)}
 .body-input{
   width:100%;background:none;border:0;padding:0;margin:0;resize:none;overflow:hidden;
-  font-size:13.5px;line-height:1.55;color:var(--ink-70);min-height:44px;
+  font-size:13.5px;line-height:1.55;color:var(--ink-70);min-height:calc(2 * 1.55em);
 }
 .body-input:focus{outline:none;color:var(--ink)}
 .body-input::placeholder{color:var(--ink-30)}
-.body-md{font-size:13.5px;line-height:1.55;color:var(--ink-70);min-height:44px}
+.body-md{font-size:13.5px;line-height:1.55;color:var(--ink-70)}
 .body-md :first-child{margin-top:0}
 .body-md p{margin:0 0 8px}
 .body-md ul,.body-md ol{margin:0 0 8px;padding-left:20px}
@@ -142,7 +144,7 @@
 .pill-select:hover{background-color:var(--fill-hover);border-color:var(--line)}
 .pill-select:focus{outline:none;border-color:var(--ink-30)}
 .pill-select option{background:var(--surface);color:var(--ink)}
-.pill-select--stage{font-family:var(--mono);font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;padding-left:22px;position:relative}
+.pill-select--stage{font-size:12px;font-weight:500;padding-left:22px;position:relative}
 .v--stage{position:relative}
 .v--stage .stage-dot{position:absolute;left:9px;top:50%;transform:translateY(-50%);width:8px;height:8px;border-radius:50%;border:1.5px solid var(--ink-50);pointer-events:none}
 .v--stage[data-stage="seed"] .stage-dot{border-color:var(--ink-30)}
@@ -151,14 +153,13 @@
 .v--stage[data-stage="executing"] .stage-dot{border-color:var(--green);background:var(--green);box-shadow:0 0 8px var(--green-glow)}
 .v--stage[data-stage="archived"] .stage-dot{border-style:dashed;border-color:var(--ink-30)}
 .sheet .v .weak{font-size:12.5px}
-.sheet .v .t-mono{font-size:10.5px;color:var(--ink-50)}
 
 /* ---------- secoes: passos e atividade ---------- */
 .section{margin-top:20px}
 .section__head{display:flex;align-items:center;gap:8px;margin:0 0 6px;cursor:pointer;user-select:none;color:var(--ink)}
 .section__head svg{width:14px;height:14px;color:var(--ink-30);transition:transform var(--t)}
 .section__head .title{font-size:13.5px;font-weight:500}
-.section__head .count{font-family:var(--mono);font-size:11px;color:var(--ink-30)}
+.section__head .count{font-size:11.5px;font-weight:500;color:var(--ink-50);font-variant-numeric:tabular-nums}
 .section.is-closed .section__head svg{transform:rotate(-90deg)}
 .section.is-closed .section__body{display:none}
 .section__head .bar{flex:0 0 90px;margin-left:auto;height:4px}
@@ -180,7 +181,7 @@
 .activity li b{font-weight:500;color:var(--ink)}
 .activity li .when{margin-left:auto;flex:0 0 auto;font-size:11.5px;color:var(--ink-30);white-space:nowrap}
 .activity li .txt{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.activity li .tag{display:inline-flex;align-items:center;height:18px;padding:0 7px;border-radius:var(--br-pill);border:1px solid var(--line-soft);background:var(--fill);font-family:var(--mono);font-size:9.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-50);margin:0 2px}
+.activity li .tag{display:inline-flex;align-items:center;height:18px;padding:0 7px;border-radius:var(--br-pill);border:1px solid var(--line-soft);background:var(--fill);font-size:11.5px;font-weight:500;color:var(--ink-50);margin:0 2px}
 
 /* ---------- quadro por estagio (visao alternativa) ---------- */
 .board-col{flex:1 1 auto;min-width:0;overflow:auto;padding:var(--pd)}
@@ -191,7 +192,7 @@
   padding:var(--pd2);
 }
 .board__title{display:flex;align-items:center;justify-content:space-between;gap:var(--pd2);margin:2px 4px;color:var(--ink-50)}
-.board__count{font-family:var(--mono);font-size:10px;color:var(--ink-30)}
+.board__count{font-size:11.5px;font-weight:500;color:var(--ink-50);font-variant-numeric:tabular-nums}
 .board__drop{display:flex;flex-direction:column;gap:6px;min-height:48px;border-radius:var(--br2);transition:background var(--t)}
 .board__drop.is-over{background:var(--fill-hover)}
 .board__empty{margin:0;padding:8px 4px;font-size:11.5px;color:var(--ink-30)}
@@ -220,8 +221,6 @@
   .screen[data-mobile="list"] .panel{display:none}
   .back-btn{display:inline-grid}
   .panel__bar{overflow-x:auto;scrollbar-width:none}
-  .panel__bar .pill span{display:none}
-  .panel__bar .pill{width:28px;padding:0;justify-content:center}
   .sheet{grid-template-columns:84px 1fr}
 }
 
@@ -248,7 +247,7 @@
 .step__now{
   flex:none;height:16px;padding:0 6px;border-radius:var(--br-pill);
   background:color-mix(in srgb,var(--green) 15%,transparent);
-  color:var(--green-ink);font-size:9px;letter-spacing:.08em;
+  color:var(--green-ink);font-size:11px;font-weight:500;letter-spacing:0;
   display:inline-flex;align-items:center;
 }
 .step.is-now{background:color-mix(in srgb,var(--green) 5%,transparent)}
@@ -316,26 +315,27 @@
 }
 .print-full img{max-width:100%;max-height:92vh;border-radius:var(--br2);box-shadow:var(--sombra-2)}
 
-/* ---------- a descricao ----------
-   era um paragrafo solto embaixo do titulo, sem rotulo e sem moldura, e o
-   gesto de edita-la morava num "editar" no canto oposto da barra. quem abria
-   a nota nao tinha como saber que aquele texto era dele para mexer.
-   agora ela tem nome, borda que responde ao ponteiro, e o gesto ao lado. */
+/* ---------- a descrição ----------
+   a caixa com rótulo e moldura resolveu o "isto é editável?", mas vazia ela
+   era o maior bloco do painel. agora é texto corrido sem borda, que cresce
+   com o conteúdo; o fundo leve no ponteiro é o que diz que dá para mexer. */
 .body{margin:0 0 var(--pd)}
-.body__label{
-  display:flex;align-items:baseline;justify-content:space-between;gap:10px;
-  margin:0 0 6px;color:var(--ink-30);
-}
-.body__label .link{font-size:11.5px}
 .body .body-input,.body .body-md{
-  width:100%;border-radius:var(--br2);padding:10px 12px;
-  border:1px solid var(--line-soft);background:var(--fill);
-  transition:border-color var(--t),background var(--t);
+  width:calc(100% + 16px);margin:0 -8px;padding:4px 8px;border-radius:var(--br2);
+  transition:background var(--t);
 }
-.body .body-input:focus{border-color:var(--ink-30);background:var(--fill-hover);color:var(--ink)}
-/* lendo: a moldura so acende no ponteiro, para o texto formatado respirar */
-.body.is-reading .body-md{background:none;border-color:transparent;cursor:text}
-.body.is-reading .body-md:hover{border-color:var(--line-soft);background:var(--fill)}
+.body.is-reading .body-md{cursor:text}
+.body.is-reading .body-md:hover{background:var(--fill)}
+
+/* os concluídos da checklist, dobrados no fim */
+.done-steps{margin-top:6px}
+.done-steps__head{
+  display:flex;align-items:center;gap:6px;padding:4px;background:none;border:0;
+  font-size:12.5px;font-weight:500;color:var(--ink-50);cursor:pointer;transition:color var(--t);
+}
+.done-steps__head:hover{color:var(--ink)}
+.done-steps__head svg{width:13px;height:13px;color:var(--ink-30);transition:transform var(--t)}
+.done-steps.is-closed .done-steps__head svg{transform:rotate(-90deg)}
 
 /* ---------- a checklist ----------
    o numero na frente e o circulo fino somavam para o mesmo lugar errado:

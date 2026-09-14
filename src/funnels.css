@@ -89,36 +89,39 @@
 .fe-group .action[aria-pressed="true"]{color:var(--ink);background:var(--fill-hover)}
 #suggest-btn:disabled{opacity:.6;cursor:default}
 
-/* biblioteca de tipos, à esquerda: clique põe no centro, arrasto solta onde quiser */
+/* biblioteca de tipos: pop-up do "+", encostado embaixo dele. linha de
+   28px com ícone e nome, sem cartão em volta de cada tipo — 27 retângulos
+   iguais em fila eram só ruído. a marcada (setas, ponteiro) ganha o fundo. */
 .fe-library{
-  position:absolute;top:64px;left:12px;bottom:76px;z-index:7;width:196px;
-  display:flex;flex-direction:column;gap:10px;padding:12px;border-radius:var(--br);overflow:hidden;
+  position:absolute;top:60px;right:12px;z-index:10;width:232px;max-height:calc(100% - 60px - 76px);
+  display:flex;flex-direction:column;gap:6px;padding:8px;border-radius:var(--br);overflow:hidden;
+  animation:fe-pop .14s ease-out;
 }
-.fe-library__top{display:flex;align-items:center;justify-content:space-between;color:var(--ink-30)}
+@keyframes fe-pop{from{opacity:0;transform:translateY(-4px)}}
+.fe-library.is-dragging{opacity:0;pointer-events:none}
 .fe-library__search{padding:6px 12px;font-size:12.5px;flex:none}
-/* a biblioteca vem em prateleiras (aquisição, página, captura…): a rolagem
-   é do conjunto, não de cada grade, senão cada prateleira rolaria sozinha */
-.fe-library__shelves{display:flex;flex-direction:column;gap:13px;overflow-y:auto;scrollbar-width:thin;padding-right:2px;margin-right:-2px}
-.fe-shelf__name{margin:0 0 5px;color:var(--ink-30);font-size:9.5px;letter-spacing:.08em;text-transform:uppercase}
-.fe-library__grid{display:flex;flex-direction:column;gap:4px}
+/* a rolagem é do conjunto, não de cada prateleira */
+.fe-library__shelves{display:flex;flex-direction:column;gap:6px;overflow-y:auto;scrollbar-width:thin;min-height:0}
+.fe-shelf__name{margin:4px 8px 2px;font-family:var(--sans);font-size:11px;font-weight:500;color:var(--ink-30)}
 .fe-type{
-  display:flex;align-items:center;gap:10px;padding:5px 6px;
-  border-radius:10px;background:var(--fill);border:1px solid var(--line-soft);
-  cursor:grab;text-align:left;user-select:none;-webkit-user-select:none;
-  transition:background var(--t),border-color var(--t),transform var(--t);
+  display:flex;align-items:center;gap:9px;width:100%;height:28px;padding:0 8px;
+  border-radius:var(--br2);color:var(--ink-50);cursor:grab;text-align:left;
+  user-select:none;-webkit-user-select:none;transition:background var(--t),color var(--t);
 }
-.fe-type:hover{background:var(--fill-hover);border-color:var(--line);transform:translateX(2px)}
-.fe-type:active{cursor:grabbing;transform:none}
-.fe-type .ico,.fe-panel__top .ico{
+.fe-type.is-active{background:var(--fill-hover);color:var(--ink)}
+.fe-type:active{cursor:grabbing}
+.fe-type svg{width:15px;height:15px;flex:none}
+.fe-type.is-conversion svg{color:var(--green-ink)}
+.fe-type span{font-size:12.5px;color:var(--ink);line-height:1.2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fe-library .empty{margin:6px 8px;font-size:12px}
+.fe-panel__top .ico{
   width:26px;height:26px;flex:none;display:grid;place-items:center;border-radius:8px;
   background:var(--surface-2);border:1px solid var(--line-soft);color:var(--ink-70);
 }
-.fe-type .ico svg,.fe-panel__top .ico svg{width:15px;height:15px}
-.fe-type.is-conversion .ico,.fe-panel__top .ico.is-conversion{
+.fe-panel__top .ico svg{width:15px;height:15px}
+.fe-panel__top .ico.is-conversion{
   color:var(--green-ink);background:color-mix(in srgb,var(--green) 12%,transparent);border-color:color-mix(in srgb,var(--green) 32%,transparent);
 }
-.fe-type span:not(.ico){font-size:12.5px;color:var(--ink);line-height:1.2}
-.fe-library__hint{margin:0;font-size:11px;color:var(--ink-30);line-height:1.4}
 
 /* painel da direita: o funil (nada selecionado), o nó, ou a aresta */
 .fe-panel{
@@ -127,13 +130,13 @@
 }
 .fe-panel__top{display:flex;align-items:center;gap:10px;padding:12px 12px 10px;border-bottom:1px solid var(--line-soft)}
 .fe-panel__title{flex:1 1 auto;min-width:0}
-.fe-panel__title .t-mono{display:block;font-size:9.5px;color:var(--ink-30);margin-bottom:1px}
+.fe-panel__title .t-mono{display:block;font-family:var(--sans);font-size:11px;font-weight:500;letter-spacing:0;text-transform:none;color:var(--ink-30);margin-bottom:1px}
 .fe-panel__top h3{margin:0;font-size:13.5px;font-weight:600;letter-spacing:-.01em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .fe-panel__body{flex:1 1 auto;min-height:0;overflow-y:auto;padding:12px;scrollbar-width:thin}
 .fe-panel .input,.fe-panel .textarea,.fe-panel .select{margin-bottom:8px}
 .fe-panel .textarea{min-height:60px}
 .pn-section{margin-top:12px;padding-top:10px;border-top:1px solid var(--line-soft)}
-.pn-section h4{margin:0 0 6px;font-family:var(--mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-30);font-weight:400}
+.pn-section h4{margin:0 0 6px;font-family:var(--sans);font-size:11.5px;font-weight:500;color:var(--ink-30)}
 .pn-item{display:flex;align-items:center;gap:6px;padding:4px 0;font-size:12.5px;color:var(--ink-70)}
 .pn-add{font-size:12px;color:var(--green-ink);margin-top:4px}
 .pn-add:hover{filter:brightness(1.15)}
@@ -175,7 +178,6 @@
 .fe-drawer__top{display:flex;align-items:center;gap:10px;padding:10px 12px 10px 16px;border-bottom:1px solid var(--line-soft)}
 .fe-drawer__top h3{margin:0;font-size:13.5px;font-weight:600;flex:1 1 auto}
 .fe-drawer__body{flex:1 1 auto;min-height:0;overflow:auto;padding:12px 16px 16px;scrollbar-width:thin}
-.fe.is-drawer .fe-library{display:none}
 .fe.is-drawer .fe-panel{bottom:calc(min(46%,440px) + 76px)}
 .fe-add-row{margin-bottom:var(--pd)}
 .fe-drawer .table .input,.fe-drawer .table .select{min-width:120px}
@@ -193,16 +195,18 @@
 .node-icon-bg.is-conversion{fill:color-mix(in srgb,var(--green) 14%,transparent);stroke:color-mix(in srgb,var(--green) 34%,transparent)}
 .node-icon{color:var(--ink-70);fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
 .node-icon.is-conversion{color:var(--green-ink)}
-.node-type{fill:var(--ink-30);font-family:var(--mono);font-size:9px;letter-spacing:.08em;text-transform:uppercase}
+.node-type{fill:var(--ink-30);font-family:var(--sans);font-size:10.5px;font-weight:500}
 .node-title{fill:var(--ink);font-family:var(--sans);font-size:12.5px;font-weight:500}
 .node-body{fill:var(--bg);fill-opacity:.55;stroke:var(--line-soft)}
 html.light .node-body{fill-opacity:.35}
 .node-dot{fill:var(--ink-30)}
 .node-dot.has-number{fill:var(--green)}
 .node-number{fill:var(--ink);font-family:var(--mono);font-size:19px;font-weight:500;letter-spacing:-.02em}
-.node-number.is-empty{fill:var(--ink-30);font-weight:400;font-size:14px}
+/* sem número e sem projeção o desenho escreve "—": melhor não escrever nada */
+.node-number.is-empty{display:none}
 .node-number.is-projected{fill:var(--ink-30);font-weight:400}
-.node-compare,.node-caption{fill:var(--ink-30);font-family:var(--mono);font-size:10px}
+.node-compare{fill:var(--ink-30);font-family:var(--mono);font-size:10.5px}
+.node-caption{fill:var(--ink-50);font-family:var(--sans);font-size:10.5px}
 .node-chip{fill:var(--fill);stroke:var(--line-soft)}
 .node-chip-text{fill:var(--ink-50);font-family:var(--mono);font-size:9.5px}
 .node-port{fill:var(--surface-2);stroke:var(--line)}
@@ -224,7 +228,7 @@ html.light .node-body{fill-opacity:.35}
 .edge-line.is-weak{stroke-opacity:.7}
 .edge:hover .edge-line{stroke:var(--ink-70)}
 .edge.is-selected .edge-line{stroke:var(--green)}
-.edge-label{fill:var(--ink-70);font-family:var(--mono);font-size:10px}
+.edge-label{fill:var(--ink-70);font-family:var(--mono);font-size:10.5px}
 .edge-label.is-weak{fill:var(--ink-50)}
 .edge-label.is-avg{fill:var(--ink-30)}
 .edge-label-bg{fill:var(--surface-2);stroke:var(--line)}
@@ -245,7 +249,7 @@ html.light .node-body{fill-opacity:.35}
 .ghost:hover .ghost-box{fill-opacity:.96;stroke:var(--green);stroke-dasharray:none}
 .ghost-icon{color:var(--ink-50);fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
 .ghost-icon.is-conversion{color:var(--green-ink)}
-.ghost-type{fill:var(--ink-50);font-family:var(--mono);font-size:9px;letter-spacing:.08em;text-transform:uppercase}
+.ghost-type{fill:var(--ink-50);font-family:var(--sans);font-size:10.5px;font-weight:500}
 .ghost-why{fill:var(--ink-30);font-family:var(--sans);font-size:11px}
 .ghost:hover .ghost-type{fill:var(--ink-70)}
 .ghost:hover .ghost-why{fill:var(--ink-50)}
@@ -275,7 +279,7 @@ html.light .node-body{fill-opacity:.35}
 .ladder-item .price{font-family:var(--mono)}
 .trigger-chips{margin-bottom:var(--pd)}
 .sug-group{margin-bottom:var(--pd)}
-.sug-group h4{margin:0 0 6px;font-size:11px;letter-spacing:.05em;text-transform:uppercase;color:var(--ink-30);font-weight:400}
+.sug-group h4{margin:0 0 6px;font-family:var(--sans);font-size:11.5px;font-weight:500;color:var(--ink-30)}
 .sug-item{display:flex;align-items:flex-start;gap:8px;padding:7px 4px;border-bottom:1px solid var(--line-soft)}
 .sug-item input[type="checkbox"]{margin-top:3px;flex:0 0 auto;accent-color:var(--green)}
 .sug-title{font-weight:600;font-size:13px}
@@ -292,7 +296,9 @@ html.light .node-body{fill-opacity:.35}
   .fe-group .pill--icon{width:36px;min-height:36px}
   .pn-add{min-height:34px}
   .fe-name{max-width:none;width:auto;flex:1 1 auto}
-  .fe-library,.fe-panel{top:auto;left:12px;right:12px;bottom:64px;width:auto;height:52%}
+  .fe-panel{top:auto;left:12px;right:12px;bottom:64px;width:auto;height:52%}
+  .fe-library{top:auto;left:12px;right:12px;bottom:64px;width:auto;max-height:52%}
+  .fe-type{height:36px}
   .fe.is-drawer .fe-panel{display:none}
   .fe-drawer{height:60%}
   .fe-dock{gap:0;padding:4px;overflow-x:auto;scrollbar-width:none;justify-content:flex-start}

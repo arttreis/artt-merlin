@@ -137,7 +137,6 @@ const MIN_K = 0.2, MAX_K = 2.5; // limites do zoom, os mesmos para botão, roda 
    piso o enquadrar prefere encostar no começo do funil e deixar o resto para
    o arrasto. */
 const MIN_FIT_K = 0.62;
-const VIEW_KEY = "merlin:funnels:view:";
 const GHOSTS_KEY = "merlin:funnels:ghosts"; // a tira de próximas etapas, ligada ou desligada neste aparelho
 const LOCK_KEY = "merlin:funnels:lock";     // o palco travado: navegar e ler sem mover, ligar nem apagar etapa
 const MINI_W = 168, MINI_H = 108;          // o minimapa, em px de tela
@@ -154,9 +153,6 @@ const FitIcon = () => (
 );
 const LayoutIcon = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="5" width="6" height="5" rx="1.5" /><rect x="15" y="3" width="6" height="5" rx="1.5" /><rect x="15" y="16" width="6" height="5" rx="1.5" /><path d="M9 7.5h3v-2h3M12 7.5v11h3" /></svg>
-);
-const LibraryIcon = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1.5" /><rect x="14" y="3" width="7" height="7" rx="1.5" /><rect x="3" y="14" width="7" height="7" rx="1.5" /><path d="M17.5 14v7M14 17.5h7" /></svg>
 );
 const PanelIcon = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2" /><path d="M15 4v16" /></svg>
@@ -500,16 +496,6 @@ function askRow(x, y, thinking) {
   ]);
 }
 
-/* a vista (pan/zoom) é conveniência de tela, não dado do funil — por isso
-   mora só no localStorage deste navegador, fora da coleção sincronizada. */
-function readView(id) {
-  try {
-    const v = JSON.parse(localStorage.getItem(VIEW_KEY + id));
-    if (v && Number.isFinite(v.x) && Number.isFinite(v.y) && Number.isFinite(v.k)) return v;
-  } catch (e) {}
-  return null; // sem vista salva: quem chama decide o enquadramento inicial
-}
-
 /* o palco. `api` é um ref que o editor usa para pedir zoom, enquadrar e
    converter coordenadas — a vista mora aqui, e só aqui. */
 function Stage(props) {
@@ -524,22 +510,18 @@ function Stage(props) {
   latest.current = props;
   const [dropping, setDropping] = useState(false);
 
-  const saveView = useMemo(() => debounce(() => {
-    try { localStorage.setItem(VIEW_KEY + latest.current.doc.id, JSON.stringify(viewRef.current)); } catch (e) {}
-  }, 300), []);
-
   /* escala mínima entre 1 e a que faz o grafo inteiro caber com margem de
      40px — nunca amplia além do tamanho real dos nós, só reduz quando precisa.
-     a margem da direita e da esquerda conta a biblioteca e o painel, que
-     ficam por cima do palco: enquadrar num palco "cheio" esconderia as pontas. */
+     a margem da direita conta o painel, que fica por cima do palco:
+     enquadrar num palco "cheio" esconderia as pontas. a biblioteca não conta
+     — ela é um pop-up que abre e fecha, não uma coluna. */
   const freeArea = () => {
     const r = wrapRef.current.getBoundingClientRect();
     const p = latest.current;
     const wide = window.innerWidth >= 900;
-    const left = wide && p.libraryOpen && !p.drawerOpen ? 220 : 0;
     const right = wide && p.panelOpen ? 344 : 0;
     const bottom = p.drawerOpen ? Math.min(r.height * 0.46, 440) + 76 : 64;
-    return { left, top: 64, width: Math.max(120, r.width - left - right), height: Math.max(120, r.height - 64 - bottom) };
+    return { left: 0, top: 64, width: Math.max(120, r.width - right), height: Math.max(120, r.height - 64 - bottom) };
   };
   /* `readable` e a vista de quando o funil abre: ali o que importa e enxergar
      o comeco, nao caber tudo. o "enquadrar tudo" do menu passa sem ela e
@@ -641,7 +623,7 @@ function Stage(props) {
   };
   const miniDown = (e) => { e.preventDefault(); miniDrag.current = true; e.currentTarget.setPointerCapture(e.pointerId); miniGo(e); };
   const miniMove = (e) => { if (miniDrag.current) miniGo(e); };
-  const miniUp = () => { if (!miniDrag.current) return; miniDrag.current = false; saveView(); drawMiniView(); };
+  const miniUp = () => { if (!miniDrag.current) return; miniDrag.current = false; drawMiniView(); };
   const toWorld = (clientX, clientY) => {
     const r = svgRef.current.getBoundingClientRect();
     const v = viewRef.current;
@@ -654,11 +636,11 @@ function Stage(props) {
     const wx = (cx - v.x) / v.k, wy = (cy - v.y) / v.k;
     const k = Math.min(MAX_K, Math.max(MIN_K, v.k * factor));
     viewRef.current = { x: cx - wx * k, y: cy - wy * k, k };
-    applyView(); saveView();
+    applyView();
   };
   const fit = (nodes) => {
     viewRef.current = fitView(freeArea(), nodes || latest.current.doc.nodes);
-    applyView(); saveView();
+    applyView();
   };
   /* traz um retângulo do mundo para dentro da área livre com o menor
      empurrão que resolve — sem mexer no zoom e sem reenquadrar. é o que
@@ -675,7 +657,7 @@ function Stage(props) {
     if (y1 + dy < a.top + M) dy = a.top + M - y1;
     if (!dx && !dy) return;
     viewRef.current = { ...v, x: v.x + dx, y: v.y + dy };
-    applyView(); saveView();
+    applyView();
   };
 
   const contextOf = () => {
@@ -728,13 +710,13 @@ function Stage(props) {
     drawEdges(ctx);
   };
 
-  /* o documento mudou: copia as posições e redesenha tudo. sem vista salva
-     (funil novo, ou primeiro abrir neste navegador) calcula o enquadramento
-     agora, com o palco já visível — medir antes disso daria retângulo zero
-     e uma escala degenerada. */
+  /* o documento mudou: copia as posições e redesenha tudo. na primeira vez
+     (o funil acabou de abrir) enquadra o fluxo, com o palco já visível —
+     medir antes disso daria retângulo zero e uma escala degenerada. depois
+     disso a vista é de quem mexe: editar não reenquadra. */
   useEffect(() => {
     liveRef.current = { nodes: doc.nodes.map((n) => ({ ...n })), edges: doc.edges };
-    if (!viewRef.current) { viewRef.current = readView(doc.id) || fitView(freeArea(), doc.nodes, true); applyView(); }
+    if (!viewRef.current) { viewRef.current = fitView(freeArea(), doc.nodes, true); applyView(); }
     redraw();
   }, [doc, selected, comparing, projections, ghosts]);
   /* abrir o painel ou a gaveta muda a área livre: o minimapa confere de novo */
@@ -864,7 +846,7 @@ function Stage(props) {
     const up = (e) => {
       pointers.delete(e.pointerId);
       if (pinch) {
-        if (pointers.size < 2) { pinch = null; saveView(); }
+        if (pointers.size < 2) { pinch = null; }
         return;
       }
       const p = latest.current;
@@ -876,7 +858,7 @@ function Stage(props) {
         linking = null;
       }
       commitDrag(); // encaixa na grade ao soltar: o fluxo fica alinhado sem régua
-      if (pan) { pan = null; el.classList.remove("is-panning"); saveView(); }
+      if (pan) { pan = null; el.classList.remove("is-panning"); }
     };
     /* dois cliques no vazio: uma etapa nova ali mesmo, sem ir até a biblioteca */
     const dbl = (e) => {
@@ -899,7 +881,7 @@ function Stage(props) {
       } else {
         viewRef.current = { ...v, x: v.x - e.deltaX, y: v.y - e.deltaY };
       }
-      applyView(); saveView();
+      applyView();
     };
     el.addEventListener("pointerdown", down);
     el.addEventListener("pointermove", move);
@@ -948,8 +930,8 @@ function Stage(props) {
         </svg>
       </div>
       {empty && <p className="empty fe-empty">{ghosts
-        ? <>nenhuma etapa ainda — clique num dos cartões tracejados para começar, ou arraste um tipo da biblioteca para cá.</>
-        : <>nenhuma etapa ainda — arraste um tipo da biblioteca para cá, dê dois cliques no palco, ou selecione uma etapa e aperte <kbd>Tab</kbd> para ligar a próxima.</>}</p>}
+        ? <>nenhuma etapa ainda — clique num dos cartões tracejados para começar, ou escolha um tipo no <b>+</b> lá em cima.</>
+        : <>nenhuma etapa ainda — escolha um tipo no <b>+</b> lá em cima, dê dois cliques no palco, ou selecione uma etapa e aperte <kbd>Tab</kbd> para ligar a próxima.</>}</p>}
     </div>
   );
 }
@@ -971,7 +953,7 @@ function Editor({ id, funnels }) {
   const [selected, setSelected] = useState(null);   // {kind:"node"|"edge", id} | null
   const [drawer, setDrawer] = useState(null);        // chave de DRAWERS | null (fechada)
   const [comparing, setComparing] = useState(null);  // id do retrato em comparação, ou null
-  const [libraryOpen, setLibraryOpen] = useState(() => window.innerWidth >= 900);
+  const [libraryOpen, setLibraryOpen] = useState(false); // a biblioteca é pop-up do "+": abre quando se vai criar
   const [panelOpen, setPanelOpen] = useState(false); // começa fechado: o palco inteiro à vista; selecionar algo abre
   const [zoom, setZoom] = useState(100);
   const [snapshotForm, setSnapshotForm] = useState(false);
@@ -1058,12 +1040,13 @@ function Editor({ id, funnels }) {
     update((d) => ({ ...d, nodes }), { undo: true });
     stage.current.fit(nodes);
   };
-  /* clique na biblioteca: vai pro centro do que está à vista */
+  /* clique na biblioteca: vai pro centro do que está à vista, e o pop-up
+     sai da frente — criar é um gesto só */
   const pickType = (type) => {
     if (locked) { warnLocked(); return; }
     const c = stage.current.center();
     createNode(type, Math.round(c.x - NODE_W / 2), Math.round(c.y - NODE_H / 2));
-    if (window.innerWidth < 900) showLibrary(false); // no celular a biblioteca cobre o palco: sai da frente
+    setLibraryOpen(false);
   };
 
   /* ---------- a próxima etapa ----------
@@ -1249,6 +1232,7 @@ function Editor({ id, funnels }) {
      fecha a gaveta e depois limpa a seleção. */
   useKeydown((e) => {
     if (e.key === "Escape") {
+      if (libraryOpen) { setLibraryOpen(false); return; }
       if (drawer) { setDrawer(null); return; }
       if (selected) setSelected(null);
       return;
@@ -1293,13 +1277,13 @@ function Editor({ id, funnels }) {
   return (
     <main className={"fe" + (drawer ? " is-drawer" : "") + (locked ? " is-locked" : "")} id="editor">
       <Stage api={stage} doc={doc} selected={selected} comparing={comparing} projections={projections} ghosts={ghosts}
-        libraryOpen={libraryOpen} panelOpen={panelOpen} drawerOpen={!!drawer} empty={!doc.nodes.length}
+        panelOpen={panelOpen} drawerOpen={!!drawer} empty={!doc.nodes.length}
         locked={locked} onLocked={warnLocked}
         onSelect={select} onCreateNode={createNode} onMoveNode={moveNode} onLink={linkNodes}
         onAcceptGhost={acceptGhost} onAskMerlin={askGhosts} onZoom={(k) => setZoom(Math.round(k * 100))} />
 
       {/* a barra de cima e so o indispensavel: voltar, o nome, o que abre
-          (biblioteca e painel), o merlin e o "mais". zoom, enquadrar, arrumar
+          (o "+" da biblioteca e o painel), o merlin e o "mais". zoom, enquadrar, arrumar
           e os fantasmas moram no "mais" — a roda, a pinca e as teclas +, - e 0
           ja fazem o mesmo, e o palco nao precisa de uma regua por cima. */}
       <div className="fe-top">
@@ -1311,16 +1295,18 @@ function Editor({ id, funnels }) {
           {/* o cadeado só mora na barra enquanto está fechado: é aviso e é a
               saída. aberto, ele fica no "mais", como o resto da vista. */}
           {locked && <><button className="action" id="lock-btn" type="button" title="palco travado — clique para destravar" aria-label="Destravar o palco" aria-pressed="true" onClick={toggleLock}><LockIcon /></button><span className="sep" /></>}
-          <button className="action" id="library-toggle" type="button" title="biblioteca de tipos" aria-label="Biblioteca" aria-pressed={String(libraryOpen)} onClick={() => showLibrary(!libraryOpen)}><LibraryIcon /></button>
+          {/* um botão cheio só: o "+" é criar, e criar é a biblioteca. o
+              Merlin fica como os outros ícones, para não haver dois azuis. */}
           <button className="action" id="panel-toggle" type="button" title="painel do funil" aria-label="Painel" aria-pressed={String(panelOpen)} onClick={() => showPanel(!panelOpen)}><PanelIcon /></button>
-          <button className="pill pill--mini pill--green pill--icon" id="suggest-btn" type="button" disabled={thinking}
+          <button className="action" id="suggest-btn" type="button" disabled={thinking}
             title={thinking ? "pensando…" : "pedir sugestões ao Merlin para este funil"} aria-label="Sugerir" aria-busy={thinking} onClick={suggest}><SparkIcon /></button>
           <button className="action" id="share-btn" type="button" title="compartilhar um link só de leitura" aria-label="Compartilhar" onClick={() => setSharing(true)}>{icon("link")}</button>
           <button className="action" id="more-btn" type="button" title="mais" aria-label="Mais" onClick={() => setMenuOpen(true)}><MoreIcon /></button>
+          <button className="pill pill--mini pill--green pill--icon" id="library-toggle" type="button" title="nova etapa — biblioteca de tipos" aria-label="Nova etapa" aria-haspopup="dialog" aria-expanded={String(libraryOpen)} onClick={() => showLibrary(!libraryOpen)}>{icon("plus")}</button>
         </div>
       </div>
 
-      <Library hidden={!libraryOpen} onPick={pickType} />
+      {libraryOpen && <Library onPick={pickType} onClose={() => setLibraryOpen(false)} />}
       {panelOpen && <aside className="fe-panel glass" id="panel">{panel}</aside>}
       {drawer && <Drawer which={drawer} doc={doc} projections={projections} comparing={comparing} actions={listActions}
         onNumber={(nid, v) => patchNode(nid, { number: v })} onRead={readNumbers} reading={readingNumbers} onClose={() => setDrawer(null)} />}
@@ -1378,39 +1364,80 @@ const moneyText = (c) => (c ? (c / 100).toFixed(2).replace(".", ",") : "");
 const MoneyInput = (props) => <BufferedInput placeholder="0,00" format={moneyText} parse={parseMoney} {...props} />;
 
 /* ================================================================
-   biblioteca de tipos, à esquerda
+   biblioteca de tipos: o pop-up do "+"
    ================================================================ */
 /* a biblioteca vem em prateleiras, na ordem em que o lead anda: com 27
    tipos, uma grade única viraria um caça-palavras. buscar achata tudo de
-   volta numa lista só — quem já sabe o nome não quer saber de prateleira. */
-function Library({ hidden, onPick }) {
+   volta numa lista só — quem já sabe o nome não quer saber de prateleira.
+   ela não mora mais aberta na tela: abre no "+", já com o cursor na busca,
+   e fecha ao criar. Enter põe o primeiro (ou o marcado pelas setas), Esc
+   fecha, e arrastar um tipo para o palco continua valendo. */
+const PICK_HINT = "clique para pôr no centro, ou arraste para o palco";
+function Library({ onPick, onClose }) {
   const [term, setTerm] = useState("");
+  const [active, setActive] = useState(0);
+  const [dragging, setDragging] = useState(false);
+  const boxRef = useRef(null), inputRef = useRef(null);
   const q = foldKey(term);
   const matches = (t) => !q || foldKey(NODE_TYPES[t].label).includes(q) || t.includes(q);
-  const shelves = q
-    ? [{ name: "", types: TYPE_ORDER.filter(matches) }]
-    : TYPE_GROUPS;
+  const shelves = (q ? [{ name: "", types: TYPE_ORDER.filter(matches) }] : TYPE_GROUPS).filter((s) => s.types.length);
+  const flat = shelves.flatMap((s) => s.types);
+  const current = flat[Math.min(active, flat.length - 1)];
+
+  useEffect(() => { inputRef.current.focus(); }, []);
+  useEffect(() => { setActive(0); }, [q]);
+  useEffect(() => {
+    const el = boxRef.current.querySelector(".fe-type.is-active");
+    if (el) el.scrollIntoView({ block: "nearest" });
+  }, [active, q]);
+  /* clicar fora fecha; o próprio "+" fica de fora da conta, senão o clique
+     nele fecharia e reabriria na mesma hora */
+  useEffect(() => {
+    const down = (e) => {
+      if (boxRef.current.contains(e.target) || e.target.closest("#library-toggle")) return;
+      onClose();
+    };
+    document.addEventListener("pointerdown", down);
+    return () => document.removeEventListener("pointerdown", down);
+  }, []);
+
+  const onKey = (e) => {
+    if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); onClose(); }
+    else if (e.key === "Enter") { e.preventDefault(); if (current) onPick(current); }
+    else if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+      e.preventDefault();
+      if (!flat.length) return;
+      const step = e.key === "ArrowDown" ? 1 : -1;
+      setActive((i) => (Math.min(i, flat.length - 1) + step + flat.length) % flat.length);
+    }
+  };
   const typeButton = (t) => (
-    <button key={t} type="button" className={"fe-type" + (NODE_TYPES[t].conversion ? " is-conversion" : "")} draggable="true" title={NODE_TYPES[t].label}
-        onClick={() => onPick(t)}
-        onDragStart={(e) => { e.dataTransfer.setData("text/plain", "type:" + t); e.dataTransfer.effectAllowed = "copy"; }}>
-      <span className="ico"><TypeIcon def={NODE_TYPES[t]} /></span><span>{NODE_TYPES[t].label}</span>
+    <button key={t} type="button" draggable="true" title={PICK_HINT} tabIndex={-1}
+        className={"fe-type" + (NODE_TYPES[t].conversion ? " is-conversion" : "") + (t === current ? " is-active" : "")}
+        onClick={() => onPick(t)} onPointerEnter={() => setActive(flat.indexOf(t))}
+        onDragStart={(e) => {
+          e.dataTransfer.setData("text/plain", "type:" + t); e.dataTransfer.effectAllowed = "copy";
+          /* o pop-up sai da frente para o palco receber o solto — no quadro
+             seguinte, porque esconder a origem dentro do dragstart cancela o arrasto */
+          setTimeout(() => setDragging(true), 0);
+        }}
+        onDragEnd={onClose}>
+      <TypeIcon def={NODE_TYPES[t]} /><span>{NODE_TYPES[t].label}</span>
     </button>
   );
   return (
-    <aside className="fe-library glass" id="library" hidden={hidden}>
-      <div className="fe-library__top"><span className="t-mono">biblioteca</span><span className="t-mono">{TYPE_ORDER.length} tipos</span></div>
-      <input className="input input--pill fe-library__search" id="library-search" placeholder="buscar tipo…" autoComplete="off" value={term} onChange={(e) => setTerm(e.currentTarget.value)} />
+    <div className={"fe-library glass" + (dragging ? " is-dragging" : "")} id="library" role="dialog" aria-label="Biblioteca de tipos" ref={boxRef}>
+      <input className="input input--pill fe-library__search" id="library-search" ref={inputRef} placeholder="buscar tipo…" autoComplete="off"
+        value={term} onChange={(e) => setTerm(e.currentTarget.value)} onKeyDown={onKey} />
       <div className="fe-library__shelves">
-        {shelves.filter((s) => s.types.length).map((s) => (
+        {shelves.map((s) => (
           <div key={s.name || "busca"} className="fe-shelf">
-            {s.name && <p className="fe-shelf__name t-mono">{s.name}</p>}
-            <div className="fe-library__grid">{s.types.map(typeButton)}</div>
+            {s.name && <p className="fe-shelf__name">{s.name}</p>}
+            {s.types.map(typeButton)}
           </div>))}
-        {!shelves.some((s) => s.types.length) && <p className="empty">nenhum tipo com esse nome.</p>}
+        {!flat.length && <p className="empty">nenhum tipo com esse nome.</p>}
       </div>
-      <p className="fe-library__hint">clique para pôr no centro, ou arraste para o palco.</p>
-    </aside>
+    </div>
   );
 }
 
@@ -1983,9 +2010,9 @@ function FunnelList({ funnels }) {
   return (
     <main className="page" id="list">
       <div className="header">
-        <div><h1>funis</h1><p className="sub">o caminho que alguém percorre até virar cliente</p></div>
+        <div><h1>funis</h1>{list.length > 0 && <p className="sub">{list.length === 1 ? "1 funil" : list.length + " funis"}</p>}</div>
         <div className="actions">{choosing && list.length
-          ? <button className="pill" type="button" id="new-funnel-back" onClick={() => setChoosing(false)}>{icon("chevronLeft")}voltar</button>
+          ? <button className="pill pill--icon" type="button" id="new-funnel-back" title="voltar para a lista (esc)" aria-label="Voltar" onClick={() => setChoosing(false)}>{icon("chevronLeft")}</button>
           : <button className="pill pill--green" type="button" id="new-funnel" title="novo funil (n)" onClick={() => setChoosing(true)}>{icon("plus")}funil</button>}</div>
       </div>
       {!picking && <div className="fl-grid">{list.map((f) => <FunnelCard key={f.id} f={f} onDuplicate={() => duplicate(f.id)} onRemove={() => remove(f.id)} />)}</div>}
