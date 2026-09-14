@@ -17,7 +17,7 @@
 /* sem a mão de quem edita: o ponteiro é de clique, não de arrasto, e as
    partes que só servem para ligar e mover somem */
 .shv .mp-node,.shv .node{cursor:pointer}
-.shv .node-handle,.shv .node-port{display:none}
+.shv .node-handle,.shv .node-port,.shv .node-next{display:none}
 .shv .edge-hit{cursor:inherit}
 .shv .edge:hover .edge-line{stroke:var(--ink-30)}
 

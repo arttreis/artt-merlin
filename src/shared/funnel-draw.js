@@ -6,6 +6,7 @@
    divergiriam na primeira mudança de uma delas. */
 import { brl } from "./core.js";
 import { NODE_W, NODE_H } from "./funnel-layout.js";
+import { brandOf } from "./brands.js";
 
 export const PORT_Y = NODE_H / 2;
 
@@ -197,11 +198,25 @@ export function drawNode(n, ctx) {
     x += w + 4;
   });
   const caption = linked.length ? "" : truncate(nodeCaption(n, def), 34);
+  /* com marca, o quadradinho é da marca: cheio na cor dela e o desenho
+     vazado por cima. sem marca, o ícone do tipo de sempre. */
+  const brand = brandOf(n, def);
+  const mark = brand
+    ? [svgEl("g", { class: "node-brand" }, [
+        svgEl("title", null, [brand.label]),
+        svgEl("rect", { x: 12, y: 12, width: 28, height: 28, rx: 8, fill: brand.color }),
+        brand.path
+          ? svgEl("path", { d: brand.path, fill: brand.ink, transform: "translate(18,18) scale(.6667)" })
+          : svgText("node-brand-mono", 26, 30, brand.mono, { fill: brand.ink, "text-anchor": "middle" })
+      ])]
+    : [
+        svgEl("rect", { class: "node-icon-bg" + conv, x: 12, y: 12, width: 28, height: 28, rx: 8 }),
+        svgEl("g", { class: "node-icon" + conv, transform: "translate(19,19) scale(.5833)" }, def.icon.map(([tag, attrs]) => svgEl(tag, attrs)))
+      ];
 
   return svgEl("g", { class: "node" + (n.id === ctx.selectedNode ? " is-selected" : ""), "data-id": n.id, transform: "translate(" + n.x + "," + n.y + ")" }, [
     svgEl("rect", { class: "node-box", width: NODE_W, height: NODE_H, rx: 14 }),
-    svgEl("rect", { class: "node-icon-bg" + conv, x: 12, y: 12, width: 28, height: 28, rx: 8 }),
-    svgEl("g", { class: "node-icon" + conv, transform: "translate(19,19) scale(.5833)" }, def.icon.map(([tag, attrs]) => svgEl(tag, attrs))),
+    ...mark,
     svgText("node-type", 50, 22, def.label),
     svgText("node-title", 50, 37, truncate(n.title || def.label, 24)),
     svgEl("circle", { class: "node-dot" + (n.number != null ? " has-number" : ""), cx: NODE_W - 16, cy: 20, r: 3 }),
@@ -211,6 +226,10 @@ export function drawNode(n, ctx) {
     ...chips,
     caption ? svgText("node-caption", 16, 92, caption) : null,
     svgEl("circle", { class: "node-port", cx: 0, cy: PORT_Y, r: 4 }),
+    /* a saída diz o que é: "próxima etapa", embaixo do canto direito do
+       cartão, só enquanto o ponteiro está nele. no vão entre dois cartões
+       ela brigaria com a taxa da aresta; embaixo, não encosta em nada. */
+    svgText("node-next", NODE_W - 6, NODE_H + 15, "puxe a bolinha para a próxima etapa", { "text-anchor": "end" }),
     svgEl("g", { class: "node-handle", "data-id": n.id }, [
       svgEl("circle", { class: "hit", cx: NODE_W, cy: PORT_Y, r: 14 }),
       svgEl("circle", { class: "vis", cx: NODE_W, cy: PORT_Y, r: 5.5 })
@@ -247,9 +266,12 @@ export function drawEdge(a, ctx) {
   const volume = to.number != null ? to.number : (from.number != null ? from.number : 0);
   const width = volume > 0 ? Math.min(7, Math.max(1.2, 1.2 + 6 * (volume / ctx.maxVolume))) : 1.2;
   const labelWidth = label.length * 6.2 + 14;
+  /* tracejada é a passagem que ainda não tem número de verdade (só a média,
+     ou nada): de longe se vê até onde o funil já foi medido */
+  const real = label && !isAvg;
   return svgEl("g", { class: "edge" + (a.id === ctx.selectedEdge ? " is-selected" : ""), "data-id": a.id }, [
     svgEl("path", { class: "edge-hit", "data-id": a.id, d }),
-    svgEl("path", { class: "edge-line" + (weak ? " is-weak" : ""), d, "stroke-width": width.toFixed(2), "marker-end": "url(#flow-arrow)" }),
+    svgEl("path", { class: "edge-line" + (weak ? " is-weak" : "") + (real ? "" : " is-estimate"), d, "stroke-width": width.toFixed(2), "marker-end": "url(#flow-arrow)" }),
     label ? svgEl("rect", { class: "edge-label-bg", x: midX - labelWidth / 2, y: midY - 9, width: labelWidth, height: 18, rx: 9 }) : null,
     label ? svgText("edge-label" + (weak ? " is-weak" : "") + (isAvg ? " is-avg" : ""), midX, midY + 3.5, label, { "text-anchor": "middle" }) : null
   ]);

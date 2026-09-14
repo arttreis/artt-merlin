@@ -44,6 +44,20 @@
 .fe-stage svg.is-panning{cursor:grabbing}
 .fe-stage.is-dropping::after{content:"";position:absolute;inset:6px;border:1.5px dashed var(--green);border-radius:var(--br);pointer-events:none}
 
+/* o minimapa: só existe quando alguma etapa está fora da tela (o palco
+   decide e liga o .is-shown); no celular não cabe e não aparece */
+.fe-minimap{
+  position:absolute;right:12px;bottom:14px;z-index:6;padding:4px;border-radius:var(--br3);
+  cursor:pointer;touch-action:none;opacity:0;visibility:hidden;transform:translateY(4px);
+  transition:opacity .18s,transform .18s,visibility 0s .18s;
+}
+.fe-minimap.is-shown{opacity:1;visibility:visible;transform:none;transition:opacity .18s,transform .18s}
+.fe-minimap svg{display:block;border-radius:calc(var(--br3) - 3px);background:var(--bg)}
+.fe-minimap rect{fill:var(--ink-30);fill-opacity:.35}
+.fe-minimap rect.is-conversion{fill:var(--green);fill-opacity:.45}
+.fe-minimap .fe-minimap__view{fill:var(--ink);fill-opacity:.05;stroke:var(--ink-50);stroke-width:1.2}
+@media (max-width:899px){.fe-minimap{display:none}}
+
 /* o "vidro": todo cartão flutuante usa o mesmo fundo translúcido com blur */
 .glass{
   background:color-mix(in srgb,var(--surface) 90%,transparent);
@@ -195,9 +209,19 @@ html.light .node-body{fill-opacity:.35}
 .node-handle circle.vis{fill:var(--surface-2);stroke:var(--line);stroke-width:1.2;transition:fill .15s,stroke .15s}
 .node-handle circle.hit{fill:transparent;stroke:none;cursor:crosshair}
 .node-handle:hover circle.vis{fill:var(--green);stroke:var(--green)}
+/* a marca no lugar do ícone: a cor vem do próprio desenho, aqui só a letra */
+.node-brand-mono{font-family:var(--sans);font-size:10.5px;font-weight:700;letter-spacing:-.02em}
+/* "próxima etapa": aparece ao passar no cartão, some quando ele está
+   selecionado (ali a tira de fantasmas já diz o que vem depois) */
+.node-next{fill:var(--ink-30);font-family:var(--sans);font-size:10px;opacity:0;pointer-events:none;transition:opacity .15s}
+.node:hover:not(.is-selected) .node-next{opacity:1}
+.node:has(.node-handle:hover) .node-next{fill:var(--green-ink)}
+.fe.is-locked .node-next,.fe.is-locked .node-handle{display:none}
+.fe.is-locked .node{cursor:pointer}
 .edge-hit{fill:none;stroke:transparent;stroke-width:16;cursor:pointer}
 .edge-line{fill:none;stroke:var(--ink-30);transition:stroke .15s}
-.edge-line.is-weak{stroke-dasharray:5 4}
+.edge-line.is-estimate{stroke-dasharray:5 5}
+.edge-line.is-weak{stroke-opacity:.7}
 .edge:hover .edge-line{stroke:var(--ink-70)}
 .edge.is-selected .edge-line{stroke:var(--green)}
 .edge-label{fill:var(--ink-70);font-family:var(--mono);font-size:10px}

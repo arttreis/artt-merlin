@@ -139,6 +139,8 @@ const MIN_K = 0.2, MAX_K = 2.5; // limites do zoom, os mesmos para botão, roda 
 const MIN_FIT_K = 0.62;
 const VIEW_KEY = "merlin:funnels:view:";
 const GHOSTS_KEY = "merlin:funnels:ghosts"; // a tira de próximas etapas, ligada ou desligada neste aparelho
+const LOCK_KEY = "merlin:funnels:lock";     // o palco travado: navegar e ler sem mover, ligar nem apagar etapa
+const MINI_W = 168, MINI_H = 108;          // o minimapa, em px de tela
 
 /* ---------- ícones só desta página ---------- */
 const BackIcon = () => (
@@ -169,6 +171,9 @@ const SparkIcon = () => (
 );
 const MoreIcon = () => (
   <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.7" /><circle cx="12" cy="12" r="1.7" /><circle cx="19" cy="12" r="1.7" /></svg>
+);
+const LockIcon = ({ open }) => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="5" y="10.5" width="14" height="10" rx="2" /><path d={open ? "M8 10.5V7.5a4 4 0 017.6-1.7" : "M8 10.5V7.5a4 4 0 018 0v3"} /></svg>
 );
 const CopyIcon = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><rect x="4" y="4" width="12" height="12" rx="2" /><path d="M9 16v2a2 2 0 002 2h7a2 2 0 002-2v-7a2 2 0 00-2-2h-2" /></svg>
@@ -512,6 +517,8 @@ function Stage(props) {
   const wrapRef = useRef(null), svgRef = useRef(null), worldRef = useRef(null);
   const edgesRef = useRef(null), nodesRef = useRef(null), ghostsRef = useRef(null), tempRef = useRef(null);
   const viewRef = useRef(null);
+  const miniRef = useRef(null), miniSvgRef = useRef(null), miniNodesRef = useRef(null), miniViewRef = useRef(null);
+  const miniDrag = useRef(false);
   const liveRef = useRef({ nodes: [], edges: [] }); // cópia de trabalho: o arrasto mexe nela, nunca no documento
   const latest = useRef(props);
   latest.current = props;
@@ -568,8 +575,73 @@ function Stage(props) {
     while (step > 60) step /= 2;
     wrapRef.current.style.backgroundSize = step + "px " + step + "px";
     wrapRef.current.style.backgroundPosition = v.x + "px " + v.y + "px";
+    drawMiniView();
     latest.current.onZoom(v.k);
   };
+
+  /* ---------- o minimapa ----------
+     o funil inteiro em miniatura, no canto de baixo, com o retângulo do que
+     está à vista. só aparece quando serve: quando alguma etapa ficou fora da
+     tela. com o painel ou a gaveta abertos ele sai, porque ali o olho está
+     numa etapa, não no funil. tocar ou arrastar nele leva a vista junto. */
+  /* o que está à vista, em coordenadas do mundo: a área livre, sem o que a
+     biblioteca e o painel cobrem */
+  const visibleWorld = () => {
+    const a = freeArea(), v = viewRef.current;
+    return { x: (a.left - v.x) / v.k, y: (a.top - v.y) / v.k, w: a.width / v.k, h: a.height / v.k };
+  };
+  /* o recorte do minimapa é o funil somado ao que está à vista: assim o
+     retângulo da vista nunca sai para fora da miniatura */
+  const miniBounds = () => {
+    const nodes = liveRef.current.nodes;
+    if (!nodes.length || !viewRef.current) return null;
+    const s = visibleWorld();
+    const xs = nodes.map((n) => n.x), ys = nodes.map((n) => n.y);
+    const x = Math.min(s.x, ...xs.map((v) => v - 60)), y = Math.min(s.y, ...ys.map((v) => v - 60));
+    const x2 = Math.max(s.x + s.w, ...xs.map((v) => v + NODE_W + 60)), y2 = Math.max(s.y + s.h, ...ys.map((v) => v + NODE_H + 60));
+    return { x, y, w: x2 - x, h: y2 - y };
+  };
+  const drawMiniNodes = () => {
+    if (!miniSvgRef.current) return;
+    miniNodesRef.current.replaceChildren(...liveRef.current.nodes.map((n) =>
+      svgEl("rect", { class: typeOf(n).conversion ? "is-conversion" : null, x: n.x, y: n.y, width: NODE_W, height: NODE_H, rx: 16 })));
+  };
+  const drawMiniView = () => {
+    const box = miniRef.current, v = viewRef.current;
+    if (!box || !v || !wrapRef.current) return;
+    const p = latest.current;
+    const nodes = liveRef.current.nodes;
+    const a = freeArea();
+    const outside = nodes.some((n) => {
+      const x1 = v.x + n.x * v.k, y1 = v.y + n.y * v.k;
+      return x1 < a.left || y1 < a.top || x1 + NODE_W * v.k > a.left + a.width || y1 + NODE_H * v.k > a.top + a.height;
+    });
+    const show = miniDrag.current || (outside && !p.panelOpen && !p.drawerOpen);
+    box.classList.toggle("is-shown", show);
+    if (!show) return;
+    /* arrastando no minimapa o recorte fica parado, senão ele fugiria da mão */
+    if (!miniDrag.current) {
+      const b = miniBounds();
+      miniSvgRef.current.setAttribute("viewBox", b.x + " " + b.y + " " + b.w + " " + b.h);
+    }
+    const s = visibleWorld(), rect = miniViewRef.current;
+    rect.setAttribute("x", s.x); rect.setAttribute("y", s.y);
+    rect.setAttribute("width", s.w); rect.setAttribute("height", s.h);
+  };
+  /* o ponto tocado no minimapa vai para o meio da área livre */
+  const miniGo = (e) => {
+    const svg = miniSvgRef.current, b = miniBounds();
+    if (!svg || !b) return;
+    const pt = svg.createSVGPoint();
+    pt.x = e.clientX; pt.y = e.clientY;
+    const w = pt.matrixTransform(svg.getScreenCTM().inverse());
+    const a = freeArea(), v = viewRef.current;
+    viewRef.current = { ...v, x: a.left + a.width / 2 - w.x * v.k, y: a.top + a.height / 2 - w.y * v.k };
+    applyView();
+  };
+  const miniDown = (e) => { e.preventDefault(); miniDrag.current = true; e.currentTarget.setPointerCapture(e.pointerId); miniGo(e); };
+  const miniMove = (e) => { if (miniDrag.current) miniGo(e); };
+  const miniUp = () => { if (!miniDrag.current) return; miniDrag.current = false; saveView(); drawMiniView(); };
   const toWorld = (clientX, clientY) => {
     const r = svgRef.current.getBoundingClientRect();
     const v = viewRef.current;
@@ -643,6 +715,8 @@ function Stage(props) {
     nodesRef.current.replaceChildren(...liveRef.current.nodes.map((n) => drawNode(n, ctx)));
     drawEdges(ctx);
     drawGhosts();
+    drawMiniNodes();
+    drawMiniView();
   };
   /* durante o arrasto só o nó que anda e as arestas dele são refeitos */
   const patchNode = (id) => {
@@ -663,6 +737,13 @@ function Stage(props) {
     if (!viewRef.current) { viewRef.current = readView(doc.id) || fitView(freeArea(), doc.nodes, true); applyView(); }
     redraw();
   }, [doc, selected, comparing, projections, ghosts]);
+  /* abrir o painel ou a gaveta muda a área livre: o minimapa confere de novo */
+  useEffect(() => { drawMiniView(); }, [props.panelOpen, props.drawerOpen]);
+  useEffect(() => {
+    const onResize = () => drawMiniView();
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
 
   useEffect(() => {
     api.current = {
@@ -719,11 +800,12 @@ function Stage(props) {
       const handle = e.target.closest(".node-handle");
       const nodeEl = e.target.closest(".node");
       const edgeEl = e.target.closest(".edge");
-      if (handle) { linking = { from: handle.dataset.id }; el.setPointerCapture(e.pointerId); return; }
+      if (handle && !p.locked) { linking = { from: handle.dataset.id }; el.setPointerCapture(e.pointerId); return; }
       if (nodeEl) {
         e.preventDefault();
         const id = nodeEl.dataset.id;
         p.onSelect({ kind: "node", id });
+        if (p.locked) return; // travado: tocar seleciona e mostra, mas não arrasta
         const n = liveRef.current.nodes.find((x) => x.id === id);
         if (!n) return;
         const m = toWorld(e.clientX, e.clientY);
@@ -798,7 +880,7 @@ function Stage(props) {
     };
     /* dois cliques no vazio: uma etapa nova ali mesmo, sem ir até a biblioteca */
     const dbl = (e) => {
-      if (e.target.closest(".node") || e.target.closest(".edge")) return;
+      if (latest.current.locked || e.target.closest(".node") || e.target.closest(".edge")) return;
       const m = toWorld(e.clientX, e.clientY);
       latest.current.onCreateNode("custom", Math.round(m.x - NODE_W / 2), Math.round(m.y - NODE_H / 2));
     };
@@ -841,6 +923,7 @@ function Stage(props) {
     setDropping(false);
     const data = e.dataTransfer.getData("text/plain") || "";
     if (!data.startsWith("type:")) return;
+    if (latest.current.locked) { latest.current.onLocked(); return; }
     const m = toWorld(e.clientX, e.clientY);
     latest.current.onCreateNode(data.slice(5), Math.round(m.x - NODE_W / 2), Math.round(m.y - NODE_H / 2));
   };
@@ -857,6 +940,13 @@ function Stage(props) {
         </defs>
         <g ref={worldRef}><g ref={edgesRef} /><g ref={nodesRef} /><g ref={ghostsRef} /><g ref={tempRef} /></g>
       </svg>
+      <div className="fe-minimap glass" ref={miniRef} aria-hidden="true"
+           onPointerDown={miniDown} onPointerMove={miniMove} onPointerUp={miniUp} onPointerCancel={miniUp}>
+        <svg ref={miniSvgRef} width={MINI_W} height={MINI_H} preserveAspectRatio="xMidYMid meet">
+          <g ref={miniNodesRef} />
+          <rect className="fe-minimap__view" ref={miniViewRef} vectorEffect="non-scaling-stroke" />
+        </svg>
+      </div>
       {empty && <p className="empty fe-empty">{ghosts
         ? <>nenhuma etapa ainda — clique num dos cartões tracejados para começar, ou arraste um tipo da biblioteca para cá.</>
         : <>nenhuma etapa ainda — arraste um tipo da biblioteca para cá, dê dois cliques no palco, ou selecione uma etapa e aperte <kbd>Tab</kbd> para ligar a próxima.</>}</p>}
@@ -963,12 +1053,14 @@ function Editor({ id, funnels }) {
     setSelected(null);
   };
   const arrange = () => {
+    if (locked) { warnLocked(); return; }
     const nodes = layoutNodes(docRef.current.nodes, docRef.current.edges);
     update((d) => ({ ...d, nodes }), { undo: true });
     stage.current.fit(nodes);
   };
   /* clique na biblioteca: vai pro centro do que está à vista */
   const pickType = (type) => {
+    if (locked) { warnLocked(); return; }
     const c = stage.current.center();
     createNode(type, Math.round(c.x - NODE_W / 2), Math.round(c.y - NODE_H / 2));
     if (window.innerWidth < 900) showLibrary(false); // no celular a biblioteca cobre o palco: sai da frente
@@ -991,15 +1083,28 @@ function Editor({ id, funnels }) {
     try { localStorage.setItem(GHOSTS_KEY, on ? "off" : "on"); } catch (e) {}
     return !on;
   });
+  /* o cadeado: o palco continua navegável e a etapa continua abrindo no
+     painel, mas nada anda, liga, nasce ou some pelo palco. vale neste
+     aparelho, como a tira de fantasmas. */
+  const [locked, setLocked] = useState(() => {
+    try { return localStorage.getItem(LOCK_KEY) === "on"; } catch (e) { return false; }
+  });
+  const toggleLock = () => setLocked((on) => {
+    try { localStorage.setItem(LOCK_KEY, on ? "off" : "on"); } catch (e) {}
+    notify(on ? "palco destravado" : "palco travado: dá para navegar, não para mexer");
+    return !on;
+  });
+  const warnLocked = () => notify("o palco está travado — destrave no cadeado para mexer");
+
   const ghostFrom = selected && selected.kind === "node" ? doc.nodes.find((n) => n.id === selected.id) : null;
   const ghosts = useMemo(() => {
-    if (!ghostsOn) return null;
+    if (!ghostsOn || locked) return null;
     if (!doc.nodes.length) return { from: null, list: FIRST_STAGES.map(([type, why]) => ({ type, title: "", note: why })) };
     if (!ghostFrom) return null;
     const mine = merlinGhosts && merlinGhosts.from === ghostFrom.id;
     const list = mine ? merlinGhosts.list : ghostsFor(doc, ghostFrom);
     return list.length ? { from: ghostFrom.id, list, merlin: mine, thinking: ghosting } : null;
-  }, [doc, ghostFrom, ghostsOn, merlinGhosts, ghosting]);
+  }, [doc, ghostFrom, ghostsOn, merlinGhosts, ghosting, locked]);
 
   /* aceitar é criar: a etapa nasce onde o fantasma estava, ligada à
      anterior, e o lote inteiro é um passo só de desfazer. */
@@ -1151,6 +1256,7 @@ function Editor({ id, funnels }) {
     const typing = isTyping();
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z") { if (!typing) { e.preventDefault(); undo(); } return; }
     if (typing) return;
+    if (locked && selected && (e.key === "Delete" || e.key === "Backspace" || e.key === "Tab")) { e.preventDefault(); warnLocked(); return; }
     if (e.key === "Delete" || e.key === "Backspace") {
       if (selected && selected.kind === "node") { e.preventDefault(); removeNode(selected.id); }
       else if (selected && selected.kind === "edge") { e.preventDefault(); removeEdge(selected.id); }
@@ -1185,9 +1291,10 @@ function Editor({ id, funnels }) {
   const listActions = { addItem, patchItem, removeItem, addTrigger, pullCreative, suggestRemarketing };
 
   return (
-    <main className={"fe" + (drawer ? " is-drawer" : "")} id="editor">
+    <main className={"fe" + (drawer ? " is-drawer" : "") + (locked ? " is-locked" : "")} id="editor">
       <Stage api={stage} doc={doc} selected={selected} comparing={comparing} projections={projections} ghosts={ghosts}
         libraryOpen={libraryOpen} panelOpen={panelOpen} drawerOpen={!!drawer} empty={!doc.nodes.length}
+        locked={locked} onLocked={warnLocked}
         onSelect={select} onCreateNode={createNode} onMoveNode={moveNode} onLink={linkNodes}
         onAcceptGhost={acceptGhost} onAskMerlin={askGhosts} onZoom={(k) => setZoom(Math.round(k * 100))} />
 
@@ -1201,6 +1308,9 @@ function Editor({ id, funnels }) {
           <input className="fe-name" id="funnel-name" placeholder="nome do funil" maxLength="80" value={doc.name} onChange={(e) => update((d) => ({ ...d, name: e.currentTarget.value }))} />
         </div>
         <div className="fe-group glass">
+          {/* o cadeado só mora na barra enquanto está fechado: é aviso e é a
+              saída. aberto, ele fica no "mais", como o resto da vista. */}
+          {locked && <><button className="action" id="lock-btn" type="button" title="palco travado — clique para destravar" aria-label="Destravar o palco" aria-pressed="true" onClick={toggleLock}><LockIcon /></button><span className="sep" /></>}
           <button className="action" id="library-toggle" type="button" title="biblioteca de tipos" aria-label="Biblioteca" aria-pressed={String(libraryOpen)} onClick={() => showLibrary(!libraryOpen)}><LibraryIcon /></button>
           <button className="action" id="panel-toggle" type="button" title="painel do funil" aria-label="Painel" aria-pressed={String(panelOpen)} onClick={() => showPanel(!panelOpen)}><PanelIcon /></button>
           <button className="pill pill--mini pill--green pill--icon" id="suggest-btn" type="button" disabled={thinking}
@@ -1222,6 +1332,7 @@ function Editor({ id, funnels }) {
             <button className="pill" type="button" onClick={() => { setMenuOpen(false); stage.current.fit(); }}><FitIcon />enquadrar tudo</button>
             <button className="pill" type="button" onClick={() => { setMenuOpen(false); arrange(); }}><LayoutIcon />arrumar em camadas</button>
             <button className="pill" type="button" aria-pressed={String(ghostsOn)} onClick={() => { setMenuOpen(false); toggleGhosts(); }}><GhostIcon />{ghostsOn ? "esconder" : "mostrar"} a próxima etapa sugerida</button>
+            <button className="pill" type="button" aria-pressed={String(locked)} onClick={() => { setMenuOpen(false); toggleLock(); }}><LockIcon open={locked} />{locked ? "destravar o palco" : "travar o palco"}</button>
             <div className="fe-menu__zoom">
               <button className="action" type="button" aria-label="Afastar" onClick={() => stage.current.zoomBy(1 / 1.2)}><MinusIcon /></button>
               <output>{zoom}%</output>
