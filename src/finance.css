@@ -39,9 +39,9 @@
 .table tr:hover .row-actions{opacity:1}
 
 /* ---------- ano: doze meses lado a lado, como a aba anual da planilha ----------
-   cada mes e uma coluna estreita com o saldo de cada dia; positivo leva
-   um tom de verde, negativo leva hachura — nunca vermelho. rola por
-   dentro do proprio envoltorio para o body nunca ganhar barra horizontal. */
+   cada mes e uma coluna estreita com o saldo de cada dia, pintado nas
+   faixas da planilha (balanceTone no finance.jsx). rola por dentro do
+   proprio envoltorio para o body nunca ganhar barra horizontal. */
 .year-scroll{overflow-x:auto;padding-bottom:6px;margin:0 -2px}
 .year{display:grid;grid-template-columns:repeat(12,minmax(118px,1fr));gap:6px;padding:0 2px}
 .year__month{background:var(--surface);border:1px solid var(--line-soft);border-radius:var(--br3);overflow:hidden}
@@ -61,8 +61,18 @@
 }
 .year__day i{font-style:normal;color:var(--ink-30)}
 .year__day.has-moves{color:var(--ink)}
-.year__day.is-positive{background:color-mix(in srgb,var(--green) 9%,transparent)}
-.year__day.is-negative{background:repeating-linear-gradient(135deg,var(--line-soft) 0 2px,transparent 2px 6px)}
+
+/* as cores do saldo, as da formatacao condicional da planilha: vermelho
+   abaixo de zero, verde claro, verde cheio a partir de R$ 1.500 e ciano a
+   partir de R$ 2.500. valem no ano e na coluna de saldo do mes. */
+.year__day.is-positive,.balance-cell.is-positive{background:color-mix(in srgb,#4ade80 12%,transparent)}
+.year__day.is-high,.balance-cell.is-high{background:color-mix(in srgb,#22c55e 34%,transparent);color:var(--ink)}
+.year__day.is-top,.balance-cell.is-top{background:color-mix(in srgb,#22d3ee 34%,transparent);color:var(--ink)}
+.year__day.is-negative,.balance-cell.is-negative{background:color-mix(in srgb,#f87171 18%,transparent);color:#f87171}
+.year__day.is-negative i{color:color-mix(in srgb,#f87171 60%,transparent)}
+/* no mes, o dia futuro apaga a tinta da linha inteira; o saldo negativo
+   continua vermelho */
+.table td.balance-cell.is-negative{color:#f87171}
 .year__day.is-today{box-shadow:inset 0 0 0 1px var(--green)}
 .year__day.is-empty{visibility:hidden}
 

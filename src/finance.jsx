@@ -75,6 +75,9 @@ function alreadyEntered(entries, originType, id, day) {
    em conta nenhuma — nem saldo, nem previsto, nem categoria. o Arthur: "pode
    sugerir, mas nao pode considerar previsao". previsao e so o que a pessoa
    lancou como nao pago; a sugestao vira lancamento quando ela lanca.
+   em 14/09/2026 isso mudou em parte: de hoje em diante a sugestao soma no
+   saldo do mes e do ano (ver balanceUntil). o real, as categorias e as
+   somas de entrada/saida do hoje continuam sem ela.
 
    tudo que o dia `day` teria alem dos lancamentos ja gravados: a
    recorrencia dos fixos e a parcela de uma compra no cartao (enquanto houver
@@ -124,8 +127,12 @@ function oldestDay(entries) {
 /* saldo previsto no fim do dia `day`: parte do saldo inicial e anda dia a
    dia, somando os lancamentos, pagos ou nao — um lancamento nao pago ja e a
    propria previsao. sugestao nao entra. e dia a dia, e nao "soma tudo com data <= dia",
-   porque so assim o effectiveDay se aplica mes a mes igual um calendario. */
-function balanceUntil(day, ctx) {
+   porque so assim o effectiveDay se aplica mes a mes igual um calendario.
+   `suggestFrom` (um dia, opcional): dali em diante as sugestoes tambem somam.
+   o ano, o mes e o hoje passam `today()` — o Arthur, em 14/09/2026: "na
+   visualizacao de ano ele tem que considerar os fixos", e o mes foi junto
+   pra os dois nao discordarem. */
+function balanceUntil(day, ctx, suggestFrom) {
   const oldest = oldestDay(ctx.entries);
   const cfg = ctx.startBalance || (oldest ? { day: oldest, amount: 0 } : null);
   if (!cfg) return 0;
@@ -137,10 +144,26 @@ function balanceUntil(day, ctx) {
       if (e.day !== d) return;
       balance += e.kind === "in" ? e.amount : -e.amount;
     });
+    if (suggestFrom && d >= suggestFrom) {
+      projectionsOf(d, ctx).forEach((p) => { balance += p.kind === "in" ? p.amount : -p.amount; });
+    }
     d = addDays(d, 1);
   }
   return balance;
 }
+
+/* as faixas de cor do saldo, as mesmas da formatacao condicional da
+   planilha: vermelho abaixo de zero, verde claro ate R$ 1.500, verde cheio
+   ate R$ 2.500, ciano acima disso. em centavos. */
+const BALANCE_TIERS = { high: 150000, top: 250000 };
+function balanceTone(cents) {
+  if (cents < 0) return " is-negative";
+  if (cents >= BALANCE_TIERS.top) return " is-top";
+  if (cents >= BALANCE_TIERS.high) return " is-high";
+  return " is-positive";
+}
+/* negativo entre parenteses, como na planilha */
+const brlBalance = (cents) => cents < 0 ? "(" + brl(cents) + ")" : brl(cents);
 
 /* tres coisas, tres desenhos:
    - REAL: lancamento pago. cheio.
@@ -179,10 +202,10 @@ function suggestionsBetween(from, to, ctx) {
 
 /* o mes inteiro, dia a dia: um balanceUntil() so pro dia anterior ao 1,
    depois anda dia a dia — em vez de chamar balanceUntil() pra cada linha */
-function buildMonth(yyyymm, ctx, balanceBefore) {
+function buildMonth(yyyymm, ctx, balanceBefore, suggestFrom) {
   const [year, month] = yyyymm.split("-").map(Number);
   const nDays = daysInMonth(year, month);
-  let balance = balanceBefore != null ? balanceBefore : balanceUntil(addDays(yyyymm + "-01", -1), ctx);
+  let balance = balanceBefore != null ? balanceBefore : balanceUntil(addDays(yyyymm + "-01", -1), ctx, suggestFrom);
   /* antes do marco (saldo inicial, ou o lancamento mais antigo) nao ha
      conta: o dia aparece vazio, e o saldo fica parado no valor inicial —
      a mesma regra do balanceUntil, senao o ano e o mes discordariam */
@@ -192,10 +215,12 @@ function buildMonth(yyyymm, ctx, balanceBefore) {
     const day = yyyymm + "-" + pad(i);
     if (marker && day < marker) { days.push({ day, inflow: 0, outflow: 0, balance, items: [], suggestions: projectionsOf(day, ctx), before: true }); continue; }
     const items = ctx.entries.filter((e) => e.day === day);
-    const inflow = items.filter((x) => x.kind === "in").reduce((s, x) => s + x.amount, 0);
-    const outflow = items.filter((x) => x.kind === "out").reduce((s, x) => s + x.amount, 0);
+    const suggestions = projectionsOf(day, ctx);
+    const counted = suggestFrom && day >= suggestFrom ? items.concat(suggestions) : items;
+    const inflow = counted.filter((x) => x.kind === "in").reduce((s, x) => s + x.amount, 0);
+    const outflow = counted.filter((x) => x.kind === "out").reduce((s, x) => s + x.amount, 0);
     balance += inflow - outflow;
-    days.push({ day, inflow, outflow, balance, items, suggestions: projectionsOf(day, ctx) });
+    days.push({ day, inflow, outflow, balance, items, suggestions });
   }
   return days;
 }
@@ -495,7 +520,7 @@ const SplitBar = ({ real, forecast, of }) => {
    o mesmo do mês e do ano. */
 function TodayView({ ctx, cfg, month, onOpenMonth, onNewEntry, onEditEntry, onTogglePaid, onLaunch, onConfig, onCategory }) {
   const t = today();
-  const days = buildMonth(month, ctx);
+  const days = buildMonth(month, ctx, null, t);
   const inMonth = days.filter((d) => !d.before);
   const real = realBalanceUntil(t, ctx);
   const last = days[days.length - 1];
@@ -710,10 +735,10 @@ function CategoryForm({ finance, name, onClose }) {
 
 /* ----- mês ----- */
 function MonthView({ ctx, month, openDay, onToggleDay, onShift, onNewEntry, onEditEntry, onTogglePaid, onLaunch }) {
-  const days = buildMonth(month, ctx);
+  const t = today();
+  const days = buildMonth(month, ctx, null, t);
   const [year, monthNum] = month.split("-").map(Number);
   const nDays = daysInMonth(year, monthNum);
-  const t = today();
   const isThisMonth = month === t.slice(0, 7);
   const todayNum = isThisMonth ? +t.slice(8, 10) : 0;
 
@@ -769,7 +794,7 @@ function DayRow({ d, today: t, isToday, open, onToggle, onNewEntry, onEditEntry,
         <td>{label}{unconfirmed && <i className="dot-pending" title="tem previsto a confirmar" />}{d.suggestions.length > 0 && <i className="dot-suggest" title={d.suggestions.length + (d.suggestions.length === 1 ? " sugestão" : " sugestões") + " para lançar"} />}</td>
         <td className="num">{d.inflow ? money(d.inflow) : "—"}</td>
         <td className="num">{d.outflow ? money(-d.outflow) : "—"}</td>
-        <td className={"num" + (d.balance < 0 ? " negative" : "") + (d.before ? " weak" : "")}>{d.before ? "—" : money(d.balance)}</td>
+        <td className={"num" + (d.before ? " weak" : " balance-cell" + balanceTone(d.balance))}>{d.before ? "—" : money(d.balance)}</td>
       </tr>
       {open && (
         <tr className="day-detail"><td colSpan="4">
@@ -823,11 +848,14 @@ function YearView({ ctx, year, onShift, onOpenMonth }) {
   const t = today();
   /* o saldo entra em janeiro uma vez e desce mes a mes: doze buildMonth
      encadeados, em vez de doze balanceUntil() que recalculariam do inicio */
-  let balance = balanceUntil(addDays(year + "-01-01", -1), ctx);
+  /* os fixos e as parcelas ainda nao lancados somam de hoje em diante (igual
+     no mes) — o que ja passou sem lancar fica de fora, porque nao se sabe se
+     aconteceu */
+  let balance = balanceUntil(addDays(year + "-01-01", -1), ctx, t);
   const months = [];
   for (let m = 1; m <= 12; m++) {
     const yyyymm = year + "-" + pad(m);
-    const days = buildMonth(yyyymm, ctx, balance);
+    const days = buildMonth(yyyymm, ctx, balance, t);
     balance = days[days.length - 1].balance;
     months.push({ yyyymm, days });
   }
@@ -837,7 +865,7 @@ function YearView({ ctx, year, onShift, onOpenMonth }) {
         <button className="pill pill--icon" type="button" aria-label="Ano anterior" onClick={() => onShift(-1)}>{icon("arrowLeft")}</button>
         <strong className="mono" id="year-label">{year}</strong>
         <button className="pill pill--icon" type="button" aria-label="Ano seguinte" onClick={() => onShift(1)}>{icon("arrow")}</button>
-        <span className="small weak">o saldo no fim de cada dia, só com o que foi lançado — de amanhã em diante, previsto · clique no mês para abrir</span>
+        <span className="small weak">o saldo no fim de cada dia — de hoje em diante, previsto e com os fixos · clique no mês para abrir</span>
       </div>
       <div className="year-scroll"><div className="year">
         {months.map((mo, i) => <YearMonth key={mo.yyyymm} mo={mo} index={i} today={t} onOpen={() => onOpenMonth(mo.yyyymm)}/>)}
@@ -856,13 +884,13 @@ function YearMonth({ mo, index, today: t, onOpen }) {
     if (!day) { rows.push(<div key={n} className="year__day is-empty"><i>{pad(n)}</i><span>—</span></div>); continue; }
     if (day.before) { rows.push(<div key={n} className="year__day"><i>{pad(n)}</i><span className="weak">—</span></div>); continue; }
     const moves = day.inflow || day.outflow;
-    const cls = (day.balance < 0 ? " is-negative" : (moves ? " is-positive" : "")) + (moves ? " has-moves" : "") + (day.day === t ? " is-today" : "") + (day.day > t ? " is-future" : "");
+    const cls = balanceTone(day.balance) + (moves ? " has-moves" : "") + (day.day === t ? " is-today" : "") + (day.day > t ? " is-future" : "");
     const title = dateLabel(day.day, true) + (day.inflow ? " · +" + brl(day.inflow) : "") + (day.outflow ? " · −" + brl(day.outflow) : "");
-    rows.push(<div key={n} className={"year__day" + cls} title={title}><i>{pad(n)}</i><span>{brl(day.balance)}</span></div>);
+    rows.push(<div key={n} className={"year__day" + cls} title={title}><i>{pad(n)}</i><span>{brlBalance(day.balance)}</span></div>);
   }
   return (
     <div className={"year__month" + (mo.yyyymm === t.slice(0, 7) ? " is-current" : "")}>
-      <div className="year__head" title={"abrir " + SHORT_MONTHS[index]} onClick={onOpen}><b>{SHORT_MONTHS[index]}</b><span>{brl(end)}</span></div>
+      <div className="year__head" title={"abrir " + SHORT_MONTHS[index]} onClick={onOpen}><b>{SHORT_MONTHS[index]}</b><span>{brlBalance(end)}</span></div>
       {rows}
     </div>
   );
