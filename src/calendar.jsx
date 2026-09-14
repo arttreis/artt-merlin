@@ -34,7 +34,7 @@ import {
   normalize, onDate, inRange, overdue, dayDoc, topOrder, newTask, migrateTasks, layoutDay, readClock
 } from "./shared/tasks.js";
 import { useHourScale } from "./shared/hour-scale.js";
-import { normalize as normalizeBlock, copyRoutine } from "./shared/routine.js";
+import { normalize as normalizeBlock, copyRoutine, endFrom, allCopiesOf } from "./shared/routine.js";
 import {
   pendingOf, doneOf, reservesOf, costOf, guessMin, budget, fmt, longFmt, clock
 } from "./shared/day.js";
@@ -344,7 +344,7 @@ function Calendar() {
     clearTimeout(toastTimer.current);
   };
   const withUndo = (label, action) => {
-    const before = { tasks: store.all().map((t) => ({ ...t })), notes: notesCol.all().map((n) => ({ ...n })), label };
+    const before = { tasks: store.all().map((t) => ({ ...t })), notes: notesCol.all().map((n) => ({ ...n })), routine: routineCol.all().map((b) => ({ ...b })), label };
     action();
     undoStack.current.push(before);
     if (undoStack.current.length > UNDO_DEPTH) undoStack.current.shift();
@@ -356,6 +356,7 @@ function Calendar() {
     const step = stack.pop();
     restore(store, step.tasks);
     restore(notesCol, step.notes);
+    if (step.routine) restore(routineCol, step.routine);
     if (stack.length) showToast(stack[stack.length - 1].label);
     else closeToast();
   };
@@ -406,10 +407,37 @@ function Calendar() {
     });
   };
 
-  const remove = (id) => {
+  /* apagar o que se repete pergunta antes: so este, este e os proximos, ou
+     todos. a copia sem bloco (ele ja foi apagado) e uma tarefa comum. */
+  const [askRepeat, setAskRepeat] = useState(null); // a tarefa que vem de um bloco | null
+  const removeOnly = (id) => {
     const t = store.get(id);
     if (!t) return;
     withUndo("apaguei “" + shortTitle(t.title) + "”", () => { store.remove(id); });
+  };
+  const remove = (id) => {
+    const t = store.get(id);
+    if (!t) return;
+    if (t.origin && t.origin.type === "routine" && routineCol.get(t.origin.id)) { setAskRepeat(t); return; }
+    removeOnly(id);
+  };
+  const removeRepeat = (t, scope) => {
+    setAskRepeat(null);
+    const b = routineCol.get(t.origin.id);
+    if (scope === "one" || !b) { removeOnly(t.id); return; }
+    if (scope === "next") {
+      const r = endFrom(b, store.all(), t.date);
+      withUndo("apaguei “" + shortTitle(t.title) + "” deste dia em diante", () => {
+        r.remove.forEach((x) => store.remove(x));
+        routineCol.save(r.block);
+      });
+      return;
+    }
+    const ids = allCopiesOf(b, store.all());
+    withUndo("apaguei todos os “" + shortTitle(t.title) + "”", () => {
+      ids.forEach((x) => store.remove(x));
+      routineCol.remove(b.id);
+    });
   };
 
   const rename = (id, value) => {
@@ -921,6 +949,21 @@ function Calendar() {
           <span>{toast}</span>
           <button type="button" onClick={undo}>desfazer</button>
         </div>
+      )}
+
+      {askRepeat && (
+        <Dialog title="apagar o que se repete" label="Apagar o que se repete" onClose={() => setAskRepeat(null)}
+            sub={"“" + shortTitle(askRepeat.title) + "” acontece toda semana. o que apagar?"}
+            actions={<button className="pill" type="button" onClick={() => setAskRepeat(null)}>cancelar</button>}>
+          <div className="repeat-choices">
+            <button className="repeat-choice" type="button" autoFocus onClick={() => removeRepeat(askRepeat, "one")}>
+              <b>só este</b><span>{dateLabel(askRepeat.date, true)}</span></button>
+            <button className="repeat-choice" type="button" onClick={() => removeRepeat(askRepeat, "next")}>
+              <b>este e os próximos</b><span>para de repetir a partir deste dia</span></button>
+            <button className="repeat-choice is-danger" type="button" onClick={() => removeRepeat(askRepeat, "all")}>
+              <b>todos</b><span>apaga o evento e as ocorrências não concluídas</span></button>
+          </div>
+        </Dialog>
       )}
 
       {form && <TaskForm store={store} id={form.id} presetDate={form.date || anchor} presetAt={form.at} presetClient={view === "day" ? "" : soloClient} onClose={() => setForm(null)} onRemove={remove} onDuplicate={duplicate} />}
@@ -1589,19 +1632,36 @@ function AgendaColor({ agenda }) {
     return () => { document.removeEventListener("pointerdown", away); document.removeEventListener("keydown", esc); };
   }, [open]);
   const current = agendaColor(agenda.key);
+  const [hex, setHex] = useState("");
+  useEffect(() => { if (open) setHex((current || "").replace("#", "").toUpperCase()); }, [open]);
   const pick = (c) => { setAgendaColor(agenda.key, c); setOpen(false); };
+  /* o hex e o principal (14/09/2026): digitou seis digitos validos (ou tres,
+     que se expandem), a cor ja vale — sem o seletor do sistema no meio */
+  const typeHex = (raw) => {
+    const clean = raw.replace(/[^0-9a-f]/gi, "").slice(0, 6).toUpperCase();
+    setHex(clean);
+    const full = clean.length === 3 ? clean.split("").map((ch) => ch + ch).join("") : clean;
+    if (full.length === 6) setAgendaColor(agenda.key, "#" + full.toLowerCase());
+  };
+  const preview = /^[0-9A-F]{6}$/.test(hex) ? "#" + hex : (/^[0-9A-F]{3}$/.test(hex) ? "#" + hex.split("").map((ch) => ch + ch).join("") : current);
   return (
     <span className="agenda__color" ref={ref}>
       <button className="agenda__paint" type="button" title={"cor de " + agenda.name} aria-label={"Cor de " + agenda.name}
               aria-expanded={open} onClick={() => setOpen((o) => !o)} />
       {open && (
         <span className="swatches" role="dialog" aria-label={"Cor de " + agenda.name}>
-          {PICK_COLORS.map((c) => (
-            <button key={c} type="button" className="swatch" style={{ "--s": c }} aria-label={c} aria-pressed={current === c} onClick={() => pick(c)} />
-          ))}
-          <label className="swatch swatch--other" title="outra cor">
-            <input type="color" value={isHex(current) ? current : "#22c55e"} onChange={(e) => setAgendaColor(agenda.key, e.currentTarget.value)} />
+          <label className="hexfield">
+            <i style={{ "--s": preview || "var(--green)" }} aria-hidden="true" />
+            <span aria-hidden="true">#</span>
+            <input autoFocus spellCheck="false" autoComplete="off" maxLength="7" aria-label="cor em hex" placeholder="3B82F6"
+                   value={hex} onChange={(e) => typeHex(e.currentTarget.value)}
+                   onKeyDown={(e) => { if (e.key === "Enter") setOpen(false); }} />
           </label>
+          <span className="swatches__grid">
+            {PICK_COLORS.map((c) => (
+              <button key={c} type="button" className="swatch" style={{ "--s": c }} title={c.toUpperCase()} aria-label={c} aria-pressed={current === c} onClick={() => pick(c)} />
+            ))}
+          </span>
         </span>
       )}
     </span>

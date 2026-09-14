@@ -467,6 +467,18 @@ const dataLeft = () => globalThis.localStorage.keys().filter((k) => k in DATA);
     check("evento: reunião sem cliente é evento", R.kindOf({ id: "x", title: "weekly", reserved: true }) === "event");
     check("rotina: almoço é rotina, mesmo sendo pausa", R.kindOf({ id: "x", title: "almoço", reserved: true }) === "routine");
     check("rotina: o kind gravado vence o palpite", R.kindOf({ id: "r-1", kind: "routine" }) === "routine");
+    check("rotina: acordar é rotina mesmo vindo do 'toda semana'", R.kindOf({ id: "r-2", title: "acordar" }) === "routine");
+    {
+      const b = R.normalize({ id: "b1", title: "weekly", days: [1], weeks: {} });
+      const cp = (id, date, done) => ({ id, date, done: !!done, origin: { type: "routine", id: "b1" } });
+      const tasks = [cp("a", "2026-09-07", true), cp("b", "2026-09-14"), cp("c", "2026-09-21"), cp("d", "2026-09-28")];
+      const e = R.endFrom(b, tasks, "2026-09-21");
+      check("este e os próximos: tira as cópias do dia em diante", e.remove.join() === "c,d", e.remove.join());
+      check("este e os próximos: o bloco para de copiar no dia", e.block.until === "2026-09-21");
+      const spawned = R.spawnWeek([R.normalize(e.block)], [], "2026-09-20", "2026-09-14");
+      check("bloco encerrado não gera cópia depois do fim", spawned.tasks.length === 0);
+      check("todos: tira as não concluídas e deixa a concluída", R.allCopiesOf(b, tasks).join() === "b,c,d");
+    }
   }
 
   {

@@ -39,8 +39,11 @@ const KEEP_WEEKS = 4;
    weekly, 1:1) e evento; o resto e rotina. */
 export const BLOCK_KINDS = ["routine", "event"];
 const PAUSE = /almo[cç]|pausa|jantar|caf[eé]|lanche|intervalo|descanso|academia|treino/i;
+const SELF = /acordar|dormir|almo[cç]|jantar|caf[eé] da manh|academia|treino|banho|medita/i;
 export function kindOf(b) {
   if (b.kind === "routine" || b.kind === "event") return b.kind;
+  /* acordar e dormir sao rotina mesmo tendo vindo do antigo "toda semana" */
+  if (SELF.test(String(b.title || ""))) return "routine";
   if (String(b.id || "").startsWith("r-") || b.client) return "event";
   return b.reserved && !PAUSE.test(String(b.title || "")) ? "event" : "routine";
 }
@@ -59,6 +62,9 @@ export function normalize(b) {
     reserved: !!b.reserved,
     client: String(b.client || "").slice(0, 64),
     kind: kindOf(b),
+    /* o ultimo dia que ainda gera copia fica ANTES deste: "apagar este e os
+       proximos" grava aqui o dia apagado. vazio e para sempre */
+    until: isDay(b.until) ? b.until : "",
     weeks,
     createdAt: +b.createdAt || Date.now(),
     updatedAt: +b.updatedAt || +b.createdAt || Date.now()
@@ -105,7 +111,7 @@ export function spawnWeek(blocks, tasks, weekStart, now) {
     if (b.weeks[weekStart] || !b.days.length) return;
     b.days.forEach((d) => {
       const date = addDays(weekStart, d);
-      if (date < now) return;
+      if (date < now || (b.until && date >= b.until)) return;
       /* outro aparelho pode ter copiado antes de a marca chegar aqui */
       if (tasks.some((t) => isCopyOf(t, b.id) && t.date === date)) return;
       out.tasks.push(copyOf(b, date));
@@ -133,12 +139,27 @@ export function propagate(before, after, tasks, now) {
   Object.keys(after.weeks).filter((w) => w >= sundayOf(now)).forEach((w) => {
     added.forEach((d) => {
       const date = addDays(w, d);
-      if (date < now || tasks.some((t) => isCopyOf(t, after.id) && t.date === date)) return;
+      if (date < now || (after.until && date >= after.until) || tasks.some((t) => isCopyOf(t, after.id) && t.date === date)) return;
       out.create.push(copyOf(after, date));
     });
   });
   return out;
 }
+
+/* ---------- apagar algo que se repete ----------
+   a pergunta do calendario (14/09/2026): so este, este e os proximos, ou
+   todos. "so este" e apagar a tarefa, e nao passa por aqui.
+   - daqui em diante: o bloco ganha `until` e para de copiar a partir do dia;
+     as copias desse dia em diante que nao foram concluidas saem.
+   - todos: o bloco sai, e todas as copias nao concluidas saem junto. a
+     concluida fica — e registro do que aconteceu. */
+export function endFrom(b, tasks, date) {
+  return {
+    block: { ...b, until: b.until && b.until < date ? b.until : date, updatedAt: Date.now() },
+    remove: tasks.filter((t) => isCopyOf(t, b.id) && t.date >= date && !t.done).map((t) => t.id)
+  };
+}
+export const allCopiesOf = (b, tasks) => tasks.filter((t) => isCopyOf(t, b.id) && !t.done).map((t) => t.id);
 
 /* apagar o bloco leva junto as copias de hoje em diante que ninguem mexeu.
    o que ja passou e o que foi mexido ficam: sao historia, ou sao decisao. */

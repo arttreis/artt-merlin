@@ -14,7 +14,7 @@
 import "./shared/base.css";
 import "./shared/week-grid.css";
 import "./routine.css";
-import { initPage, notify, formatMin, parseDuration, parseMentions, readPrefs, foldKey } from "./shared/core.js";
+import { initPage, notify, today, formatMin, parseDuration, parseMentions, readPrefs, foldKey } from "./shared/core.js";
 import { useState, useRef, useLayoutEffect } from "react";
 import {
   mount, useCollection, useClients, useKeydown, isTyping, useFields,
@@ -54,7 +54,9 @@ function Routine() {
   const [suggesting, setSuggesting] = useState(false);
   const [chosen, setChosen] = useState([]);
 
-  const list = blocks.all().sort((a, b) => (a.at ?? 9999) - (b.at ?? 9999) || a.createdAt - b.createdAt);
+  /* bloco encerrado ("apagar este e os proximos" no calendario, com o dia ja
+     chegado) sai da semana-modelo: ele nao se repete mais */
+  const list = blocks.all().filter((b) => !b.until || b.until > today()).sort((a, b) => (a.at ?? 9999) - (b.at ?? 9999) || a.createdAt - b.createdAt);
   const weekMin = list.reduce((s, b) => s + b.days.length * (b.min || 0), 0);
 
   /* ---------- gravar ----------
