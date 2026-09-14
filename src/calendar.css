@@ -796,3 +796,15 @@
 .late__text{margin:0;font-size:13px;color:var(--ink-70)}
 .late__text b{color:var(--ink);font-weight:600}
 .late__actions{display:flex;gap:var(--pd2);flex-wrap:wrap}
+
+/* ---------- a caixa da tarefa ----------
+   o titulo e o campo que importa, entao ele e o maior; dia, horario e duracao
+   sao uma frase so ("dia 14, as 14h, por 1h") e ficam na mesma linha. */
+.task-form__title{height:42px;font-size:15px;font-weight:500;letter-spacing:-.01em}
+.task-form__when{display:grid;gap:var(--pd2);grid-template-columns:minmax(0,1.5fr) minmax(0,1fr) minmax(0,1fr)}
+.dialog--form .chips{padding-top:2px}
+.dialog--form .chip[aria-pressed="true"]{color:var(--ink);border-color:var(--ink-30)}
+@media (max-width:480px){
+  .task-form__when{grid-template-columns:1fr 1fr}
+  .task-form__when > :first-child{grid-column:1 / -1}
+}

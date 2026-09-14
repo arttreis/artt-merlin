@@ -1609,26 +1609,24 @@ function TaskForm({ store, id, presetDate, presetAt, onClose, onRemove, onDuplic
   };
   return (
     <Form title={c ? "tarefa" : "nova tarefa"} submit={c ? "salvar" : "adicionar"} remove={c ? "apagar" : ""}
-          onRemove={() => { onRemove(id); onClose(); }} onClose={onClose} onSubmit={submit}>
-      <Field label="título" full>
-        <input className="input" maxLength="300" required placeholder="o que fazer · @cliente · 45m" {...bind("title")}
-               onBlur={(e) => { if (!touchedReserve.current) set("reserved", isReserve(e.currentTarget.value)); }} />
-      </Field>
-      <Field label="dia"><DateField required {...bind("date")} /></Field>
-      <Field label="horário"><input className="input input--mono" placeholder="sem horário" inputMode="numeric" {...bind("at")} /></Field>
-      <Field label="duração"><input className="input input--mono" placeholder="45m, 1h30" {...bind("duration")} /></Field>
-      <Field label="cliente"><select className="select" {...bind("client")}>{clientOptionList("sem cliente")}</select></Field>
-      <label className="row full">
-        <input type="checkbox" checked={v.reserved} onChange={(e) => { touchedReserve.current = true; set("reserved", e.currentTarget.checked); }} />
-        reunião ou pausa — ocupa o tempo, mas não é trabalho para concluir
-      </label>
-      <label className="row full"><input type="checkbox" {...bind("recurring", "check")} /> toda semana</label>
-      {c && (
-        <p className="full task-form__more">
-          <button className="link" type="button" onClick={() => { onDuplicate(id); onClose(); }}>duplicar</button>
-          <span className="t-mono t-mute">Ctrl+C e Ctrl+V copiam e colam; Ctrl+D duplica</span>
-        </p>
-      )}
+          onRemove={() => { onRemove(id); onClose(); }} onClose={onClose} onSubmit={submit}
+          aside={c && <button className="link" type="button" title="Ctrl+D duplica · Ctrl+C e Ctrl+V copiam e colam"
+                              onClick={() => { onDuplicate(id); onClose(); }}>duplicar</button>}>
+      <input className="input task-form__title full" maxLength="300" required aria-label="título"
+             placeholder="o que fazer · @cliente · 45m" {...bind("title")}
+             onBlur={(e) => { if (!touchedReserve.current) set("reserved", isReserve(e.currentTarget.value)); }} />
+      <div className="full task-form__when">
+        <Field label="dia"><DateField required {...bind("date")} /></Field>
+        <Field label="horário"><input className="input input--mono" placeholder="—" inputMode="numeric" {...bind("at")} /></Field>
+        <Field label="duração"><input className="input input--mono" placeholder="45m" {...bind("duration")} /></Field>
+      </div>
+      <Field label="cliente" full><select className="select" {...bind("client")}>{clientOptionList("sem cliente")}</select></Field>
+      <div className="full chips">
+        <button className="chip" type="button" aria-pressed={v.reserved} title="ocupa o tempo, mas não é trabalho para concluir"
+                onClick={() => { touchedReserve.current = true; set("reserved", !v.reserved); }}>reunião ou pausa</button>
+        <button className="chip" type="button" aria-pressed={v.recurring}
+                onClick={() => set("recurring", !v.recurring)}>toda semana</button>
+      </div>
     </Form>
   );
 }

@@ -192,7 +192,7 @@ export function Dialog({ title, sub, wide, onClose, actions, label, children, ..
 /* o formulario em dialogo: todo "criar X" e "editar X" passa por aqui. os
    campos vem nos filhos (use <Field> e useFields); `onSubmit()` devolvendo
    false mantem a caixa aberta. o primeiro campo ganha foco ao abrir. */
-export function Form({ title, sub, wide, submit, remove, onSubmit, onRemove, onClose, children }) {
+export function Form({ title, sub, wide, submit, remove, aside, onSubmit, onRemove, onClose, children }) {
   const ref = useRef(null);
   /* foco antes da pintura: a primeira tecla ja entra no campo certo */
   useLayoutEffect(() => {
@@ -214,8 +214,9 @@ export function Form({ title, sub, wide, submit, remove, onSubmit, onRemove, onC
         {sub && <p className="dialog__sub">{sub}</p>}
         <div className="form-grid">{children}</div>
         <div className="dialog__actions">
-          {remove && <>
-            <button className="link" type="button" onClick={() => { if (onClose) onClose(); if (onRemove) onRemove(); }}>{remove}</button>
+          {(remove || aside) && <>
+            {remove && <button className="link" type="button" onClick={() => { if (onClose) onClose(); if (onRemove) onRemove(); }}>{remove}</button>}
+            {aside}
             <span className="spacer" />
           </>}
           <button className="pill" type="button" onClick={onClose}>cancelar</button>
