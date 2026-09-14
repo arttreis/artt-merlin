@@ -242,30 +242,42 @@ initTheme();
 
 /* ---------- navegacao ---------- */
 
-export const PAGES = [
-  { id: "home", label: "início", href: "index.html" },
-  /* o dia e a semana eram dois itens porque eram duas paginas. viraram duas
-     visoes de uma so, e dois itens levando ao mesmo lugar seriam duas portas
-     para a mesma sala. */
-  { id: "calendar", label: "calendário", href: "calendar.html" },
-  /* logo abaixo do calendario porque e dele que ela vive: a rotina so vira
-     tarefa quando o calendario abre a semana */
-  { id: "routine", label: "rotina", href: "routine.html" },
-  { id: "notes", label: "notas", href: "notes.html" },
-  /* a prospeccao vem antes de clientes porque e de onde eles chegam; o
-     conteudo vem logo depois, porque e o que traz quem entra na prospeccao */
-  { id: "prospecting", label: "prospecção", href: "prospecting.html" },
-  { id: "clients", label: "clientes", href: "clients.html" },
-  { id: "content", label: "conteúdo", href: "content.html" },
-  { id: "funnels", label: "funis", href: "funnels.html" },
-  { id: "maps", label: "mapas", href: "maps.html" },
-  { id: "finance", label: "financeiro", href: "finance.html" },
-  /* logo depois do financeiro porque e para la que ela desagua: o "comprei"
-     vira saida */
-  { id: "wishlist", label: "vitrine", href: "wishlist.html" },
-  { id: "habits", label: "hábitos", href: "habits.html" },
-  { id: "plans", label: "planos", href: "plans.html" }
+/* as paginas em grupos, cada grupo com um titulo que abre e fecha na barra
+   (14/09/2026: com treze paginas, a lista corrida ja nao se lia de relance).
+   a ordem dentro de cada grupo e a mesma de antes. */
+export const PAGE_GROUPS = [
+  { id: "day", label: "dia a dia", pages: [
+    { id: "home", label: "início", href: "index.html" },
+    /* o dia e a semana eram dois itens porque eram duas paginas. viraram duas
+       visoes de uma so, e dois itens levando ao mesmo lugar seriam duas portas
+       para a mesma sala. */
+    { id: "calendar", label: "calendário", href: "calendar.html" },
+    /* logo abaixo do calendario porque e dele que ela vive: a rotina so vira
+       tarefa quando o calendario abre a semana */
+    { id: "routine", label: "rotina", href: "routine.html" },
+    { id: "notes", label: "notas", href: "notes.html" }
+  ] },
+  { id: "business", label: "negócio", pages: [
+    /* a prospeccao vem antes de clientes porque e de onde eles chegam; o
+       conteudo vem logo depois, porque e o que traz quem entra na prospeccao */
+    { id: "prospecting", label: "prospecção", href: "prospecting.html" },
+    { id: "clients", label: "clientes", href: "clients.html" },
+    { id: "content", label: "conteúdo", href: "content.html" },
+    { id: "funnels", label: "funis", href: "funnels.html" },
+    { id: "maps", label: "mapas", href: "maps.html" }
+  ] },
+  { id: "money", label: "dinheiro", pages: [
+    { id: "finance", label: "financeiro", href: "finance.html" },
+    /* logo depois do financeiro porque e para la que ela desagua: o "comprei"
+       vira saida */
+    { id: "wishlist", label: "vitrine", href: "wishlist.html" }
+  ] },
+  { id: "growth", label: "evolução", pages: [
+    { id: "habits", label: "hábitos", href: "habits.html" },
+    { id: "plans", label: "planos", href: "plans.html" }
+  ] }
 ];
+export const PAGES = PAGE_GROUPS.flatMap((g) => g.pages);
 
 export function toggleSidebar() {
   const root = document.documentElement;

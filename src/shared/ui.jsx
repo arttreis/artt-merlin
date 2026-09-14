@@ -19,7 +19,7 @@ import { createPortal } from "react-dom";
 import {
   collection, cloud, clients, listClients, clientName, md, brl, parseMoney,
   api, notify, sendToDay, formatMin, readDuration,
-  PAGES, CLOUD_STATUS, search, signIn, currentNotice, onNotice, closeNotice,
+  PAGE_GROUPS, CLOUD_STATUS, search, signIn, currentNotice, onNotice, closeNotice,
   toggleSidebar, setShellRenderer, currentBrand, share, shareOf, unshare, shareUrl,
   currentTheme, toggleTheme
 } from "./core.js";
@@ -1136,6 +1136,37 @@ function Notice() {
   );
 }
 
+/* um grupo da barra: o titulo abre e fecha, e a escolha fica guardada no
+   navegador. fechado, o grupo ainda mostra a pagina em que a pessoa esta —
+   senao ela some da barra justo quando se esta nela. recolhida, a barra
+   ignora os titulos e mostra todos os icones. */
+function NavGroup({ group, page }) {
+  const key = "merlin:nav:" + group.id;
+  const [open, setOpen] = useState(() => { try { return localStorage.getItem(key) !== "closed"; } catch (e) { return true; } });
+  const toggle = () => {
+    setOpen((o) => {
+      try { localStorage.setItem(key, o ? "closed" : "open"); } catch (e) {}
+      return !o;
+    });
+  };
+  return (
+    <div className={"sb__group" + (open ? "" : " is-folded")}>
+      <button className="sb__section" type="button" aria-expanded={open} onClick={toggle}>
+        <span>{group.label}</span>{icon("chevronDown")}
+      </button>
+      <ul className="sb__list">
+        {group.pages.map((p) => (
+          <li key={p.id} className={p.id === page ? "is-here" : undefined}>
+            <a className="sb__item" href={p.href} title={p.label} aria-current={p.id === page ? "page" : undefined}>
+              {NAV_ICONS[p.id] || null}<span>{p.label}</span>
+            </a>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 /* ---------- a casca inteira ---------- */
 function Shell({ page }) {
   const [drawer, setDrawer] = useState(false);
@@ -1179,15 +1210,9 @@ function Brand() {
           <button className="sb__fold" type="button" id="sb-fold" title="Recolher (Ctrl+B)" aria-label="Recolher a barra" onClick={fold}>{NAV_ICONS.fold}</button>
         </div>
         <SearchBox onNavigate={() => setDrawer(false)} />
-        <ul className="sb__list">
-          {PAGES.map((p) => (
-            <li key={p.id}>
-              <a className="sb__item" href={p.href} title={p.label} aria-current={p.id === page ? "page" : undefined}>
-                {NAV_ICONS[p.id] || null}<span>{p.label}</span>
-              </a>
-            </li>
-          ))}
-        </ul>
+        <nav className="sb__groups">
+          {PAGE_GROUPS.map((g) => <NavGroup key={g.id} group={g} page={page} />)}
+        </nav>
         {/* aqui havia uma segunda lista, com "merlin" e "perfil". as duas
             saíram: o perfil virou o próprio cartão de quem está aqui, e o
             merlin não é uma página — é o que ele faz NESTA, e por isso mora
