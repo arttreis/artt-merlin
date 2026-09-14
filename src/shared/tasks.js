@@ -89,9 +89,10 @@ export const inRange = (all, from, to) =>
 
 /* o que ficou para tras: aberto, com data anterior a hoje. era a "fila de
    ontem" do dia e os "atrasados" da semana, que eram a mesma pergunta feita
-   sobre duas listas diferentes. */
+   sobre duas listas diferentes. reuniao nao entra: ela passa com o dia, nao
+   fica devendo. */
 export const overdue = (all, from) =>
-  all.filter((t) => !t.done && t.date < (from || today())).sort((a, b) => a.date.localeCompare(b.date) || byOrder(a, b));
+  all.filter((t) => !t.done && !t.reserved && t.date < (from || today())).sort((a, b) => a.date.localeCompare(b.date) || byOrder(a, b));
 
 /* o documento que a conta do dia (shared/day.js) sabe ler. ela nao precisa
    saber que existe colecao: continua recebendo {tasks, start, end}. */

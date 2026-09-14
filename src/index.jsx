@@ -467,7 +467,7 @@ function Home() {
   const late = overdue(allTasks, t).length;
   const counts = {
     dayOpen: pendingOf(today_).length,
-    weekOpen: allTasks.filter((x) => !x.done && weekDays.has(x.date)).length,
+    weekOpen: allTasks.filter((x) => !x.done && !x.reserved && weekDays.has(x.date)).length,
     notes: notes.all().filter((n) => n.stage !== "archived").length,
     clients: clientsCol.all().filter((x) => x.status !== "closed").length,
     funnels: funnels.all().length,
