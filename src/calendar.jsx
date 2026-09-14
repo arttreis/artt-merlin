@@ -21,7 +21,7 @@ import "./shared/week-grid.css";
 import {
   initPage, newId, today, isDay, dateOf, dayOf, addDays, sundayOf, dateLabel, monthLabel,
   api, cloud, notify, readDuration, formatMin, parseDuration, readPrefs, savePrefs,
-  readInbox, writeInbox, parseMentions, clientName
+  readInbox, writeInbox, parseMentions, clientName, clients
 } from "./shared/core.js";
 import { useState, useEffect, useLayoutEffect, useRef } from "react";
 import {
@@ -118,6 +118,35 @@ function monthGrid(month) {
 }
 
 /* ================================================================
+/* ================================================================
+   as agendas: cada cliente e uma
+   ================================================================
+   a semana e o mes pintam cada tarefa na cor do cliente dela, e a barra do
+   lado liga e desliga cada um — "so a loja x esta semana" vira um clique. o
+   que nao tem cliente e a agenda pessoal, no verde da casa.
+
+   a cor sai da ordem de cadastro (contando encerrados), e nao da ordem
+   alfabetica: cliente novo pega a proxima cor e nao repinta os outros. um
+   sorteio pelo id seria mais estavel, mas com oito cores dois clientes em
+   tres ja caiam na mesma. o que fica escondido e preferencia desta tela neste
+   aparelho, e por isso mora no localStorage e nao na nuvem. o dia nao filtra
+   nada: a conta dele e sobre o dia inteiro, e esconder uma tarefa ali
+   mentiria sobre o tempo que sobra. */
+const AGENDA_COLORS = ["#8b5cf6", "#f59e0b", "#14b8a6", "#f43f5e", "#3b82f6", "#ec4899", "#f97316", "#06b6d4"];
+const agendaColor = (client) => {
+  const c = clients().get(client);
+  if (c && c.color) return c.color;
+  const order = clients().all().sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0) || String(a.id).localeCompare(String(b.id)));
+  const i = order.findIndex((x) => x.id === client);
+  return AGENDA_COLORS[(i < 0 ? 0 : i) % AGENDA_COLORS.length];
+};
+/* o estilo que leva a cor: sem cliente nao ha variavel, e o CSS cai no verde */
+const agendaStyle = (client) => (client ? { "--c": agendaColor(client) } : {});
+const HIDDEN_KEY = "merlin:calendar:hidden";
+const SIDE_KEY = "merlin:calendar:side";
+const readHidden = () => { try { const v = JSON.parse(localStorage.getItem(HIDDEN_KEY) || "[]"); return Array.isArray(v) ? v : []; } catch (e) { return []; } };
+const readSide = () => { try { const v = localStorage.getItem(SIDE_KEY); return v ? v === "open" : window.innerWidth >= 1000; } catch (e) { return true; } };
+
    onde cada tarefa cai dentro do dia
    ================================================================
    e a partir de qual delas nao da mais tempo. tarefa sem estimativa entra
@@ -200,7 +229,7 @@ function Calendar() {
      trabalho de gravar e editar vira tarefa la em conteudo. */
   const contentCol = useCollection("content");
   const pieces = contentCol.all().filter((c) => c.date && c.title);
-  useClients();
+  const clientList = useClients();
   const hash = useHash();
   const delegate = useDelegate();
   const prefs = readPrefs();
@@ -222,6 +251,8 @@ function Calendar() {
   const [target, setTarget] = useState("");     /* a data sob o arrasto */
   const [editing, setEditing] = useState(null);
 
+  const [hidden, setHidden] = useState(readHidden);   /* as agendas desligadas: "" e a pessoal */
+  const [side, setSide] = useState(readSide);
   const undoStack = useRef([]);
   const toastTimer = useRef(null);
   const drag = useRef(null);
@@ -235,6 +266,27 @@ function Calendar() {
   const all = store.all();
 
   /* a visao tambem vem do endereco: `calendar.html#week` e o que os enderecos
+  /* ---------- as agendas ----------
+     so vale esconder o que ainda tem botao para voltar: cliente encerrado
+     some da barra, e as tarefas dele nao podem sumir junto sem saida. */
+  const off = new Set(hidden.filter((k) => k === "" || clientList.some((c) => c.id === k)));
+  const visible = off.size ? all.filter((t) => !off.has(t.client || "")) : all;
+  const saveHidden = (list) => {
+    setHidden(list);
+    try { localStorage.setItem(HIDDEN_KEY, JSON.stringify(list)); } catch (e) {}
+  };
+  const toggleAgenda = (key) => saveHidden(off.has(key) ? [...off].filter((k) => k !== key) : [...off, key]);
+  const onlyAgenda = (key) => saveHidden(["", ...clientList.map((c) => c.id)].filter((k) => k !== key));
+  const toggleSide = () => setSide((v) => {
+    try { localStorage.setItem(SIDE_KEY, v ? "closed" : "open"); } catch (e) {}
+    return !v;
+  });
+  /* com uma agenda de cliente so ligada, tarefa nova ja nasce dela */
+  const soloClient = (() => {
+    const on = ["", ...clientList.map((c) => c.id)].filter((k) => !off.has(k));
+    return on.length === 1 ? on[0] : "";
+  })();
+
      antigos (day.html, week.html) apontam depois de a pagina virar uma so.
      uma DATA no lugar da visao abre aquele dia — e o que a busca da barra usa
      para levar a uma tarefa, e o que um link mandado para si mesmo faz. */
@@ -804,6 +856,10 @@ function Calendar() {
           <p className="calbar__sub">{isNow ? "o período de agora" : (view === "day" ? weekdayName(anchor) : "")}</p>
         </div>
         <span className="calbar__gap" />
+        {view !== "day" && (
+          <button className={"action calbar__side"} type="button" aria-pressed={String(side)}
+                  title={side ? "esconder as agendas" : "mostrar as agendas"} aria-label="Agendas" onClick={toggleSide}>{icon("menu")}</button>
+        )}
         <div className="calbar__nav">
           <button className="action" type="button" title="anterior (Alt+←)" aria-label="Período anterior" onClick={() => shift(-1)}>{icon("chevronLeft")}</button>
           <button className="pill" type="button" disabled={isNow} onClick={() => setAnchor(today())}>hoje</button>
@@ -850,16 +906,25 @@ function Calendar() {
           onCreateNote={createNote} onPullNote={pullNote} onRemoveNote={removeNote} />
       )}
 
-      {view === "week" && (
-        <WeekGrid all={all} pieces={pieces} weekStart={weekStart} prefs={prefs} actions={actions}
-          onNew={(date, at) => setForm({ id: "", date, at })} onOpenDay={(date) => { setAnchor(date); chooseView("day"); }}
-          onMove={moveTo} />
-      )}
-
-      {view === "month" && (
-        <MonthView all={all} pieces={pieces} month={monthOf(anchor)} target={target} actions={actions}
-          onNew={(date) => setForm({ id: "", date })} onOpenDay={(date) => { setAnchor(date); chooseView("day"); }}
-          onEnter={setTarget} onLeave={(d) => setTarget((cur) => (cur === d ? "" : cur))} onDrop={onDropOn} />
+      {view !== "day" && (
+        <div className={"calbody" + (side ? " has-side" : "")}>
+          {side && (
+            <CalSide anchor={anchor} view={view} weekStart={weekStart} all={all} clients={clientList} off={off}
+              onPick={setAnchor} onToggle={toggleAgenda} onOnly={onlyAgenda} onShowAll={() => saveHidden([])} />
+          )}
+          <div className="calbody__main">
+            {view === "week" && (
+              <WeekGrid all={visible} pieces={pieces} weekStart={weekStart} prefs={prefs} actions={actions}
+                onNew={(date, at) => setForm({ id: "", date, at })} onOpenDay={(date) => { setAnchor(date); chooseView("day"); }}
+                onMove={moveTo} />
+            )}
+            {view === "month" && (
+              <MonthView all={visible} pieces={pieces} month={monthOf(anchor)} target={target} actions={actions}
+                onNew={(date) => setForm({ id: "", date })} onOpenDay={(date) => { setAnchor(date); chooseView("day"); }}
+                onEnter={setTarget} onLeave={(d) => setTarget((cur) => (cur === d ? "" : cur))} onDrop={onDropOn} />
+            )}
+          </div>
+        </div>
       )}
 
       {toast != null && (
@@ -869,7 +934,7 @@ function Calendar() {
         </div>
       )}
 
-      {form && <TaskForm store={store} id={form.id} presetDate={form.date || anchor} presetAt={form.at} onClose={() => setForm(null)} onRemove={remove} onDuplicate={duplicate} />}
+      {form && <TaskForm store={store} id={form.id} presetDate={form.date || anchor} presetAt={form.at} presetClient={view === "day" ? "" : soloClient} onClose={() => setForm(null)} onRemove={remove} onDuplicate={duplicate} />}
       {summary != null && <MerlinDialog text={summary} onClose={() => setSummary(null)} />}
 
       {delegate.answer && (
@@ -1462,6 +1527,10 @@ function WeekBlock({ b, actions, onGrab, onRelease }) {
     e.stopPropagation();
     const y0 = e.clientY, base = b.to;
     let last = base;
+  /* o nome do cliente em cima, na cor dele, so quando sobra altura: num bloco
+     de meia hora a cor ja diz de quem e */
+  const client = clientName(x.client);
+  const tall = height >= 52;
     const move = (ev) => {
       last = Math.max(b.from + SNAP, Math.min(1440, b.from + snap(base - b.from + (ev.clientY - y0) / HOUR_H * 60)));
       setResize({ to: last });
@@ -1479,8 +1548,8 @@ function WeekBlock({ b, actions, onGrab, onRelease }) {
   return (
     <div className={"wk__block" + (x.reserved ? " is-reserved" : " is-task") + (x.done ? " is-done" : "") + (b.fixed ? "" : " is-loose") + (short ? " is-short" : "") + (b.cols > 1 ? " is-narrow" : "") + (actions.dragging === x.id ? " is-dragging" : "")}
          data-task={x.id} tabIndex="0" draggable={resize ? "false" : "true"}
-         title={x.title + " · " + time + (b.fixed ? "" : " (na fila, sem horário)")}
-         style={{ top: b.from / 60 * HOUR_H, height, left: "calc(" + (b.col / b.cols * 100) + "% + 2px)", width: "calc(" + (100 / b.cols) + "% - 4px)" }}
+         title={(client ? client + " · " : "") + x.title + " · " + time + (b.fixed ? "" : " (na fila, sem horário)")}
+         style={{ ...agendaStyle(x.client), top: b.from / 60 * HOUR_H, height, left: "calc(" + (b.col / b.cols * 100) + "% + 2px)", width: "calc(" + (100 / b.cols) + "% - 4px)" }}
          onDragStart={(e) => { onGrab(e); actions.onDragStart(e, x); }}
          onDragEnd={() => { onRelease(); actions.onDragEnd(); }}
          onClick={(e) => { if (!e.target.closest("button")) actions.edit(x.id); }}
@@ -1496,6 +1565,7 @@ function WeekBlock({ b, actions, onGrab, onRelease }) {
       <span className="wk__resize" onPointerDown={startResize} aria-hidden="true" />
     </div>
   );
+        {client && tall && <span className="wk__client">{client}</span>}
 }
 
 /* ================================================================
@@ -1528,7 +1598,8 @@ function MonthView({ all, pieces = [], month, target, actions, onNew, onOpenDay,
   const item = (x) => (
     <button key={x.id} type="button" draggable="true" data-id={x.id} data-task={x.id}
             className={"month__item" + (x.done ? " is-done" : "") + (x.reserved ? " is-reserved" : "")}
-            title={x.title + (x.at != null ? " · " + clock(x.at) : "") + (x.min ? " · " + fmt(x.min) : "")}
+            style={agendaStyle(x.client)}
+            title={(x.client ? clientName(x.client) + " · " : "") + x.title + (x.at != null ? " · " + clock(x.at) : "") + (x.min ? " · " + fmt(x.min) : "")}
             onDragStart={(e) => actions.onDragStart(e, x)} onDragEnd={actions.onDragEnd}
             onClick={() => actions.edit(x.id)}>
       {x.reserved ? <span className="month__clock" aria-hidden="true">{icon("clock")}</span> : <i aria-hidden="true" />}
@@ -1583,17 +1654,83 @@ function MonthView({ all, pieces = [], month, target, actions, onNew, onOpenDay,
    no titulo, "@cliente" e a duracao no fim continuam valendo — e a mesma
    gramatica do campo do dia — mas os campos ao lado ganham quando preenchidos.
 
+/* ================================================================
+   a barra das agendas
+   ================================================================
+   um mes pequeno para pular de data, e a lista das agendas com a caixa na
+   cor de cada uma. o numero ao lado e quantas tarefas ela tem no periodo
+   aberto — conta, nao duracao: so o dia tem minutos. */
+function CalSide({ anchor, view, weekStart, all, clients, off, onPick, onToggle, onOnly, onShowAll }) {
+  const [month, setMonth] = useState(monthOf(anchor));
+  useEffect(() => { setMonth(monthOf(anchor)); }, [anchor]);
+  const shiftMonth = (n) => {
+    const d = dateOf(month + "-01");
+    setMonth(monthOf(dayOf(new Date(d.getFullYear(), d.getMonth() + n, 1))));
+  };
+  const t = today();
+  const weekEnd = addDays(weekStart, 6);
+  const grid = monthGrid(monthOf(anchor));
+  const [from, to] = view === "week" ? [weekStart, weekEnd] : [grid[0][0], grid[grid.length - 1][6]];
+  const counts = new Map();
+  inRange(all, from, to).forEach((x) => { const k = x.client || ""; counts.set(k, (counts.get(k) || 0) + 1); });
+  const busy = new Set(all.filter((x) => monthOf(x.date || "") === month).map((x) => x.date));
+  const agendas = [{ key: "", name: "pessoal" }, ...clients.map((c) => ({ key: c.id, name: c.name }))];
+  const y = month.slice(0, 4);
+
+  return (
+    <aside className="calside" aria-label="Agendas">
+      <div className="mini">
+        <div className="mini__head">
+          <button className="action" type="button" aria-label="Mês anterior" onClick={() => shiftMonth(-1)}>{icon("chevronLeft")}</button>
+          <b>{monthLabel(month).replace(/\s*\d{4}$/, "")} <span>{y}</span></b>
+          <button className="action" type="button" aria-label="Próximo mês" onClick={() => shiftMonth(1)}>{icon("chevronRight")}</button>
+        </div>
+        <div className="mini__grid">
+          {WEEKDAYS.map((w) => <span key={w} className="mini__wd" aria-hidden="true">{w.slice(0, 1)}</span>)}
+          {monthGrid(month).flat().map((day) => (
+            <button key={day} type="button" data-day={day} aria-label={dateLabel(day)} aria-pressed={String(day === anchor)}
+                    className={"mini__day" + (day.slice(0, 7) !== month ? " is-out" : "") + (day === t ? " is-today" : "")
+                      + (view === "week" && day >= weekStart && day <= weekEnd ? " is-in" : "") + (busy.has(day) ? " is-busy" : "")}
+                    onClick={() => onPick(day)}>{dayNumber(day)}</button>
+          ))}
+        </div>
+      </div>
+
+      <div className="agendas">
+        <p className="agendas__title">
+          <span>agendas</span>
+          {off.size > 0 && <button className="text-link" type="button" onClick={onShowAll}>mostrar todas</button>}
+        </p>
+        <ul>
+          {agendas.map((a) => (
+            <li key={a.key || "pessoal"} className={"agenda" + (off.has(a.key) ? " is-off" : "")} style={agendaStyle(a.key)}>
+              <label>
+                <input type="checkbox" checked={!off.has(a.key)} onChange={() => onToggle(a.key)} />
+                <span className="agenda__box" aria-hidden="true">{icon("check")}</span>
+                <span className="agenda__name">{a.name}</span>
+              </label>
+              <button className="agenda__only" type="button" title={"mostrar só " + a.name} onClick={() => onOnly(a.key)}>só</button>
+              <span className="agenda__n t-mono">{counts.get(a.key) || ""}</span>
+            </li>
+          ))}
+        </ul>
+        {!clients.length && <p className="agendas__hint">cada cliente vira uma agenda com cor própria. <a href="clients.html">cadastrar clientes</a></p>}
+      </div>
+    </aside>
+  );
+}
+
    o horario e opcional: sem ele a tarefa e so uma posicao na fila do dia. e
    "reuniao ou pausa" deixou de ser so um palpite pelo titulo — o palpite
    continua marcando a caixa, mas agora da para desmarcar. */
-function TaskForm({ store, id, presetDate, presetAt, onClose, onRemove, onDuplicate }) {
+function TaskForm({ store, id, presetDate, presetAt, presetClient, onClose, onRemove, onDuplicate }) {
   const c = id ? store.get(id) : null;
   const [v, bind, set] = useFields({
     title: c ? c.title : "",
     date: c ? c.date : presetDate,
     at: c ? (c.at != null ? clock(c.at) : "") : (presetAt != null ? clock(presetAt) : ""),
     duration: c && c.min ? formatMin(c.min) : "",
-    client: c ? c.client : "",
+    client: c ? c.client : (presetClient || ""),
     reserved: !!(c && c.reserved)
   });
   const touchedReserve = useRef(!!c);

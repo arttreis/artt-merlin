@@ -669,7 +669,7 @@
 .month__item.is-done{color:var(--ink-30);text-decoration:line-through}
 .month__item.is-reserved{background:none;color:var(--ink-50);padding-top:1px;padding-bottom:1px;font-size:10.5px}
 .month__item.is-reserved:hover{background:var(--fill)}
-.month__item i{width:5px;height:5px;border-radius:50%;background:var(--green)}
+.month__item i{width:6px;height:6px;border-radius:50%;background:var(--c,var(--green))}
 .month__item.is-done i{background:var(--ink-30)}
 /* conteudo que vai ao ar no dia: link, sem fundo, com o play verde */
 .piece-mark{
@@ -690,6 +690,7 @@
 @media (max-width:720px){
   .month__cell{min-height:74px;padding:4px}
   .month__item{font-size:10.5px;padding:2px 4px}
+.month__item.is-reserved .month__clock{color:var(--c,var(--ink-30))}
 }
 
 /* ---------- o que ficou para tras ----------
@@ -711,6 +712,89 @@
 .task-form__when{display:grid;gap:var(--pd2);grid-template-columns:minmax(0,1.5fr) minmax(0,1fr) minmax(0,1fr)}
 .dialog--form .chips{padding-top:2px}
 .dialog--form .chip[aria-pressed="true"]{color:var(--ink);border-color:var(--ink-30)}
+/* ================================================================
+   as agendas
+   ================================================================
+   a semana e o mes ganham uma coluna a esquerda: o mes pequeno em cima, a
+   lista das agendas embaixo. no celular ela vem fechada e, aberta, empilha
+   em cima da grade — nao ha largura para as duas lado a lado. */
+.calbar__side[aria-pressed="true"]{color:var(--ink)}
+.calbody{display:grid;grid-template-columns:minmax(0,1fr);gap:var(--pd);align-items:start}
+.calbody.has-side{grid-template-columns:236px minmax(0,1fr)}
+.calbody__main{min-width:0}
+.calside{
+  display:flex;flex-direction:column;min-width:0;
+  background:var(--surface);border:1px solid var(--line-soft);border-radius:var(--br3);overflow:hidden;
+}
+
+.mini{padding:10px 10px 12px;border-bottom:1px solid var(--line-soft)}
+.mini__head{display:flex;align-items:center;justify-content:space-between;gap:6px;margin-bottom:6px}
+.mini__head b{font-size:13.5px;font-weight:500;color:var(--ink);text-transform:lowercase}
+.mini__head b span{color:var(--ink-30);font-weight:400}
+.mini__head .action{width:28px;height:28px;border-radius:50%;border:1px solid var(--line-soft)}
+.mini__head .action svg{width:13px;height:13px}
+.mini__grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));row-gap:2px}
+.mini__wd{text-align:center;font-family:var(--mono);font-size:9.5px;color:var(--ink-30);padding:2px 0 4px;text-transform:uppercase}
+.mini__day{
+  position:relative;height:28px;border:0;border-radius:8px;background:none;cursor:pointer;
+  font-size:12px;color:var(--ink-70);font-variant-numeric:tabular-nums;
+  transition:background var(--t),color var(--t);
+}
+.mini__day:hover{background:var(--fill-hover);color:var(--ink)}
+.mini__day.is-out{color:var(--ink-30)}
+/* a semana aberta e uma faixa: os sete dias com o mesmo fundo, cantos so nas pontas */
+.mini__day.is-in{background:var(--fill);border-radius:0}
+.mini__day.is-in:nth-child(7n+1){border-radius:8px 0 0 8px}
+.mini__day.is-in:nth-child(7n){border-radius:0 8px 8px 0}
+.mini__day.is-busy::after{content:"";position:absolute;left:50%;bottom:3px;width:3px;height:3px;margin-left:-1.5px;border-radius:50%;background:var(--ink-30)}
+.mini__day[aria-pressed="true"]{color:var(--ink);font-weight:600}
+.mini__day.is-today{background:var(--green);color:var(--on-green);font-weight:600;border-radius:8px}
+.mini__day.is-today::after{background:var(--on-green)}
+
+.agendas{padding:12px 10px 10px}
+.agendas__title{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:0 4px 6px;font-size:13.5px;font-weight:500;color:var(--ink)}
+.agendas__title .text-link{font-size:11.5px}
+.agendas ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:1px}
+.agenda{
+  --c:var(--green);
+  display:flex;align-items:center;gap:4px;min-width:0;padding:0 6px 0 4px;border-radius:8px;
+  transition:background var(--t);
+}
+.agenda:hover{background:var(--fill)}
+.agenda label{position:relative;flex:1 1 auto;display:flex;align-items:center;gap:9px;min-width:0;height:32px;cursor:pointer}
+.agenda input{position:absolute;opacity:0;width:1px;height:1px;pointer-events:none}
+.agenda__box{
+  display:grid;place-items:center;flex:0 0 auto;width:18px;height:18px;border-radius:5px;
+  background:var(--c);border:1.5px solid var(--c);color:#fff;transition:background var(--t);
+}
+.agenda__box svg{width:11px;height:11px}
+.agenda input:focus-visible + .agenda__box{box-shadow:0 0 0 2px var(--bg),0 0 0 4px var(--c)}
+.agenda__name{min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-size:13px;color:var(--ink-70)}
+.agenda.is-off .agenda__box{background:none}
+.agenda.is-off .agenda__box svg{opacity:0}
+.agenda.is-off .agenda__name{color:var(--ink-30)}
+.agenda__n{flex:0 0 auto;font-size:10px;color:var(--ink-30);min-width:12px;text-align:right}
+/* "so": aparece no hover, e no toque fica sempre la, apagado */
+.agenda__only{
+  flex:0 0 auto;border:0;background:none;cursor:pointer;padding:2px 6px;border-radius:6px;
+  font-size:11px;color:var(--ink-30);opacity:0;transition:opacity var(--t),background var(--t);
+}
+.agenda:hover .agenda__only,.agenda__only:focus-visible{opacity:1}
+.agenda__only:hover{background:var(--fill-hover);color:var(--ink)}
+.agendas__hint{margin:8px 4px 0;font-size:12px;line-height:1.45;color:var(--ink-30)}
+.agendas__hint a{color:var(--ink-70)}
+
+@media (hover:none){.agenda__only{opacity:.7}}
+@media (max-width:999px){
+  .calbody.has-side{grid-template-columns:minmax(0,1fr)}
+  .calside{display:grid;grid-template-columns:minmax(0,260px) minmax(0,1fr)}
+  .mini{border-bottom:0;border-right:1px solid var(--line-soft)}
+}
+@media (max-width:560px){
+  .calside{display:flex}
+  .mini{border-right:0;border-bottom:1px solid var(--line-soft)}
+}
+
 @media (max-width:480px){
   .task-form__when{grid-template-columns:1fr 1fr}
   .task-form__when > :first-child{grid-column:1 / -1}

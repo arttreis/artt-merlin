@@ -68,14 +68,20 @@
 }
 .wk__block:focus-visible{outline:none;box-shadow:0 0 0 2px var(--green)}
 .wk__block:hover{z-index:2;box-shadow:var(--sombra)}
+/* a cor e a da agenda (--c, o cliente da tarefa, posto pelo calendario); sem
+   ela, o verde da casa — que e tambem o que a rotina desenha */
 .wk__block.is-task{
-  background:color-mix(in srgb,var(--green) 16%,var(--surface-2));
-  border:1px solid color-mix(in srgb,var(--green) 34%,transparent);
-  border-left:3px solid var(--green);color:var(--ink);
+  background:color-mix(in srgb,var(--c,var(--green)) 16%,var(--surface-2));
+  border:1px solid color-mix(in srgb,var(--c,var(--green)) 34%,transparent);
+  border-left:3px solid var(--c,var(--green));color:var(--ink);
 }
 .wk__block.is-task.is-loose{border-left-style:dashed}
 .wk__block.is-reserved{
-  background:var(--fill-hover);border:1px solid var(--line);border-left:3px solid var(--ink-30);color:var(--ink-70);
+  background:var(--fill-hover);border:1px solid var(--line);border-left:3px solid var(--c,var(--ink-30));color:var(--ink-70);
+}
+.wk__client{
+  font-size:10px;font-weight:500;line-height:1.3;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;
+  color:color-mix(in srgb,var(--c,var(--green)) 75%,var(--ink));
 }
 .wk__block.is-done{opacity:.55}
 .wk__block.is-done .wk__text b{text-decoration:line-through}
