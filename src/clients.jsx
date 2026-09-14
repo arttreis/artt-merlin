@@ -634,7 +634,10 @@ function Properties({ doc, ctx }) {
   const origin = doc.ideaOrigin && collection("notes").get(doc.ideaOrigin);
   const cameFrom = [doc.source, origin ? "nota: " + (origin.title || "sem título") : ""].filter(Boolean).join(" · ");
   return (
+    /* duas colunas desde 14/09/2026: a esquerda e o contrato, a direita e como
+       falar com ele — a ficha empilhada empurrava as abas para baixo da dobra */
     <div className="props">
+      <div className="props__col">
       <Prop label="status">
         <div className="chips">
           {CLIENT_STATUSES.map((st) => (
@@ -658,6 +661,14 @@ function Properties({ doc, ctx }) {
         <span className="prop__sep">até</span>
         <DateField className="prop__date" value={doc.contract.end} onChange={(e) => update((d) => { d.contract.end = e.currentTarget.value; })} />
       </Prop>
+      <Prop label="próximo passo">
+        <input className="prop__input prop__input--next" id="prop-next" placeholder="o que move esse cliente agora" value={doc.next}
+               onChange={(e) => update((d) => { d.next = e.currentTarget.value.slice(0, 200); })}
+               onBlur={() => { const now = collection("clients").get(doc.id); if (now) syncNext(now); }} />
+        <DateField className="prop__date" title="quando — vira tarefa no calendário" value={doc.nextDate} onChange={(e) => setNext({ nextDate: e.currentTarget.value })} />
+      </Prop>
+      </div>
+      <div className="props__col">
       <Prop label="whatsapp">
         <input className="prop__input" id="prop-whatsapp" inputMode="tel" placeholder="vazio" value={doc.whatsapp} onChange={(e) => update((d) => { d.whatsapp = e.currentTarget.value; })} />
         {open(waUrl(doc.whatsapp), "conversar")}
@@ -674,12 +685,6 @@ function Properties({ doc, ctx }) {
         <input className="prop__input" placeholder="vazio" value={doc.site} onChange={(e) => update((d) => { d.site = e.currentTarget.value; })} />
         {open(siteUrl(doc.site), "abrir")}
       </Prop>
-      <Prop label="próximo passo">
-        <input className="prop__input prop__input--next" id="prop-next" placeholder="o que move esse cliente agora" value={doc.next}
-               onChange={(e) => update((d) => { d.next = e.currentTarget.value.slice(0, 200); })}
-               onBlur={() => { const now = collection("clients").get(doc.id); if (now) syncNext(now); }} />
-        <DateField className="prop__date" title="quando — vira tarefa no calendário" value={doc.nextDate} onChange={(e) => setNext({ nextDate: e.currentTarget.value })} />
-      </Prop>
       {!!(cameFrom || doc.wonAt) && (
         <Prop label="veio de">
           <span className="prop__text">
@@ -688,6 +693,7 @@ function Properties({ doc, ctx }) {
           </span>
         </Prop>
       )}
+      </div>
     </div>
   );
 }

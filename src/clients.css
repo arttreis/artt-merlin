@@ -81,18 +81,22 @@
 /* ---------- a pagina do cliente ---------- */
 .client-page{padding:var(--pd) calc(var(--pd) * 1.5) calc(var(--pd) * 1.5)}
 .client-page .panel-head{margin-bottom:var(--pd2)}
-.client-hero{display:flex;align-items:center;gap:14px;margin:4px 0 var(--pd)}
-.avatar--big{width:56px;height:56px;border-radius:16px;font-size:22px;background:var(--green);border-color:var(--green);color:var(--on-green)}
+.client-hero{display:flex;align-items:center;gap:12px;margin:0 0 var(--pd2)}
+.avatar--big{width:44px;height:44px;border-radius:13px;font-size:18px;background:var(--green);border-color:var(--green);color:var(--on-green)}
 .client-hero__names{flex:1 1 auto;min-width:0;display:flex;flex-direction:column}
 .client-hero__name,.client-hero__brand{width:100%;background:none;border:0;outline:none;padding:0;color:var(--ink)}
-.client-hero__name{font-size:clamp(22px,2.6vw,30px);font-weight:600;letter-spacing:-.03em;line-height:1.15}
+.client-hero__name{font-size:clamp(20px,2.2vw,26px);font-weight:600;letter-spacing:-.03em;line-height:1.15}
 .client-hero__brand{font-size:13.5px;color:var(--ink-50);margin-top:2px}
 .client-hero__name::placeholder,.client-hero__brand::placeholder{color:var(--ink-30)}
 
 /* as propriedades: rotulo a esquerda, valor editavel a direita, sem moldura
    ate o ponteiro chegar — a ficha e lida muito mais vezes do que editada */
-.props{display:flex;flex-direction:column;border-top:1px solid var(--line-soft);padding-top:6px}
-.prop{display:grid;grid-template-columns:150px minmax(0,1fr);align-items:center;min-height:36px;border-radius:var(--br2)}
+/* duas colunas (contrato | contato) quando cabem; menos altura por linha e
+   rotulo mais estreito, pra ficha inteira e as abas caberem sem rolar */
+.props{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:var(--pd);border-top:1px solid var(--line-soft);padding-top:6px}
+.props__col{display:flex;flex-direction:column;min-width:0}
+@media (max-width:1100px){ .props{grid-template-columns:minmax(0,1fr)} }
+.prop{display:grid;grid-template-columns:112px minmax(0,1fr);align-items:center;min-height:34px;border-radius:var(--br2)}
 .prop:hover{background:var(--fill)}
 .prop__k{font-size:12.5px;color:var(--ink-50);padding:0 8px;white-space:nowrap}
 .prop__v{display:flex;align-items:center;gap:8px;min-width:0;padding-right:6px;flex-wrap:wrap}
@@ -104,10 +108,10 @@
 .prop__input::placeholder{color:var(--ink-30)}
 .prop__input:focus,.prop__select:focus{border-color:var(--line);background:var(--fill-hover)}
 .prop__input.input--num{flex:0 0 130px;text-align:left;font-size:13px}
-.prop__input--next{flex:0 1 320px}
+.prop__input--next{flex:1 1 160px}
 .prop__select{flex:0 0 auto;color:var(--ink-50);cursor:pointer}
 .prop__select option{background:var(--surface);color:var(--ink)}
-.prop__date{flex:0 0 150px}
+.prop__date{flex:0 0 136px}
 .prop__date .datefield__input{background:none;border-color:transparent}
 .prop__date .datefield__input:focus{border-color:var(--line);background:var(--fill-hover)}
 .prop__sep{font-size:12px;color:var(--ink-30)}
@@ -123,7 +127,7 @@
 .pending .t-mono{color:var(--ink-30);margin-right:4px}
 .pending__item{border-style:dashed}
 
-.client-page .tabs{margin-top:var(--pd)}
+.client-page .tabs{margin-top:var(--pd2)}
 .tab__count{font-size:11px;font-variant-numeric:tabular-nums;color:var(--ink-30);margin-left:6px}
 
 /* ---------- aba: pagina ---------- */
