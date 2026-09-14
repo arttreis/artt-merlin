@@ -273,22 +273,13 @@ html.sidebar-closed .sb__logo--gl .gl-mark{display:block}
   content:"";position:absolute;right:0;top:6px;bottom:6px;width:3px;border-radius:2px;
   background:var(--green);box-shadow:0 0 12px var(--green-glow);
 }
-/* os grupos: o titulo pequeno com a seta, que abre e fecha. a lista rola por
-   dentro se a tela for baixa, pro cartao da nuvem nunca sair de vista */
-.sb__groups{flex:0 1 auto;min-height:0;overflow-y:auto;overflow-x:hidden;display:flex;flex-direction:column;gap:6px;scrollbar-width:none}
+/* os grupos: um titulo pequeno em cima de cada um, e ar entre eles. a lista
+   rola por dentro se a tela for baixa, pro cartao da nuvem nunca sair de vista */
+.sb__groups{flex:0 1 auto;min-height:0;overflow-y:auto;overflow-x:hidden;display:flex;flex-direction:column;gap:18px;scrollbar-width:none}
 .sb__groups::-webkit-scrollbar{display:none}
-.sb__section{
-  display:flex;align-items:center;gap:4px;width:100%;height:26px;padding:0 10px;
-  font-size:11.5px;font-weight:500;color:var(--ink-30);text-align:left;
-  border-radius:var(--br2);transition:color var(--t);
-}
-.sb__section:hover{color:var(--ink-70)}
-.sb__section svg{width:12px;height:12px;flex:none;transition:transform var(--t)}
-.sb__group.is-folded .sb__section svg{transform:rotate(-90deg)}
-/* fechado, so fica a pagina atual */
-.sb__group.is-folded .sb__list li:not(.is-here){display:none}
-html.sidebar-closed .sb__group.is-folded .sb__list li{display:revert}
-html.sidebar-closed .sb__group + .sb__group{border-top:1px solid var(--line-soft);padding-top:6px}
+.sb__section{display:flex;align-items:center;height:22px;margin:0 0 2px;padding:0 10px;font-size:11.5px;font-weight:500;color:var(--ink-30)}
+html.sidebar-closed .sb__groups{gap:8px}
+html.sidebar-closed .sb__group + .sb__group{border-top:1px solid var(--line-soft);padding-top:8px}
 .sb__sep{height:1px;background:var(--line-soft);margin:var(--pd2) 0}
 .sb__spacer{flex:1 1 auto}
 
@@ -368,7 +359,7 @@ html.sidebar-closed .sb__item[aria-current="page"]::after{right:-8px}
   html.sidebar-closed .sb__item{justify-content:flex-start;padding:0 10px}
   html.sidebar-closed .sb{padding:var(--pd) 12px}
   html.sidebar-closed .sb__section{display:flex}
-  html.sidebar-closed .sb__group.is-folded .sb__list li:not(.is-here){display:none}
+  html.sidebar-closed .sb__groups{gap:18px}
   html.sidebar-closed .sb__group + .sb__group{border-top:0;padding-top:0}
   .sb__mobile{display:flex}
   .sb__fold{display:none}

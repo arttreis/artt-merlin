@@ -1136,27 +1136,16 @@ function Notice() {
   );
 }
 
-/* um grupo da barra: o titulo abre e fecha, e a escolha fica guardada no
-   navegador. fechado, o grupo ainda mostra a pagina em que a pessoa esta —
-   senao ela some da barra justo quando se esta nela. recolhida, a barra
-   ignora os titulos e mostra todos os icones. */
+/* um grupo da barra: o titulo pequeno e as paginas dele. nao abre nem fecha
+   — o Arthur, em 14/09/2026: "nao pode ser collapsaveis". recolhida, a barra
+   esconde os titulos e mostra todos os icones. */
 function NavGroup({ group, page }) {
-  const key = "merlin:nav:" + group.id;
-  const [open, setOpen] = useState(() => { try { return localStorage.getItem(key) !== "closed"; } catch (e) { return true; } });
-  const toggle = () => {
-    setOpen((o) => {
-      try { localStorage.setItem(key, o ? "closed" : "open"); } catch (e) {}
-      return !o;
-    });
-  };
   return (
-    <div className={"sb__group" + (open ? "" : " is-folded")}>
-      <button className="sb__section" type="button" aria-expanded={open} onClick={toggle}>
-        <span>{group.label}</span>{icon("chevronDown")}
-      </button>
+    <div className="sb__group">
+      <p className="sb__section">{group.label}</p>
       <ul className="sb__list">
         {group.pages.map((p) => (
-          <li key={p.id} className={p.id === page ? "is-here" : undefined}>
+          <li key={p.id}>
             <a className="sb__item" href={p.href} title={p.label} aria-current={p.id === page ? "page" : undefined}>
               {NAV_ICONS[p.id] || null}<span>{p.label}</span>
             </a>
