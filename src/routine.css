@@ -6,6 +6,9 @@
    de hoje e onde o olho confere se a rotina bate com o dia que esta vivendo */
 .rt__dayname{display:block;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-50);padding:4px 0 2px}
 .rt .wk__day.is-today .rt__dayname{color:var(--green-ink)}
+/* o evento que se repete (vai para o calendario) leva um ponto no canto; a
+   rotina, que fica so aqui, nao */
+.rt .wk__block.is-event::after{content:"";position:absolute;right:5px;top:5px;width:5px;height:5px;border-radius:50%;background:var(--green);pointer-events:none}
 .rt .wk__scroll{height:calc(100dvh - var(--nav-h) - 150px)}
 
 /* ---------- a caixa do bloco ---------- */

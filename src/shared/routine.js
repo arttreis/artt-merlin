@@ -30,6 +30,21 @@ import { newTask, MINUTES } from "./tasks.js";
    cresce e um documento que um dia nao cabe. */
 const KEEP_WEEKS = 4;
 
+/* ---------- rotina x evento que se repete ----------
+   o Arthur, em 14/09/2026: "uma coisa e ROTINA outra coisa e eventos que se
+   repetem". rotina e o proprio dia (acordar, almoco, dormir) e nao aparece no
+   calendario; evento e compromisso (daily, weekly) e aparece.
+   bloco sem `kind` gravado decide pelo que ele e: o que veio do antigo botao
+   "toda semana" (id "r-"), tem cliente ou e reuniao que nao e pausa (daily,
+   weekly, 1:1) e evento; o resto e rotina. */
+export const BLOCK_KINDS = ["routine", "event"];
+const PAUSE = /almo[cç]|pausa|jantar|caf[eé]|lanche|intervalo|descanso|academia|treino/i;
+export function kindOf(b) {
+  if (b.kind === "routine" || b.kind === "event") return b.kind;
+  if (String(b.id || "").startsWith("r-") || b.client) return "event";
+  return b.reserved && !PAUSE.test(String(b.title || "")) ? "event" : "routine";
+}
+
 export function normalize(b) {
   b = b || {};
   const days = Array.isArray(b.days) ? b.days.map(Number).filter((n) => Number.isInteger(n) && n >= 0 && n <= 6) : [];
@@ -43,6 +58,7 @@ export function normalize(b) {
     min: Number.isFinite(+b.min) && +b.min > 0 ? Math.min(Math.round(+b.min), MINUTES) : 0,
     reserved: !!b.reserved,
     client: String(b.client || "").slice(0, 64),
+    kind: kindOf(b),
     weeks,
     createdAt: +b.createdAt || Date.now(),
     updatedAt: +b.updatedAt || +b.createdAt || Date.now()

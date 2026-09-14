@@ -291,9 +291,9 @@ function RoutineBlock({ x, sc, dragging, onEdit, onResize, onGrab, onRelease }) 
   };
 
   return (
-    <div className={"wk__block" + (b.reserved ? " is-reserved" : " is-task") + (x.fixed ? "" : " is-loose") + (short ? " is-short" : "") + (x.cols > 1 ? " is-narrow" : "") + (dragging ? " is-dragging" : "")}
+    <div className={"wk__block" + (b.reserved ? " is-reserved" : " is-task") + (b.kind === "event" ? " is-event" : "") + (x.fixed ? "" : " is-loose") + (short ? " is-short" : "") + (x.cols > 1 ? " is-narrow" : "") + (dragging ? " is-dragging" : "")}
          tabIndex="0" draggable={stretch != null ? "false" : "true"}
-         title={b.title + " · " + time + " · " + daysLabel(b.days) + (many ? " (mudar a hora muda todos os dias)" : "")}
+         title={b.title + " · " + time + " · " + daysLabel(b.days) + (b.kind === "event" ? " · evento, aparece no calendário" : " · rotina, fora do calendário") + (many ? " (mudar a hora muda todos os dias)" : "")}
          style={{ top: sc.y(x.from), height, left: "calc(" + (x.col / x.cols * 100) + "% + 2px)", width: "calc(" + (100 / x.cols) + "% - 4px)" }}
          onDragStart={onGrab} onDragEnd={onRelease}
          onClick={onEdit}
@@ -318,7 +318,8 @@ function BlockForm({ blocks, id, preset, onClose, onSave, onRemove }) {
     at: b ? (b.at != null ? clock(b.at) : "") : (preset.at != null ? clock(preset.at) : ""),
     duration: b && b.min ? formatMin(b.min) : "",
     client: b ? b.client : "",
-    reserved: b ? b.reserved : false
+    reserved: b ? b.reserved : false,
+    kind: b ? b.kind : "routine"
   });
   if (id && !b) return null;
   const toggleDay = (d) => set("days", v.days.includes(d) ? v.days.filter((x) => x !== d) : v.days.concat([d]).sort());
@@ -331,7 +332,7 @@ function BlockForm({ blocks, id, preset, onClose, onSave, onRemove }) {
     const at = readClock(v.at);
     if (at === undefined) { notify("não entendi o horário — escreva como 9h30 ou 14:00"); return false; }
     const fields = {
-      title, days: v.days, at, reserved: v.reserved,
+      title, days: v.days, at, reserved: v.reserved, kind: v.kind,
       min: parseDuration(v.duration).min || parsed.min,
       client: v.client || found.client
     };
@@ -343,6 +344,12 @@ function BlockForm({ blocks, id, preset, onClose, onSave, onRemove }) {
           submit={b ? "salvar" : "criar"} remove={b ? "apagar" : ""}
           onRemove={() => onRemove(b)} onClose={onClose} onSubmit={submit}>
       <input className="input full" maxLength="300" required aria-label="nome" placeholder="daily, almoço, relatório · @cliente · 45m" {...bind("title")} />
+      <div className="full chips" role="group" aria-label="o que é">
+        <button className="chip" type="button" aria-pressed={v.kind === "routine"} title="parte do seu dia — não aparece no calendário"
+                onClick={() => set("kind", "routine")}>rotina</button>
+        <button className="chip" type="button" aria-pressed={v.kind === "event"} title="compromisso que se repete — aparece no calendário"
+                onClick={() => set("kind", "event")}>evento que se repete</button>
+      </div>
       <Field label="dias" full>
         <div className="weekday-picker">
           {WEEKDAYS.map((name, d) => (

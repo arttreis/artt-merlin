@@ -463,6 +463,10 @@ const dataLeft = () => globalThis.localStorage.keys().filter((k) => k in DATA);
       m.tasks.filter((t) => t.id !== "o").every((t) => !t.recurring && R.isCopyOf(t, "r-m")));
     check("rotina: cópia sem mãe só perde o selo", m.tasks.some((t) => t.id === "o" && !t.recurring && !t.origin));
     check("rotina: rodar de novo não acha mais nada", R.fromRecurring(m.tasks).blocks.length === 0);
+    check("evento: o que veio do 'toda semana' é evento", m.blocks[0].kind === "event");
+    check("evento: reunião sem cliente é evento", R.kindOf({ id: "x", title: "weekly", reserved: true }) === "event");
+    check("rotina: almoço é rotina, mesmo sendo pausa", R.kindOf({ id: "x", title: "almoço", reserved: true }) === "routine");
+    check("rotina: o kind gravado vence o palpite", R.kindOf({ id: "r-1", kind: "routine" }) === "routine");
   }
 
   {
