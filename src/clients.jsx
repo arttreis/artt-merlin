@@ -10,8 +10,8 @@ import {
 import { useState, useEffect, useRef } from "react";
 import {
   mount, useCollection, useHash, setHash, useKeydown, isTyping,
-  useFields, Form, Field, Dialog, Markdown, TemplatePicker, EmptyStart, icon,
-  useDelegate, DelegateDialog
+  useFields, Form, Field, Dialog, Markdown, TemplatePicker, EmptyStart, ChannelThumb, icon,
+  useDelegate, DelegateDialog, DateField
 } from "./shared/ui.jsx";
 import {
   CHANNEL_TYPES, CHANNEL_LABEL, CHANNEL_CHECKLISTS, FUNNEL_TEMPLATES, funnelGroups, funnelChain, buildFunnel,
@@ -464,12 +464,12 @@ function Clients() {
           text="Cada modelo é um tipo de negócio, não um cliente de mentira. Ele nasce com os canais daquele tipo (cada um com o próprio checklist), os objetivos que aquela operação persegue e o backlog do que precisa existir antes de qualquer campanha. Tudo editável a partir daí."
           groups={clientGroups().map((g) => ({
             ...g,
-            items: g.items.map((t) => ({ ...t, line: clientChannels(t).join(" · ") }))
+            items: g.items.map((t) => ({ ...t, hint: clientChannels(t).join(" · ") }))
           }))}
+          thumb={(t) => <ChannelThumb labels={clientChannels(t)} />}
           onPick={(t) => setNewForm({ template: t.id })}
-          onBlank={() => openNew()}
-          note="Nenhum parece com ele?"
-          blankLabel="criar em branco" />
+          onBlank={() => openNew({ template: "" })}
+          blankRow blankLabel="cliente em branco" blankNote="a ficha vazia, e você preenche" />
       ) : (
       <div className="clients-screen" id="screen" data-view={selectedId ? "panel" : "list"}>
         <section className="list-column">
@@ -727,8 +727,8 @@ function Profile({ doc, ctx }) {
               <option value="">—</option>
               {RECURRENCES.filter(Boolean).map((r) => <option key={r} value={r}>{RECURRENCE_LABEL[r]}</option>)}
             </select></div>
-          <div><label className="field-label">início</label><input className="input" type="date" id="f-start" value={doc.contract.start} onChange={(e) => update((d) => { d.contract.start = e.currentTarget.value; })} /></div>
-          <div><label className="field-label">fim</label><input className="input" type="date" id="f-end" value={doc.contract.end} onChange={(e) => update((d) => { d.contract.end = e.currentTarget.value; })} /></div>
+          <div><label className="field-label">início</label><DateField id="f-start" value={doc.contract.start} onChange={(e) => update((d) => { d.contract.start = e.currentTarget.value; })} /></div>
+          <div><label className="field-label">fim</label><DateField id="f-end" value={doc.contract.end} onChange={(e) => update((d) => { d.contract.end = e.currentTarget.value; })} /></div>
         </div>
         <label className="field-label">extras</label>
         <textarea className="textarea" id="f-extras" value={doc.contract.extras} onChange={(e) => update((d) => { d.contract.extras = e.currentTarget.value; })} />
@@ -966,7 +966,7 @@ function GoalForm({ onClose, onAdd }) {
     <Form title="novo objetivo" submit="adicionar" onSubmit={submit} onClose={onClose}>
       <Field label="título" full><input className="input" required maxLength="140" {...bind("text")} /></Field>
       <Field label="resultado-chave"><input className="input" maxLength="140" {...bind("keyResult")} /></Field>
-      <Field label="prazo"><input className="input" type="date" {...bind("due")} /></Field>
+      <Field label="prazo"><DateField {...bind("due")} /></Field>
     </Form>
   );
 }
@@ -986,7 +986,7 @@ function Goal({ g, ctx }) {
       </div>
       <div className="form-row">
         <input className="input" placeholder="resultado-chave" value={g.keyResult} onChange={(e) => updateItem(goalsOf, g.id, (x) => { x.keyResult = e.currentTarget.value; })} />
-        <input className="input" type="date" value={g.due} onChange={(e) => updateItem(goalsOf, g.id, (x) => { x.due = e.currentTarget.value; })} />
+        <DateField value={g.due} onChange={(e) => updateItem(goalsOf, g.id, (x) => { x.due = e.currentTarget.value; })} />
       </div>
       <p className="heading mt2"><span className="t-mono">passos</span><span className="small weak">{done} de {g.steps.length}</span></p>
       <ul className="list">
@@ -1035,7 +1035,7 @@ function Backlog({ doc, ctx }) {
                 <button className="action mark" type="button" data-done={b.done} aria-label="Marcar feito" onClick={() => updateItem(backlogOf, b.id, (x) => { x.done = !x.done; })}>{icon("check")}</button>
                 <span className="name">{b.text}</span>
                 {b.min > 0 && <span className="measure">{formatMin(b.min)}</span>}
-                <input className="input backlog-due" type="date" title="prazo" value={b.due} onChange={(e) => updateItem(backlogOf, b.id, (x) => { x.due = e.currentTarget.value; })} />
+                <DateField className="backlog-due" title="prazo" value={b.due} onChange={(e) => updateItem(backlogOf, b.id, (x) => { x.due = e.currentTarget.value; })} />
                 <div className="row-actions">
                   <button className="action" type="button" disabled={!!delegate.busy} data-thinking={delegate.busy === b.id ? "yes" : null}
                     title={delegate.busy === b.id ? "pensando…" : "perguntar ao merlin: dá pra fazer com o Claude?"}
@@ -1065,7 +1065,7 @@ function BacklogForm({ onClose, onAdd }) {
     <Form title="nova tarefa do backlog" sub="sem hora: ela só ganha minutos quando for puxada para o dia" submit="adicionar" onSubmit={submit} onClose={onClose}>
       <Field label="tarefa" full><input className="input" required maxLength="200" placeholder="o que fazer · 45m" {...bind("text")} /></Field>
       <Field label="duração"><input className="input input--mono" placeholder="45m, 1h30" {...bind("duration")} /></Field>
-      <Field label="prazo"><input className="input" type="date" {...bind("due")} /></Field>
+      <Field label="prazo"><DateField {...bind("due")} /></Field>
     </Form>
   );
 }
@@ -1272,17 +1272,22 @@ function ClientForm({ prefill, onCreate, onClose }) {
       ideaOrigin: prefill.ideaOrigin || "", template: tpl
     });
   };
+  /* quem veio da tela de escolher já escolheu: a caixa não repete a lista,
+     só diz qual foi. a lista fica para quem abriu pelo botão do cabeçalho. */
+  const chosen = "template" in prefill;
   return (
-    <Form title="novo cliente" submit="criar" onSubmit={submit} onClose={onClose}>
+    <Form title="novo cliente" sub={chosen ? (tpl ? "modelo: " + tpl.name : "em branco") : undefined} submit="criar" onSubmit={submit} onClose={onClose}>
       <Field label="nome" full><input className="input" required {...bind("name")} /></Field>
       <Field label="status" full><select className="select" {...bind("status")}>{STATUSES.map((s) => <option key={s} value={s}>{STATUS_LABEL[s]}</option>)}</select></Field>
-      <Field label="modelo" full>
-        <TemplatePicker groups={clientGroups()} empty="em branco" value={tplId} onChange={choose} id="client-tpl" />
-        {tpl && <>
-          <p className="tpl-note">{tpl.summary}</p>
-          <p className="tpl-chain">{clientChannels(tpl).join(" · ")} · {tpl.goals.length} objetivos · {tpl.backlog.length} no backlog</p>
-        </>}
-      </Field>
+      {(!chosen || tpl) && (
+        <Field label={chosen ? "o que ele traz" : "modelo"} full>
+          {!chosen && <TemplatePicker groups={clientGroups()} empty="em branco" value={tplId} onChange={choose} id="client-tpl" />}
+          {tpl && <>
+            <p className="tpl-note">{tpl.summary}</p>
+            <p className="tpl-chain">{clientChannels(tpl).join(" · ")} · {tpl.goals.length} objetivos · {tpl.backlog.length} no backlog</p>
+          </>}
+        </Field>
+      )}
     </Form>
   );
 }

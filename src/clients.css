@@ -42,11 +42,8 @@
 
 /* prazo do backlog: discreto e de largura fixa, para o titulo (que cresce e
    corta com reticencias) nao perder espaco para uma data */
-.backlog-due{
-  width:150px;flex:0 0 auto;
-  font-family:var(--mono);font-size:12px;color:var(--ink-50);
-  padding:6px 8px;
-}
+.backlog-due{width:150px;flex:0 0 auto}
+.backlog-due .datefield__input{font-size:12px;color:var(--ink-50);padding:6px 32px 6px 8px}
 
 /* cofre de acessos: uma linha rotulo->valor por campo, igual a uma ficha
    tecnica — e nao um formulario, porque a maior parte do tempo e so leitura */

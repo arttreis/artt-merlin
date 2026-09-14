@@ -381,6 +381,39 @@ const dataLeft = () => globalThis.localStorage.keys().filter((k) => k in DATA);
   }
 
   {
+    /* a grade de horas da semana: quem tem hora fica na hora, o resto entra
+       em fila a partir do começo da janela e desvia de quem tem hora. */
+    const { normalize, layoutDay, readClock } = await load();
+    const t = (id, extra) => normalize({ id, title: id, date: "2026-09-14", ...extra });
+    check("o horário é opcional e nasce vazio", t("a").at === null);
+    check("o horário guarda minutos desde a meia-noite", t("a", { at: 570 }).at === 570);
+    check("zero é meia-noite, e não 'sem horário'", t("a", { at: 0 }).at === 0);
+    check("horário fora do dia não entra", t("a", { at: 1440 }).at === null && t("a", { at: -5 }).at === null);
+
+    const blocks = layoutDay([
+      t("reuniao", { at: 600, min: 60, reserved: true }),
+      t("primeira", { min: 45, order: 0 }),
+      t("segunda", { min: 30, order: 1 })
+    ], { start: 540, guess: 30 });
+    const at = (id) => blocks.find((b) => b.t.id === id);
+    check("o que tem hora fica na hora", at("reuniao").from === 600 && at("reuniao").to === 660);
+    check("a fila começa no início da janela", at("primeira").from === 540, String(at("primeira").from));
+    check("e desvia da reunião em vez de cair em cima dela", at("segunda").from === 660, String(at("segunda").from));
+    check("sem sobreposição, cada um ocupa a largura inteira", blocks.every((b) => b.cols === 1));
+
+    const clash = layoutDay([t("x", { at: 600, min: 60 }), t("y", { at: 630, min: 60 })], { start: 540 });
+    check("dois com hora sobrepostos dividem a largura", clash.every((b) => b.cols === 2) && clash[0].col !== clash[1].col);
+    check("sem duração, ocupa o palpite", layoutDay([t("z", {})], { start: 540, guess: 40 })[0].to === 580);
+
+    check("readClock: 9h30", readClock("9h30") === 570);
+    check("readClock: 09:30", readClock("09:30") === 570);
+    check("readClock: 930", readClock("930") === 570);
+    check("readClock: 14", readClock("14") === 840);
+    check("readClock: vazio é sem hora", readClock("") === null);
+    check("readClock: 25h não é hora", readClock("25h") === undefined);
+  }
+
+  {
     /* dois aparelhos: cada um tem o seu merlin:day, e os dois são lidos. sem
        isso, migrar num navegador deixaria para trás a fila que ficou no outro. */
     const { mergeInto } = await load();

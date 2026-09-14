@@ -15,11 +15,12 @@
 
 import { useState, useEffect, useLayoutEffect, useRef, useMemo, useCallback, createElement, Fragment } from "react";
 import { createRoot } from "react-dom/client";
+import { createPortal } from "react-dom";
 import {
   collection, cloud, clients, listClients, clientName, md, brl, parseMoney,
   api, notify, sendToDay, formatMin, readDuration,
   PAGES, CLOUD_STATUS, search, signIn, currentNotice, onNotice, closeNotice,
-  toggleSidebar, setShellRenderer, currentBrand
+  toggleSidebar, setShellRenderer, currentBrand, share, shareOf, unshare, shareUrl
 } from "./core.js";
 import { LOGO, GL_LOGO, GL_MARK, ICONS, NAV_ICONS, icon } from "./icons.jsx";
 
@@ -264,40 +265,69 @@ export function TemplatePicker({ groups, empty, value, onChange, id }) {
   );
 }
 
-/* ---------- a tela vazia que começa por você ----------
-   o mesmo gesto em clientes, hábitos e financeiro: em vez de uma frase
-   dizendo "nada aqui, crie o primeiro", a tela vazia OFERECE — modelos de
-   negócio, hábitos sugeridos, o esqueleto de um mês.
+/* ---------- a tela de escolher por onde começar ----------
+   o mesmo gesto em mapas, funis, clientes, hábitos e financeiro: em vez de
+   uma frase dizendo "nada aqui, crie o primeiro", a tela OFERECE — modelos de
+   mapa e de funil, tipos de negócio, hábitos sugeridos, o esqueleto de um mês.
 
-   por que é um componente só: os três onboardings pedidos eram o mesmo
-   problema (a primeira tela não ensina nada), e três telas de boas-vindas
-   diferentes seriam três coisas para manter e três vocabulários para
-   aprender. o que muda entre eles é a lista; o gesto é um.
+   o desenho é o de uma página de ajustes: uma fileira por grupo, com o que o
+   grupo é na coluna da esquerda e as opções dele na da direita, separadas por
+   uma linha. a prateleira densa de antes (uma linha de texto por modelo)
+   deixava trinta e nove modelos legíveis, mas todos com a mesma cara — aqui
+   cada um tem a miniatura da própria forma, e o grupo diz para que serve.
 
-   `groups` é [{ key, label, items: [{ id, name, summary, line }] }] — a
-   mesma forma que os grupos de modelo de funil e mapa já têm. `onPick`
-   recebe o item inteiro, não só o id: quem oferece é quem sabe construir. */
-export function EmptyStart({ title, text, groups, note, onPick, onBlank, blankLabel, picked, dense }) {
+   `groups` é [{ key, label, note?, items: [{ id, name, summary, line }] }].
+   `onPick` recebe o item inteiro: quem oferece é quem sabe construir.
+   `thumb(item)` desenha a miniatura; sem ela, a opção é um cartão de texto.
+   `blankRow` põe "começar do zero" como a primeira opção, com um "+" no lugar
+   da miniatura; sem ele, o `onBlank` continua sendo o link do rodapé — é o
+   caso dos hábitos, onde ele não é um modelo, é "criar os escolhidos". */
+export function EmptyStart({ title, text, groups, note, onPick, onBlank, blankLabel, blankNote, blankRow, picked, thumb }) {
+  const option = (key, it, isOn, art, onClick) => (
+    <button key={key} type="button" className={"opt" + (art ? "" : " opt--text") + (isOn ? " is-on" : "")}
+            aria-pressed={picked ? String(isOn) : undefined} title={it.hint || it.summary || it.name} onClick={onClick}>
+      {art && (
+        <span className={"opt__thumb" + (key === "" ? " opt__thumb--blank" : "")}>
+          {art}
+          {isOn && <span className="opt__check" aria-hidden="true">{icon("check")}</span>}
+        </span>
+      )}
+      <b className="opt__name">{it.name}</b>
+      {it.summary && <span className="opt__sum">{it.summary}</span>}
+      {it.line && <span className="opt__line t-mono">{it.line}</span>}
+      {!art && isOn && <span className="opt__check" aria-hidden="true">{icon("check")}</span>}
+    </button>
+  );
   return (
-    <section className={"start" + (dense ? " start--dense" : "")}>
-      <h2 className="start__title">{title}</h2>
+    <section className="start">
+      {title && <h2 className="start__title">{title}</h2>}
       {text && <p className="start__text">{text}</p>}
-      {groups.map((g) => (
-        <Fragment key={g.key}>
-          <p className="start__group t-mono">{g.label}</p>
-          <div className="start__grid">
-            {g.items.map((it) => (
-              <button key={it.id} className={"start__card" + (picked && picked(it) ? " is-on" : "")} type="button"
-                      title={it.hint || it.summary || it.name} onClick={() => onPick(it)}>
-                <b>{it.name}</b>
-                {it.summary && <span className="start__summary">{it.summary}</span>}
-                {it.line && <span className="start__line t-mono">{it.line}</span>}
-              </button>
-            ))}
+      <div className="start__rows">
+        {blankRow && onBlank && (
+          <div className="start__row">
+            <div className="start__head">
+              <b>do zero</b>
+              <p>sem modelo nenhum</p>
+            </div>
+            <div className="start__grid">
+              {option("", { name: blankLabel || "em branco", summary: blankNote }, false, icon("plus"), onBlank)}
+            </div>
           </div>
-        </Fragment>
-      ))}
-      {(note || onBlank) && (
+        )}
+        {groups.map((g) => (
+          <div className="start__row" key={g.key}>
+            <div className="start__head">
+              <b>{g.label}</b>
+              {g.note && <p>{g.note}</p>}
+              <span className="t-mono">{g.items.length + (g.items.length === 1 ? " opção" : " opções")}</span>
+            </div>
+            <div className="start__grid">
+              {g.items.map((it) => option(it.id, it, !!(picked && picked(it)), thumb ? thumb(it) : null, () => onPick(it)))}
+            </div>
+          </div>
+        ))}
+      </div>
+      {!blankRow && (note || onBlank) && (
         <p className="start__foot">
           {note}
           {onBlank && (
@@ -309,6 +339,310 @@ export function EmptyStart({ title, text, groups, note, onPick, onBlank, blankLa
         </p>
       )}
     </section>
+  );
+}
+
+/* as miniaturas dos modelos. são SVG à mão e herdam a tinta (currentColor),
+   por isso funcionam nos dois temas e nas duas marcas sem cor escrita. o
+   número no canto é o tamanho — a silhueta de um funil de cinco etapas e a de
+   um de nove são quase a mesma. */
+const BAR = 6.4, GAP = 1.6;
+export function FunnelThumb({ shape, size }) {
+  const h = shape.length * BAR + (shape.length - 1) * GAP;
+  const top = (56 - h) / 2;
+  return (
+    <svg viewBox="0 0 100 56" aria-hidden="true" className="th th--funnel">
+      {shape.map((s, i) => <rect key={i} x={(100 - s.pct) / 2} y={top + i * (BAR + GAP)} width={s.pct} height={BAR} rx="1.6" />)}
+      <text x="96" y="52" className="th__n">{size}</text>
+    </svg>
+  );
+}
+export function MapThumb({ shape, size }) {
+  const step = 52 / Math.max(1, shape.length);
+  return (
+    <svg viewBox="0 0 100 56" aria-hidden="true" className="th th--map">
+      <circle cx="10" cy="28" r="3.6" className="th__root" />
+      {shape.map((b, i) => {
+        const y = 2 + step * i + step / 2;
+        return (
+          <g key={i}>
+            <path d={"M14 28 C 26 28, 26 " + y + ", 38 " + y} />
+            <circle cx="40" cy={y} r="2.4" />
+            {Array.from({ length: Math.min(b.kids, 5) }, (_, k) => <circle key={k} cx={50 + k * 8.5} cy={y} r="1.4" className="th__leaf" />)}
+          </g>
+        );
+      })}
+      <text x="97" y="52" className="th__n">{size}</text>
+    </svg>
+  );
+}
+/* o cliente não tem forma geométrica: o que ele tem é por onde vende */
+export function ChannelThumb({ labels }) {
+  return (
+    <span className="th th--channels">
+      {labels.slice(0, 4).map((l, i) => <i key={i}>{l}</i>)}
+      {labels.length > 4 && <i>+{labels.length - 4}</i>}
+    </span>
+  );
+}
+
+/* ---------- compartilhar um mapa ou um funil ----------
+   o link abre o PRÓPRIO desenho (share.html), sem nenhum gesto de edição. o
+   endereço é um token; fechar o link apaga o token no servidor. */
+export function ShareDialog({ type, id, name, onClose }) {
+  const c = useCloud();
+  const [state, setState] = useState({ loading: true });
+  const [busy, setBusy] = useState(false);
+  const what = type === "maps" ? "mapa" : "funil";
+
+  useEffect(() => {
+    if (!c.signedIn) { setState({ token: null }); return; }
+    let alive = true;
+    shareOf(type, id).then((sh) => { if (alive) setState({ token: sh ? sh.token : null }); });
+    return () => { alive = false; };
+  }, [type, id, c.signedIn]);
+
+  const copy = (text, msg) => {
+    if (!navigator.clipboard) { notify("não consegui copiar"); return; }
+    navigator.clipboard.writeText(text).then(() => notify(msg)).catch(() => notify("não consegui copiar"));
+  };
+  const create = async () => {
+    setBusy(true);
+    try {
+      const sh = await share(type, id);
+      setState({ token: sh.token });
+      /* copiar no mesmo gesto: ninguém cria um link para olhar para ele */
+      copy(shareUrl(sh.token), "link criado e copiado");
+    } catch (e) {
+      notify(e.message || "não consegui criar o link");
+    } finally { setBusy(false); }
+  };
+  const revoke = async () => {
+    setBusy(true);
+    const ok = await unshare(type, id);
+    setBusy(false);
+    if (!ok) { notify("não consegui fechar o link"); return; }
+    setState({ token: null });
+    notify("link fechado — quem tinha o endereço não entra mais");
+  };
+
+  const url = state.token ? shareUrl(state.token) : "";
+  return (
+    <Dialog title="compartilhar" sub={name} onClose={onClose}
+      actions={<button className="pill" type="button" onClick={onClose}>fechar</button>}>
+      {!c.signedIn ? (
+        <p className="note">O link é o servidor lendo este {what}, e sem sessão ele nunca subiu
+        para lugar nenhum. Entre com seu e-mail e o botão aparece aqui.</p>
+      ) : state.loading ? (
+        <p className="note">vendo se já existe um…</p>
+      ) : url ? (
+        <>
+          <p className="note">Quem tiver este endereço vê o {what} do jeito que ele está desenhado,
+          sem conta e sem poder mexer.</p>
+          <div className="share__url">
+            <input className="input" id="share-url" readOnly value={url} onFocus={(e) => e.currentTarget.select()} />
+            <button className="pill pill--icon" type="button" title="copiar" aria-label="Copiar o link"
+                    onClick={() => copy(url, "link copiado")}>{icon("link")}</button>
+            <a className="pill pill--icon" href={url} target="_blank" rel="noreferrer" title="abrir" aria-label="Abrir o link">{icon("arrow")}</a>
+          </div>
+          <p className="note">Ele mostra a versão de agora: o que você mudar aqui aparece lá.
+          Fechar o link corta o acesso na hora.</p>
+          <div className="share__actions">
+            <button className="pill" type="button" id="share-revoke" disabled={busy} onClick={revoke}>fechar o link</button>
+          </div>
+        </>
+      ) : (
+        <>
+          <p className="note">Cria um endereço público que abre este {what} do jeito que ele está
+          desenhado: sem conta, sem entrar e sem poder mexer. Dá para fechar depois.</p>
+          <div className="share__actions">
+            <button className="pill pill--green" type="button" id="share-create" disabled={busy} onClick={create}>
+              {icon("link")}<span>{busy ? "criando…" : "criar o link"}</span>
+            </button>
+          </div>
+        </>
+      )}
+    </Dialog>
+  );
+}
+
+/* ---------- o campo de data ----------
+   o <input type="date"> abria o calendário do navegador: branco ou cinza de
+   sistema, com a fonte do sistema, "Limpar" e "Hoje" em azul, e cada navegador
+   com um desenho diferente. era a única peça da tela que não era do Merlin.
+
+   aqui o campo continua aceitando digitar ("14/09", "14/9/26", "14092026") —
+   quem sabe a data não quer clicar em mês nenhum — e o botão ao lado abre o
+   calendário do próprio sistema. o valor que entra e sai é o mesmo do campo
+   nativo, "aaaa-mm-dd" ou "", e o onChange recebe um evento com
+   currentTarget.value: por isso ele entra no lugar do nativo sem mudar quem
+   o usa, inclusive o bind() do useFields.
+
+   o calendário mora num portal, com posição fixa: dentro de uma caixa de
+   diálogo ele seria cortado pela rolagem da caixa. */
+const MONTH_NAMES = ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"];
+const WEEK_INITIALS = ["D", "S", "T", "Q", "Q", "S", "S"];
+const pad2 = (n) => String(n).padStart(2, "0");
+const isoOf = (d) => d.getFullYear() + "-" + pad2(d.getMonth() + 1) + "-" + pad2(d.getDate());
+const dateFromIso = (s) => { const [y, m, d] = String(s).split("-").map(Number); return new Date(y, m - 1, d, 12); };
+const validIso = (s) => /^\d{4}-\d{2}-\d{2}$/.test(String(s || "")) && isoOf(dateFromIso(s)) === s;
+const brOf = (s) => (validIso(s) ? s.slice(8, 10) + "/" + s.slice(5, 7) + "/" + s.slice(0, 4) : "");
+
+/* o que a pessoa digitou, virando data. sem ano, o ano de agora; ano de dois
+   dígitos, deste século. o que não fecha numa data de verdade (31/02) não
+   entra — o campo volta para o que era. */
+export function readTypedDate(text) {
+  const raw = String(text || "").trim();
+  if (!raw) return "";
+  let d, m, y;
+  const parts = raw.split(/[\/.\-\s]+/).filter(Boolean);
+  if (parts.length === 1 && /^\d{6}(\d{2})?$/.test(parts[0])) {
+    d = +parts[0].slice(0, 2); m = +parts[0].slice(2, 4); y = +parts[0].slice(4);
+  } else if (parts.length >= 2 && parts.length <= 3 && parts.every((p) => /^\d+$/.test(p))) {
+    [d, m, y] = parts.map(Number);
+  } else return null;
+  if (y == null || Number.isNaN(y)) y = new Date().getFullYear();
+  if (y < 100) y += 2000;
+  const iso = y + "-" + pad2(m) + "-" + pad2(d);
+  return validIso(iso) ? iso : null;
+}
+
+const CalendarIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <rect x="3.5" y="5" width="17" height="15.5" rx="3" /><path d="M3.5 10h17M8 3v4M16 3v4" />
+  </svg>
+);
+
+export function DateField({ value, onChange, required, id, name, className, title, placeholder, disabled }) {
+  const [open, setOpen] = useState(false);
+  const [text, setText] = useState(brOf(value));
+  const wrapRef = useRef(null), inputRef = useRef(null), popRef = useRef(null);
+  useEffect(() => { setText(brOf(value)); }, [value]);
+
+  const emit = (v) => {
+    if (!onChange) return;
+    const target = { value: v, name };
+    onChange({ target, currentTarget: target });
+  };
+  const commitText = () => {
+    const iso = readTypedDate(text);
+    if (iso === null || (iso === "" && required)) { setText(brOf(value)); return; }
+    if (iso !== (value || "")) emit(iso);
+    else setText(brOf(value));
+  };
+  const pick = (iso) => {
+    emit(iso);
+    setOpen(false);
+    if (inputRef.current) inputRef.current.focus();
+  };
+
+  return (
+    <span className={"datefield" + (className ? " " + className : "")} ref={wrapRef}>
+      <input ref={inputRef} className="input datefield__input" id={id} name={name} inputMode="numeric" autoComplete="off"
+             placeholder={placeholder || "dd/mm/aaaa"} title={title} required={required} disabled={disabled}
+             value={text} onChange={(e) => setText(e.currentTarget.value)} onBlur={commitText}
+             onKeyDown={(e) => {
+               if (e.key === "Enter") { e.preventDefault(); commitText(); }
+               else if (e.key === "ArrowDown" && e.altKey) { e.preventDefault(); setOpen(true); }
+             }} />
+      <button className="datefield__btn" type="button" tabIndex="-1" disabled={disabled}
+              aria-label="Abrir o calendário" aria-expanded={String(open)}
+              onClick={() => setOpen((o) => !o)}><CalendarIcon /></button>
+      {open && <DatePopover anchor={wrapRef} popRef={popRef} value={validIso(value) ? value : ""} required={required}
+                            onPick={pick} onClose={() => { setOpen(false); if (inputRef.current) inputRef.current.focus(); }} />}
+    </span>
+  );
+}
+
+function DatePopover({ anchor, popRef, value, required, onPick, onClose }) {
+  const todayIso = isoOf(new Date());
+  const [focus, setFocus] = useState(value || todayIso);
+  const [pos, setPos] = useState(null);
+  const month = focus.slice(0, 7);
+
+  /* a posição: embaixo do campo, ou em cima se embaixo não couber */
+  useLayoutEffect(() => {
+    const place = () => {
+      const r = anchor.current.getBoundingClientRect();
+      const h = popRef.current ? popRef.current.offsetHeight : 320;
+      const w = popRef.current ? popRef.current.offsetWidth : 272;
+      const below = r.bottom + 6 + h <= window.innerHeight - 8;
+      setPos({
+        left: Math.max(8, Math.min(r.left, window.innerWidth - w - 8)),
+        top: below ? r.bottom + 6 : Math.max(8, r.top - 6 - h)
+      });
+    };
+    place();
+    window.addEventListener("resize", place);
+    window.addEventListener("scroll", place, true);
+    return () => { window.removeEventListener("resize", place); window.removeEventListener("scroll", place, true); };
+  }, []);
+
+  /* fora dele, fecha. o Esc também — e ele é ouvido na janela, em captura,
+     antes do Esc da caixa de diálogo: sem isso o Esc fecharia a caixa inteira
+     junto com o calendário. */
+  useEffect(() => {
+    const down = (e) => {
+      if (popRef.current && popRef.current.contains(e.target)) return;
+      if (anchor.current && anchor.current.contains(e.target)) return;
+      onClose();
+    };
+    const key = (e) => { if (e.key === "Escape") { e.stopImmediatePropagation(); e.preventDefault(); onClose(); } };
+    document.addEventListener("pointerdown", down, true);
+    window.addEventListener("keydown", key, true);
+    return () => { document.removeEventListener("pointerdown", down, true); window.removeEventListener("keydown", key, true); };
+  }, [onClose]);
+
+  useEffect(() => {
+    const b = popRef.current && popRef.current.querySelector('[data-iso="' + focus + '"]');
+    if (b) b.focus();
+  }, [focus]);
+
+  const shiftMonth = (n) => {
+    const d = dateFromIso(focus);
+    const target = new Date(d.getFullYear(), d.getMonth() + n, 1, 12);
+    const last = new Date(target.getFullYear(), target.getMonth() + 1, 0).getDate();
+    target.setDate(Math.min(d.getDate(), last));
+    setFocus(isoOf(target));
+  };
+  const addDaysIso = (iso, n) => { const d = dateFromIso(iso); d.setDate(d.getDate() + n); return isoOf(d); };
+  const onKey = (e) => {
+    const step = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -7, ArrowDown: 7 }[e.key];
+    if (step) { e.preventDefault(); setFocus(addDaysIso(focus, step)); return; }
+    if (e.key === "PageUp" || e.key === "PageDown") { e.preventDefault(); shiftMonth(e.key === "PageUp" ? -1 : 1); }
+  };
+
+  const first = dateFromIso(month + "-01");
+  const start = new Date(first); start.setDate(1 - first.getDay());
+  const cells = Array.from({ length: 42 }, (_, i) => { const d = new Date(start); d.setDate(start.getDate() + i); return isoOf(d); });
+  /* seis semanas só quando o mês precisa: um calendário que muda de altura
+     de um mês para o outro faz o "próximo" fugir do ponteiro */
+  const rows = cells.slice(35).some((c) => c.slice(0, 7) === month) ? 6 : 5;
+
+  return createPortal(
+    <div className="datepop" ref={popRef} role="dialog" aria-label="Escolher data" onKeyDown={onKey}
+         style={pos ? { left: pos.left, top: pos.top } : { visibility: "hidden" }}>
+      <div className="datepop__head">
+        <b>{MONTH_NAMES[first.getMonth()] + " de " + first.getFullYear()}</b>
+        <button className="action" type="button" aria-label="Mês anterior" onClick={() => shiftMonth(-1)}>{icon("chevronLeft")}</button>
+        <button className="action" type="button" aria-label="Próximo mês" onClick={() => shiftMonth(1)}>{icon("chevronRight")}</button>
+      </div>
+      <div className="datepop__grid" role="grid">
+        {WEEK_INITIALS.map((w, i) => <span key={i} className="datepop__wd" aria-hidden="true">{w}</span>)}
+        {cells.slice(0, rows * 7).map((iso) => (
+          <button key={iso} type="button" data-iso={iso} tabIndex={iso === focus ? 0 : -1}
+                  className={"datepop__day" + (iso.slice(0, 7) !== month ? " is-out" : "") + (iso === todayIso ? " is-today" : "") + (iso === value ? " is-on" : "")}
+                  aria-pressed={String(iso === value)} aria-label={brOf(iso)}
+                  onClick={() => onPick(iso)}>{+iso.slice(8)}</button>
+        ))}
+      </div>
+      <div className="datepop__foot">
+        {!required && <button className="link" type="button" onClick={() => onPick("")}>limpar</button>}
+        <span className="spacer" />
+        <button className="pill pill--mini" type="button" onClick={() => onPick(todayIso)}>hoje</button>
+      </div>
+    </div>,
+    document.body
   );
 }
 

@@ -54,19 +54,19 @@ export const CHANNEL_CHECKLISTS = {
 
 /* a ordem dos grupos é a ordem da lista na hora de escolher */
 export const FUNNEL_GROUPS = [
-  ["structures", "estruturas clássicas"],
-  ["launch", "lançamentos e cursos"],
-  ["service", "serviços e high ticket"],
-  ["retention", "recuperação e recompra"],
-  ["mercadolivre", "mercado livre"],
-  ["shopee", "shopee"],
-  ["tiktokshop", "tiktok shop"],
-  ["amazon", "amazon"],
-  ["site", "site próprio"],
-  ["instagram", "instagram"],
-  ["google", "google"],
-  ["whatsapp", "whatsapp"],
-  ["email", "e-mail"]
+  ["structures", "estruturas clássicas", "os formatos que servem a quase qualquer negócio"],
+  ["launch", "lançamentos e cursos", "quando a venda acontece numa janela, e não todo dia"],
+  ["service", "serviços e high ticket", "venda com conversa no meio: diagnóstico, proposta, fechamento"],
+  ["retention", "recuperação e recompra", "quem já comprou, ou quase comprou"],
+  ["mercadolivre", "mercado livre", "da busca dentro do marketplace até a reputação"],
+  ["shopee", "shopee", "vitrine, cupom e a disputa pelo frete grátis"],
+  ["tiktokshop", "tiktok shop", "o vídeo e a live como vitrine"],
+  ["amazon", "amazon", "catálogo, buy box e Ads dentro da loja"],
+  ["site", "site próprio", "a loja onde o cliente e o dado são seus"],
+  ["instagram", "instagram", "do perfil e da DM até a venda"],
+  ["google", "google", "quem já está procurando pelo que você vende"],
+  ["whatsapp", "whatsapp", "a conversa como o próprio checkout"],
+  ["email", "e-mail", "a lista, o único público que não se aluga"]
 ];
 
 export const FUNNEL_TEMPLATES = [
@@ -723,6 +723,28 @@ export const FUNNEL_TEMPLATES = [
   }
 ];
 
+/* a forma do modelo, para a miniatura da tela de escolher: as etapas como
+   barras que afunilam (no máximo sete, senão viram risco) e quantas são. a
+   taxa não entra na largura — quem quer o número abre o funil. */
+export const funnelShape = (tpl) => {
+  const stages = Object.values(tpl.stages || {});
+  const n = Math.min(stages.length, 7);
+  return stages.slice(0, n).map(([type, title], i) => ({
+    type, title,
+    pct: Math.round(100 - (i * (68 / Math.max(1, n - 1))))
+  }));
+};
+export const funnelSize = (tpl) => Object.keys(tpl.stages || {}).length;
+
+/* a árvore em dois números: quantos galhos saem da raiz e quantas folhas há
+   ao todo. é o que separa "um mapa de cinco decisões" de "um mapa de trinta". */
+export const mapShape = (tpl) => (tpl.tree || []).slice(0, 7).map((spec) => ({
+  label: Array.isArray(spec) ? spec[0] : spec,
+  kids: Array.isArray(spec) && Array.isArray(spec[1]) ? spec[1].length : 0
+}));
+export const mapSize = (tpl) => (tpl.tree || []).reduce(
+  (n, spec) => n + 1 + (Array.isArray(spec) && Array.isArray(spec[1]) ? spec[1].length : 0), 0);
+
 /* o caminho do modelo em uma linha só, para a tela mostrar antes de criar */
 export const funnelChain = (tpl) => Object.values(tpl.stages || {}).map(([, title]) => title);
 
@@ -732,7 +754,7 @@ export function funnelGroups(channel) {
   const list = channel ? FUNNEL_TEMPLATES.filter((t) => t.channel === channel) : FUNNEL_TEMPLATES;
   const pool = list.length ? list : FUNNEL_TEMPLATES;
   return FUNNEL_GROUPS
-    .map(([key, label]) => ({ key, label, items: pool.filter((t) => t.group === key) }))
+    .map(([key, label, note]) => ({ key, label, note, items: pool.filter((t) => t.group === key) }))
     .filter((g) => g.items.length);
 }
 
@@ -780,10 +802,10 @@ export function buildFunnel(tpl) {
    ================================================================ */
 
 export const MAP_GROUPS = [
-  ["campaign", "campanhas e lançamentos"],
-  ["offer", "oferta e copy"],
-  ["client", "clientes e canais"],
-  ["business", "negócio e decisão"]
+  ["campaign", "campanhas e lançamentos", "o que decidir antes de subir anúncio, e o que acompanhar depois"],
+  ["offer", "oferta e copy", "a promessa, os argumentos e as objeções, antes de virar texto"],
+  ["client", "clientes e canais", "o retrato de um cliente e de onde ele vende"],
+  ["business", "negócio e decisão", "para pensar o que não cabe numa lista"]
 ];
 
 export const MAP_TEMPLATES = [
@@ -1045,7 +1067,7 @@ export const MAP_TEMPLATES = [
 ];
 
 export const mapGroups = () => MAP_GROUPS
-  .map(([key, label]) => ({ key, label, items: MAP_TEMPLATES.filter((t) => t.group === key) }))
+  .map(([key, label, note]) => ({ key, label, note, items: MAP_TEMPLATES.filter((t) => t.group === key) }))
   .filter((g) => g.items.length);
 
 /* os galhos de primeiro nível, para a tela mostrar antes de criar */
@@ -1082,10 +1104,10 @@ export function buildMap(tpl, name) {
    ================================================================ */
 
 export const CLIENT_GROUPS = [
-  { key: "marketplace", label: "marketplace" },
-  { key: "own", label: "loja própria" },
-  { key: "service", label: "serviço" },
-  { key: "content", label: "conteúdo e infoproduto" }
+  { key: "marketplace", label: "marketplace", note: "vende dentro da casa dos outros: ML, Shopee, Amazon" },
+  { key: "own", label: "loja própria", note: "site próprio, onde o cliente e o dado são dele" },
+  { key: "service", label: "serviço", note: "vende hora, projeto ou contrato" },
+  { key: "content", label: "conteúdo e infoproduto", note: "vive de audiência antes de viver de venda" }
 ];
 
 export const CLIENT_TEMPLATES = [

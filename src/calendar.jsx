@@ -25,11 +25,11 @@ import {
 import { useState, useEffect, useLayoutEffect, useRef } from "react";
 import {
   mount, useCollection, useClients, useKeydown, isTyping, useHash, setHash, useFields,
-  Form, Field, Dialog, Markdown, DurationField, ClientBadge, clientOptionList,
-  useDelegate, DelegateDialog, icon
+  Form, Field, Dialog, Markdown, ClientBadge, clientOptionList,
+  useDelegate, DelegateDialog, icon, DateField
 } from "./shared/ui.jsx";
 import {
-  normalize, onDate, inRange, overdue, dayDoc, topOrder, newTask, migrateTasks
+  normalize, onDate, inRange, overdue, dayDoc, topOrder, newTask, migrateTasks, layoutDay, readClock
 } from "./shared/tasks.js";
 import {
   pendingOf, doneOf, reservesOf, costOf, guessMin, budget, fmt, longFmt, clock
@@ -166,9 +166,9 @@ const PlusThinIcon = () => (
 const SendIcon = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h13M12 5l7 7-7 7"/></svg>
 );
-const RecurringIcon = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-    <path d="M20 11a8 8 0 00-14.9-4M4 13a8 8 0 0014.9 4" /><path d="M4 4v4h4M20 20v-4h-4" />
+const CopyIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <rect x="8.5" y="8.5" width="11.5" height="11.5" rx="2.5" /><path d="M15.5 8.5V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7.5a2 2 0 002 2h2.5" />
   </svg>
 );
 
@@ -388,6 +388,62 @@ function Calendar() {
     });
   };
 
+  /* ---------- copiar, colar, duplicar ----------
+     a copia nasce como tarefa nova: id novo, aberta, e sem o "toda semana" —
+     uma copia de uma tarefa recorrente que tambem fosse recorrente espalharia
+     duas de cada na semana seguinte. o horario e a duracao vao junto, porque
+     e isso que se quer repetir quando se copia a reuniao de terca para quinta.
+
+     colar vai para o dia sob o ponteiro (a coluna da semana, a celula do
+     mes); na visao do dia, para o dia aberto. */
+  const clip = useRef(null);
+  const pointed = useRef({ task: "", day: "" });
+  const copyOf = (t, date, order) => newTask({
+    title: t.title, date, at: t.at, min: t.min, reserved: t.reserved,
+    clickup: t.clickup, client: t.client, origin: t.origin, order
+  });
+  const copyTask = (id) => {
+    const t = store.get(id);
+    if (!t) return;
+    clip.current = { ...t };
+    if (navigator.clipboard) navigator.clipboard.writeText(t.title).catch(() => {});
+    notify("copiei “" + shortTitle(t.title) + "” — Ctrl+V cola no dia sob o ponteiro");
+  };
+  const pasteTask = () => {
+    const t = clip.current;
+    if (!t) return;
+    const date = view === "day" ? anchor : (pointed.current.day || anchor);
+    withUndo("colei “" + shortTitle(t.title) + "” em " + (date === today() ? "hoje" : dateLabel(date)), () => {
+      store.save(copyOf(t, date, topOrder(store.all(), date)));
+    });
+  };
+  const duplicate = (id) => {
+    const t = store.get(id);
+    if (!t) return;
+    /* logo depois do original na fila, e nao no topo: duplicar e "mais uma
+       dessa", e ela aparece onde o olho ja esta */
+    const next = store.all().filter((x) => x.date === t.date && x.order > t.order).sort((a, b) => a.order - b.order)[0];
+    const order = next ? (t.order + next.order) / 2 : t.order + 1;
+    withUndo("dupliquei “" + shortTitle(t.title) + "”", () => { store.save(copyOf(t, t.date, order)); });
+  };
+  /* soltar na grade da semana: o dia e a hora onde o bloco caiu */
+  const moveTo = (id, date, at) => {
+    const t = store.get(id);
+    if (!t || (t.date === date && t.at === at)) return;
+    save({ ...t, date, at, order: t.date === date ? t.order : topOrder(store.all(), date) });
+  };
+  useEffect(() => {
+    const track = (e) => {
+      const el = e.target && e.target.closest ? e.target : null;
+      if (!el) return;
+      const task = el.closest("[data-task]"), day = el.closest("[data-day]");
+      pointed.current = { task: task ? task.dataset.task : "", day: day ? day.dataset.day : "" };
+    };
+    document.addEventListener("mouseover", track);
+    document.addEventListener("focusin", track);
+    return () => { document.removeEventListener("mouseover", track); document.removeEventListener("focusin", track); };
+  }, []);
+
   /* ---------- o que ficou para tras ----------
      era a "fila de ontem" do dia e os "cartoes atrasados" da semana: a mesma
      pergunta feita sobre duas listas diferentes. agora e uma so. */
@@ -533,7 +589,7 @@ function Calendar() {
       if (inWeek.some((x) => x.title === t.title)) return;
       const offset = Math.round((dateOf(t.date) - dateOf(sourceStart)) / 86400000);
       const copy = newTask({
-        title: t.title, date: addDays(weekStart, offset), min: t.min, client: t.client,
+        title: t.title, date: addDays(weekStart, offset), min: t.min, client: t.client, at: t.at, reserved: t.reserved,
         recurring: true, recurringSource: t.id, order: t.order
       });
       fresh.push(copy);
@@ -696,6 +752,15 @@ function Calendar() {
       return;
     }
     if (form || summary != null || isTyping()) return;
+    if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey) {
+      const k = e.key.toLowerCase();
+      const focused = el && el.closest ? el.closest("[data-task]") : null;
+      const id = (focused && focused.dataset.task) || pointed.current.task;
+      /* texto selecionado na tela e copia de texto, e nao de tarefa */
+      if (k === "c" && id && store.get(id) && !String(window.getSelection ? window.getSelection() : "")) { e.preventDefault(); copyTask(id); return; }
+      if (k === "d" && id && store.get(id)) { e.preventDefault(); duplicate(id); return; }
+      if (k === "v" && clip.current) { e.preventDefault(); pasteTask(); return; }
+    }
     if (e.key === "/" && view === "day") { e.preventDefault(); if (fieldRef.current) fieldRef.current.focus(); return; }
     if (e.key === "n" && view !== "day" && !e.ctrlKey && !e.metaKey && !e.altKey) { e.preventDefault(); setForm({ id: "", date: anchor }); return; }
     if (e.altKey && (e.key === "ArrowLeft" || e.key === "ArrowRight")) { e.preventDefault(); shift(e.key === "ArrowLeft" ? -1 : 1); }
@@ -727,7 +792,7 @@ function Calendar() {
     complete, reopen, remove, rename, move, setDuration, applyOrder, dragStart,
     delegate: askDelegate, thinking: delegate.busy, toggleDone, setDate,
     edit: (id) => setForm({ id }), editing, setEditing, store, dragging,
-    onDragStart, onDragEnd, save
+    onDragStart, onDragEnd, save, duplicate, copy: copyTask
   };
 
   const period = view === "day" ? dateStamp(anchor).toLowerCase()
@@ -792,9 +857,9 @@ function Calendar() {
       )}
 
       {view === "week" && (
-        <WeekView all={all} weekStart={weekStart} target={target} actions={actions}
-          onNew={(date) => setForm({ id: "", date })} onOpenDay={(date) => { setAnchor(date); chooseView("day"); }}
-          onEnter={setTarget} onLeave={(d) => setTarget((cur) => (cur === d ? "" : cur))} onDrop={onDropOn} />
+        <WeekGrid all={all} weekStart={weekStart} prefs={prefs} actions={actions}
+          onNew={(date, at) => setForm({ id: "", date, at })} onOpenDay={(date) => { setAnchor(date); chooseView("day"); }}
+          onMove={moveTo} />
       )}
 
       {view === "month" && (
@@ -810,7 +875,7 @@ function Calendar() {
         </div>
       )}
 
-      {form && <TaskForm store={store} id={form.id} presetDate={form.date || anchor} onClose={() => setForm(null)} onRemove={remove} />}
+      {form && <TaskForm store={store} id={form.id} presetDate={form.date || anchor} presetAt={form.at} onClose={() => setForm(null)} onRemove={remove} onDuplicate={duplicate} />}
       {summary != null && <MerlinDialog text={summary} onClose={() => setSummary(null)} />}
 
       {delegate.answer && (
@@ -862,7 +927,7 @@ function DayView({
           <Headline doc={doc} b={b} done={done} date={date} />
           <Track b={b} slots={slots} trackRef={trackRef} />
           {windowOpen && <WindowEditor doc={doc} onSave={onSaveWindow} onClose={onCloseWindow} />}
-          {reserves.length > 0 && <Reserves list={reserves} onRemove={actions.remove} />}
+          {reserves.length > 0 && <Reserves list={reserves} onRemove={actions.remove} onDuplicate={actions.duplicate} onEdit={actions.edit} />}
           {open.length > 0 && <p className="section-label"><span className="t-mono">{open.length + (open.length === 1 ? " coisa na fila" : " coisas na fila")}</span></p>}
           <ul className="queue" ref={listRef}>{rows}</ul>
           {!open.length && <EmptyState doc={doc} b={b} />}
@@ -981,19 +1046,25 @@ const clickupLink = (t) => t.clickup && (
 /* ---------- o que ocupa o dia sem ser trabalho ----------
    fica acima da fila porque acontece antes dela na conta: e o dia que voce ja
    nao tem. sem check, porque nao se conclui almoco para ganhar tempo. */
-function Reserves({ list, onRemove }) {
+function Reserves({ list, onRemove, onDuplicate, onEdit }) {
   const total = list.reduce((s, t) => s + t.min, 0);
+  /* com horario, na ordem do relogio; sem, na ordem da fila, depois */
+  list = list.slice().sort((a, b) => (a.at ?? 9999) - (b.at ?? 9999));
   return (
     <section className="reserves">
       <p className="section-label"><span className="t-mono">{longFmt(total) + " fora do trabalho"}</span></p>
       <ul className="reserve-list">
         {list.map((t) => (
-          <li key={t.id} className="reserve" data-id={t.id}>
+          <li key={t.id} className="reserve" data-id={t.id} data-task={t.id} tabIndex="0"
+              onKeyDown={(e) => { if (e.target === e.currentTarget && e.key === "Enter") onEdit(t.id); }}>
             <span className="reserve__mark">{icon("clock")}</span>
+            {t.at != null && <span className="reserve__time">{clock(t.at)}</span>}
             <span className="reserve__name">{t.title}</span>
             <span className="reserve__time">{fmt(t.min)}</span>
             <div className="actions">
               {clickupLink(t)}
+              <button className="action" type="button" title="editar" aria-label={"Editar reserva: " + t.title} onClick={() => onEdit(t.id)}>{icon("pencil")}</button>
+              <button className="action" type="button" title="duplicar (Ctrl+D)" aria-label={"Duplicar reserva: " + t.title} onClick={() => onDuplicate(t.id)}><CopyIcon /></button>
               <button className="action" type="button" aria-label={"Remover reserva: " + t.title} onClick={() => onRemove(t.id)}>{icon("trash")}</button>
             </div>
           </li>
@@ -1048,7 +1119,7 @@ function TaskRow({ t, start, slot, fits, dragging, leaving, actions }) {
   };
 
   return (
-    <li className={"task" + (dragging ? " is-dragging" : "") + (leaving ? " is-leaving" : "")} data-id={t.id}
+    <li className={"task" + (dragging ? " is-dragging" : "") + (leaving ? " is-leaving" : "")} data-id={t.id} data-task={t.id}
         data-fits={fits ? null : "no"} tabIndex="0"
         title={slot ? clock(start + slot.from) + "–" + clock(start + slot.from + slot.min) : null}
         onKeyDown={onKeyDown}>
@@ -1077,6 +1148,7 @@ function TaskRow({ t, start, slot, fits, dragging, leaving, actions }) {
         <button className="action" type="button" disabled={!!actions.thinking} data-thinking={actions.thinking === t.id ? "yes" : null}
           title={actions.thinking === t.id ? "pensando…" : "perguntar ao Merlin: dá para fazer com o Claude?"}
           aria-label={"Perguntar ao Merlin se dá para fazer com o Claude: " + t.title} onClick={() => actions.delegate(t)}>{icon("spark")}</button>
+        <button className="action" type="button" title="duplicar (Ctrl+D)" aria-label={"Duplicar: " + t.title} onClick={() => actions.duplicate(t.id)}><CopyIcon /></button>
         <button className="action" type="button" aria-label={"Apagar: " + t.title} onClick={() => actions.remove(t.id)}>{icon("trash")}</button>
       </div>
       <button className="grip" type="button" aria-label={"Arrastar para reordenar: " + t.title} onPointerDown={(e) => actions.dragStart(e, t.id)}>{icon("grip")}</button>
@@ -1271,123 +1343,164 @@ function NotesBox({ notes, onCreate, onPull, onRemove }) {
 }
 
 /* ================================================================
-   a visao da semana
+   a visao da semana — uma grade de horas
    ================================================================
-   sete colunas, uma por dia. o fim de semana deixou de ser uma coluna so:
-   ele era um cartao com data de segunda e um prefixo, e isso existia porque
-   a semana tinha o proprio jeito de guardar data. com uma colecao de datas de
-   verdade, sabado e domingo sao dois dias como os outros cinco. */
-function WeekView({ all, weekStart, target, actions, onNew, onOpenDay, onEnter, onLeave, onDrop }) {
+   era um quadro de sete colunas com cartoes empilhados: dava para ver o que
+   havia em cada dia, mas nao QUANDO, e uma reuniao das 15h e uma tarefa sem
+   hora eram o mesmo retangulo. agora e a grade de uma agenda: uma coluna por
+   dia, uma linha por hora, e cada coisa com a altura do tempo que ocupa.
+
+   quem tem hora fica na hora; quem nao tem entra em fila a partir do comeco
+   da janela do dia e desvia de quem tem (a conta e o layoutDay do tasks.js).
+   o horario de quem esta em fila aparece com "~", porque e onde ela CAIRIA, e
+   nao um compromisso.
+
+   reunioes e pausas tem outra cara: fundo apagado, relogio e sem caixa de
+   marcar — elas nao se concluem, so ocupam.
+
+   arrastar um bloco grava o dia e a hora onde ele caiu; puxar a borda de
+   baixo muda a duracao. clicar num espaco vazio cria ali. */
+const HOUR_H = 44;
+const SNAP = 15;
+const snap = (min) => Math.round(min / SNAP) * SNAP;
+const clampMin = (min) => Math.max(0, Math.min(1440 - SNAP, min));
+const nowMinutes = () => { const d = new Date(); return d.getHours() * 60 + d.getMinutes(); };
+
+function WeekGrid({ all, weekStart, prefs, actions, onNew, onOpenDay, onMove }) {
   const days = WEEK_DAYS(weekStart);
   const t = today();
+  const scrollRef = useRef(null);
+  const grab = useRef(null);
+  const [drop, setDrop] = useState(null);
+
+  /* abre na hora em que o dia comeca, com uma hora de folga acima: a
+     madrugada existe, mas nao e onde se olha primeiro */
+  useLayoutEffect(() => {
+    if (scrollRef.current) scrollRef.current.scrollTop = Math.max(0, (prefs.dayStart / 60 - 1) * HOUR_H);
+  }, [weekStart]);
+
+  const minuteAt = (lane, clientY) => (clientY - lane.getBoundingClientRect().top) / HOUR_H * 60;
+
   return (
-    <div className="board-scroll">
-      <div className="board">
-        {days.map((day, i) => (
-          <DayColumn key={day} day={day} label={WEEKDAYS[i]} list={onDate(all, day)} actions={actions}
-            isToday={day === t} isTarget={target === day}
-            onNew={onNew} onOpenDay={onOpenDay} onEnter={onEnter} onLeave={onLeave} onDrop={onDrop} />
-        ))}
+    <div className="wk">
+      <div className="wk__scroll" ref={scrollRef}>
+      <div className="wk__head">
+        <div className="wk__corner" />
+        {days.map((day, i) => {
+          const list = onDate(all, day);
+          const meetings = list.filter((x) => x.reserved);
+          const open = list.filter((x) => !x.reserved && !x.done);
+          const meetMin = meetings.reduce((s, x) => s + (x.min || 0), 0);
+          return (
+            <div key={day} className={"wk__day" + (day === t ? " is-today" : "")} data-day={day}>
+              <button className="wk__dayname" type="button" title="abrir esse dia" onClick={() => onOpenDay(day)}>
+                <span className="t-mono">{WEEKDAYS[i]}</span><b>{dayNumber(day)}</b>
+              </button>
+              <p className="wk__sum t-mono">
+                <span>{open.length ? open.length + (open.length === 1 ? " tarefa" : " tarefas") : " "}</span>
+                <span className="wk__sum-meet">{meetings.length ? fmt(meetMin || meetings.length * 30) + " em reuniões" : " "}</span>
+              </p>
+            </div>
+          );
+        })}
+      </div>
+        <div className="wk__body" style={{ height: 24 * HOUR_H }}>
+          <div className="wk__hours" aria-hidden="true">
+            {Array.from({ length: 24 }, (_, h) => <span key={h} style={{ top: h * HOUR_H }}>{h ? String(h).padStart(2, "0") + ":00" : ""}</span>)}
+          </div>
+          {days.map((day) => {
+            const blocks = layoutDay(onDate(all, day), { start: prefs.dayStart, guess: guessMin() });
+            const isToday = day === t;
+            return (
+              <div key={day} className={"wk__lane" + (isToday ? " is-today" : "")} data-day={day}
+                   style={{ "--win-from": (prefs.dayStart / 60 * HOUR_H) + "px", "--win-to": (prefs.dayEnd / 60 * HOUR_H) + "px" }}
+                   onClick={(e) => { if (e.target === e.currentTarget) onNew(day, clampMin(Math.floor(minuteAt(e.currentTarget, e.clientY) / 30) * 30)); }}
+                   onDragOver={(e) => {
+                     if (!grab.current) return;
+                     e.preventDefault();
+                     e.dataTransfer.dropEffect = "move";
+                     const from = clampMin(snap(minuteAt(e.currentTarget, e.clientY) - grab.current.offset));
+                     setDrop((d) => (d && d.day === day && d.from === from ? d : { day, from, len: grab.current.len }));
+                   }}
+                   onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget)) setDrop((d) => (d && d.day === day ? null : d)); }}
+                   onDrop={(e) => {
+                     e.preventDefault();
+                     const g = grab.current;
+                     setDrop(null);
+                     if (!g) return;
+                     onMove(g.id, day, clampMin(snap(minuteAt(e.currentTarget, e.clientY) - g.offset)));
+                   }}>
+                {blocks.map((b) => (
+                  <WeekBlock key={b.t.id} b={b} actions={actions}
+                    onGrab={(e) => {
+                      const r = e.currentTarget.getBoundingClientRect();
+                      grab.current = { id: b.t.id, offset: (e.clientY - r.top) / HOUR_H * 60, len: b.to - b.from };
+                    }}
+                    onRelease={() => { grab.current = null; setDrop(null); }} />
+                ))}
+                {drop && drop.day === day && (
+                  <div className="wk__drop" style={{ top: drop.from / 60 * HOUR_H, height: drop.len / 60 * HOUR_H - 2 }}>
+                    <span className="t-mono">{clock(drop.from)}</span>
+                  </div>
+                )}
+                {isToday && <div className="wk__now" style={{ top: nowMinutes() / 60 * HOUR_H }} aria-hidden="true" />}
+              </div>
+            );
+          })}
+        </div>
       </div>
     </div>
   );
 }
 
-/* ---------- uma coluna do quadro ----------
-   a coluna INTEIRA e a area de soltar, e nao so a lista de cartoes dentro
-   dela. enquanto o alvo era a lista, ela media o tamanho do conteudo: uma
-   terca com dois cartoes dava uma faixa de dois dedos para mirar, e passar
-   uma tarefa para quinta virava um exercicio de pontaria com rolagem no meio.
-   agora as sete colunas tem a mesma altura, a altura e a do quadro, e soltar
-   em qualquer ponto da coluna significa "neste dia".
+/* um bloco da grade. a borda de baixo e a alca de duracao: arrastar para
+   baixo aumenta, para cima diminui, de quinze em quinze minutos. */
+function WeekBlock({ b, actions, onGrab, onRelease }) {
+  const x = b.t;
+  const [resize, setResize] = useState(null);
+  const to = resize ? resize.to : b.to;
+  const height = Math.max(14, (to - b.from) / 60 * HOUR_H - 2);
+  const short = height < 34;
+  const time = (b.fixed ? "" : "~") + clock(b.from) + (short ? "" : "–" + clock(to));
 
-   as concluidas descem para o pe da coluna e ficam fechadas: o que resta do
-   dia nao divide espaco com o que ja saiu da frente. */
-function DayColumn({ day, label, list, actions, isToday, isTarget, onNew, onOpenDay, onEnter, onLeave, onDrop }) {
-  const [doneOpen, setDoneOpen] = useState(false);
-  const open = list.filter((x) => !x.done);
-  const done = list.filter((x) => x.done);
-  const openMin = open.reduce((s, x) => s + x.min, 0);
-  return (
-    <section className={"day-column" + (isToday ? " is-today" : "") + (isTarget ? " is-target" : "")} data-day={day}
-             onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = "move"; }}
-             onDragEnter={() => onEnter(day)}
-             onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget)) onLeave(day); }}
-             onDrop={(e) => onDrop(e, day)}>
-      <header className="day-column__head">
-        <div>
-          <button className="day-column__day" type="button" title="abrir esse dia" onClick={() => onOpenDay(day)}>
-            {label + " " + dayNumber(day)}
-          </button>
-          <p className="day-column__min t-mono t-mute">{openMin ? formatMin(openMin) : "—"}</p>
-        </div>
-        <button className="action day-column__add" type="button" title={"nova tarefa em " + label}
-                aria-label={"Nova tarefa em " + label} onClick={() => onNew(day)}>{icon("plus")}</button>
-      </header>
-      <div className="day-column__body">
-        <ul className="day-column__list">
-          {open.map((x) => <Card key={x.id} c={x} actions={actions} />)}
-        </ul>
-        {done.length > 0 && (
-          <div className="day-column__done" data-open={doneOpen ? "yes" : "no"}>
-            <button className="day-column__toggle" type="button" aria-expanded={String(doneOpen)}
-                    onClick={() => setDoneOpen((v) => !v)}>
-              <ChevronIcon /><span>{done.length + (done.length === 1 ? " finalizada" : " finalizadas")}</span>
-            </button>
-            <ul className="day-column__list">
-              {done.map((x) => <Card key={x.id} c={x} actions={actions} />)}
-            </ul>
-          </div>
-        )}
-      </div>
-    </section>
-  );
-}
-
-/* ---------- o cartao ---------- */
-function Card({ c, actions }) {
-  return (
-    <li className={"card" + (c.done ? " is-done" : "") + (actions.dragging === c.id ? " is-dragging" : "")} draggable="true" data-id={c.id}
-        onDragStart={(e) => actions.onDragStart(e, c)} onDragEnd={actions.onDragEnd}>
-      <button className="mark card__check" type="button" role="checkbox" aria-checked={String(c.done)}
-              aria-label={"Concluir " + c.title} onClick={() => actions.toggleDone(c, !c.done)}>{icon("check")}</button>
-      {actions.editing === c.id
-        ? <EditableTitle c={c} save={actions.save} onClose={() => actions.setEditing(null)} />
-        : <span className="card__title" tabIndex="0" onClick={() => actions.setEditing(c.id)}>{c.title}</span>}
-      <span className="card__foot">
-        <ClientBadge id={c.client} />
-        {/* a duracao continua clicavel aqui, mas sem promessa: fora de hoje
-            ela e uma estimativa guardada, e nao um pedaco de dia comprometido. */}
-        <DurationField className="card__min" min={c.min} label={"Duração de " + c.title}
-                       placeholder="—" onChange={(min) => actions.setDuration(c.id, min)} />
-        {c.recurring && <span className="card__recurring" title="toda semana"><RecurringIcon /></span>}
-      </span>
-      <span className="card__actions">
-        <button className="action" type="button" title="editar" onClick={() => actions.edit(c.id)}>{icon("pencil")}</button>
-        <button className="action" type="button" title="apagar" onClick={() => actions.remove(c.id)}>{icon("trash")}</button>
-      </span>
-    </li>
-  );
-}
-
-/* ---------- edicao inline do titulo ---------- */
-function EditableTitle({ c, save, onClose }) {
-  const ref = useRef(null);
-  const closed = useRef(false);
-  const [value, setValue] = useState(c.title);
-  useEffect(() => { ref.current.focus(); ref.current.select(); }, []);
-  const commit = () => {
-    if (closed.current) return;
-    closed.current = true;
-    const t = value.trim();
-    if (t && t !== c.title) save({ ...c, title: t.slice(0, 300) });
-    onClose();
+  const startResize = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const y0 = e.clientY, base = b.to;
+    let last = base;
+    const move = (ev) => {
+      last = Math.max(b.from + SNAP, Math.min(1440, b.from + snap(base - b.from + (ev.clientY - y0) / HOUR_H * 60)));
+      setResize({ to: last });
+    };
+    const up = () => {
+      document.removeEventListener("pointermove", move);
+      document.removeEventListener("pointerup", up);
+      setResize(null);
+      if (last !== base) actions.setDuration(x.id, last - b.from);
+    };
+    document.addEventListener("pointermove", move);
+    document.addEventListener("pointerup", up);
   };
-  const cancel = () => { if (closed.current) return; closed.current = true; onClose(); };
+
   return (
-    <input ref={ref} className="input card__title-input" value={value} maxLength="300"
-      onChange={(e) => setValue(e.currentTarget.value)} onBlur={commit}
-      onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); commit(); } else if (e.key === "Escape") { e.preventDefault(); cancel(); } }} />
+    <div className={"wk__block" + (x.reserved ? " is-reserved" : " is-task") + (x.done ? " is-done" : "") + (b.fixed ? "" : " is-loose") + (short ? " is-short" : "") + (b.cols > 1 ? " is-narrow" : "") + (actions.dragging === x.id ? " is-dragging" : "")}
+         data-task={x.id} tabIndex="0" draggable={resize ? "false" : "true"}
+         title={x.title + " · " + time + (b.fixed ? "" : " (na fila, sem horário)")}
+         style={{ top: b.from / 60 * HOUR_H, height, left: "calc(" + (b.col / b.cols * 100) + "% + 2px)", width: "calc(" + (100 / b.cols) + "% - 4px)" }}
+         onDragStart={(e) => { onGrab(e); actions.onDragStart(e, x); }}
+         onDragEnd={() => { onRelease(); actions.onDragEnd(); }}
+         onClick={(e) => { if (!e.target.closest("button")) actions.edit(x.id); }}
+         onKeyDown={(e) => { if (e.target === e.currentTarget && e.key === "Enter") { e.preventDefault(); actions.edit(x.id); } }}>
+      {x.reserved
+        ? <span className="wk__icon" aria-hidden="true">{icon("clock")}</span>
+        : <button className="mark wk__check" type="button" role="checkbox" aria-checked={String(x.done)}
+                  aria-label={"Concluir: " + x.title} onClick={() => actions.toggleDone(x, !x.done)}>{icon("check")}</button>}
+      <span className="wk__text">
+        <b>{x.title}</b>
+        <span className="t-mono">{time}</span>
+      </span>
+      <span className="wk__resize" onPointerDown={startResize} aria-hidden="true" />
+    </div>
   );
 }
 
@@ -1397,43 +1510,58 @@ function EditableTitle({ c, save, onClose }) {
    a unica das tres que nao existia. ela nao faz conta nenhuma de propósito:
    um mes que somasse horas estaria prometendo capacidade para trinta dias de
    uma vez, e a promessa do produto e sobre UM dia. aqui o que se ve e onde as
-   coisas estao — e o gesto que ela da e mudar isso de lugar. */
+   coisas estao — e o gesto que ela da e mudar isso de lugar.
+
+   reunioes e pausas moram numa faixa propria, acima das tarefas: elas nao
+   sao o que voce tem para fazer, sao o que tira tempo de fazer, e na mesma
+   lista disputavam as tres vagas da celula com o trabalho. */
 const MONTH_MAX = 3;
 
 function MonthView({ all, month, target, actions, onNew, onOpenDay, onEnter, onLeave, onDrop }) {
   const weeks = monthGrid(month);
   const t = today();
+  const item = (x) => (
+    <button key={x.id} type="button" draggable="true" data-id={x.id} data-task={x.id}
+            className={"month__item" + (x.done ? " is-done" : "") + (x.reserved ? " is-reserved" : "")}
+            title={x.title + (x.at != null ? " · " + clock(x.at) : "") + (x.min ? " · " + fmt(x.min) : "")}
+            onDragStart={(e) => actions.onDragStart(e, x)} onDragEnd={actions.onDragEnd}
+            onClick={() => actions.edit(x.id)}>
+      {x.reserved ? <span className="month__clock" aria-hidden="true">{icon("clock")}</span> : <i aria-hidden="true" />}
+      {x.at != null && <span className="month__at t-mono">{clock(x.at)}</span>}
+      <span className="month__title">{x.title}</span>
+    </button>
+  );
   return (
     <div className="month">
       {WEEKDAYS.map((w) => <div key={w} className="month__head">{w}</div>)}
       {weeks.map((week) => week.map((day) => {
         const list = onDate(all, day);
+        const meetings = list.filter((x) => x.reserved).sort((a, b) => (a.at ?? 9999) - (b.at ?? 9999));
+        const work = list.filter((x) => !x.reserved);
         const out = monthOf(day) !== month;
-        const shown = list.slice(0, MONTH_MAX);
+        const openWork = work.filter((x) => !x.done).length;
         return (
-          <div key={day}
+          <div key={day} data-day={day}
                className={"month__cell" + (out ? " is-out" : "") + (day === t ? " is-today" : "") + (target === day ? " is-over" : "")}
                onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = "move"; }}
                onDragEnter={() => onEnter(day)}
                onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget)) onLeave(day); }}
                onDrop={(e) => onDrop(e, day)}
-               onDoubleClick={() => onNew(day)}>
+               onDoubleClick={(e) => { if (e.target === e.currentTarget) onNew(day); }}>
             <button className="month__day" type="button" title={"abrir " + dateLabel(day)} onClick={() => onOpenDay(day)}>
               <span className="month__n">{dayNumber(day)}</span>
-              {list.length > 0 && <span className="month__count">{list.filter((x) => !x.done).length || "✓"}</span>}
+              {work.length > 0 && <span className="month__count">{openWork || "✓"}</span>}
             </button>
-            {shown.map((x) => (
-              <button key={x.id} type="button" draggable="true" data-id={x.id}
-                      className={"month__item" + (x.done ? " is-done" : "") + (x.reserved ? " is-reserved" : "")}
-                      title={x.title + (x.min ? " · " + fmt(x.min) : "")}
-                      onDragStart={(e) => actions.onDragStart(e, x)} onDragEnd={actions.onDragEnd}
-                      onClick={() => actions.edit(x.id)}>
-                <i aria-hidden="true" />{x.title}
-              </button>
-            ))}
-            {list.length > MONTH_MAX && (
+            {meetings.length > 0 && (
+              <div className="month__meetings">
+                {meetings.slice(0, 2).map(item)}
+                {meetings.length > 2 && <button className="month__more" type="button" onClick={() => onOpenDay(day)}>{"+" + (meetings.length - 2) + " reuniões"}</button>}
+              </div>
+            )}
+            {work.slice(0, MONTH_MAX).map(item)}
+            {work.length > MONTH_MAX && (
               <button className="month__more" type="button" onClick={() => onOpenDay(day)}>
-                {"e mais " + (list.length - MONTH_MAX)}
+                {"e mais " + (work.length - MONTH_MAX)}
               </button>
             )}
           </div>
@@ -1447,16 +1575,23 @@ function MonthView({ all, month, target, actions, onNew, onOpenDay, onEnter, onL
    a caixa da tarefa: criar e editar sao a mesma
    ================================================================
    no titulo, "@cliente" e a duracao no fim continuam valendo — e a mesma
-   gramatica do campo do dia — mas os campos ao lado ganham quando preenchidos. */
-function TaskForm({ store, id, presetDate, onClose, onRemove }) {
+   gramatica do campo do dia — mas os campos ao lado ganham quando preenchidos.
+
+   o horario e opcional: sem ele a tarefa e so uma posicao na fila do dia. e
+   "reuniao ou pausa" deixou de ser so um palpite pelo titulo — o palpite
+   continua marcando a caixa, mas agora da para desmarcar. */
+function TaskForm({ store, id, presetDate, presetAt, onClose, onRemove, onDuplicate }) {
   const c = id ? store.get(id) : null;
-  const [v, bind] = useFields({
+  const [v, bind, set] = useFields({
     title: c ? c.title : "",
     date: c ? c.date : presetDate,
+    at: c ? (c.at != null ? clock(c.at) : "") : (presetAt != null ? clock(presetAt) : ""),
     duration: c && c.min ? formatMin(c.min) : "",
     client: c ? c.client : "",
+    reserved: !!(c && c.reserved),
     recurring: !!(c && c.recurring)
   });
+  const touchedReserve = useRef(!!c);
   if (id && !c) return null;
   const submit = () => {
     const found = parseMentions(v.title);
@@ -1464,21 +1599,36 @@ function TaskForm({ store, id, presetDate, onClose, onRemove }) {
     const title = parsed.title.trim().slice(0, 300);
     if (!title) { notify("a tarefa precisa de um título"); return false; }
     if (!isDay(v.date)) { notify("preciso de uma data"); return false; }
+    const at = readClock(v.at);
+    if (at === undefined) { notify("não entendi o horário — escreva como 9h30 ou 14:00"); return false; }
     const min = parseDuration(v.duration).min || parsed.min;
     const client = v.client || found.client;
-    if (c) store.save({ ...c, title, date: v.date, client, min, recurring: v.recurring, updatedAt: Date.now() });
-    else store.save(newTask({ title, date: v.date, client, min, reserved: isReserve(title), recurring: v.recurring }));
+    const reserved = touchedReserve.current ? v.reserved : (v.reserved || isReserve(title));
+    if (c) store.save({ ...c, title, date: v.date, at, client, min, reserved, recurring: v.recurring, updatedAt: Date.now() });
+    else store.save(newTask({ title, date: v.date, at, client, min, reserved, recurring: v.recurring }));
   };
   return (
     <Form title={c ? "tarefa" : "nova tarefa"} submit={c ? "salvar" : "adicionar"} remove={c ? "apagar" : ""}
           onRemove={() => { onRemove(id); onClose(); }} onClose={onClose} onSubmit={submit}>
       <Field label="título" full>
-        <input className="input" maxLength="300" required placeholder="o que fazer · @cliente · 45m" {...bind("title")} />
+        <input className="input" maxLength="300" required placeholder="o que fazer · @cliente · 45m" {...bind("title")}
+               onBlur={(e) => { if (!touchedReserve.current) set("reserved", isReserve(e.currentTarget.value)); }} />
       </Field>
-      <Field label="dia"><input className="input" type="date" required {...bind("date")} /></Field>
+      <Field label="dia"><DateField required {...bind("date")} /></Field>
+      <Field label="horário"><input className="input input--mono" placeholder="sem horário" inputMode="numeric" {...bind("at")} /></Field>
       <Field label="duração"><input className="input input--mono" placeholder="45m, 1h30" {...bind("duration")} /></Field>
-      <Field label="cliente" full><select className="select" {...bind("client")}>{clientOptionList("sem cliente")}</select></Field>
+      <Field label="cliente"><select className="select" {...bind("client")}>{clientOptionList("sem cliente")}</select></Field>
+      <label className="row full">
+        <input type="checkbox" checked={v.reserved} onChange={(e) => { touchedReserve.current = true; set("reserved", e.currentTarget.checked); }} />
+        reunião ou pausa — ocupa o tempo, mas não é trabalho para concluir
+      </label>
       <label className="row full"><input type="checkbox" {...bind("recurring", "check")} /> toda semana</label>
+      {c && (
+        <p className="full task-form__more">
+          <button className="link" type="button" onClick={() => { onDuplicate(id); onClose(); }}>duplicar</button>
+          <span className="t-mono t-mute">Ctrl+C e Ctrl+V copiam e colam; Ctrl+D duplica</span>
+        </p>
+      )}
     </Form>
   );
 }

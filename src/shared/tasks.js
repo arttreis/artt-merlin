@@ -56,6 +56,11 @@ export function normalize(t) {
     /* a ordem dentro do dia. e a prioridade — a fila do dia nao tem campo de
        prioridade justamente porque a ordem e ela. */
     order: Number.isFinite(+t.order) ? +t.order : 0,
+    /* o horario de inicio, em minutos desde a meia-noite, ou null. e opcional
+       de proposito: a fila do dia continua sendo a ordem, e nao a hora. quem
+       tem hora e o que tem hora na vida — a reuniao das 10h, o almoco do meio
+       dia — ou o que foi arrastado para uma hora na grade da semana. */
+    at: t.at == null || t.at === "" || !Number.isFinite(+t.at) || +t.at < 0 || +t.at >= MINUTES ? null : Math.round(+t.at),
     /* toda semana de novo. so a origem espalha copia; a copia carrega
        recurringSource e nunca vira, ela mesma, uma nova origem. */
     recurring: !!t.recurring,
@@ -108,11 +113,91 @@ export function newTask(spec) {
     clickup: spec.clickup || "",
     client: spec.client || "",
     order: Number.isFinite(+spec.order) ? +spec.order : now,
+    at: spec.at == null ? null : spec.at,
     recurring: !!spec.recurring,
     recurringSource: spec.recurringSource || "",
     origin: spec.origin || null,
     createdAt: now, updatedAt: now
   });
+}
+
+/* ---------- a grade de horas ----------
+   a semana virou uma grade: uma coluna por dia, uma linha por hora, e cada
+   coisa ocupando a altura do tempo dela. mas tarefa não precisa ter hora — a
+   fila do dia é uma ORDEM —, então a grade tem que decidir onde desenhar quem
+   não tem.
+
+   a regra é a do próprio dia: o que tem hora fica na hora; o resto entra em
+   sequência a partir do começo da janela, na ordem da fila, e desvia do que
+   tem hora (uma reunião às 10h empurra a tarefa que cairia ali para depois
+   dela). a reserva sem hora vai na frente, como o dia já faz: ela é o espaço
+   que o almoço tira, e não o horário real dele. as concluídas vão antes das
+   abertas, porque aconteceram antes.
+
+   sem duração, a tarefa ocupa o palpite (`guess`): desenhar um risco de zero
+   minutos esconderia justamente o que falta estimar.
+
+   devolve blocos com `from`/`to` em minutos e `col`/`cols` para quem se
+   sobrepõe dividir a largura, como numa agenda. função pura: prova-se sem
+   navegador. */
+export function layoutDay(list, opts) {
+  const start = (opts && opts.start) || 0;
+  const guess = (opts && opts.guess) || 30;
+  const len = (t) => Math.max(15, t.min || guess);
+  const fixed = list.filter((t) => t.at != null)
+    .map((t) => ({ t, from: t.at, to: Math.min(MINUTES, t.at + len(t)), fixed: true }))
+    .sort((a, b) => a.from - b.from);
+  const loose = list.filter((t) => t.at == null);
+  const flow = loose.filter((t) => t.reserved)
+    .concat(loose.filter((t) => !t.reserved && t.done), loose.filter((t) => !t.reserved && !t.done));
+
+  const blocks = fixed.slice();
+  let cursor = start;
+  flow.forEach((t) => {
+    const size = len(t);
+    /* desvia do que tem hora: enquanto o bloco cair em cima de um fixo, pula
+       para o fim dele. a lista de fixos está ordenada, então uma passada basta. */
+    for (const f of fixed) {
+      if (cursor < f.to && cursor + size > f.from) cursor = f.to;
+    }
+    const from = Math.min(cursor, MINUTES - 15);
+    blocks.push({ t, from, to: Math.min(MINUTES, from + size), fixed: false });
+    cursor = from + size;
+  });
+
+  /* colunas: quem se sobrepõe divide a largura. agrupa em cachos de
+     sobreposição e, dentro de cada um, dá a primeira coluna livre. */
+  blocks.sort((a, b) => a.from - b.from || b.to - a.to);
+  let cluster = [], clusterEnd = -1;
+  const close = () => {
+    const cols = cluster.reduce((m, b) => Math.max(m, b.col + 1), 0);
+    cluster.forEach((b) => { b.cols = cols; });
+    cluster = [];
+  };
+  blocks.forEach((b) => {
+    if (cluster.length && b.from >= clusterEnd) close();
+    const taken = new Set(cluster.filter((x) => x.to > b.from).map((x) => x.col));
+    let col = 0;
+    while (taken.has(col)) col++;
+    b.col = col;
+    cluster.push(b);
+    clusterEnd = Math.max(clusterEnd, b.to);
+  });
+  if (cluster.length) close();
+  return blocks;
+}
+
+/* "9", "9h", "9h30", "09:30", "930" → minutos desde a meia-noite. vazio é
+   "sem hora" (null); o que não é hora de verdade devolve undefined, para quem
+   chama distinguir "apagou" de "escreveu errado". */
+export function readClock(text) {
+  const raw = String(text || "").trim().toLowerCase();
+  if (!raw) return null;
+  const m = /^(\d{1,2})(?:\s*(?:h|:)\s*(\d{2})?|(\d{2}))?\s*(?:h|min)?$/.exec(raw);
+  if (!m) return undefined;
+  const h = +m[1], min = +(m[2] || m[3] || 0);
+  if (h > 23 || min > 59) return undefined;
+  return h * 60 + min;
 }
 
 /* ---------- a juncao das duas colecoes antigas ----------

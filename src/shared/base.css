@@ -261,55 +261,134 @@ kbd{font-family:var(--mono);font-size:10.5px;padding:1px 6px;border-radius:5px;b
   .dialog__close{width:36px;height:36px}
 }
 
-/* ---------- a tela vazia que oferece (EmptyStart do ui.jsx) ----------
-   nao e um "estado vazio" no sentido de aviso: e a primeira tela util do
-   modulo. por isso ocupa o lugar da lista inteira em vez de ser uma frase
-   cinza no meio dela. */
-.start{max-width:900px;margin:0 auto;padding:clamp(12px,3vh,28px) 0}
+/* ---------- a tela de escolher por onde começar (EmptyStart do ui.jsx) ----------
+   não é um "estado vazio" no sentido de aviso: é a primeira tela útil do
+   módulo, e por isso ocupa o lugar da lista inteira.
+
+   o desenho é o de uma página de ajustes: uma fileira por grupo, o que o grupo
+   é na coluna da esquerda, as opções na da direita, e uma linha entre as
+   fileiras. a medida que decide se a coluna da esquerda existe é a do próprio
+   bloco (container), e não a da janela: a mesma tela mora na página, que é
+   larga, e dentro de uma caixa de diálogo, que não é. */
+.start{max-width:1080px;margin:0 auto;padding:clamp(12px,3vh,28px) 0}
 .start__title{margin:0;font-size:clamp(18px,2.4vw,23px);font-weight:600;letter-spacing:-.03em;color:var(--ink)}
 .start__text{margin:8px 0 0;font-size:13.5px;line-height:1.5;color:var(--ink-50);max-width:62ch}
-.start__group{margin:var(--pd) 0 8px;font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-30)}
-.start__grid{display:grid;gap:var(--pd2);grid-template-columns:repeat(auto-fill,minmax(232px,1fr))}
-.start__card{
-  display:flex;flex-direction:column;gap:4px;text-align:left;
-  padding:13px 15px;border-radius:var(--br3);
-  background:var(--fill);border:1px solid var(--line-soft);
-  transition:background var(--t),border-color var(--t);
+.start__rows{container-type:inline-size;margin-top:var(--pd)}
+.start__title:empty + .start__rows,.start > .start__rows:first-child{margin-top:0}
+.start__row{display:grid;grid-template-columns:1fr;gap:12px;padding:var(--pd) 0;border-top:1px solid var(--line-soft)}
+.start > .start__rows:first-child > .start__row:first-child{border-top:0;padding-top:0}
+.start__head{min-width:0}
+.start__head b{display:block;font-size:13px;font-weight:600;letter-spacing:-.01em;color:var(--ink)}
+.start__head p{margin:3px 0 0;font-size:12.5px;line-height:1.45;color:var(--ink-50);max-width:34ch}
+.start__head .t-mono{display:block;margin-top:8px;font-size:10.5px;color:var(--ink-30)}
+@container (min-width:680px){
+  .start__row{grid-template-columns:minmax(170px,230px) 1fr;gap:clamp(20px,4cqi,48px)}
 }
-.start__card:hover{background:var(--fill-hover);border-color:var(--line)}
-.start__card.is-on{
-  border-color:color-mix(in srgb,var(--green) 40%,transparent);
-  background:color-mix(in srgb,var(--green) 10%,transparent);
-}
-.start__card b{font-size:13.5px;font-weight:600;letter-spacing:-.01em;color:var(--ink)}
-.start__summary{font-size:12.5px;line-height:1.4;color:var(--ink-50)}
-.start__line{font-size:10.5px;letter-spacing:.04em;color:var(--ink-30)}
+.start__grid{display:grid;gap:18px 14px;grid-template-columns:repeat(auto-fill,minmax(168px,1fr));align-items:start}
 .start__foot{margin:var(--pd) 0 0;font-size:12.5px;color:var(--ink-30)}
 .start__foot .link{background:none;border:0;padding:0;cursor:pointer}
 
+/* a opção. com miniatura, o cartão É a miniatura, com o nome e o resumo por
+   baixo e fora dela: uma caixa em volta da miniatura fazia duas bordas
+   encaixadas, e o respiro entre elas nunca fechava igual dos quatro lados. */
+.opt{
+  position:relative;display:flex;flex-direction:column;text-align:left;min-width:0;
+  padding:0;background:none;border:0;border-radius:var(--br3);cursor:pointer;color:inherit;
+}
+.opt:focus-visible{outline:none}
+.opt__thumb{
+  position:relative;display:grid;place-items:center;aspect-ratio:16/10;width:100%;margin-bottom:9px;
+  border-radius:var(--br3);background:var(--fill);border:1px solid var(--line-soft);
+  overflow:hidden;color:var(--ink-30);
+  transition:background var(--t),border-color var(--t),box-shadow var(--t),color var(--t);
+}
+.opt:hover .opt__thumb{background:var(--fill-hover);border-color:var(--line)}
+.opt:focus-visible .opt__thumb,.opt--text:focus-visible{box-shadow:0 0 0 2px var(--green)}
+.opt.is-on .opt__thumb{border-color:var(--green);box-shadow:0 0 0 1px var(--green);color:var(--green-ink)}
+.opt__thumb--blank svg{width:18px;height:18px}
+.opt:hover .opt__thumb--blank{color:var(--ink-70)}
+.opt__check{
+  position:absolute;right:7px;bottom:7px;width:18px;height:18px;border-radius:50%;
+  display:grid;place-items:center;background:var(--green);color:var(--on-green);
+}
+.opt__check svg{width:11px;height:11px}
+.opt__name{font-size:12.5px;font-weight:600;letter-spacing:-.01em;line-height:1.3;color:var(--ink)}
+.opt__sum{
+  margin-top:2px;font-size:11.5px;line-height:1.4;color:var(--ink-30);
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;
+}
+.opt__line{margin-top:4px;font-size:10px;letter-spacing:.03em;color:var(--ink-30);overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+/* sem miniatura (hábitos, o mês do financeiro): a opção é um cartão de texto,
+   com a mesma borda e o mesmo aceso da miniatura */
+.opt--text{
+  padding:12px 14px;min-height:100%;
+  background:var(--fill);border:1px solid var(--line-soft);
+  transition:background var(--t),border-color var(--t),box-shadow var(--t);
+}
+.opt--text:hover{background:var(--fill-hover);border-color:var(--line)}
+.opt--text.is-on{border-color:var(--green);box-shadow:0 0 0 1px var(--green)}
+.opt--text .opt__check{top:10px;bottom:auto;right:10px}
+.opt--text.is-on .opt__name{padding-right:22px}
 
+/* as miniaturas em si, todas em currentColor */
+.th{width:86%;height:78%}
+.th--funnel rect{fill:currentColor;opacity:.5}
+.th--funnel rect:first-child{opacity:.95}
+.th__n{fill:currentColor;opacity:.6;text-anchor:end;font-family:var(--mono);font-size:9px}
+.th--map{stroke:currentColor;fill:none;stroke-width:1.2;opacity:.75}
+.th--map circle{fill:currentColor;stroke:none}
+.th--map .th__root{opacity:1}
+.th--map .th__leaf{opacity:.55}
+.th--channels{display:flex;flex-wrap:wrap;gap:4px;justify-content:center;align-items:center;padding:6px}
+.th--channels i{
+  font-family:var(--mono);font-style:normal;font-size:9.5px;letter-spacing:.04em;
+  padding:3px 6px;border-radius:var(--br2);background:var(--fill-hover);color:var(--ink-50);
+  max-width:74px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;
+}
+.opt.is-on .th--channels i{color:var(--green-ink)}
 
+@media (max-width:600px){
+  .start__grid{grid-template-columns:repeat(auto-fill,minmax(136px,1fr))}
 }
 
-/* ---------- a prateleira densa ----------
-   com trinta e nove modelos, o cartao de tres linhas vira uma parede: a tela
-   pede rolagem antes de alguem ter lido o segundo grupo. no modo denso o item
-   e uma LINHA — nome, resumo ao lado, e o caminho das etapas so no title. da
-   para varrer os trinta e nove com os olhos, que e o que uma prateleira
-   precisa permitir. */
-.start--dense{max-width:1080px}
-.start--dense .start__grid{grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:2px}
-.start--dense .start__card{
-  flex-direction:row;align-items:baseline;gap:9px;
-  padding:8px 11px;border-radius:var(--br2);border-color:transparent;background:none;
+/* ---------- o link público (ShareDialog do ui.jsx) ---------- */
+.share__url{display:flex;gap:6px;align-items:center;margin:10px 0}
+.share__url .input{flex:1 1 auto;min-width:0;font-family:var(--mono);font-size:12px}
+.share__actions{display:flex;justify-content:flex-start;margin-top:12px}
+
+/* ---------- o campo de data (DateField do ui.jsx) ----------
+   o calendário é do sistema, e não do navegador: a mesma superfície das
+   caixas, o verde para o dia escolhido e um anel para hoje. */
+.datefield{position:relative;display:flex;align-items:center;min-width:0}
+.datefield__input{flex:1 1 auto;min-width:0;padding-right:36px;font-family:var(--mono);font-size:12.5px;letter-spacing:.02em}
+.datefield__btn{
+  position:absolute;right:4px;top:50%;transform:translateY(-50%);
+  width:28px;height:28px;display:grid;place-items:center;border-radius:var(--br2);
+  color:var(--ink-30);transition:color var(--t),background var(--t);
 }
-.start--dense .start__card:hover{background:var(--fill);border-color:var(--line-soft)}
-.start--dense .start__card b{flex:0 0 auto;font-size:13px;font-weight:500}
-.start--dense .start__summary{
-  flex:1 1 auto;min-width:0;font-size:12px;color:var(--ink-30);
-  overflow:hidden;white-space:nowrap;text-overflow:ellipsis;
+.datefield__btn:hover,.datefield__btn[aria-expanded="true"]{color:var(--ink);background:var(--fill-hover)}
+.datefield__btn svg{width:15px;height:15px}
+.datepop{
+  position:fixed;z-index:1000;width:272px;padding:12px;
+  background:var(--surface-2);border:1px solid var(--line);border-radius:var(--br3);box-shadow:var(--sombra-2);
 }
-/* o caminho das etapas sai da tela e vai para o title: era ele que fazia cada
-   item ter quatro linhas de mono e a lista virar um muro */
-.start--dense .start__line{display:none}
-.start--dense .start__group{margin:18px 0 4px}
+.datepop__head{display:flex;align-items:center;gap:2px;margin:0 0 8px}
+.datepop__head b{flex:1 1 auto;padding-left:4px;font-size:13px;font-weight:600;letter-spacing:-.01em;color:var(--ink)}
+.datepop__head .action{width:28px;height:28px}
+.datepop__head .action svg{width:14px;height:14px}
+.datepop__grid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px}
+.datepop__wd{display:grid;place-items:center;height:26px;font-family:var(--mono);font-size:10px;color:var(--ink-30)}
+.datepop__day{
+  height:34px;display:grid;place-items:center;border-radius:var(--br2);
+  font-size:12.5px;font-variant-numeric:tabular-nums;color:var(--ink-70);
+  transition:background var(--t),color var(--t);
+}
+.datepop__day:hover{background:var(--fill-hover);color:var(--ink)}
+.datepop__day:focus-visible{outline:none;box-shadow:inset 0 0 0 1.5px var(--ink-50)}
+.datepop__day.is-out{color:var(--ink-30);opacity:.55}
+.datepop__day.is-today{box-shadow:inset 0 0 0 1px var(--ink-30);color:var(--ink)}
+.datepop__day.is-on,.datepop__day.is-on:hover{background:var(--green);color:var(--on-green);font-weight:600;box-shadow:none;opacity:1}
+.datepop__foot{display:flex;align-items:center;gap:8px;margin-top:10px;padding-top:10px;border-top:1px solid var(--line-soft)}
+.datepop__foot .link{font-size:12px;background:none;border:0;padding:0;cursor:pointer}
+
+}

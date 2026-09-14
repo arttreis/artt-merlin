@@ -487,7 +487,7 @@
   border-top:1px solid var(--line);margin-top:var(--pd3);padding-top:var(--pd2);
 }
 .preview li[data-cut="yes"]::after{
-  content:"daqui não dá tempo";
+  content:"daqui não dá tempo hoje";
   font-family:var(--mono);font-size:9px;letter-spacing:.08em;
   text-transform:uppercase;color:var(--ink-30);flex:0 0 auto;
 }
@@ -573,122 +573,115 @@
 .behind__text b{color:var(--ink);font-weight:600}
 .behind__actions{display:flex;gap:var(--pd2);flex-wrap:wrap}
 
-/* ---------- o quadro ----------
-   rola por dentro do proprio wrapper: e assim que o body nunca ganha uma
-   barra horizontal, no celular ou com a janela estreita. */
-.board-scroll{overflow-x:auto;overflow-y:hidden;padding-bottom:6px;margin:0 -2px}
-/* as colunas tem TODAS a mesma altura, e a altura e a do quadro — nao a do
-   dia mais cheio. isso nao e estetica: a coluna inteira e a area de soltar, e
-   uma area que media o conteudo dava um alvo de dois dedos numa terca vazia. */
-.board{display:flex;align-items:stretch;gap:var(--pd2);padding:0 2px;min-height:clamp(340px,58vh,660px)}
-.day-column{
-  flex:0 0 230px;width:230px;
-  display:flex;flex-direction:column;
-  background:var(--surface);border:1px solid var(--line-soft);border-radius:var(--br3);
-  transition:border-color var(--t),background var(--t);
+/* ---------- a grade de horas da semana ----------
+   uma coluna de horas e sete de dias. o cabeçalho fica fora da rolagem, e a
+   rolagem é da grade: o dia tem vinte e quatro horas, a tela não. a janela do
+   dia (o começo e o fim que o perfil guarda) é um fundo um tom acima — o
+   resto das horas existe, mas é madrugada. */
+.wk{
+  --wk-gutter:52px;
+  display:flex;flex-direction:column;min-width:0;
+  background:var(--surface);border:1px solid var(--line-soft);border-radius:var(--br3);overflow:hidden;
 }
-/* a partir daqui as seis colunas cabem sem cortar: vira grade que preenche a
-   largura inteira, e o rolar horizontal do celular/notebook estreito some. */
-/* eram seis colunas (seg a sex mais o fim de semana num cartao so) e viraram
-   sete, porque sabado e domingo passaram a ser dois dias como os outros. a
-   grade so liga quando as sete cabem: abaixo disso o quadro rola por dentro,
-   que e o que o .board-scroll existe para fazer. */
-@media (min-width:1240px){
-  .board{display:grid;grid-template-columns:repeat(7,minmax(0,1fr))}
-  .day-column{flex:none;width:auto}
+.wk__head,.wk__body{display:grid;grid-template-columns:var(--wk-gutter) repeat(7,minmax(96px,1fr))}
+.wk__head{border-bottom:1px solid var(--line-soft);background:var(--surface)}
+.wk__corner{border-right:1px solid var(--line-soft)}
+.wk__day{padding:8px 8px 7px;min-width:0;border-right:1px solid var(--line-soft);text-align:center}
+.wk__day:last-child{border-right:0}
+.wk__dayname{display:inline-flex;flex-direction:column;align-items:center;gap:2px;background:none;border:0;padding:0;cursor:pointer;color:var(--ink-50)}
+.wk__dayname .t-mono{font-size:10px;letter-spacing:.08em;text-transform:uppercase}
+.wk__dayname b{
+  display:grid;place-items:center;width:34px;height:34px;border-radius:50%;
+  font-size:19px;font-weight:500;letter-spacing:-.02em;color:var(--ink);transition:background var(--t);
 }
-/* hoje se destaca por borda, nao por cor de fundo: o quadro inteiro continua
-   sendo lido de relance, e o dia certo salta so um pouco */
-.day-column.is-today{border-color:var(--ink-30)}
-.day-column.is-target{border-color:var(--green);background:var(--fill)}
-/* o cabecalho da coluna tem o nome do dia, os minutos abertos e o "+" que
-   abre a caixa de novo cartao ja naquele dia — nenhum campo solto embaixo */
-.day-column__head{display:flex;align-items:flex-start;justify-content:space-between;gap:6px;padding:10px 8px 8px 12px;border-bottom:1px solid var(--line-soft)}
-/* o nome do dia virou botao: clicar nele abre aquele dia na visao do dia.
-   e o atalho que faz a semana e o dia serem a mesma coisa, e nao duas. */
-.day-column__day{
-  margin:0;padding:0;background:none;border:0;cursor:pointer;text-align:left;
-  font-size:13px;font-weight:600;letter-spacing:-.01em;color:var(--ink);
-  transition:color var(--t);
-}
-.day-column__day:hover{color:var(--green-ink)}
-.day-column.is-today .day-column__day{color:var(--green-ink)}
-.day-column__min{margin:2px 0 0}
-.day-column__add{width:24px;height:24px;flex:0 0 auto}
-.day-column__add svg{width:14px;height:14px}
-.day-column__body{flex:1 1 auto;min-height:60px;padding:8px;display:flex;flex-direction:column;gap:10px}
+.wk__dayname:hover b{background:var(--fill-hover)}
+.wk__day.is-today .wk__dayname{color:var(--green-ink)}
+.wk__day.is-today .wk__dayname b{background:var(--green);color:var(--on-green)}
+.wk__sum{margin:3px 0 0;display:flex;flex-direction:column;font-size:9.5px;line-height:1.35;color:var(--ink-30)}
+.wk__sum span{overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.wk__sum-meet{color:var(--ink-50)}
 
-.day-column__list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:4px;min-height:6px}
+.wk__scroll{position:relative;overflow:auto;max-height:calc(100dvh - var(--nav-h) - 170px);min-height:380px;background:var(--bg)}
+/* o cabecalho mora dentro da rolagem, grudado no topo: fora dela, rolar para
+   o lado no celular desalinhava os dias das colunas */
+.wk__head{position:sticky;top:0;z-index:6}
+/* a coluna de horas gruda na esquerda pelo mesmo motivo */
+.wk__corner,.wk__hours{position:sticky;left:0;z-index:5;background:var(--surface)}
+.wk__body{position:relative;min-width:calc(var(--wk-gutter) + 7 * 96px)}
+.wk__head{min-width:calc(var(--wk-gutter) + 7 * 96px)}
+.wk__hours{position:relative;border-right:1px solid var(--line-soft)}
+.wk__hours span{
+  position:absolute;right:8px;transform:translateY(-50%);
+  font-family:var(--mono);font-size:9.5px;color:var(--ink-30);
+}
+.wk__lane{
+  position:relative;min-width:0;border-right:1px solid var(--line-soft);cursor:cell;
+  background:
+    repeating-linear-gradient(to bottom,var(--line-soft) 0 1px,transparent 1px 44px),
+    linear-gradient(to bottom,transparent var(--win-from),var(--surface) var(--win-from),var(--surface) var(--win-to),transparent var(--win-to));
+}
+.wk__lane:last-child{border-right:0}
+.wk__lane.is-today{background:
+    repeating-linear-gradient(to bottom,var(--line-soft) 0 1px,transparent 1px 44px),
+    linear-gradient(to bottom,transparent var(--win-from),color-mix(in srgb,var(--green) 5%,var(--surface)) var(--win-from),color-mix(in srgb,var(--green) 5%,var(--surface)) var(--win-to),transparent var(--win-to))}
+.wk__now{position:absolute;left:0;right:0;height:2px;background:var(--green);pointer-events:none;z-index:3}
+.wk__now::before{content:"";position:absolute;left:-4px;top:-3px;width:8px;height:8px;border-radius:50%;background:var(--green)}
 
-/* ---------- as finalizadas da coluna ----------
-   descem para o pe da coluna e ficam fechadas: o que resta do dia nao divide
-   espaco com o que ja saiu da frente. abrir e por conta de quem pergunta. */
-.day-column__done{margin-top:auto;padding-top:8px;display:flex;flex-direction:column;gap:4px}
-.day-column__done[data-open="no"] .day-column__list{display:none}
-.day-column__done[data-open="no"] .day-column__toggle svg{transform:rotate(-90deg)}
-.day-column__toggle{
-  display:flex;align-items:center;gap:5px;width:100%;
-  margin:0;padding:3px 4px;background:none;border:0;border-radius:var(--br2);
-  cursor:pointer;text-align:left;
-  font-family:var(--mono);font-size:10px;letter-spacing:.06em;
-  color:var(--ink-50);transition:color var(--t),background var(--t);
+/* o bloco. tarefa é cheia; reunião e pausa são apagadas, com o relógio no
+   lugar da caixa de marcar — é o que separa, de longe, o que você FAZ do que
+   só ocupa o seu tempo. a tarefa em fila (sem horário) tem a borda da
+   esquerda tracejada: a hora dela é onde ela cairia, não um compromisso. */
+.wk__block{
+  position:absolute;z-index:1;display:flex;align-items:flex-start;gap:6px;overflow:hidden;
+  padding:4px 6px 4px 6px;border-radius:7px;cursor:grab;
+  font-size:11.5px;line-height:1.25;
+  transition:box-shadow var(--t),opacity var(--t);
 }
-.day-column__toggle:hover{color:var(--ink);background:var(--fill)}
-.day-column__toggle svg{width:10px;height:10px;flex:0 0 auto;transition:transform var(--t)}
-.day-column__done .card{opacity:.7}
+.wk__block:focus-visible{outline:none;box-shadow:0 0 0 2px var(--green)}
+.wk__block:hover{z-index:2;box-shadow:var(--sombra)}
+.wk__block.is-task{
+  background:color-mix(in srgb,var(--green) 16%,var(--surface-2));
+  border:1px solid color-mix(in srgb,var(--green) 34%,transparent);
+  border-left:3px solid var(--green);color:var(--ink);
+}
+.wk__block.is-task.is-loose{border-left-style:dashed}
+.wk__block.is-reserved{
+  background:var(--fill-hover);border:1px solid var(--line);border-left:3px solid var(--ink-30);color:var(--ink-70);
+}
+.wk__block.is-done{opacity:.55}
+.wk__block.is-done .wk__text b{text-decoration:line-through}
+.wk__block.is-dragging{opacity:.35}
+.wk__check{width:15px;height:15px;flex:0 0 auto;margin-top:1px;border-radius:5px}
+.wk__check svg{width:9px;height:9px}
+.wk__icon{display:flex;flex:0 0 auto;margin-top:1px;color:var(--ink-30)}
+.wk__icon svg{width:12px;height:12px}
+.wk__text{display:flex;flex-direction:column;min-width:0}
+.wk__text b{font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.wk__text .t-mono{font-size:9.5px;color:var(--ink-50);white-space:nowrap}
+.wk__block.is-short{align-items:center;padding-top:1px;padding-bottom:1px}
+.wk__block.is-short .wk__text{flex-direction:row;gap:6px;align-items:baseline}
+/* estreito (dividindo a hora com outro): o nome vale mais que a hora, que ja
+   esta no title e na linha da grade */
+.wk__block.is-narrow.is-short .wk__text .t-mono{display:none}
+.wk__block.is-narrow{padding-left:4px;padding-right:4px;gap:4px}
+.wk__resize{position:absolute;left:0;right:0;bottom:0;height:7px;cursor:ns-resize}
+.wk__drop{
+  position:absolute;left:2px;right:2px;z-index:4;pointer-events:none;
+  border:1.5px dashed var(--green);border-radius:7px;background:color-mix(in srgb,var(--green) 10%,transparent);
+}
+.wk__drop span{position:absolute;left:6px;top:3px;font-size:9.5px;color:var(--green-ink)}
 
-/* ---------- cartao ---------- */
-.card{
-  display:flex;align-items:center;gap:6px;min-width:0;
-  padding:6px 7px;border-radius:var(--br2);
-  background:var(--fill);border:1px solid var(--line-soft);
-  cursor:grab;transition:background var(--t),border-color var(--t),opacity var(--t);
+@media (max-width:640px){
+  .wk{--wk-gutter:40px}
+  .wk__head,.wk__body{grid-template-columns:var(--wk-gutter) repeat(7,minmax(84px,1fr))}
+  .wk__body,.wk__head{min-width:calc(var(--wk-gutter) + 7 * 84px)}
 }
-.card:hover,.card:focus-within{background:var(--fill-hover)}
-.card.is-dragging{opacity:.4}
-.card.is-done{cursor:default}
-/* a caixa de marcar e a do sistema (.mark, no shell.css); aqui so o tamanho
-   que o cartao pede — a coluna tem 230px e 22px comeria o titulo. */
-.card__check{width:18px;height:18px;border-radius:6px}
-.card__check svg{width:10px;height:10px}
-.card__title{
-  flex:1 1 auto;min-width:0;font-size:12.5px;color:var(--ink);cursor:text;
-  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;white-space:normal;
-}
-.card.is-done .card__title{color:var(--ink-30);text-decoration:line-through}
-.card__title-input{
-  flex:1 1 auto;min-width:0;background:var(--fill-hover);
-  border:1px solid var(--green-glow);border-radius:4px;padding:1px 5px;
-  font-size:12.5px;color:var(--ink);
-}
-.card .badge{height:17px;padding:0 6px;font-size:9px}
-.card__min{font-size:10.5px}
-.card__recurring{flex:0 0 auto;display:flex;color:var(--ink-30)}
-.card__recurring svg{width:11px;height:11px}
-/* as acoes so existem no hover: fora dele nao ocupam largura, senao o
-   titulo perde espaco numa coluna que ja e estreita */
-.card{position:relative}
-.card__actions{position:absolute;right:4px;top:50%;transform:translateY(-50%);display:flex;align-items:center;gap:0;opacity:0;pointer-events:none;background:var(--surface-2);border-radius:var(--br2);padding:0 2px;transition:opacity var(--t)}
-.card:hover .card__actions,.card:focus-within .card__actions{opacity:1;pointer-events:auto}
-.card__actions .action{width:22px;height:22px}
-.card__actions .action svg{width:12px;height:12px}
-@media (hover:none){.card__actions{opacity:1;pointer-events:auto;position:static;transform:none;background:none}}
 
 /* ---------- botao e dialogo do merlin ---------- */
 .merlin-btn__icon{display:flex;width:13px;height:13px;color:var(--green-ink)}
 .merlin-btn__icon svg{width:100%;height:100%}
 #merlin-btn:disabled{opacity:.6;cursor:default}
 
-@media (max-width:640px){
-  .day-column{flex-basis:78vw;width:78vw}
-}
-
-/* o rodape do cartao: os selos e a duracao numa linha propria. enquanto tudo
-   dividia uma linha so, as acoes que flutuam sobre o canto direito no hover
-   cobriam a duracao — a mao que ia clicar nela encontrava a lixeira. */
-.card{flex-wrap:wrap}
-.card__foot{flex:1 1 100%;display:flex;align-items:center;gap:6px;padding-left:26px;min-width:0}
-.card__foot:empty{display:none}
 
 /* ================================================================
    a barra do calendario
@@ -760,17 +753,26 @@
 .month__n{font-size:11px}
 .month__count{font-size:9.5px;opacity:.7}
 .month__item{
-  display:block;width:100%;max-width:100%;min-width:0;text-align:left;
+  display:flex;align-items:center;gap:4px;width:100%;max-width:100%;min-width:0;text-align:left;
   padding:3px 5px 3px 12px;border-radius:6px;border:0;cursor:grab;position:relative;
   background:var(--fill);color:var(--ink-70);font-size:11.5px;line-height:1.35;
-  overflow:hidden;white-space:nowrap;text-overflow:ellipsis;
+  overflow:hidden;white-space:nowrap;
 }
+.month__title{min-width:0;overflow:hidden;text-overflow:ellipsis}
+.month__at{flex:0 0 auto;font-size:9.5px;color:var(--ink-30)}
+/* reunioes e pausas: uma faixa propria no topo da celula, sem fundo e com o
+   relogio no lugar da bolinha. elas nao disputam as tres vagas das tarefas. */
+.month__meetings{display:flex;flex-direction:column;gap:1px;padding-bottom:3px;margin-bottom:1px;border-bottom:1px dashed var(--line-soft)}
+.month__meetings .month__more{padding-top:0}
+.month__clock{position:absolute;left:3px;top:calc(50% - 4.5px);display:flex;color:var(--ink-30)}
+.month__clock svg{width:9px;height:9px}
 /* a bolinha e absoluta porque num flex ela disputava largura com o titulo, e
    quem perdia era o titulo — que e a unica coisa que a celula existe para dizer */
 .month__item i{position:absolute;left:4px;top:calc(50% - 2.5px)}
 .month__item:hover{background:var(--fill-hover);color:var(--ink)}
 .month__item.is-done{color:var(--ink-30);text-decoration:line-through}
-.month__item.is-reserved{background:none;border:1px dashed var(--line);color:var(--ink-30)}
+.month__item.is-reserved{background:none;color:var(--ink-50);padding-top:1px;padding-bottom:1px;font-size:10.5px}
+.month__item.is-reserved:hover{background:var(--fill)}
 .month__item i{width:5px;height:5px;border-radius:50%;background:var(--green)}
 .month__item.is-done i{background:var(--ink-30)}
 .month__more{

@@ -11,7 +11,7 @@ import { useState } from "react";
 import { FINANCE_TEMPLATES, financeGroups, buildFinance } from "./shared/templates.js";
 import {
   mount, useCollection, useKeydown, isTyping,
-  useFields, Form, Field, EmptyStart, icon
+  useFields, Form, Field, EmptyStart, icon, DateField
 } from "./shared/ui.jsx";
 
 initPage("finance");
@@ -658,9 +658,9 @@ function MonthView({ ctx, month, openDay, onToggleDay, onShift, onNewEntry, onEd
   return (
     <>
       <div className="row mb">
-        <button className="pill pill--icon" type="button" aria-label="mês anterior" onClick={() => onShift(-1)}>{icon("arrowLeft")}</button>
+        <button className="pill pill--icon" type="button" aria-label="Mês anterior" onClick={() => onShift(-1)}>{icon("arrowLeft")}</button>
         <strong className="mono" id="month-label">{monthLabel(month)}</strong>
-        <button className="pill pill--icon" type="button" aria-label="mês seguinte" onClick={() => onShift(1)}>{icon("arrow")}</button>
+        <button className="pill pill--icon" type="button" aria-label="Mês seguinte" onClick={() => onShift(1)}>{icon("arrow")}</button>
         <span className="spacer"></span>
         <button className="pill pill--green" type="button" onClick={() => onNewEntry()}>{icon("plus")}lançamento</button>
       </div>
@@ -743,9 +743,9 @@ function YearView({ ctx, year, onShift, onOpenMonth }) {
   return (
     <>
       <div className="row mb">
-        <button className="pill pill--icon" type="button" aria-label="ano anterior" onClick={() => onShift(-1)}>{icon("arrowLeft")}</button>
+        <button className="pill pill--icon" type="button" aria-label="Ano anterior" onClick={() => onShift(-1)}>{icon("arrowLeft")}</button>
         <strong className="mono" id="year-label">{year}</strong>
-        <button className="pill pill--icon" type="button" aria-label="ano seguinte" onClick={() => onShift(1)}>{icon("arrow")}</button>
+        <button className="pill pill--icon" type="button" aria-label="Ano seguinte" onClick={() => onShift(1)}>{icon("arrow")}</button>
         <span className="small weak">saldo previsto no fim de cada dia · clique no mês para abrir</span>
       </div>
       <div className="year-scroll"><div className="year">
@@ -923,7 +923,7 @@ function EntryForm({ finance, categories, id, presetDay, onClose, onRemove, onSa
         onRemove={() => onRemove(id, "lançamento apagado")} onClose={onClose} onSubmit={submit}>
       <Field label="nome" full><input className="input" required maxLength="140" {...bind("name")}/></Field>
       <Field label="valor"><MoneyInput {...bind("amount")}/></Field>
-      <Field label="data"><input className="input" type="date" {...bind("day")}/></Field>
+      <Field label="data"><DateField {...bind("day")} /></Field>
       <Field label="tipo"><select className="select" {...bind("kind")}><option value="out">saída</option><option value="in">entrada</option></select></Field>
       <Field label="categoria"><CategorySelect categories={categories} {...bind("category")}/></Field>
       <label className="row full"><input type="checkbox" {...bind("paid", "check")}/> já pago</label>
@@ -1062,7 +1062,7 @@ function ConfigForm({ finance, onClose }) {
   };
   return (
     <Form title="config" sub="o ponto de partida do saldo, a divisão das entradas e as categorias" onClose={onClose} onSubmit={submit}>
-      <Field label="saldo inicial · data"><input className="input" type="date" {...bind("day")}/></Field>
+      <Field label="saldo inicial · data"><DateField {...bind("day")} /></Field>
       <Field label="saldo inicial · valor"><MoneyInput {...bind("amount")}/></Field>
       <Field label="despesas %"><input className="input input--num" type="number" min="0" max="100" {...bind("expenses")}/></Field>
       <Field label="gastos %"><input className="input input--num" type="number" min="0" max="100" {...bind("spending")}/></Field>
