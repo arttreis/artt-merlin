@@ -260,6 +260,9 @@ export const PAGES = [
   { id: "funnels", label: "funis", href: "funnels.html" },
   { id: "maps", label: "mapas", href: "maps.html" },
   { id: "finance", label: "financeiro", href: "finance.html" },
+  /* logo depois do financeiro porque e para la que ela desagua: o "comprei"
+     vira saida */
+  { id: "wishlist", label: "vitrine", href: "wishlist.html" },
   { id: "habits", label: "hábitos", href: "habits.html" },
   { id: "plans", label: "planos", href: "plans.html" }
 ];
@@ -286,6 +289,8 @@ const SEARCH_SOURCES = [
   { type: "maps", label: "mapa", field: "name", href: (d) => "maps.html#" + encodeURIComponent(d.id) },
   { type: "funnels", label: "funil", field: "name", href: (d) => "funnels.html#" + encodeURIComponent(d.id) },
   { type: "finance", label: "R$", field: "name", href: () => "finance.html", filter: (d) => d.type === "entry" || d.type === "fixed" || d.type === "debt" || d.type === "card" },
+  { type: "wishlist", label: "coletânea", field: "name", href: (d) => "wishlist.html#" + encodeURIComponent(d.id), filter: (d) => d.type === "list" },
+  { type: "wishlist", label: "vitrine", field: "name", href: (d) => "wishlist.html#" + encodeURIComponent(d.list || ""), filter: (d) => d.type === "item" && !d.bought },
   { type: "habits", label: "hábito", field: "name", href: () => "habits.html", filter: (d) => !d.archived },
   { type: "routine", label: "rotina", field: "title", href: () => "routine.html" },
   /* os objetivos moram dentro do documento do periodo: `each` abre o doc em varios achados */

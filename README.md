@@ -31,6 +31,7 @@ está em [MIGRATION.md](MIGRATION.md).
 | `funnels.html` | funil como grafo com tipos de nó, vazão por etapa, criativos, automações, ofertas e gatilhos. |
 | `maps.html` | mapa mental com teclado e layout automático. |
 | `finance.html` | do jeito da planilha: o mês dia a dia com saldo previsto, o ano em doze colunas, e o painel com saídas fixas, entradas fixas, compras no cartão e dívidas, mais a divisão 50/30/20. |
+| `wishlist.html` | a vitrine: o que se quer comprar, em coletâneas, com preço, link e foto. "comprei" lança a saída no financeiro; desfazer a compra tira o lançamento. |
 | `habits.html` | a grade do mês: hábitos nas linhas, dias nas colunas, uma marca por dia. Sequência e taxa do mês. |
 | `plans.html` | trimestre, mês e semana lado a lado: desdobrar de um horizonte para o outro. Acender um objetivo apaga tudo que não tem parentesco com ele nas outras colunas. |
 | `profile.html` | o perfil: a sessão, a aparência (o tema mora aqui), a apresentação e o inventário do que está guardado. |

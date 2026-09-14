@@ -1,0 +1,70 @@
+/* merlin · o CSS da vitrine
+   importado logo depois do base.css: primeiro o comum, depois o da pagina. */
+
+/* ---------- a vitrine inteira ----------
+   cada coletanea e um cartao com capa: as fotos do que ainda falta, em
+   mosaico de ate quatro. sem foto, a inicial — a grade continua alinhada. */
+.shelf{display:grid;gap:var(--pd);grid-template-columns:repeat(auto-fill,minmax(210px,1fr))}
+.shelf__card{
+  display:flex;flex-direction:column;gap:6px;text-align:left;padding:10px 10px 12px;
+  background:var(--surface);border:1px solid var(--line);border-radius:var(--br);box-shadow:var(--sombra);
+  transition:border-color var(--t),transform var(--t);
+}
+.shelf__card:hover{border-color:var(--ink-30);transform:translateY(-2px)}
+.shelf__cover{
+  display:grid;gap:2px;aspect-ratio:4/3;border-radius:var(--br2);overflow:hidden;background:var(--fill);margin-bottom:4px;
+}
+.shelf__cover img{width:100%;height:100%;object-fit:cover;display:block;min-height:0}
+.shelf__cover--2{grid-template-columns:1fr 1fr}
+.shelf__cover--3{grid-template-columns:2fr 1fr;grid-template-rows:1fr 1fr}
+.shelf__cover--3 img:first-child{grid-row:span 2}
+.shelf__cover--4{grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr}
+.shelf__blank,.wish__photo i{
+  display:grid;place-items:center;width:100%;height:100%;font-style:normal;
+  font-size:28px;font-weight:500;color:var(--ink-30);text-transform:lowercase;
+}
+.shelf__name{font-size:14px;color:var(--ink);font-weight:500;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.shelf__meta{font-size:12px;color:var(--ink-50);font-variant-numeric:tabular-nums}
+
+/* ---------- uma coletanea ---------- */
+.wish-back{display:inline-flex;align-items:center;gap:6px;margin:0 0 8px;font-size:12px;color:var(--ink-50)}
+.wish-back:hover{color:var(--ink)}
+.wish-back svg{width:14px;height:14px}
+
+.wish-grid{display:grid;gap:var(--pd);grid-template-columns:repeat(auto-fill,minmax(180px,1fr))}
+.wish{
+  position:relative;background:var(--surface);border:1px solid var(--line);border-radius:var(--br);
+  box-shadow:var(--sombra);overflow:hidden;transition:border-color var(--t);
+}
+.wish:hover{border-color:var(--ink-30)}
+.wish__open{display:flex;flex-direction:column;gap:4px;width:100%;text-align:left;padding:0 0 12px}
+.wish__photo{display:block;aspect-ratio:1;background:var(--fill);margin-bottom:6px}
+.wish__photo img{width:100%;height:100%;object-fit:cover;display:block}
+.wish__name{padding:0 12px;font-size:13px;color:var(--ink);overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.wish__meta{padding:0 12px;font-size:12px;color:var(--ink-50);font-variant-numeric:tabular-nums;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+/* as acoes flutuam no canto da foto, sobre um fundo proprio para ler em qualquer imagem */
+.wish__actions{position:absolute;top:8px;right:8px;background:var(--surface);border:1px solid var(--line-soft);border-radius:var(--br2);padding:1px}
+.wish:hover .row-actions,.wish:focus-within .row-actions{opacity:1}
+.wish.is-bought .wish__photo img{filter:grayscale(1);opacity:.6}
+.wish.is-bought .wish__name{color:var(--ink-50)}
+
+.wish-bought{margin-top:calc(var(--pd) * 1.5)}
+.wish-bought__toggle{display:inline-flex;align-items:center;gap:6px;margin-bottom:var(--pd2);font-size:12.5px;color:var(--ink-50)}
+.wish-bought__toggle:hover{color:var(--ink)}
+.wish-bought__toggle svg{width:14px;height:14px}
+
+/* ---------- a foto dentro da caixa ---------- */
+.wish-photo{
+  display:flex;flex-direction:column;gap:8px;padding:10px;border:1px dashed var(--line);border-radius:var(--br2);
+  background:var(--fill);transition:border-color var(--t),background var(--t);
+}
+.wish-photo.is-over{border-color:var(--green-ink);background:var(--fill-hover)}
+.wish-photo__img{display:block;width:120px;aspect-ratio:1;border-radius:var(--br2);overflow:hidden}
+.wish-photo__img img{width:100%;height:100%;object-fit:cover;display:block}
+.wish-photo__hint{font-size:12px;color:var(--ink-30)}
+.wish-photo__foot{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+
+@media (max-width:600px){
+  .shelf{grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--pd2)}
+  .wish-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--pd2)}
+}

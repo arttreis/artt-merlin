@@ -145,7 +145,7 @@ vezes numa montagem (esvaziar a caixa de entrada, gerar a recorrência da semana
 
 | o quê | para quê |
 | --- | --- |
-| `initPage(id)` | sidebar, clientes, preferências, sessão. `id` é `home, calendar, routine, notes, prospecting, clients, content, funnels, maps, finance, habits, plans, profile` |
+| `initPage(id)` | sidebar, clientes, preferências, sessão. `id` é `home, calendar, routine, notes, prospecting, clients, content, funnels, maps, finance, wishlist, habits, plans, profile` |
 | `collection(type, {normalize})` | fora de componente; dentro use `useCollection` |
 | `newId()`, `today()`, `dayOf(date)`, `isDay(v)`, `dateOf(day)`, `addDays(day, n)`, `mondayOf(day)` | datas como `YYYY-MM-DD` |
 | `dateLabel(day, withYear?)`, `weekdayOf(day)`, `monthLabel("YYYY-MM")` | rótulos |
@@ -225,6 +225,7 @@ Um documento é um objeto JSON plano. Coloque nele o que o módulo precisa, mas 
 | `maps` | maps.html | `{id, name, root:{id, title, note, color, collapsed, children:[…]}, client, idea, funnel}` |
 | `funnels` | funnels.html | `{id, name, client, channel, nodes:[{id, type, title, x, y, fields:{}, number}], edges:[{from, to}], creatives:[…], automations:[…], offers:[…], triggers:[…], snapshots:[…]}` |
 | `finance` | finance.html | vários docs: `{id, type:'entry'|'fixed'|'card'|'debt'|'config', …}` (`card` é uma compra parcelada: `{name, card, total, installments, start:'YYYY-MM', dayOfMonth}`) |
+| `wishlist` | wishlist.html | dois tipos: `{id, type:'list', name, order}` e `{id, type:'item', list, name, price (centavos), url, photo:{id, name, type, size}\|null, note, bought:{day, amount, entry}\|null, order}` — `entry` é o lançamento do financeiro, com `origin:{type:'wishlist', id}` |
 | `vault` | clients.html | um doc `{id:'config', salt}` — só o sal do cofre; o segredo vai cifrado dentro do cliente |
 | `habits` | habits.html | `{id, name, schedule:{type:'daily'|'perWeek'|'weekdays', times, weekdays:[0-6]}, min, color, order, archived, marks:{'YYYY-MM-DD':true}}` |
 | `plans` | plans.html | um doc por período, id `kind:period`: `{id, kind:'quarter'|'month'|'week', period:'2026-Q4'|'2026-09'|'2026-W37', goals:[{id, text, client, done, parent, card, order}], review:{went, didnt, next}}` |
