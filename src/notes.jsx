@@ -4,7 +4,7 @@
 import "./shared/base.css";
 import "./notes.css";
 import {
-  initPage, newId, today, dayOf, addDays, dateLabel, notify, sendToDay, api, cloud,
+  initPage, newId, today, dayOf, addDays, dateLabel, notify, api, cloud,
   uploadFile, deleteFile, fileUrl, isImage, FILE_TYPES,
   parseMentions, listClients, clientName, collection
 } from "./shared/core.js";
@@ -13,6 +13,7 @@ import {
   mount, useCollection, useClients, useHash,
   useKeydown, isTyping, useFields, Form, Field, Dialog, Markdown, clientOptionList, icon
 } from "./shared/ui.jsx";
+import { TaskDialog } from "./shared/task-form.jsx";
 
 initPage("notes");   // monta a barra, carrega os clientes, retoma a sessao
 
@@ -75,6 +76,9 @@ function normalize(d) {
     body: String(d.body || ""),
     stage: STAGE_IDS.includes(d.stage) ? d.stage : "seed",
     client: d.client || "",
+    /* fixada fica no topo da lista, fora dos dias: e a nota de consulta (as
+       regras dos videos, o roteiro de call), que nao envelhece como as outras */
+    pinned: !!d.pinned,
     steps: Array.isArray(d.steps) ? d.steps : [],
     /* os prints: so o bilhete do arquivo, nunca o binario. um documento
        antigo nao tem o campo, e isso e valido — a secao aparece vazia. */
@@ -152,6 +156,7 @@ function Notes() {
   const [view, setView] = useState(readView);
   const [openId, setOpenId] = useState(null);
   const [form, setForm] = useState(false);
+  const [taskFrom, setTaskFrom] = useState(null);         // {title, client, noteId} | null — a caixa de virar tarefa
   const [suggestions, setSuggestions] = useState(null);   // { targetId, items:[{type, title, note, checked}] } | null
   const [thinking, setThinking] = useState(false);
   const [panelSync, setPanelSync] = useState(0);          // sobe quando o painel deve reler o documento inteiro
@@ -171,7 +176,7 @@ function Notes() {
      sair da lista nao e sumir: elas descem para o rodape, fechadas, e voltam
      de la. arquivar que nao tem volta a vista e so um apagar com outro nome. */
   const byRecent = (a, b) => (b.updatedAt || 0) - (a.updatedAt || 0);
-  const listItems = all.filter((d) => d.stage !== "archived").sort(byRecent);
+  const listItems = all.filter((d) => d.stage !== "archived").sort((a, b) => (b.pinned - a.pinned) || byRecent(a, b));
   const archivedItems = all.filter((d) => d.stage === "archived").sort(byRecent);
   const live = listItems.length;
   const open = openId ? notes.get(openId) : null;
@@ -215,10 +220,12 @@ function Notes() {
     if (!doc || doc.stage === next) return;
     saveNote({ ...doc, stage: next, history: doc.history.concat([{ type: "stage", from: doc.stage, to: next, at: Date.now() }]) });
   };
-  const pull = (doc) => {
-    sendToDay({ title: doc.title || "nota sem título", client: doc.client || "", origin: { type: "note", id: doc.id } });
-    recordOutput(doc, "day", "");
-  };
+  /* virar tarefa pede o dia (e a duracao, se quiser): sem data, o sendToDay
+     antigo devolvia a nota como OUTRA nota. o registro de saida so entra
+     quando a tarefa existe de fato. */
+  const pull = (doc) => setTaskFrom({ title: doc.title || "", client: doc.client || "", noteId: doc.id });
+  const pullStepOf = (doc, step) => setTaskFrom({ title: step.text, client: doc.client || "", noteId: doc.id });
+  const togglePin = (doc) => saveNote({ ...doc, pinned: !doc.pinned });
   const removeNote = (id) => {
     const before = notes.remove(id);
     if (openId === id) closePanel();
@@ -254,7 +261,8 @@ function Notes() {
   };
   const toClient = (d) => {
     recordOutput(d, "client", "");
-    location.href = "clients.html#new?note=" + encodeURIComponent(d.id);
+    /* clients.jsx le `idea`: com `note` o cliente novo nascia sem nada da nota */
+    location.href = "clients.html#new?idea=" + encodeURIComponent(d.id);
   };
 
   /* ---------- ramificar: o Merlin le a nota e sugere perguntas, caminhos e passos ---------- */
@@ -344,7 +352,7 @@ function Notes() {
 
   const actions = {
     open: (id) => openNote(id), close: () => closePanel(),
-    pull, archive: archiveOrRestore, remove: removeNote, save: saveNote, changeStage, toMap, toClient, expand,
+    pull, pullStep: pullStepOf, pin: togglePin, archive: archiveOrRestore, remove: removeNote, save: saveNote, changeStage, toMap, toClient, expand,
     toggleSection: (k) => setSections((s) => ({ ...s, [k]: !s[k] }))
   };
 
@@ -371,6 +379,9 @@ function Notes() {
         ) : <Board items={all} onDrop={(id, stage) => changeStage(notes.get(id), stage)} onOpen={(id) => { changeView("list"); openNote(id); }} />}
       </div>
 
+      {taskFrom && <TaskDialog title={taskFrom.title} client={taskFrom.client} origin={{ type: "note", id: taskFrom.noteId }}
+                               onClose={() => setTaskFrom(null)}
+                               onCreated={(task) => { const d = notes.get(taskFrom.noteId); if (d) recordOutput(d, "day", task.id); }} />}
       {form && <NoteForm onCreate={create} onClose={() => setForm(false)} />}
       {suggestions && <SuggestionsDialog items={suggestions.items} onToggle={toggleSuggestion} onAdd={addSuggestions} onClose={() => setSuggestions(null)} />}
     </>
@@ -383,8 +394,9 @@ function NoteList({ items, archived, openId, listRef, actions }) {
   const rows = [];
   let group = "";
   items.forEach((d) => {
-    const day = dayOfStamp(d.updatedAt || d.createdAt);
-    if (day !== group) { group = day; rows.push(<p key={"day:" + day} className="group">{groupLabel(day)}</p>); }
+    /* as fixadas vem primeiro (a ordenacao ja garante) e ganham um grupo so delas */
+    const day = d.pinned ? "pinned" : dayOfStamp(d.updatedAt || d.createdAt);
+    if (day !== group) { group = day; rows.push(<p key={"day:" + day} className="group">{d.pinned ? "fixadas" : groupLabel(day)}</p>); }
     rows.push(<NoteItem key={d.id} d={d} active={d.id === openId} actions={actions} />);
   });
   return (
@@ -433,7 +445,8 @@ function NoteItem({ d, active, actions }) {
       </div>
       {isUntouched(d) && <span className="item__new" title="ainda não mexida"></span>}
       <span className="item__actions">
-        <button className="action" type="button" title="puxar para o dia" onClick={stop(() => actions.pull(d))}>{icon("clock")}</button>
+        <button className="action" type="button" title={d.pinned ? "desafixar" : "fixar no topo"} aria-pressed={String(d.pinned)} onClick={stop(() => actions.pin(d))}>{icon("pin")}</button>
+        <button className="action" type="button" title="virar tarefa" onClick={stop(() => actions.pull(d))}>{icon("task")}</button>
         <button className="action" type="button" title={d.stage === "archived" ? "desarquivar" : "arquivar"} onClick={stop(() => actions.archive(d))}>{icon("archive")}</button>
         <button className="action" type="button" title="apagar" onClick={stop(() => actions.remove(d.id))}>{icon("trash")}</button>
       </span>
@@ -629,8 +642,7 @@ function NotePanel({ note, notes, sync, thinking, focusTitle, sections, actions 
   };
   const pullStep = (step) => {
     const now = notes.get(note.id);
-    if (!now) return;
-    sendToDay({ title: step.text, client: now.client || "", origin: { type: "note", id: now.id } });
+    if (now) actions.pullStep(now, step);
   };
   const removeStep = (stepId) => {
     const now = notes.get(note.id);
@@ -644,7 +656,8 @@ function NotePanel({ note, notes, sync, thinking, focusTitle, sections, actions 
     <section className="panel">
       <div className="panel__bar">
         <button className="action back-btn" type="button" title="voltar para a lista" aria-label="Voltar" onClick={actions.close}><BackIcon /></button>
-        <button className="pill" type="button" title="puxar para o dia" onClick={() => actions.pull(note)}>{icon("clock")}<span>puxar para o dia</span></button>
+        <button className="pill" type="button" title="vira tarefa com dia (e duração, se quiser)" onClick={() => actions.pull(note)}>{icon("task")}<span>virar tarefa</span></button>
+        <button className="pill" type="button" aria-pressed={String(note.pinned)} title={note.pinned ? "tirar do topo da lista" : "fica no topo da lista"} onClick={() => actions.pin(notes.get(note.id) || note)}>{icon("pin")}<span>{note.pinned ? "fixada" : "fixar"}</span></button>
         <button className="pill" type="button" title="abrir como mapa mental" onClick={() => actions.toMap(note)}>{icon("map")}<span>mapa</span></button>
         <button className="pill" type="button" title="virar projeto de cliente" onClick={() => actions.toClient(note)}><PersonIcon /><span>cliente</span></button>
         <span className="sep"></span>
@@ -774,7 +787,7 @@ function Step({ step, current, onToggle, onEdit, onPull, onRemove, onMove, first
       <span className="step__actions">
         <button className="action" type="button" title="subir" disabled={first} onClick={() => onMove(-1)}>{icon("chevronUp")}</button>
         <button className="action" type="button" title="descer" disabled={last} onClick={() => onMove(1)}>{icon("chevronDown")}</button>
-        <button className="action" type="button" title="puxar para o dia" onClick={onPull}>{icon("clock")}</button>
+        <button className="action" type="button" title="virar tarefa" onClick={onPull}>{icon("task")}</button>
         <button className="action" type="button" title="apagar" onClick={onRemove}>{icon("trash")}</button>
       </span>
     </div>
@@ -798,7 +811,7 @@ function NewStep({ onAdd }) {
    ninguém mudou de estágio, era uma linha só dizendo "criada". agora o que
    se FAZ na nota também conta: passo concluído é acontecimento, e é o
    registro que responde "isto andou?" sem ter que comparar checklists. */
-const OUTPUT_LABELS = { day: "puxada para o dia", map: "virou mapa mental", client: "virou projeto de cliente", funnel: "virou funil" };
+const OUTPUT_LABELS = { day: "virou tarefa", map: "virou mapa mental", client: "virou projeto de cliente", funnel: "virou funil" };
 function Activity({ note }) {
   const events = [{ at: note.createdAt, key: "created", kind: "born", node: <b>criada</b> }]
     .concat(note.history.filter((h) => h.type === "stage").map((h, i) => ({

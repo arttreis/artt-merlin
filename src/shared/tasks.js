@@ -310,7 +310,7 @@ export function migrateTasks(complete) {
   if (local) docs.push(local);
 
   const store = tasks();
-  writeMerged(store, mergeInto(entries, docs));
+  const written = writeMerged(store, mergeInto(entries, docs));
 
   /* a marca so e posta quando a fonte esta completa. com sessao, isso e
      depois de a semana ter baixado — e depois de os dias do servidor terem
@@ -318,7 +318,10 @@ export function migrateTasks(complete) {
   if (!complete) return;
   if (cloud.signedIn && !week.hasDownloaded()) return;
   if (cloud.signedIn) { pullServerDays().catch(() => {}); return; }
-  try { localStorage.setItem(DONE_KEY, String(adopted.length + saved.length)); } catch (e) {}
+  /* sem sessao a passada acaba aqui. isto lia `adopted` e `saved`, que so
+     existem dentro do mergeInto: o ReferenceError impedia a marca de ser
+     gravada, e a migracao recomecava a cada abertura. */
+  try { localStorage.setItem(DONE_KEY, String(written)); } catch (e) {}
 }
 
 /* a migracao roda mais de uma vez antes de se dar por encerrada (uma antes da
