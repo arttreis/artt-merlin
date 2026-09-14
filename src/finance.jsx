@@ -11,7 +11,7 @@ import { useState } from "react";
 import { FINANCE_TEMPLATES, financeGroups, buildFinance } from "./shared/templates.js";
 import {
   mount, useCollection, useKeydown, isTyping,
-  useFields, Form, Field, EmptyStart, icon, DateField
+  useFields, Form, Field, EmptyStart, icon, DateField, DayOfMonthField
 } from "./shared/ui.jsx";
 
 initPage("finance");
@@ -27,7 +27,7 @@ const TABS = [
   { id: "today", label: "hoje" },
   { id: "month", label: "mês" },
   { id: "year", label: "ano" },
-  { id: "panel", label: "painel" }
+  { id: "panel", label: "fixos" }
 ];
 
 /* ================================================================
@@ -70,9 +70,17 @@ function alreadyEntered(entries, originType, id, day) {
     e.origin && e.origin.type === originType && e.origin.id === id && e.day.slice(0, 7) === month);
 }
 
-/* tudo que o dia `day` teria alem dos lancamentos ja gravados: a
-   recorrencia dos fixos, a parcela de uma divida (enquanto ela nao
-   quitar) e a parcela de uma compra no cartao (enquanto houver parcela).
+/* as SUGESTOES do dia: o que os fixos e as parcelas do cartao dizem que
+   cairia em `day` e ainda nao foi lancado. desde 13/09/2026 elas nao entram
+   em conta nenhuma — nem saldo, nem previsto, nem categoria. o Arthur: "pode
+   sugerir, mas nao pode considerar previsao". previsao e so o que a pessoa
+   lancou como nao pago; a sugestao vira lancamento quando ela lanca.
+
+   tudo que o dia `day` teria alem dos lancamentos ja gravados: a
+   recorrencia dos fixos e a parcela de uma compra no cartao (enquanto houver
+   parcela). a divida NAO entra: desde 13/09/2026 ela e so um registro do que
+   se deve, que a pessoa regula a mao no painel — nao desconta do saldo, nao
+   aparece nos proximos dias nem nas categorias.
    nada aqui grava documento nenhum — e so a pergunta "o que cai neste
    dia?" respondida sem efeito colateral, pra poder chamar de novo a
    vontade (o mes inteiro, o balanceUntil, o ano). */
@@ -82,23 +90,12 @@ function projectionsOf(day, ctx) {
   const proj = [];
 
   (ctx.fixed || []).forEach((f) => {
-    if (!f.active) return;
+    if (!f.active || !f.amount) return; /* fixo sem valor nao sugere nada */
     if (effectiveDay(year, month, f.dayOfMonth) !== dayNum) return;
     if (alreadyEntered(ctx.entries, "fixed", f.id, day)) return;
     proj.push({
       id: "proj-fixed-" + f.id + "-" + day, name: f.name, amount: f.amount, kind: f.kind,
       category: f.category, origin: { type: "fixed", id: f.id }
-    });
-  });
-
-  (ctx.debts || []).forEach((d) => {
-    if (d.paid >= d.total) return; /* quitada: para de projetar */
-    if (effectiveDay(year, month, d.dayOfMonth) !== dayNum) return;
-    if (alreadyEntered(ctx.entries, "debt", d.id, day)) return;
-    const remaining = d.total - d.paid;
-    proj.push({
-      id: "proj-debt-" + d.id + "-" + day, name: d.name, amount: Math.min(d.installment || remaining, remaining),
-      kind: "out", category: "Dívida", origin: { type: "debt", id: d.id }
     });
   });
 
@@ -124,9 +121,9 @@ function oldestDay(entries) {
   return oldest;
 }
 
-/* saldo no fim do dia `day`: parte do saldo inicial e anda dia a dia,
-   somando lancamentos (pago ou nao — um lancamento nao pago ja e a propria
-   previsao) e as projecoes. e dia a dia, e nao "soma tudo com data <= dia",
+/* saldo previsto no fim do dia `day`: parte do saldo inicial e anda dia a
+   dia, somando os lancamentos, pagos ou nao — um lancamento nao pago ja e a
+   propria previsao. sugestao nao entra. e dia a dia, e nao "soma tudo com data <= dia",
    porque so assim o effectiveDay se aplica mes a mes igual um calendario. */
 function balanceUntil(day, ctx) {
   const oldest = oldestDay(ctx.entries);
@@ -140,10 +137,44 @@ function balanceUntil(day, ctx) {
       if (e.day !== d) return;
       balance += e.kind === "in" ? e.amount : -e.amount;
     });
-    projectionsOf(d, ctx).forEach((p) => { balance += p.kind === "in" ? p.amount : -p.amount; });
     d = addDays(d, 1);
   }
   return balance;
+}
+
+/* tres coisas, tres desenhos:
+   - REAL: lancamento pago. cheio.
+   - PREVISTO: lancamento que a pessoa gravou como nao pago. tracejado, com
+     o "≈" — a mesma regra do funil, tracejado e o que ainda nao aconteceu.
+   - SUGESTAO: fixo ou parcela ainda nao lancado. nao tem numero nas contas;
+     aparece apagado, com o botao de lancar.
+   somados num numero so, eles faziam o "saldo de hoje" mentir. */
+const isForecast = (it) => !it.paid;
+
+/* o que esta na conta no fim do dia `day`: o saldo inicial e so o que foi
+   pago de verdade. o balanceUntil soma as projecoes tambem, e responde outra
+   pergunta — onde a conta vai estar. */
+function realBalanceUntil(day, ctx) {
+  const oldest = oldestDay(ctx.entries);
+  const cfg = ctx.startBalance || (oldest ? { day: oldest, amount: 0 } : null);
+  if (!cfg) return 0;
+  return (ctx.entries || [])
+    .filter((e) => e.paid && e.day >= cfg.day && e.day <= day)
+    .reduce((s, e) => s + (e.kind === "in" ? e.amount : -e.amount), cfg.amount);
+}
+
+/* o previsto cujo dia ja passou: a pessoa disse que ia acontecer, e ninguem
+   confirmou se aconteceu */
+const pendingBefore = (day, ctx) => (ctx.entries || [])
+  .filter((e) => !e.paid && e.day < day)
+  .sort((a, b) => a.day.localeCompare(b.day))
+  .map((e) => ({ day: e.day, it: e }));
+
+/* as sugestoes de um intervalo, dia a dia */
+function suggestionsBetween(from, to, ctx) {
+  const out = [];
+  for (let d = from; d <= to; d = addDays(d, 1)) projectionsOf(d, ctx).forEach((it) => out.push({ day: d, it }));
+  return out;
 }
 
 /* o mes inteiro, dia a dia: um balanceUntil() so pro dia anterior ao 1,
@@ -159,12 +190,12 @@ function buildMonth(yyyymm, ctx, balanceBefore) {
   const days = [];
   for (let i = 1; i <= nDays; i++) {
     const day = yyyymm + "-" + pad(i);
-    if (marker && day < marker) { days.push({ day, inflow: 0, outflow: 0, balance, items: [], before: true }); continue; }
-    const items = ctx.entries.filter((e) => e.day === day).concat(projectionsOf(day, ctx));
+    if (marker && day < marker) { days.push({ day, inflow: 0, outflow: 0, balance, items: [], suggestions: projectionsOf(day, ctx), before: true }); continue; }
+    const items = ctx.entries.filter((e) => e.day === day);
     const inflow = items.filter((x) => x.kind === "in").reduce((s, x) => s + x.amount, 0);
     const outflow = items.filter((x) => x.kind === "out").reduce((s, x) => s + x.amount, 0);
     balance += inflow - outflow;
-    days.push({ day, inflow, outflow, balance, items });
+    days.push({ day, inflow, outflow, balance, items, suggestions: projectionsOf(day, ctx) });
   }
   return days;
 }
@@ -250,7 +281,11 @@ function normalize(d) {
           spending: Number.isFinite(+((d.percents || {}).spending)) ? +d.percents.spending : 30,
           assets: Number.isFinite(+((d.percents || {}).assets)) ? +d.percents.assets : 20
         },
-        categories: Array.isArray(d.categories) && d.categories.length ? d.categories.map(String) : DEFAULT_CATEGORIES.slice()
+        categories: Array.isArray(d.categories) && d.categories.length ? d.categories.map(String) : DEFAULT_CATEGORIES.slice(),
+        /* a meta de gasto do mes por categoria, em centavos: { "Lazer": 50000 }.
+           vale para todo mes igual — meta que muda todo mes vira planilha. */
+        budgets: Object.fromEntries(Object.entries(d.budgets && typeof d.budgets === "object" ? d.budgets : {})
+          .map(([k, v]) => [String(k), Math.round(Math.abs(+v)) || 0]).filter(([, v]) => v > 0))
       };
     default:
       return { ...base, ...d };
@@ -318,36 +353,24 @@ function Finance() {
   };
 
   /* ---------- acoes do dia ---------- */
-  const confirmProjection = (day, originType, originId) => {
-    const proj = projectionsOf(day, contextOf(finance)).find((p) => p.origin.type === originType && p.origin.id === originId);
-    if (!proj) return;
-    finance.save({
-      id: newId(), type: "entry", day, name: proj.name, amount: proj.amount,
-      kind: proj.kind, category: proj.category,
-      paid: true, origin: proj.origin, createdAt: Date.now(), updatedAt: Date.now()
-    });
-    if (originType === "debt") {
-      const d = finance.get(originId);
-      if (d) finance.save({ ...d, paid: Math.min(d.total, d.paid + proj.amount), updatedAt: Date.now() });
-    }
-    notify("confirmado — virou lançamento");
-  };
+  /* lancar uma sugestao: a caixa de lancamento ja preenchida com o que o
+     fixo ou a parcela diz. quem decide o valor, o dia e se ja foi pago e a
+     pessoa — a sugestao so poupa a digitacao. */
+  const launchSuggestion = (day, it) => setForm({ type: "entry", id: "", day,
+    preset: { name: it.name, amount: it.amount, kind: it.kind, category: it.category, origin: it.origin, paid: day <= today() } });
   const togglePaid = (id) => {
     const doc = finance.get(id);
     if (doc) finance.save({ ...doc, paid: !doc.paid, updatedAt: Date.now() });
   };
+  /* abater uma parcela so anda o "ja pago" da divida: nao cria lancamento,
+     porque a divida e registro e nao movimento do saldo */
   const payInstallment = (id) => {
     const d = finance.get(id);
     if (!d) return;
     const amount = Math.min(d.installment || (d.total - d.paid), d.total - d.paid);
     if (amount <= 0) return;
-    finance.save({
-      id: newId(), type: "entry", day: today(), name: "parcela · " + d.name, amount,
-      kind: "out", category: "Dívida", paid: true,
-      origin: { type: "debt", id: d.id }, createdAt: Date.now(), updatedAt: Date.now()
-    });
     finance.save({ ...d, paid: d.paid + amount, updatedAt: Date.now() });
-    notify("parcela paga — virou lançamento de hoje");
+    notify("abati " + brl(amount) + " de " + d.name, () => finance.save({ ...d, updatedAt: Date.now() }));
   };
 
   /* atalhos: n abre um lancamento novo, alt+setas troca de mes ou de ano —
@@ -383,7 +406,7 @@ function Finance() {
     notify("montei o esqueleto — agora os valores");
   };
 
-  const dayActions = { onNewEntry: newEntry, onEditEntry: (id) => edit("entry", id), onTogglePaid: togglePaid, onConfirm: confirmProjection };
+  const dayActions = { onNewEntry: newEntry, onEditEntry: (id) => edit("entry", id), onTogglePaid: togglePaid, onLaunch: launchSuggestion };
   const formProps = { finance, categories: cfg.categories, onClose: closeForm, onRemove: removeWithUndo, onSave: save };
 
   return (
@@ -391,10 +414,9 @@ function Finance() {
       <div className="header">
         <div>
           <h1>financeiro</h1>
-          <p className="sub">o mês dia a dia, e o que é fixo — do jeito da planilha</p>
         </div>
         <div className="actions">
-          <button className="pill" type="button" onClick={() => setForm({ type: "config" })}>config</button>
+          <button className="pill" type="button" onClick={() => setForm({ type: "config" })}>ajustes</button>
         </div>
       </div>
 
@@ -429,14 +451,16 @@ function Finance() {
 
       <div id="view">
         {tab === "today" && <TodayView ctx={ctx} cfg={cfg} finance={finance} month={month}
-          onOpenMonth={() => openTab("month")} onConfig={() => setForm({ type: "config" })} {...dayActions}/>}
+          onOpenMonth={() => openTab("month")} onConfig={() => setForm({ type: "config" })}
+          onCategory={(name) => setForm({ type: "category", name })} {...dayActions}/>}
         {tab === "month" && <MonthView ctx={ctx} month={month} openDay={openDay} onToggleDay={toggleDay} onShift={shiftMonth} {...dayActions}/>}
         {tab === "year" && <YearView ctx={ctx} year={year} onShift={shiftYear} onOpenMonth={openMonth}/>}
         {tab === "panel" && <PanelView ctx={ctx} cfg={cfg} onEdit={edit} onNewFixed={newFixed} onNewCard={() => setForm({ type: "card", id: "" })} onNewDebt={() => setForm({ type: "debt", id: "" })} onPay={payInstallment}/>}
       </div>
       </>}
 
-      {form && form.type === "entry" && <EntryForm key={"entry:" + form.id} id={form.id} presetDay={form.day} {...formProps}/>}
+      {form && form.type === "entry" && <EntryForm key={"entry:" + form.id + ":" + form.day} id={form.id} presetDay={form.day} preset={form.preset} {...formProps}/>}
+      {form && form.type === "category" && <CategoryForm key={"category:" + form.name} finance={finance} name={form.name} onClose={closeForm}/>}
       {form && form.type === "fixed" && <FixedForm key={"fixed:" + form.id} id={form.id} presetKind={form.kind} {...formProps}/>}
       {form && form.type === "card" && <CardForm key={"card:" + form.id} id={form.id} {...formProps}/>}
       {form && form.type === "debt" && <DebtForm key={"debt:" + form.id} id={form.id} {...formProps}/>}
@@ -445,200 +469,247 @@ function Finance() {
   );
 }
 
-/* um medidor: legenda em cima, numero embaixo */
-const Meter = ({ label, value, cls }) => (
-  <div className="meter"><span className="legend">{label}</span><span className={"num mono" + (cls || "")}>{brl(value)}</span></div>);
+/* um medidor: legenda em cima, numero embaixo. `forecast` desenha o numero
+   como previsao: tinta mais leve, sublinhado tracejado e o "≈" na frente */
+const Meter = ({ label, value, cls, forecast }) => (
+  <div className="meter"><span className="legend">{label}</span><span className={"num mono" + (forecast ? " is-forecast" : "") + (cls || "")}>{forecast ? "≈ " : ""}{brl(value, true)}</span></div>);
+
+/* a barra de dois tempos: o cheio e o que ja aconteceu, o tracejado e o que
+   ainda vai, sobre o total `of`. passar do total nao some: a barra enche e
+   a legenda diz quanto passou. */
+const SplitBar = ({ real, forecast, of }) => {
+  const base = Math.max(1, of || real + forecast);
+  const r = Math.min(100, (real / base) * 100);
+  const f = Math.min(100 - r, (forecast / base) * 100);
+  return <span className="split"><i style={{ width: r + "%" }} /><b style={{ width: f + "%" }} /></span>;
+};
 
 /* ----- hoje: a primeira tela do dinheiro -----
-   o financeiro abria no mês dia a dia, que é uma planilha de 30 linhas: para
-   saber quanto tem hoje era preciso achar a linha de hoje no meio dela. esta
-   aba responde as três perguntas que se faz antes de qualquer outra — quanto
-   tenho, quanto sobra no fim do mês, e o que vence agora — e só depois abre
-   a planilha para quem quiser o dia a dia.
+   três perguntas, nessa ordem: quanto tem na conta agora (real), onde ela
+   chega no fim do mês (previsto), e o que falta acontecer. antes eram três
+   ladrilhos iguais com o real e o previsto somados no mesmo número — "hoje"
+   já contava o aluguel que ainda não saiu, e nada na tela dizia qual número
+   era fato e qual era conta (13/09/2026).
 
-   nenhuma conta nova mora aqui: saldo e projeção saem de balanceUntil e
-   buildMonth, os mesmos do mês e do ano. duas contas para o mesmo saldo
-   seriam dois saldos. */
-function TodayView({ ctx, cfg, finance, month, onOpenMonth, onNewEntry, onEditEntry, onTogglePaid, onConfirm, onConfig }) {
+   nenhuma conta nova de previsão mora aqui: o fim do mês sai do buildMonth,
+   o mesmo do mês e do ano. */
+function TodayView({ ctx, cfg, month, onOpenMonth, onNewEntry, onEditEntry, onTogglePaid, onLaunch, onConfig, onCategory }) {
   const t = today();
   const days = buildMonth(month, ctx);
-  const balanceToday = balanceUntil(t, ctx);
+  const inMonth = days.filter((d) => !d.before);
+  const real = realBalanceUntil(t, ctx);
   const last = days[days.length - 1];
-  const inflow = days.reduce((s, d) => s + d.inflow, 0);
-  const outflow = days.reduce((s, d) => s + d.outflow, 0);
-  const isThisMonth = month === t.slice(0, 7);
+  const all = inMonth.flatMap((d) => d.items);
+  const sum = (kind, pred) => all.filter((it) => it.kind === kind && pred(it)).reduce((s, it) => s + it.amount, 0);
+  const inReal = sum("in", (it) => !isForecast(it)), inAll = sum("in", () => true);
+  const outReal = sum("out", (it) => !isForecast(it)), outAll = sum("out", () => true);
 
-  /* o que vence nos próximos sete dias, projeção junto: é o que muda uma
-     decisão hoje. mais que isso já é o mês, e o mês tem aba própria. */
+  const pending = pendingBefore(t, ctx);
+  const pendingNet = pending.reduce((s, p) => s + (p.it.kind === "in" ? p.it.amount : -p.it.amount), 0);
+
+  /* o que vence nos próximos sete dias: é o que muda uma decisão hoje */
   const horizon = addDays(t, 7);
-  const soon = days
-    .filter((d) => d.day >= t && d.day <= horizon && d.items.length)
-    .map((d) => ({ day: d.day, items: d.items.filter((it) => it.kind === "out" || it.kind === "in") }))
-    .filter((d) => d.items.length);
+  const soon = days.filter((d) => d.day >= t && d.day <= horizon && d.items.length);
+  /* as sugestões do mês até daqui a sete dias, ainda não lançadas. mostra
+     seis; o resto está no mês, dia a dia */
+  const SHOWN = 6;
+  const suggested = suggestionsBetween(month + "-01", [horizon, days[days.length - 1].day].sort()[0], ctx);
 
-  /* o menor saldo do mês daqui pra frente: o buraco antes dele fechar. um
-     mês que termina no azul pode passar por vermelho no meio, e é isso que
-     nenhum "previsto para o fim do mês" conta sozinho. */
+  /* o menor saldo previsto daqui pra frente: um mês que fecha no azul pode
+     passar por baixo de zero no meio, e o "fim do mês" sozinho não conta */
   const ahead = days.filter((d) => d.day >= t && !d.before);
   const low = ahead.length ? ahead.reduce((m, d) => (d.balance < m.balance ? d : m), ahead[0]) : null;
 
   return (
     <>
-      <div className="grid">
-        <section className="block col-4">
-          <p className="heading"><span className="t-mono">{isThisMonth ? "hoje" : "no fim do mês"}</span></p>
-          <Meter label={isThisMonth ? dateLabel(t) : monthLabel(month)}
-                 value={isThisMonth ? balanceToday : last.balance}
-                 cls={(isThisMonth ? balanceToday : last.balance) < 0 ? " is-negative" : ""} />
-          {!cfg.startBalance && (
-            <p className="note mt2">sem saldo inicial a conta parte do zero.{" "}
-              <button className="link" type="button" onClick={onConfig}>definir</button></p>)}
-        </section>
-
-        <section className="block col-4">
-          <p className="heading"><span className="t-mono">previsto · fim de {monthLabel(month)}</span></p>
-          <Meter label={last.balance >= balanceToday ? "sobe no que falta do mês" : "desce no que falta do mês"}
-                 value={last.balance} cls={last.balance < 0 ? " is-negative" : ""} />
-          {low && low.balance < 0 && (
-            <p className="note mt2">passa por {brl(low.balance)} em {dateLabel(low.day)} antes de fechar.</p>)}
-        </section>
-
-        <section className="block col-4">
-          <p className="heading"><span className="t-mono">o mês</span></p>
-          {/* dois numeros lado a lado no mesmo ladrilho estouravam a coluna:
-             aqui eles sao uma linha cada, e a barra embaixo e que compara. */}
-          <div className="money-pair">
-            <span><b className="mono is-green">{brl(inflow, true)}</b><small>entra</small></span>
-            <span><b className="mono">{brl(-outflow)}</b><small>sai</small></span>
+      <section className="block fin-sum">
+        <div className="fin-sum__cell">
+          <p className="fin-sum__label">na conta hoje</p>
+          <p className={"fin-sum__num" + (real < 0 ? " is-negative" : "")}>{brl(real, true)}</p>
+          <p className="note">{!cfg.startBalance
+            ? <>sem saldo inicial a conta parte do zero. <button className="link" type="button" onClick={onConfig}>definir</button></>
+            : pending.length
+              ? pending.length + (pending.length === 1 ? " item" : " itens") + " a confirmar (" + brl(pendingNet, true) + ")"
+              : "só o que já aconteceu"}</p>
+        </div>
+        <div className="fin-sum__cell">
+          <p className="fin-sum__label">previsto no fim de {monthLabel(month)}</p>
+          <p className={"fin-sum__num is-forecast" + (last.balance < 0 ? " is-negative" : "")}>≈ {brl(last.balance, true)}</p>
+          <p className="note">{low && low.balance < 0
+            ? "passa por " + brl(low.balance, true) + " em " + dateLabel(low.day) + " antes de fechar"
+            : suggested.length
+              ? "só com o que foi lançado — " + suggested.length + (suggested.length === 1 ? " sugestão fica" : " sugestões ficam") + " de fora"
+              : "o que já aconteceu mais o previsto que você lançou"}</p>
+        </div>
+        <div className="fin-sum__cell fin-sum__cell--flow">
+          <p className="fin-sum__label">o mês</p>
+          <div className="flow">
+            <span className="flow__name">entrou</span>
+            <SplitBar real={inReal} forecast={inAll - inReal} />
+            <span className="flow__val"><b>{brl(inReal)}</b> <small>de {brl(inAll)}</small></span>
           </div>
-          <div className="bar mt2"><i style={{ width: (inflow ? Math.min(100, Math.round((outflow / inflow) * 100)) : 100) + "%" }} /></div>
-          <p className="note mt2">{inflow
-            ? (outflow <= inflow
-                ? "sai " + Math.round((outflow / inflow) * 100) + "% do que entra"
-                : "sai mais do que entra neste mês")
-            : "nada entrou neste mês ainda"}</p>
-        </section>
+          <div className="flow">
+            <span className="flow__name">saiu</span>
+            <SplitBar real={outReal} forecast={outAll - outReal} />
+            <span className="flow__val"><b>{brl(outReal)}</b> <small>de {brl(outAll)}</small></span>
+          </div>
+          <p className="legend-line"><i className="lg lg--real" />aconteceu <i className="lg lg--forecast" />previsto</p>
+        </div>
+      </section>
 
+      <div className="grid mt">
         <section className="block col-7">
+          {pending.length > 0 && (
+            <div className="soon soon--pending">
+              <p className="heading"><span className="t-mono">a confirmar</span><span className="small weak">o dia já passou — aconteceu?</span></p>
+              <ul className="list">
+                {pending.map((p) => <DayItem key={p.it.id} it={p.it} day={p.day} showDay onEditEntry={onEditEntry} onTogglePaid={onTogglePaid} />)}
+              </ul>
+            </div>)}
           <p className="heading">
-            <span className="t-mono">os próximos sete dias</span>
-            <button className="pill pill--mini" type="button" onClick={() => onNewEntry(t)}>{icon("plus")}lançamento</button>
+            <span className="t-mono">próximos sete dias</span>
+            <button className="action" type="button" title="novo lançamento (n)" aria-label="novo lançamento" onClick={() => onNewEntry(t)}>{icon("plus")}</button>
           </p>
           {soon.length
             ? soon.map((d) => (
                 <div key={d.day} className="soon">
                   <p className="soon__day t-mono">{d.day === t ? "hoje" : dateLabel(d.day)}</p>
                   <ul className="list">
-                    {d.items.map((it) => <DayItem key={it.id} it={it} day={d.day} onEditEntry={onEditEntry} onTogglePaid={onTogglePaid} onConfirm={onConfirm} />)}
+                    {d.items.map((it) => <DayItem key={it.id} it={it} day={d.day} onEditEntry={onEditEntry} onTogglePaid={onTogglePaid} />)}
                   </ul>
                 </div>))
-            : <p className="empty">nada vence nos próximos sete dias.</p>}
+            : <p className="empty">nada lançado para os próximos sete dias.</p>}
+          {suggested.length > 0 && (
+            <div className="soon soon--suggest">
+              <p className="heading"><span className="t-mono">sugestões</span><span className="small weak">dos fixos e parcelas · não contam em nada até você lançar</span></p>
+              <ul className="list">
+                {suggested.slice(0, SHOWN).map((p) => <SuggestionItem key={p.it.id} it={p.it} day={p.day} onLaunch={onLaunch} />)}
+              </ul>
+              {suggested.length > SHOWN && <p className="note mt2"><button className="link" type="button" onClick={onOpenMonth}>mais {suggested.length - SHOWN} no mês</button></p>}
+            </div>)}
           <p className="note mt2"><button className="link" type="button" onClick={onOpenMonth}>ver o mês dia a dia</button></p>
         </section>
 
         <section className="block col-5">
-          <Categories finance={finance} cfg={cfg} days={days} month={month} />
+          <Categories cfg={cfg} days={inMonth} month={month} onCategory={onCategory} />
         </section>
       </div>
     </>
   );
 }
 
-/* ----- as categorias -----
-   elas existiam só dentro da caixa de config, como uma fileira de chips em
-   que um clique apagava sem perguntar e sem desfazer — e, fora do <select>
-   do formulário, não queriam dizer nada. aqui elas ganham a única coisa que
-   torna uma categoria útil: quanto passou por ela neste mês. renomear
-   arrasta junto tudo que estava marcado com o nome antigo; apagar avisa
-   quantos lançamentos ficam sem etiqueta, e volta atrás. */
-function Categories({ finance, cfg, days, month }) {
-  const [adding, setAdding] = useState("");
-  const [renaming, setRenaming] = useState(null); // { from, to } | null
-
-  /* o que passou por cada categoria neste mês, projeção incluída: é a mesma
-     lista que a tabela do mês mostra, agrupada por etiqueta em vez de por dia */
+/* ----- as categorias, com a meta de gasto -----
+   cada categoria diz quanto já saiu por ela no mês (cheio), quanto ainda
+   está previsto (tracejado) e, se tiver meta, contra quanto. clicar na linha
+   abre a caixa da categoria — nome e meta —, como todo "editar" do sistema;
+   o campo solto de "nova categoria" e o renomear no meio da lista saíram. */
+function Categories({ cfg, days, month, onCategory }) {
   const moved = {};
   days.forEach((d) => d.items.forEach((it) => {
     const k = it.category || "sem categoria";
-    const m = moved[k] || (moved[k] = { out: 0, in: 0, n: 0 });
-    m[it.kind === "in" ? "in" : "out"] += it.amount;
-    m.n++;
+    const m = moved[k] || (moved[k] = { outReal: 0, outAll: 0, in: 0 });
+    if (it.kind === "in") m.in += it.amount;
+    else { m.outAll += it.amount; if (!isForecast(it)) m.outReal += it.amount; }
   }));
-  /* a lista da config mais as etiquetas que aparecem nos lançamentos e não
-     estão nela: categoria órfã existe (a lista mudou depois), e escondê-la
-     faria as somas não fecharem */
+  /* a lista da config mais as etiquetas órfãs: escondê-las faria as somas não fecharem */
   const names = cfg.categories.concat(Object.keys(moved).filter((k) => k !== "sem categoria" && !cfg.categories.includes(k)));
-  const biggest = Math.max(1, ...names.map((n) => (moved[n] ? moved[n].out : 0)));
-
-  /* quantos documentos carregam esta etiqueta — a resposta para "posso
-     apagar?" antes de apagar, e não depois */
-  const usedBy = (name) => finance.all().filter((d) => (d.type === "entry" || d.type === "fixed") && d.category === name);
-
-  const add = () => {
-    const name = adding.trim().slice(0, 30);
-    if (!name || cfg.categories.includes(name)) { setAdding(""); return; }
-    saveConfig(finance, { categories: cfg.categories.concat([name]) });
-    setAdding("");
-  };
-  const rename = () => {
-    const from = renaming.from, to = renaming.to.trim().slice(0, 30);
-    setRenaming(null);
-    if (!to || to === from) return;
-    const touched = usedBy(from);
-    finance.saveMany(touched.map((d) => ({ ...d, category: to, updatedAt: Date.now() })));
-    saveConfig(finance, { categories: cfg.categories.map((c) => (c === from ? to : c)) });
-    notify(touched.length ? "renomeada em " + touched.length + (touched.length === 1 ? " lançamento" : " lançamentos") : "renomeada");
-  };
-  const remove = (name) => {
-    const before = cfg.categories;
-    const n = usedBy(name).length;
-    saveConfig(finance, { categories: before.filter((c) => c !== name) });
-    notify(n ? "apaguei — " + n + (n === 1 ? " lançamento fica" : " lançamentos ficam") + " com a etiqueta antiga" : "categoria apagada",
-      () => saveConfig(finance, { categories: before }));
-  };
+  const budgets = cfg.budgets || {};
+  const out = (n) => (moved[n] ? moved[n].outAll : 0);
+  const biggest = Math.max(1, ...names.map((n) => Math.max(out(n), budgets[n] || 0)));
+  const withGoal = names.filter((n) => budgets[n]);
+  const totalBudget = withGoal.reduce((s, n) => s + budgets[n], 0);
+  const totalUse = withGoal.reduce((s, n) => s + out(n), 0);
+  /* com meta vem primeiro, a mais apertada no topo; sem meta, a que mais gastou */
+  const rank = (n) => (budgets[n] ? 1e9 * (out(n) / budgets[n]) : out(n) / 1e3);
+  const sorted = names.slice().sort((a, b) => rank(b) - rank(a));
 
   return (
     <>
-      <p className="heading"><span className="t-mono">as categorias · {monthLabel(month)}</span></p>
+      <p className="heading">
+        <span className="t-mono">gasto por categoria · {monthLabel(month)}</span>
+        <button className="action" type="button" title="nova categoria" aria-label="nova categoria" onClick={() => onCategory("")}>{icon("plus")}</button>
+      </p>
+      {totalBudget > 0
+        ? <p className="note">nas categorias com meta: ≈ {brl(totalUse)} de {brl(totalBudget)}</p>
+        : <p className="note">clique numa categoria para dar uma meta de gasto por mês.</p>}
       {names.length ? (
         <ul className="cats">
-          {names.map((name) => {
-            const m = moved[name] || { out: 0, in: 0, n: 0 };
+          {sorted.map((name) => {
+            const m = moved[name] || { outReal: 0, outAll: 0, in: 0 };
+            const goal = budgets[name] || 0;
             const orphan = !cfg.categories.includes(name);
+            const over = goal > 0 && m.outAll > goal;
+            const isIn = m.in > m.outAll;
             return (
-              <li key={name} className={"cat" + (orphan ? " is-orphan" : "")}>
-                {renaming && renaming.from === name ? (
-                  <input className="input" autoFocus maxLength="30" value={renaming.to}
-                    onChange={(e) => setRenaming({ from: name, to: e.currentTarget.value })}
-                    onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); rename(); } if (e.key === "Escape") { e.preventDefault(); setRenaming(null); } }}
-                    onBlur={rename} />
-                ) : (
-                  <>
-                    <span className="cat__name">{name}{orphan && <small title="não está na lista, mas há lançamentos com ela">fora da lista</small>}</span>
-                    <span className="cat__bar"><i style={{ width: Math.round((m.out / biggest) * 100) + "%" }} /></span>
-                    <span className="cat__value mono">{m.out || m.in ? (m.in > m.out ? brl(m.in, true) : brl(-m.out)) : "—"}</span>
-                    <span className="row-actions">
-                      <button className="action" type="button" title="renomear" onClick={() => setRenaming({ from: name, to: name })}>{icon("pencil")}</button>
-                      {!orphan && <button className="action" type="button" title="tirar da lista" onClick={() => remove(name)}>{icon("trash")}</button>}
-                    </span>
-                  </>)}
+              <li key={name}>
+                <button type="button" className={"cat" + (orphan ? " is-orphan" : "") + (over ? " is-over" : "")}
+                        title={orphan ? "não está na lista, mas há lançamentos com ela" : "editar nome e meta"}
+                        onClick={() => onCategory(name)}>
+                  <span className="cat__name">{name}</span>
+                  <span className="cat__bar">{!isIn && <SplitBar real={m.outReal} forecast={m.outAll - m.outReal} of={goal || biggest} />}</span>
+                  <span className="cat__value">
+                    {isIn ? "+" + brl(m.in)
+                      : goal ? <><b>{brl(m.outAll)}</b> <small>de {brl(goal)}</small></>
+                      : m.outAll ? brl(m.outAll) : <small>—</small>}
+                  </span>
+                </button>
+                {over && <p className="cat__over">passou {brl(m.outAll - goal)} da meta{m.outReal <= goal ? ", contando o previsto" : ""}</p>}
               </li>);
           })}
         </ul>
       ) : <p className="empty">nenhuma categoria ainda.</p>}
-      <div className="form-row mt2">
-        <input className="input" placeholder="nova categoria" maxLength="30" value={adding}
-          onChange={(e) => setAdding(e.currentTarget.value)}
-          onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); add(); } }} />
-        <button className="pill pill--mini" type="button" onClick={add}>adicionar</button>
-      </div>
-      <p className="note mt2">renomear arrasta junto tudo que está marcado com o nome antigo.</p>
     </>
   );
 }
 
+/* a caixa da categoria: nome e meta. renomear arrasta junto tudo que estava
+   marcado com o nome antigo — lançamentos, fixos e a meta; tirar da lista
+   avisa quantos ficam com a etiqueta antiga, e volta atrás. */
+function CategoryForm({ finance, name, onClose }) {
+  const cfg = configOf(finance);
+  const isNew = !name;
+  const [v, bind] = useFields({ name: name || "", budget: inReais((cfg.budgets || {})[name]) });
+  const usedBy = (n) => finance.all().filter((d) => (d.type === "entry" || d.type === "fixed") && d.category === n);
+  const submit = () => {
+    const to = v.name.trim().slice(0, 30);
+    if (!to) { notify("a categoria precisa de um nome"); return false; }
+    const now = configOf(finance);
+    if ((isNew || to !== name) && now.categories.includes(to)) { notify("já existe a categoria " + to); return false; }
+    const budgets = { ...(now.budgets || {}) };
+    if (name) delete budgets[name];
+    const goal = parseMoney(v.budget);
+    if (goal > 0) budgets[to] = goal;
+    let categories = now.categories;
+    if (isNew) categories = categories.concat([to]);
+    else if (to !== name) {
+      const touched = usedBy(name);
+      finance.saveMany(touched.map((d) => ({ ...d, category: to, updatedAt: Date.now() })));
+      categories = categories.includes(name) ? categories.map((c) => (c === name ? to : c)) : categories.concat([to]);
+    } else if (!categories.includes(name)) categories = categories.concat([name]);
+    saveConfig(finance, { categories, budgets });
+    notify(isNew ? "categoria criada" : "categoria salva");
+  };
+  const remove = () => {
+    const before = configOf(finance);
+    const n = usedBy(name).length;
+    const budgets = { ...(before.budgets || {}) };
+    delete budgets[name];
+    saveConfig(finance, { categories: before.categories.filter((c) => c !== name), budgets });
+    notify(n ? "tirei da lista — " + n + (n === 1 ? " lançamento fica" : " lançamentos ficam") + " com a etiqueta" : "categoria apagada",
+      () => saveConfig(finance, { categories: before.categories, budgets: before.budgets }));
+  };
+  return (
+    <Form title={isNew ? "nova categoria" : "categoria"} sub="a meta é quanto pode sair por ela em cada mês"
+        submit={isNew ? "criar" : "salvar"} remove={!isNew && cfg.categories.includes(name) ? "tirar da lista" : ""}
+        onRemove={remove} onClose={onClose} onSubmit={submit}>
+      <Field label="nome"><input className="input" required maxLength="30" {...bind("name")} /></Field>
+      <Field label="meta por mês"><MoneyInput placeholder="sem meta" {...bind("budget")} /></Field>
+    </Form>
+  );
+}
+
 /* ----- mês ----- */
-function MonthView({ ctx, month, openDay, onToggleDay, onShift, onNewEntry, onEditEntry, onTogglePaid, onConfirm }) {
+function MonthView({ ctx, month, openDay, onToggleDay, onShift, onNewEntry, onEditEntry, onTogglePaid, onLaunch }) {
   const days = buildMonth(month, ctx);
   const [year, monthNum] = month.split("-").map(Number);
   const nDays = daysInMonth(year, monthNum);
@@ -646,7 +717,7 @@ function MonthView({ ctx, month, openDay, onToggleDay, onShift, onNewEntry, onEd
   const isThisMonth = month === t.slice(0, 7);
   const todayNum = isThisMonth ? +t.slice(8, 10) : 0;
 
-  const balanceToday = balanceUntil(t, ctx);
+  const balanceToday = realBalanceUntil(t, ctx);
   const balanceEnd = days[days.length - 1].balance;
   /* o "diario" da planilha: o que sobra no fim do mes dividido pelos dias
      que ainda faltam — mesma logica da barra do dia */
@@ -666,18 +737,18 @@ function MonthView({ ctx, month, openDay, onToggleDay, onShift, onNewEntry, onEd
       </div>
 
       <div className="meters mb">
-        <Meter label="saldo hoje" value={balanceToday} cls={balanceToday < 0 ? " is-negative" : ""}/>
-        <Meter label="fim do mês" value={balanceEnd} cls={balanceEnd < 0 ? " is-negative" : ""}/>
-        <Meter label={daily < 0 ? "não fecha" : "diário"} value={daily} cls={daily < 0 ? " is-negative" : " is-green"}/>
-        <Meter label="entradas" value={monthIn}/>
-        <Meter label="saídas" value={monthOut}/>
+        <Meter label="na conta hoje" value={balanceToday} cls={balanceToday < 0 ? " is-negative" : ""}/>
+        <Meter label="fim do mês" value={balanceEnd} forecast cls={balanceEnd < 0 ? " is-negative" : ""}/>
+        <Meter label={daily < 0 ? "não fecha" : "por dia até o fim"} value={daily} forecast cls={daily < 0 ? " is-negative" : ""}/>
+        <Meter label="entradas do mês" value={monthIn} forecast/>
+        <Meter label="saídas do mês" value={monthOut} forecast/>
       </div>
 
       <div className="table-scroll"><table className="table">
         <thead><tr><th>dia</th><th className="num">entradas</th><th className="num">saídas</th><th className="num">saldo</th></tr></thead>
         <tbody>
-          {days.map((d) => <DayRow key={d.day} d={d} isToday={isThisMonth && d.day === t} open={openDay === d.day}
-            onToggle={() => onToggleDay(d.day)} onNewEntry={onNewEntry} onEditEntry={onEditEntry} onTogglePaid={onTogglePaid} onConfirm={onConfirm}/>)}
+          {days.map((d) => <DayRow key={d.day} d={d} today={t} isToday={isThisMonth && d.day === t} open={openDay === d.day}
+            onToggle={() => onToggleDay(d.day)} onNewEntry={onNewEntry} onEditEntry={onEditEntry} onTogglePaid={onTogglePaid} onLaunch={onLaunch}/>)}
         </tbody>
       </table></div>
     </>
@@ -685,43 +756,63 @@ function MonthView({ ctx, month, openDay, onToggleDay, onShift, onNewEntry, onEd
 }
 
 /* a linha do dia e, embaixo dela, o detalhe quando esta aberta */
-function DayRow({ d, isToday, open, onToggle, onNewEntry, onEditEntry, onTogglePaid, onConfirm }) {
+/* o dia que ainda não chegou é previsão inteira: tinta leve e o "≈". o que
+   já passou com item sem confirmar ganha o ponto de "a confirmar". */
+function DayRow({ d, today: t, isToday, open, onToggle, onNewEntry, onEditEntry, onTogglePaid, onLaunch }) {
   const label = weekdayOf(d.day) + " " + (+d.day.slice(8, 10));
+  const future = d.day > t;
+  const unconfirmed = !future && !d.before && d.items.some(isForecast);
+  const money = (v) => (future ? "≈ " : "") + brl(v, true);
   return (
     <>
-      <tr className={"day-row" + (isToday ? " is-today" : "")} data-day={d.day} onClick={onToggle}>
-        <td>{label}</td>
-        <td className="num">{d.inflow ? brl(d.inflow, true) : "—"}</td>
-        <td className="num">{d.outflow ? brl(-d.outflow) : "—"}</td>
-        <td className={"num" + (d.balance < 0 ? " negative" : "") + (d.before ? " weak" : "")}>{d.before ? "—" : brl(d.balance)}</td>
+      <tr className={"day-row" + (isToday ? " is-today" : "") + (future ? " is-future" : "")} data-day={d.day} onClick={onToggle}>
+        <td>{label}{unconfirmed && <i className="dot-pending" title="tem previsto a confirmar" />}{d.suggestions.length > 0 && <i className="dot-suggest" title={d.suggestions.length + (d.suggestions.length === 1 ? " sugestão" : " sugestões") + " para lançar"} />}</td>
+        <td className="num">{d.inflow ? money(d.inflow) : "—"}</td>
+        <td className="num">{d.outflow ? money(-d.outflow) : "—"}</td>
+        <td className={"num" + (d.balance < 0 ? " negative" : "") + (d.before ? " weak" : "")}>{d.before ? "—" : money(d.balance)}</td>
       </tr>
       {open && (
         <tr className="day-detail"><td colSpan="4">
-          {d.items.length
-            ? <ul className="list">{d.items.map((it) => <DayItem key={it.id} it={it} day={d.day} onEditEntry={onEditEntry} onTogglePaid={onTogglePaid} onConfirm={onConfirm}/>)}</ul>
-            : <p className="empty">nada neste dia</p>}
+          {d.items.length > 0 && <ul className="list">{d.items.map((it) => <DayItem key={it.id} it={it} day={d.day} onEditEntry={onEditEntry} onTogglePaid={onTogglePaid}/>)}</ul>}
+          {d.suggestions.length > 0 && <ul className="list mt2">{d.suggestions.map((it) => <SuggestionItem key={it.id} it={it} day={d.day} onLaunch={onLaunch}/>)}</ul>}
+          {!d.items.length && !d.suggestions.length && <p className="empty">nada neste dia</p>}
           <p className="mt2"><button className="pill pill--mini" type="button" onClick={() => onNewEntry(d.day)}>+ lançamento neste dia</button></p>
         </td></tr>)}
     </>
   );
 }
 
-/* um item do dia: lancamento gravado ou projecao (id "proj-…"), que so
-   tem o "confirmar" */
-function DayItem({ it, day, onEditEntry, onTogglePaid, onConfirm }) {
-  const proj = it.id.startsWith("proj-");
+/* um lançamento do dia. o previsto vem tracejado, com o "aconteceu" que o
+   confirma; o real vem cheio, e o check dele volta para previsto. */
+function DayItem({ it, day, showDay, onEditEntry, onTogglePaid }) {
+  const forecast = isForecast(it);
   const sign = it.kind === "in" ? "+" : "−";
   return (
-    <li className="line">
-      <span className={"name" + (proj ? " weak" : "")}>{it.name}{it.category && <>{" "}<small>#{it.category}</small></>}{!proj && !it.paid && <>{" "}<small>previsto</small></>}</span>
-      <span className="measure mono">{sign} {brl(it.amount)}</span>
-      <span className="row-actions">
-        {proj
-          ? <button className="action" type="button" title="confirmar: virou lançamento" onClick={() => onConfirm(day, it.origin.type, it.origin.id)}>{icon("check")}</button>
-          : <>
-            <button className="action" type="button" title={it.paid ? "marcar como previsto" : "marcar como pago"} onClick={() => onTogglePaid(it.id)}>{icon("check")}</button>
-            <button className="action" type="button" title="editar" onClick={() => onEditEntry(it.id)}>{icon("pencil")}</button>
-          </>}
+    <li className={"line fin-item" + (forecast ? " is-forecast" : "")}>
+      <span className="name">
+        {showDay && <small className="fin-item__day">{dateLabel(day)}</small>}
+        {it.name}{it.category && <>{" "}<small>#{it.category}</small></>}
+      </span>
+      <span className={"measure mono" + (it.kind === "in" ? " positive" : "")}>{forecast ? "≈ " : ""}{sign} {brl(it.amount)}</span>
+      <span className="fin-item__acts">
+        {forecast
+          ? <button className="pill pill--mini" type="button" title={it.kind === "in" ? "entrou de verdade" : "saiu de verdade"} onClick={() => onTogglePaid(it.id)}>{icon("check")}aconteceu</button>
+          : <button className="action" type="button" title="voltar para previsto" aria-label="voltar para previsto" onClick={() => onTogglePaid(it.id)}>{icon("check")}</button>}
+        <button className="action" type="button" title="editar" aria-label="editar" onClick={() => onEditEntry(it.id)}>{icon("pencil")}</button>
+      </span>
+    </li>
+  );
+}
+
+/* uma sugestão: apagada, sem sinal de conta, e o "lançar" que abre a caixa
+   preenchida. o valor aparece porque ajuda a decidir — mas não soma. */
+function SuggestionItem({ it, day, onLaunch }) {
+  return (
+    <li className="line fin-item is-suggestion">
+      <span className="name"><small className="fin-item__day">{dateLabel(day)}</small>{it.name}{it.category && <>{" "}<small>#{it.category}</small></>}</span>
+      <span className="measure">{brl(it.amount)}</span>
+      <span className="fin-item__acts">
+        <button className="pill pill--mini" type="button" title="abre o lançamento preenchido" onClick={() => onLaunch(day, it)}>{icon("plus")}lançar</button>
       </span>
     </li>
   );
@@ -746,7 +837,7 @@ function YearView({ ctx, year, onShift, onOpenMonth }) {
         <button className="pill pill--icon" type="button" aria-label="Ano anterior" onClick={() => onShift(-1)}>{icon("arrowLeft")}</button>
         <strong className="mono" id="year-label">{year}</strong>
         <button className="pill pill--icon" type="button" aria-label="Ano seguinte" onClick={() => onShift(1)}>{icon("arrow")}</button>
-        <span className="small weak">saldo previsto no fim de cada dia · clique no mês para abrir</span>
+        <span className="small weak">o saldo no fim de cada dia, só com o que foi lançado — de amanhã em diante, previsto · clique no mês para abrir</span>
       </div>
       <div className="year-scroll"><div className="year">
         {months.map((mo, i) => <YearMonth key={mo.yyyymm} mo={mo} index={i} today={t} onOpen={() => onOpenMonth(mo.yyyymm)}/>)}
@@ -765,7 +856,7 @@ function YearMonth({ mo, index, today: t, onOpen }) {
     if (!day) { rows.push(<div key={n} className="year__day is-empty"><i>{pad(n)}</i><span>—</span></div>); continue; }
     if (day.before) { rows.push(<div key={n} className="year__day"><i>{pad(n)}</i><span className="weak">—</span></div>); continue; }
     const moves = day.inflow || day.outflow;
-    const cls = (day.balance < 0 ? " is-negative" : (moves ? " is-positive" : "")) + (moves ? " has-moves" : "") + (day.day === t ? " is-today" : "");
+    const cls = (day.balance < 0 ? " is-negative" : (moves ? " is-positive" : "")) + (moves ? " has-moves" : "") + (day.day === t ? " is-today" : "") + (day.day > t ? " is-future" : "");
     const title = dateLabel(day.day, true) + (day.inflow ? " · +" + brl(day.inflow) : "") + (day.outflow ? " · −" + brl(day.outflow) : "");
     rows.push(<div key={n} className={"year__day" + cls} title={title}><i>{pad(n)}</i><span>{brl(day.balance)}</span></div>);
   }
@@ -834,7 +925,7 @@ function DebtRow({ d, onEdit, onPay }) {
       <td className="num">{settled
         ? <span className="badge badge--green">pago</span>
         : <span className="bar" title={brl(d.paid) + " de " + brl(d.total)}><i style={{ width: pct + "%" }}></i></span>}</td>
-      <td className="num">{!settled && <span className="row-actions"><button className="pill pill--mini" type="button" title="paga uma parcela hoje" onClick={(e) => { e.stopPropagation(); onPay(d.id); }}>pagar</button></span>}</td>
+      <td className="num">{!settled && <span className="row-actions"><button className="pill pill--mini" type="button" title={"abate " + brl(Math.min(d.installment || (d.total - d.paid), d.total - d.paid)) + " do que falta"} onClick={(e) => { e.stopPropagation(); onPay(d.id); }}>abater</button></span>}</td>
     </tr>
   );
 }
@@ -860,26 +951,26 @@ function PanelView({ ctx, cfg, onEdit, onNewFixed, onNewCard, onNewDebt, onPay }
   return (
     <>
       <div className="grid">
-        <PanelBlock title="saídas fixas" total={brl(totalOut)} addTitle="nova saída fixa" onAdd={() => onNewFixed("out")}>
+        <PanelBlock title="saídas fixas" total={brl(totalOut) + " por mês"} addTitle="nova saída fixa" onAdd={() => onNewFixed("out")}>
           <PanelTable headers={fixedHeaders("saída")} empty="nenhuma saída fixa — aluguel, luz, academia…"
             rows={outs.map((f) => <FixedRow key={f.id} f={f} onEdit={() => onEdit("fixed", f.id)}/>)}/>
         </PanelBlock>
-        <PanelBlock title="entradas fixas" total={brl(totalIn)} addTitle="nova entrada fixa" onAdd={() => onNewFixed("in")}>
+        <PanelBlock title="entradas fixas" total={brl(totalIn) + " por mês"} addTitle="nova entrada fixa" onAdd={() => onNewFixed("in")}>
           <PanelTable headers={fixedHeaders("entrada")} empty="nenhuma entrada fixa — o que entra todo mês"
             rows={ins.map((f) => <FixedRow key={f.id} f={f} onEdit={() => onEdit("fixed", f.id)}/>)}/>
         </PanelBlock>
-        <PanelBlock title="cartão de crédito" total={brl(totalCard)} addTitle="nova compra parcelada" onAdd={onNewCard}>
+        <PanelBlock title="compras parceladas" total={"faltam " + brl(totalCard)} addTitle="nova compra parcelada" onAdd={onNewCard}>
           <PanelTable headers={[{ text: "nome" }, { text: "cartão" }, { text: "parcelamento", num: true }, { text: "total", num: true }]} empty="nenhuma compra parcelada"
             rows={cards.map((c) => <CardRow key={c.id} c={c} thisMonth={thisMonth} onEdit={() => onEdit("card", c.id)}/>)}/>
         </PanelBlock>
-        <PanelBlock title="dívidas" total={brl(totalOwed)} addTitle="nova dívida" onAdd={onNewDebt}>
+        <PanelBlock title="dívidas · não entram no saldo" total={"deve " + brl(totalOwed)} addTitle="nova dívida" onAdd={onNewDebt}>
           <PanelTable headers={[{ text: "nome" }, { text: "pessoa" }, { text: "valor", num: true }, { text: "pago", num: true }, { text: "", num: true }]} empty="nenhuma dívida"
             rows={debts.map((d) => <DebtRow key={d.id} d={d} onEdit={() => onEdit("debt", d.id)} onPay={onPay}/>)}/>
         </PanelBlock>
       </div>
 
       <div className="block mt">
-        <p className="heading"><span className="t-mono">divisão {pct.expenses}/{pct.spending}/{pct.assets}</span><span className="small weak">sobre as entradas fixas</span></p>
+        <p className="heading"><span className="t-mono">como as entradas fixas se dividem · {pct.expenses}/{pct.spending}/{pct.assets}</span><span className="small weak">muda em ajustes</span></p>
         <div className="meters">
           <Meter label={"despesas · " + pct.expenses + "%"} value={Math.round(totalIn * pct.expenses / 100)}/>
           <Meter label={"gastos · " + pct.spending + "%"} value={Math.round(totalIn * pct.spending / 100)}/>
@@ -894,19 +985,31 @@ function PanelView({ ctx, cfg, onEdit, onNewFixed, onNewCard, onNewDebt, onPay }
 /* ---------- formularios (todos em pop-up) ----------
    o mesmo <Form> do ui: criar e editar sao a mesma caixa, a diferenca e
    ter ou nao um documento por baixo. */
-const MoneyInput = (props) => <input className="input input--num" inputMode="decimal" placeholder="0,00" {...props}/>;
-const DayOfMonthInput = (props) => <input className="input input--num" type="number" min="1" max="31" {...props}/>;
+/* a unidade mora no campo ("R$" antes, "%" e "x" depois), e nao no rotulo */
+const MoneyInput = (props) => <span className="affix affix--pre"><i>R$</i><input className="input input--num" inputMode="decimal" placeholder="0,00" {...props}/></span>;
+const UnitInput = ({ unit, ...props }) => <span className="affix affix--post"><input className="input input--num" type="number" {...props}/><i>{unit}</i></span>;
+const DayOfMonthInput = (props) => <DayOfMonthField required {...props}/>;
+/* entrada ou saida: duas opcoes cabem num par de chips, sem abrir lista */
+const KindChips = ({ value, onChange }) => (
+  <div className="chips" role="radiogroup">
+    {[["out", "saída"], ["in", "entrada"]].map(([k, label]) => (
+      <button key={k} type="button" className="chip" role="radio" aria-checked={String(value === k)} aria-pressed={String(value === k)}
+              onClick={() => onChange({ currentTarget: { value: k } })}>{label}</button>
+    ))}
+  </div>
+);
 const CategorySelect = ({ categories, ...props }) => <select className="select" {...props}>{categories.map((c) => <option key={c} value={c}>{c}</option>)}</select>;
 
-function EntryForm({ finance, categories, id, presetDay, onClose, onRemove, onSave }) {
+function EntryForm({ finance, categories, id, presetDay, preset, onClose, onRemove, onSave }) {
   const l = id ? finance.get(id) : null;
+  const pre = preset || {};
   const [v, bind] = useFields({
-    name: l ? l.name : "",
-    amount: inReais(l && l.amount),
+    name: l ? l.name : (pre.name || ""),
+    amount: inReais(l ? l.amount : pre.amount),
     day: l ? l.day : (presetDay || today()),
-    kind: l ? l.kind : "out",
-    category: pickCategory(categories, l ? l.category : ""),
-    paid: l ? l.paid : true
+    kind: l ? l.kind : (pre.kind || "out"),
+    category: pickCategory(categories, l ? l.category : (pre.category || "")),
+    paid: l ? l.paid : (pre.paid != null ? pre.paid : true)
   });
   if (id && !l) return null;
   const submit = () => {
@@ -915,18 +1018,19 @@ function EntryForm({ finance, categories, id, presetDay, onClose, onRemove, onSa
     onSave({
       id: l ? l.id : newId(), type: "entry", name: v.name.trim(), amount,
       day: isDay(v.day) ? v.day : today(), kind: v.kind, category: v.category,
-      paid: v.paid, origin: l ? l.origin : null
+      paid: v.paid, origin: l ? l.origin : (pre.origin || null)
     }, l, l ? "lançamento atualizado" : "lançamento criado");
   };
   return (
-    <Form title={l ? "lançamento" : "novo lançamento"} submit={l ? "salvar" : "adicionar"} remove={l ? "apagar" : ""}
+    <Form title={l ? "lançamento" : (pre.origin ? "lançar a sugestão" : "novo lançamento")}
+        sub={l ? "" : "pago é real; não pago é previsto e entra no fim do mês com ≈"} submit={l ? "salvar" : "adicionar"} remove={l ? "apagar" : ""}
         onRemove={() => onRemove(id, "lançamento apagado")} onClose={onClose} onSubmit={submit}>
       <Field label="nome" full><input className="input" required maxLength="140" {...bind("name")}/></Field>
       <Field label="valor"><MoneyInput {...bind("amount")}/></Field>
       <Field label="data"><DateField {...bind("day")} /></Field>
-      <Field label="tipo"><select className="select" {...bind("kind")}><option value="out">saída</option><option value="in">entrada</option></select></Field>
+      <Field label="tipo"><KindChips {...bind("kind")}/></Field>
       <Field label="categoria"><CategorySelect categories={categories} {...bind("category")}/></Field>
-      <label className="row full"><input type="checkbox" {...bind("paid", "check")}/> já pago</label>
+      <label className="row full"><input type="checkbox" {...bind("paid", "check")}/> já aconteceu (desmarcado, fica previsto)</label>
     </Form>
   );
 }
@@ -952,14 +1056,14 @@ function FixedForm({ finance, categories, id, presetKind, onClose, onRemove, onS
   };
   return (
     <Form title={f ? (kind === "in" ? "entrada fixa" : "saída fixa") : (kind === "in" ? "nova entrada fixa" : "nova saída fixa")}
-        sub="cai todo mês no mesmo dia; na tabela do mês aparece como previsto até você confirmar"
+        sub="cai todo mês no mesmo dia, como previsto até você confirmar"
         submit={f ? "salvar" : "adicionar"} remove={f ? "apagar" : ""}
         onRemove={() => onRemove(id, "fixo apagado")} onClose={onClose} onSubmit={submit}>
       <Field label="nome" full><input className="input" required maxLength="140" {...bind("name")}/></Field>
       <Field label="valor"><MoneyInput {...bind("amount")}/></Field>
       <Field label="dia do mês"><DayOfMonthInput {...bind("dayOfMonth")}/></Field>
       <Field label="categoria"><CategorySelect categories={categories} {...bind("category")}/></Field>
-      {f && <label className="row full"><input type="checkbox" {...bind("active", "check")}/> ativo (desmarque para pausar sem apagar)</label>}
+      {f && <label className="row full" title="desmarque para pausar sem apagar"><input type="checkbox" {...bind("active", "check")}/> ativo</label>}
     </Form>
   );
 }
@@ -985,13 +1089,13 @@ function CardForm({ finance, id, onClose, onRemove, onSave }) {
   };
   return (
     <Form title={c ? "compra no cartão" : "nova compra parcelada"}
-        sub="a parcela sai do total e cai todo mês no dia do vencimento, até acabar"
+        sub="a parcela cai todo mês no dia do vencimento, até acabar"
         submit={c ? "salvar" : "adicionar"} remove={c ? "apagar" : ""}
         onRemove={() => onRemove(id, "compra apagada")} onClose={onClose} onSubmit={submit}>
-      <Field label="o que" full><input className="input" required maxLength="140" {...bind("name")}/></Field>
+      <Field label="compra" full><input className="input" required maxLength="140" {...bind("name")}/></Field>
       <Field label="cartão"><input className="input" maxLength="40" placeholder="Nubank, C6…" {...bind("card")}/></Field>
       <Field label="total"><MoneyInput {...bind("total")}/></Field>
-      <Field label="parcelas"><input className="input input--num" type="number" min="1" max="120" {...bind("installments")}/></Field>
+      <Field label="parcelas"><UnitInput unit="x" min="1" max="120" {...bind("installments")}/></Field>
       <Field label="primeira parcela"><input className="input" type="month" {...bind("start")}/></Field>
       <Field label="dia do vencimento"><DayOfMonthInput {...bind("dayOfMonth")}/></Field>
     </Form>
@@ -1019,15 +1123,15 @@ function DebtForm({ finance, id, onClose, onRemove, onSave }) {
   };
   return (
     <Form title={d ? "dívida" : "nova dívida"}
-        sub="com parcela e dia, ela cai todo mês como previsto até quitar; sem parcela, é só o que você deve"
+        sub="só um registro do que você deve — não desconta do saldo"
         submit={d ? "salvar" : "adicionar"} remove={d ? "apagar" : ""}
         onRemove={() => onRemove(id, "dívida apagada")} onClose={onClose} onSubmit={submit}>
       <Field label="nome" full><input className="input" required maxLength="140" {...bind("name")}/></Field>
-      <Field label="pessoa / credor"><input className="input" maxLength="80" {...bind("creditor")}/></Field>
+      <Field label="credor"><input className="input" maxLength="80" placeholder="pessoa ou empresa" {...bind("creditor")}/></Field>
       <Field label="total"><MoneyInput {...bind("total")}/></Field>
       <Field label="já pago"><MoneyInput {...bind("paid")}/></Field>
-      <Field label="parcela (opcional)"><MoneyInput {...bind("installment")}/></Field>
-      <Field label="dia do mês"><DayOfMonthInput {...bind("dayOfMonth")}/></Field>
+      <Field label="parcela por mês"><MoneyInput placeholder="opcional" {...bind("installment")}/></Field>
+      <Field label="vencimento"><DayOfMonthInput {...bind("dayOfMonth")}/></Field>
     </Form>
   );
 }
@@ -1044,15 +1148,6 @@ function ConfigForm({ finance, onClose }) {
     spending: cfg.percents.spending,
     assets: cfg.percents.assets
   });
-  const [newCategory, setNewCategory] = useState("");
-  const addCategory = () => {
-    const name = newCategory.trim();
-    if (!name) return;
-    const current = configOf(finance).categories;
-    if (!current.includes(name)) saveConfig(finance, { categories: current.concat([name]) });
-    setNewCategory("");
-  };
-  const removeCategory = (name) => saveConfig(finance, { categories: configOf(finance).categories.filter((c) => c !== name) });
   const submit = () => {
     saveConfig(finance, {
       startBalance: isDay(v.day) ? { day: v.day, amount: parseMoney(v.amount) } : null,
@@ -1061,24 +1156,12 @@ function ConfigForm({ finance, onClose }) {
     notify("configuração salva");
   };
   return (
-    <Form title="config" sub="o ponto de partida do saldo, a divisão das entradas e as categorias" onClose={onClose} onSubmit={submit}>
-      <Field label="saldo inicial · data"><DateField {...bind("day")} /></Field>
-      <Field label="saldo inicial · valor"><MoneyInput {...bind("amount")}/></Field>
-      <Field label="despesas %"><input className="input input--num" type="number" min="0" max="100" {...bind("expenses")}/></Field>
-      <Field label="gastos %"><input className="input input--num" type="number" min="0" max="100" {...bind("spending")}/></Field>
-      <Field label="ativos %"><input className="input input--num" type="number" min="0" max="100" {...bind("assets")}/></Field>
-      <div className="full">
-        <label className="field-label">categorias</label>
-        <div className="cfg-categories" id="cfg-categories">
-          {cfg.categories.map((c) => <button key={c} className="chip" type="button" title="remover" onClick={() => removeCategory(c)}>{c} ✕</button>)}
-        </div>
-        <div className="cfg-new">
-          <input className="input" id="cfg-new" placeholder="nova categoria" maxLength="30" value={newCategory}
-            onChange={(e) => setNewCategory(e.currentTarget.value)}
-            onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addCategory(); } }}/>
-          <button className="pill pill--icon" type="button" id="cfg-add" aria-label="adicionar categoria" onClick={addCategory}>+</button>
-        </div>
-      </div>
+    <Form title="ajustes" sub="de onde o saldo parte e como as entradas se dividem — as categorias e as metas moram na aba hoje" onClose={onClose} onSubmit={submit}>
+      <Field label="saldo inicial em"><DateField {...bind("day")} /></Field>
+      <Field label="saldo inicial"><MoneyInput {...bind("amount")}/></Field>
+      <Field label="despesas"><UnitInput unit="%" min="0" max="100" {...bind("expenses")}/></Field>
+      <Field label="gastos"><UnitInput unit="%" min="0" max="100" {...bind("spending")}/></Field>
+      <Field label="ativos"><UnitInput unit="%" min="0" max="100" {...bind("assets")}/></Field>
     </Form>
   );
 }

@@ -80,7 +80,66 @@
    o que passa disso e o mes, e o mes tem aba. */
 .soon{margin:0 0 var(--pd2)}
 .soon:last-of-type{margin-bottom:0}
-.soon__day{margin:0 0 6px;font-size:10px;letter-spacing:.08em;color:var(--ink-30)}
+
+/* ---------- real, previsto e sugestão ----------
+   cheio é o que aconteceu; tracejado é o previsto que a pessoa lançou; a
+   sugestão (fixo ou parcela não lançado) nem borda tem — é texto apagado com
+   um botão. a mesma regra do funil: tracejado é o que ainda não foi medido. */
+.is-forecast{color:var(--ink-50)}
+.meter .num.is-forecast{color:var(--ink-50);text-decoration:underline dashed var(--ink-30);text-decoration-thickness:1px;text-underline-offset:6px}
+
+/* o resumo: uma faixa só, três respostas separadas por linha — e não três
+   ladrilhos iguais */
+.fin-sum{display:grid;grid-template-columns:1fr 1fr 1.25fr;padding:0;overflow:hidden}
+.fin-sum__cell{padding:calc(var(--pd) * 1.1) calc(var(--pd) * 1.25);min-width:0}
+.fin-sum__cell + .fin-sum__cell{border-left:1px solid var(--line-soft)}
+.fin-sum__label{margin:0 0 6px;font-size:12px;color:var(--ink-50)}
+.fin-sum__num{margin:0 0 6px;font-family:var(--mono);font-size:clamp(22px,2.4vw,32px);font-weight:500;letter-spacing:-.03em;line-height:1.05;color:var(--ink);white-space:nowrap}
+.fin-sum__num.is-forecast{color:var(--ink-50);text-decoration:underline dashed var(--ink-30);text-decoration-thickness:1px;text-underline-offset:7px}
+.fin-sum__num.is-negative{color:var(--ink-50)}
+.fin-sum .note{margin:0}
+@media (max-width:900px){
+  .fin-sum{grid-template-columns:1fr}
+  .fin-sum__cell + .fin-sum__cell{border-left:0;border-top:1px solid var(--line-soft)}
+}
+.flow{display:grid;grid-template-columns:44px 1fr auto;align-items:center;gap:10px;margin:0 0 8px}
+.flow__name{font-size:12px;color:var(--ink-50)}
+.flow__val{font-size:12px;color:var(--ink-30);white-space:nowrap;font-variant-numeric:tabular-nums}
+.flow__val b{font-weight:500;color:var(--ink)}
+.legend-line{display:flex;align-items:center;gap:6px;margin:4px 0 0;font-size:11px;color:var(--ink-30)}
+.lg{display:inline-block;width:14px;height:6px;border-radius:100px}
+.lg + .lg,.legend-line .lg:not(:first-child){margin-left:8px}
+.lg--real{background:var(--green)}
+.lg--forecast{border:1px dashed var(--ink-30)}
+
+/* a barra de dois tempos (SplitBar): cheio + tracejado */
+.split{display:flex;height:6px;border-radius:100px;background:var(--fill-hover);overflow:hidden;min-width:20px}
+.split i{display:block;height:100%;background:var(--green)}
+.split b{display:block;height:100%;background:repeating-linear-gradient(135deg,var(--ink-30) 0 2px,transparent 2px 5px)}
+
+/* os itens do dia */
+.fin-item .name small.fin-item__day{margin:0 8px 0 0;font-size:11px;color:var(--ink-30)}
+.fin-item__acts{display:flex;align-items:center;gap:2px;flex:0 0 auto}
+.fin-item__acts .pill svg{width:12px;height:12px}
+.fin-item.is-forecast{border-style:dashed;border-color:var(--line);background:transparent}
+.fin-item.is-forecast .name{color:var(--ink-70)}
+.fin-item.is-forecast .measure{color:var(--ink-50)}
+.fin-item.is-suggestion{background:transparent;border-color:transparent}
+.fin-item.is-suggestion:hover{background:var(--fill)}
+.fin-item.is-suggestion .name,.fin-item.is-suggestion .measure{color:var(--ink-30)}
+.fin-item.is-suggestion .fin-item__acts .pill{opacity:.8}
+.fin-item.is-suggestion:hover .fin-item__acts .pill{opacity:1}
+.measure.positive{color:var(--green-ink)}
+.soon--pending{margin-bottom:var(--pd);padding-bottom:var(--pd2);border-bottom:1px solid var(--line-soft)}
+.soon--suggest{margin-top:var(--pd);padding-top:var(--pd2);border-top:1px solid var(--line-soft)}
+.soon__day{margin:0 0 6px;font-size:11px;color:var(--ink-30)}
+
+/* o mês e o ano: o que ainda não chegou em tinta leve */
+.day-row.is-future td{color:var(--ink-50)}
+.dot-pending,.dot-suggest{display:inline-block;width:6px;height:6px;border-radius:50%;margin-left:7px;vertical-align:middle}
+.dot-pending{border:1px dashed var(--ink-50)}
+.dot-suggest{background:var(--ink-30);opacity:.6}
+.year__day.is-future{opacity:.6}
 
 /* ---------- as categorias ----------
    elas viviam como uma fileira de chips dentro da caixa de config, onde um
@@ -88,28 +147,26 @@
    mes — que e a unica coisa que faz uma etiqueta valer alguma coisa. */
 .cats{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:2px}
 .cat{
-  display:flex;align-items:center;gap:10px;min-height:30px;
-  padding:3px 4px 3px 8px;border-radius:var(--br2);
+  display:flex;align-items:center;gap:10px;min-height:32px;width:100%;text-align:left;
+  padding:4px 8px;border-radius:var(--br2);background:none;border:0;color:inherit;cursor:pointer;
   transition:background var(--t);
 }
 .cat:hover{background:var(--fill)}
 .cat .input{height:28px;padding:4px 8px;font-size:12.5px}
 .cat__name{flex:0 0 auto;max-width:44%;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-size:12.5px;color:var(--ink)}
 .cat__name small{margin-left:6px;font-size:9.5px;color:var(--ink-30)}
-.cat__bar{flex:1 1 auto;height:4px;border-radius:100px;background:var(--fill-hover);overflow:hidden;min-width:20px}
-.cat__bar i{display:block;height:100%;background:var(--ink-30);border-radius:100px;transition:width .35s var(--ease)}
-.cat__value{flex:0 0 auto;font-size:11.5px;color:var(--ink-50)}
-.cat .row-actions{opacity:0}
-.cat:hover .row-actions,.cat:focus-within .row-actions{opacity:1}
-@media (hover:none){.cat .row-actions{opacity:1}}
+.cat__name{flex:0 0 32%}
+.cat__bar{flex:1 1 auto;min-width:20px}
+.cat__bar .split{height:5px}
+.cat__value{flex:0 0 auto;font-size:12px;color:var(--ink-50);font-variant-numeric:tabular-nums;white-space:nowrap}
+.cat__value b{font-weight:500;color:var(--ink)}
+.cat__value small{color:var(--ink-30)}
+/* passou da meta: a barra enche em tinta cheia e uma linha diz quanto — sem
+   vermelho, que o sistema não usa */
+.cat.is-over .split i{background:var(--ink)}
+.cat.is-over .cat__value b{text-decoration:underline;text-underline-offset:3px}
+.cat__over{margin:0 0 4px 8px;font-size:11px;color:var(--ink-50)}
 /* etiqueta que nao esta mais na lista mas ainda marca lancamentos: some da
    lista faria as somas do mes nao fecharem */
 .cat.is-orphan .cat__name{color:var(--ink-50)}
 
-/* dois numeros no mesmo ladrilho: em .meters eles disputavam a largura e se
-   sobrepunham. uma linha cada, e a barra embaixo e quem compara. */
-.money-pair{display:flex;flex-direction:column;gap:6px}
-.money-pair span{display:flex;align-items:baseline;justify-content:space-between;gap:10px}
-.money-pair b{font-size:clamp(16px,1.5vw,20px);font-weight:500;letter-spacing:-.02em;color:var(--ink)}
-.money-pair b.is-green{color:var(--green-ink)}
-.money-pair small{font-size:11.5px;color:var(--ink-30)}
