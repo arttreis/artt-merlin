@@ -589,7 +589,7 @@ function Panel({ doc, tab, ctx, vault, thinking, onBack, onDelete, onMeeting }) 
         </div>
       </div>
 
-      <Properties doc={doc} ctx={ctx} />
+      <Properties key={doc.id} doc={doc} ctx={ctx} />
       <Pending doc={doc} ctx={ctx} />
 
       <div className="tabs" id="tabs" role="tablist">
@@ -630,6 +630,8 @@ function Properties({ doc, ctx }) {
     const now = collection("clients").get(doc.id);
     if (now) syncNext(now);
   };
+  const recurring = !!doc.contract.recurrence;
+  const [endOpen, setEndOpen] = useState(false);
   const open = (href, label) => href ? <a className="prop__open" href={href} target="_blank" rel="noopener">{label}</a> : null;
   const origin = doc.ideaOrigin && collection("notes").get(doc.ideaOrigin);
   const cameFrom = [doc.source, origin ? "nota: " + (origin.title || "sem título") : ""].filter(Boolean).join(" · ");
@@ -656,10 +658,16 @@ function Properties({ doc, ctx }) {
           {RECURRENCES.filter(Boolean).map((r) => <option key={r} value={r}>{RECURRENCE_LABEL[r]}</option>)}
         </select>
       </Prop>
-      <Prop label="início e fim">
+      {/* cliente recorrente nao tem fim marcado (14/09/2026): com recorrencia,
+          a linha e so o inicio, e o fim aparece quando alguem decide um */}
+      <Prop label={recurring && !doc.contract.end && !endOpen ? "desde" : "início e fim"}>
         <DateField className="prop__date" value={doc.contract.start} onChange={(e) => update((d) => { d.contract.start = e.currentTarget.value; })} />
-        <span className="prop__sep">até</span>
-        <DateField className="prop__date" value={doc.contract.end} onChange={(e) => update((d) => { d.contract.end = e.currentTarget.value; })} />
+        {recurring && !doc.contract.end && !endOpen
+          ? <button className="prop__open" type="button" title="marcar quando o contrato acaba" onClick={() => setEndOpen(true)}>sem fim · definir</button>
+          : <>
+              <span className="prop__sep">até</span>
+              <DateField className="prop__date" value={doc.contract.end} onChange={(e) => update((d) => { d.contract.end = e.currentTarget.value; })} />
+            </>}
       </Prop>
       <Prop label="próximo passo">
         <input className="prop__input prop__input--next" id="prop-next" placeholder="o que move esse cliente agora" value={doc.next}
