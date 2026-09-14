@@ -49,6 +49,10 @@ export function normalize(t) {
     /* reserva ocupa a janela sem ser trabalho: almoco, reuniao, bloco fixo.
        nao se conclui, nao devolve tempo, nao entra na fila — so encolhe o dia. */
     reserved: !!t.reserved,
+    /* da para passar adiante: outra pessoa (ou o Claude) faz. e so uma marca —
+       nao muda a conta do dia, nao tira da fila. nasce na caixa da tarefa ou
+       no quadrante "delega" da matriz (13/09/2026). */
+    delegable: !!t.delegable,
     /* id da tarefa no ClickUp, nao a URL: o href se monta na tela, e assim nao
        existe caminho para um "javascript:" entrar por um titulo. */
     clickup: CLICKUP_ID.test(String(t.clickup || "")) ? String(t.clickup) : "",
@@ -111,6 +115,7 @@ export function newTask(spec) {
     date: spec.date || today(),
     min: spec.min || 0,
     reserved: !!spec.reserved,
+    delegable: !!spec.delegable,
     clickup: spec.clickup || "",
     client: spec.client || "",
     order: Number.isFinite(+spec.order) ? +spec.order : now,

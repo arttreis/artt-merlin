@@ -24,6 +24,7 @@ import {
   readInbox, writeInbox, parseMentions, clientName, clients
 } from "./shared/core.js";
 import { useState, useEffect, useLayoutEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import {
   mount, useCollection, useClients, useKeydown, isTyping, useHash, setHash, useFields,
   Form, Field, Dialog, Markdown, ClientBadge, clientOptionList,
@@ -118,7 +119,6 @@ function monthGrid(month) {
 }
 
 /* ================================================================
-/* ================================================================
    as agendas: cada cliente e uma
    ================================================================
    a semana e o mes pintam cada tarefa na cor do cliente dela, e a barra do
@@ -147,6 +147,7 @@ const SIDE_KEY = "merlin:calendar:side";
 const readHidden = () => { try { const v = JSON.parse(localStorage.getItem(HIDDEN_KEY) || "[]"); return Array.isArray(v) ? v : []; } catch (e) { return []; } };
 const readSide = () => { try { const v = localStorage.getItem(SIDE_KEY); return v ? v === "open" : window.innerWidth >= 1000; } catch (e) { return true; } };
 
+/* ================================================================
    onde cada tarefa cai dentro do dia
    ================================================================
    e a partir de qual delas nao da mais tempo. tarefa sem estimativa entra
@@ -250,9 +251,9 @@ function Calendar() {
   const [thinking, setThinking] = useState(false);
   const [target, setTarget] = useState("");     /* a data sob o arrasto */
   const [editing, setEditing] = useState(null);
-
   const [hidden, setHidden] = useState(readHidden);   /* as agendas desligadas: "" e a pessoal */
   const [side, setSide] = useState(readSide);
+
   const undoStack = useRef([]);
   const toastTimer = useRef(null);
   const drag = useRef(null);
@@ -265,7 +266,6 @@ function Calendar() {
 
   const all = store.all();
 
-  /* a visao tambem vem do endereco: `calendar.html#week` e o que os enderecos
   /* ---------- as agendas ----------
      so vale esconder o que ainda tem botao para voltar: cliente encerrado
      some da barra, e as tarefas dele nao podem sumir junto sem saida. */
@@ -287,6 +287,7 @@ function Calendar() {
     return on.length === 1 ? on[0] : "";
   })();
 
+  /* a visao tambem vem do endereco: `calendar.html#week` e o que os enderecos
      antigos (day.html, week.html) apontam depois de a pagina virar uma so.
      uma DATA no lugar da visao abre aquele dia — e o que a busca da barra usa
      para levar a uma tarefa, e o que um link mandado para si mesmo faz. */
@@ -418,12 +419,16 @@ function Calendar() {
     save({ ...t, date, order: order != null ? order : topOrder(store.all(), date) });
   };
 
-  /* uma ordem nova para a fila de uma data */
-  const applyOrder = (ids) => {
+  /* uma ordem nova para a fila de uma data. `delegable`, quando vem (da
+     matriz), diz quais dessas tarefas ficam marcadas para delegar — e as que
+     não estão na lista perdem a marca. */
+  const applyOrder = (ids, delegable) => {
     const changed = [];
     ids.forEach((id, i) => {
       const t = store.get(id);
-      if (t && t.order !== i) changed.push({ ...t, order: i, updatedAt: Date.now() });
+      if (!t) return;
+      const d = delegable ? delegable.includes(id) : t.delegable;
+      if (t.order !== i || t.delegable !== d) changed.push({ ...t, order: i, delegable: d, updatedAt: Date.now() });
     });
     if (changed.length) store.saveMany(changed);
   };
@@ -851,15 +856,15 @@ function Calendar() {
   return (
     <>
       <div className="calbar">
+        {view !== "day" && (
+          <button className={"action calbar__side"} type="button" aria-pressed={String(side)}
+                  title={side ? "esconder as agendas" : "mostrar as agendas"} aria-label="Agendas" onClick={toggleSide}>{icon("menu")}</button>
+        )}
         <div>
           <h1 className="calbar__title">{period}</h1>
           <p className="calbar__sub">{isNow ? "o período de agora" : (view === "day" ? weekdayName(anchor) : "")}</p>
         </div>
         <span className="calbar__gap" />
-        {view !== "day" && (
-          <button className={"action calbar__side"} type="button" aria-pressed={String(side)}
-                  title={side ? "esconder as agendas" : "mostrar as agendas"} aria-label="Agendas" onClick={toggleSide}>{icon("menu")}</button>
-        )}
         <div className="calbar__nav">
           <button className="action" type="button" title="anterior (Alt+←)" aria-label="Período anterior" onClick={() => shift(-1)}>{icon("chevronLeft")}</button>
           <button className="pill" type="button" disabled={isNow} onClick={() => setAnchor(today())}>hoje</button>
@@ -1193,8 +1198,9 @@ function TaskRow({ t, start, slot, fits, dragging, leaving, actions }) {
             : <button className="task__time" type="button" data-missing={t.min ? null : "yes"}
                 aria-label={t.min ? "Duração: " + longFmt(t.min) + ". Alterar" : "Sem duração, contando " + longFmt(guessMin()) + " como palpite. Definir"}
                 onClick={() => setEditingTime(true)}>{icon("clock")}<span>{(t.min ? fmt(t.min) : "definir duração · contando " + fmt(guessMin())) + partial}</span></button>}
-          {(!!client || !!t.origin) && (
+          {(!!client || !!t.origin || t.delegable) && (
             <div className="task__badges">
+              {t.delegable && <span className="badge badge--delegable" title="dá para passar adiante">delegável</span>}
               <ClientBadge id={t.client} />
               {t.origin && ORIGIN_LABEL[t.origin.type] && <span className="badge">{ORIGIN_LABEL[t.origin.type]}</span>}
             </div>
@@ -1521,16 +1527,16 @@ function WeekBlock({ b, actions, onGrab, onRelease }) {
   const height = Math.max(14, (to - b.from) / 60 * HOUR_H - 2);
   const short = height < 34;
   const time = (b.fixed ? "" : "~") + clock(b.from) + (short ? "" : "–" + clock(to));
+  /* o nome do cliente em cima, na cor dele, so quando sobra altura: num bloco
+     de meia hora a cor ja diz de quem e */
+  const client = clientName(x.client);
+  const tall = height >= 52;
 
   const startResize = (e) => {
     e.preventDefault();
     e.stopPropagation();
     const y0 = e.clientY, base = b.to;
     let last = base;
-  /* o nome do cliente em cima, na cor dele, so quando sobra altura: num bloco
-     de meia hora a cor ja diz de quem e */
-  const client = clientName(x.client);
-  const tall = height >= 52;
     const move = (ev) => {
       last = Math.max(b.from + SNAP, Math.min(1440, b.from + snap(base - b.from + (ev.clientY - y0) / HOUR_H * 60)));
       setResize({ to: last });
@@ -1559,13 +1565,13 @@ function WeekBlock({ b, actions, onGrab, onRelease }) {
         : <button className="mark wk__check" type="button" role="checkbox" aria-checked={String(x.done)}
                   aria-label={"Concluir: " + x.title} onClick={() => actions.toggleDone(x, !x.done)}>{icon("check")}</button>}
       <span className="wk__text">
+        {client && tall && <span className="wk__client">{client}</span>}
         <b>{x.title}</b>
         <span className="t-mono">{time}</span>
       </span>
       <span className="wk__resize" onPointerDown={startResize} aria-hidden="true" />
     </div>
   );
-        {client && tall && <span className="wk__client">{client}</span>}
 }
 
 /* ================================================================
@@ -1649,12 +1655,6 @@ function MonthView({ all, pieces = [], month, target, actions, onNew, onOpenDay,
 }
 
 /* ================================================================
-   a caixa da tarefa: criar e editar sao a mesma
-   ================================================================
-   no titulo, "@cliente" e a duracao no fim continuam valendo — e a mesma
-   gramatica do campo do dia — mas os campos ao lado ganham quando preenchidos.
-
-/* ================================================================
    a barra das agendas
    ================================================================
    um mes pequeno para pular de data, e a lista das agendas com a caixa na
@@ -1720,6 +1720,12 @@ function CalSide({ anchor, view, weekStart, all, clients, off, onPick, onToggle,
   );
 }
 
+/* ================================================================
+   a caixa da tarefa: criar e editar sao a mesma
+   ================================================================
+   no titulo, "@cliente" e a duracao no fim continuam valendo — e a mesma
+   gramatica do campo do dia — mas os campos ao lado ganham quando preenchidos.
+
    o horario e opcional: sem ele a tarefa e so uma posicao na fila do dia. e
    "reuniao ou pausa" deixou de ser so um palpite pelo titulo — o palpite
    continua marcando a caixa, mas agora da para desmarcar. */
@@ -1731,7 +1737,8 @@ function TaskForm({ store, id, presetDate, presetAt, presetClient, onClose, onRe
     at: c ? (c.at != null ? clock(c.at) : "") : (presetAt != null ? clock(presetAt) : ""),
     duration: c && c.min ? formatMin(c.min) : "",
     client: c ? c.client : (presetClient || ""),
-    reserved: !!(c && c.reserved)
+    reserved: !!(c && c.reserved),
+    delegable: !!(c && c.delegable)
   });
   const touchedReserve = useRef(!!c);
   if (id && !c) return null;
@@ -1746,8 +1753,9 @@ function TaskForm({ store, id, presetDate, presetAt, presetClient, onClose, onRe
     const min = parseDuration(v.duration).min || parsed.min;
     const client = v.client || found.client;
     const reserved = touchedReserve.current ? v.reserved : (v.reserved || isReserve(title));
-    if (c) store.save({ ...c, title, date: v.date, at, client, min, reserved, updatedAt: Date.now() });
-    else store.save(newTask({ title, date: v.date, at, client, min, reserved }));
+    const delegable = !!v.delegable;
+    if (c) store.save({ ...c, title, date: v.date, at, client, min, reserved, delegable, updatedAt: Date.now() });
+    else store.save(newTask({ title, date: v.date, at, client, min, reserved, delegable }));
   };
   return (
     <Form title={c ? "tarefa" : "nova tarefa"} submit={c ? "salvar" : "adicionar"} remove={c ? "apagar" : ""}
@@ -1766,6 +1774,8 @@ function TaskForm({ store, id, presetDate, presetAt, presetClient, onClose, onRe
       <div className="full chips">
         <button className="chip" type="button" aria-pressed={v.reserved} title="ocupa o tempo, mas não é trabalho para concluir"
                 onClick={() => { touchedReserve.current = true; set("reserved", !v.reserved); }}>reunião ou pausa</button>
+        <button className="chip" type="button" aria-pressed={v.delegable} title="outra pessoa (ou o Claude) pode fazer"
+                onClick={() => set("delegable", !v.delegable)}>dá pra delegar</button>
         {/* o que se repete toda semana mora na rotina, e nao numa tarefa: a
             copia so aponta para la */}
         {c && c.origin && c.origin.type === "routine" && <a className="chip" href="routine.html" title="mudar aqui muda só esta semana">vem da rotina</a>}
@@ -1786,11 +1796,25 @@ function MerlinDialog({ text, onClose }) {
 /* ================================================================
    a matriz de eisenhower
    ================================================================
-   um instrumento de ordenacao, e so isso: o quadrante NAO e gravado. ele
-   existe enquanto a folha esta aberta e morre ao fechar. o que sobra e a
-   unica ordenacao que o produto tem, que e a ordem da fila. */
+   um instrumento de ordenacao: o quadrante NAO e gravado. ele existe
+   enquanto a caixa esta aberta e morre ao fechar. o que sobra e a ordem da
+   fila — e, desde 13/09/2026, a marca de "delegavel" de quem ficou no
+   quadrante "delega", que e a unica coisa daqui que vale guardar.
+
+   ela era um bloco sempre aberto no trilho da direita, com cinco caixas
+   tracejadas vazias e rotulos em caixa alta — ocupava a tela inteira do lado
+   para um gesto que se faz uma vez por dia. virou um cartao pequeno com o
+   botao, e a matriz abre numa caixa larga, com os eixos escritos (urgente,
+   importante) e a fila resultante do lado. */
 const ZONES = ["q1", "q2", "q3", "q4", "pool"];
-const ZONE_LABELS = { pool: "na fila, sem classificar", q1: "faz agora", q2: "agenda", q3: "delega", q4: "fica pra depois" };
+const ZONE_INFO = {
+  pool: { label: "sem classificar", hint: "" },
+  q1: { label: "faz agora", hint: "urgente e importante" },
+  q2: { label: "agenda", hint: "importante, pode esperar" },
+  q3: { label: "delega", hint: "urgente, outra pessoa faz" },
+  q4: { label: "fica pra depois", hint: "nem urgente nem importante" }
+};
+const ZONE_KEYS = { "1": "q1", "2": "q2", "3": "q3", "4": "q4", "0": "pool" };
 
 function Matrix({ doc, open, onApply }) {
   const [zones, setZones] = useState(null);   /* null = fechada; {pool, q1..q4: [ids]} */
@@ -1799,9 +1823,12 @@ function Matrix({ doc, open, onApply }) {
   const focusId = useRef(null);
   const fieldRef = useRef(null);
 
-  /* abre sempre do zero, com tudo sem classificar: e o que "efemera" quer
-     dizer. a fila de hoje ja e a sua ordem — a matriz e para revisita-la. */
-  const openMatrix = () => setZones({ pool: open.map((t) => t.id), q1: [], q2: [], q3: [], q4: [] });
+  /* abre com tudo sem classificar, menos o que ja esta marcado para delegar,
+     que abre no quadrante dele — a marca e a unica memoria da matriz */
+  const openMatrix = () => setZones({
+    pool: open.filter((t) => !t.delegable).map((t) => t.id),
+    q1: [], q2: [], q3: open.filter((t) => t.delegable).map((t) => t.id), q4: []
+  });
   const close = () => { setZones(null); setDragId(null); setTarget(null); };
   /* a ordem que sai da matriz: os quadrantes na ordem canonica, e no fim o
      que voce nao classificou — que continua exatamente na ordem em que estava. */
@@ -1854,14 +1881,14 @@ function Matrix({ doc, open, onApply }) {
     };
   }, [dragId]);
 
-  /* teclado: o produto inteiro e navegavel sem mouse, e uma folha que so
-     aceita arrasto seria a unica tela que nao e. */
+  /* teclado: 1 a 4 mandam para o quadrante, 0 devolve; as setas passeiam.
+     uma caixa que so aceita arrasto seria a unica tela sem teclado. */
   const onChipKey = (e, id, zone) => {
+    let dest = ZONE_KEYS[e.key] || null;
     const i = ZONES.indexOf(zone);
-    let dest = null;
-    if (e.key === "ArrowRight") dest = ZONES[(i + 1) % ZONES.length];
-    else if (e.key === "ArrowLeft") dest = ZONES[(i + ZONES.length - 1) % ZONES.length];
-    else return;
+    if (!dest && e.key === "ArrowRight") dest = ZONES[(i + 1) % ZONES.length];
+    else if (!dest && e.key === "ArrowLeft") dest = ZONES[(i + ZONES.length - 1) % ZONES.length];
+    if (!dest) return;
     e.preventDefault();
     moveTo(id, dest, null);
     focusId.current = id;
@@ -1876,26 +1903,32 @@ function Matrix({ doc, open, onApply }) {
 
   const apply = () => {
     const ids = zones ? orderOf(zones) : [];
-    if (ids.length) onApply(ids);
+    if (ids.length) onApply(ids, zones.q3.slice());
     close();
   };
 
   const zone = (z) => (
-    <div key={z} className={"zone" + (z === "pool" ? " zone--pool" : "")} data-zone={z} data-target={target === z ? "yes" : "no"}>
-      <span className="t-mono matrix__label">{ZONE_LABELS[z]}</span>
+    <div key={z} className={"mx-zone mx-zone--" + z} data-zone={z} data-target={target === z ? "yes" : "no"}>
+      <p className="mx-zone__head">
+        <b>{ZONE_INFO[z].label}</b>
+        {ZONE_INFO[z].hint && <small>{ZONE_INFO[z].hint}</small>}
+        {z !== "pool" && <kbd>{ZONES.indexOf(z) + 1}</kbd>}
+      </p>
       <ul className="zone__chips">
         {zones[z].map((id) => {
           const t = byId.get(id);
           if (!t) return null;
           return (
             <li key={id} className={"matrix-chip" + (dragId === id ? " is-dragging" : "")} data-id={id} tabIndex="0" role="listitem"
-                aria-label={t.title + ", " + fmt(costOf(t)) + ". Setas movem entre os quadrantes."}
+                aria-label={t.title + ", " + fmt(costOf(t)) + ". Teclas 1 a 4 mandam para um quadrante, 0 devolve."}
                 onPointerDown={(e) => startDrag(e, id)} onKeyDown={(e) => onChipKey(e, id, z)}>
               <span className="matrix-chip__name">{t.title}</span>
               <span className="matrix-chip__min">{fmt(costOf(t))}</span>
             </li>
           );
         })}
+        {!zones[z].length && z !== "pool" && <li className="mx-zone__empty" aria-hidden="true">arraste para cá</li>}
+        {!zones[z].length && z === "pool" && <li className="mx-zone__empty" aria-hidden="true">tudo classificado</li>}
       </ul>
     </div>
   );
@@ -1903,33 +1936,64 @@ function Matrix({ doc, open, onApply }) {
   /* a MESMA conta da tela principal, so que sobre a ordem hipotetica */
   const tasks = zones ? orderOf(zones).map((id) => byId.get(id)).filter(Boolean) : [];
   const { slots, cut } = zones ? distribute(doc, tasks) : { slots: new Map(), cut: -1 };
+  const delegable = open.filter((t) => t.delegable);
 
   return (
-    <section className="block" id="matrix">
-      <p className="section-label">
-        <span className="t-mono">ordenar</span>
-        <button className="pill" type="button" id="matrix-toggle" aria-expanded={String(!!zones)} onClick={() => (zones ? close() : openMatrix())}>{zones ? "fechar" : "abrir"}</button>
-      </p>
-      <p className="matrix__note">Arruma a fila por urgência e importância. O que sair daqui vira a ordem do dia.</p>
-      {zones && (
-        <>
-          <div className="matrix__field" ref={fieldRef}>
-            {zone("pool")}
-            <div className="matrix__grid">{zone("q1")}{zone("q2")}{zone("q3")}{zone("q4")}</div>
+    <>
+      <section className="block matrix-card" id="matrix">
+        <p className="matrix-card__title">ordenar a fila</p>
+        <p className="matrix__note">Separa o urgente do importante e o que dá para passar adiante. A ordem que sair vira a fila do dia.</p>
+        <button className="pill matrix-card__open" type="button" id="matrix-toggle" disabled={!open.length} onClick={openMatrix}>
+          {open.length ? "ordenar " + open.length + (open.length === 1 ? " tarefa" : " tarefas") : "a fila está vazia"}
+        </button>
+        {delegable.length > 0 && (
+          <div className="matrix-card__deleg">
+            <p className="matrix-card__sub">dá pra delegar · {fmt(delegable.reduce((s, t) => s + costOf(t), 0))}</p>
+            <ul>
+              {delegable.map((t) => <li key={t.id}><span>{t.title}</span><small>{fmt(costOf(t))}</small></li>)}
+            </ul>
           </div>
-          <p className="matrix__label t-mono preview-label">a fila que sai daqui</p>
-          <ol className="preview">
-            {tasks.length
-              ? tasks.map((t, i) => <li key={t.id} data-fits={slots.has(t.id) && !slots.get(t.id).partial ? "yes" : "no"} data-cut={i === cut ? "yes" : null}><span className="preview__name">{t.title}</span></li>)
-              : <li className="preview__empty">a fila está vazia.</li>}
-          </ol>
-          <div className="matrix__actions">
-            <button className="pill" type="button" id="matrix-apply" onClick={apply}>aplicar</button>
-            <button className="text-link" type="button" id="matrix-discard" onClick={close}>descartar</button>
+        )}
+      </section>
+      {/* a caixa vai para o <body>: dentro do .dayv ela herdaria a .pill e a
+          .action pequenas do dia, que só servem para dentro do aparelho */}
+      {zones && createPortal(
+        <Dialog title="ordenar a fila" wide label="Ordenar a fila" onClose={close}
+                sub="arraste cada tarefa para um quadrante, ou use as teclas 1 a 4. o que cair em “delega” fica marcado."
+                actions={<>
+                  <button className="pill" type="button" id="matrix-discard" onClick={close}>descartar</button>
+                  <button className="pill pill--green" type="button" id="matrix-apply" onClick={apply}>aplicar a ordem</button>
+                </>}>
+          <div className="mx" ref={fieldRef}>
+            <div className="mx__main">
+              {zone("pool")}
+              <div className="mx__grid">
+                <span />
+                <span className="mx__axis">urgente</span>
+                <span className="mx__axis">pode esperar</span>
+                <span className="mx__axis mx__axis--row">importante</span>
+                {zone("q1")}{zone("q2")}
+                <span className="mx__axis mx__axis--row">não importante</span>
+                {zone("q3")}{zone("q4")}
+              </div>
+            </div>
+            <aside className="mx__preview">
+              <p className="mx__preview-title">a fila que sai daqui</p>
+              <ol className="preview">
+                {tasks.length
+                  ? tasks.map((t, i) => (
+                      <li key={t.id} data-fits={slots.has(t.id) && !slots.get(t.id).partial ? "yes" : "no"} data-cut={i === cut ? "yes" : null}>
+                        <span className="preview__name">{t.title}</span>
+                        {zones.q3.includes(t.id) && <span className="badge badge--delegable">delega</span>}
+                      </li>))
+                  : <li className="preview__empty">a fila está vazia.</li>}
+              </ol>
+            </aside>
           </div>
-        </>
+        </Dialog>,
+        document.body
       )}
-    </section>
+    </>
   );
 }
 

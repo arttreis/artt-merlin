@@ -443,56 +443,75 @@
 .dayv .note-form input::placeholder{color:var(--ink-30)}
 
 /* ---------- matriz de eisenhower ----------
-   ela e um instrumento do medidor, nao um painel ao lado dele: por isso a
-   previa da fila resultante, com a linha de corte, fica dentro do bloco e
-   anda junto com o arrasto. sem ela os quadrantes teriam capacidade infinita
-   e priorizar voltaria a ser de graca — que e exatamente o que a ordem da
-   fila existe para impedir. */
-.matrix__note{margin:0 0 var(--pd2);font-size:12px;color:var(--ink-30)}
-.matrix__label{display:block;color:var(--ink-30);margin-bottom:var(--pd3);font-size:9.5px}
-.matrix__field{display:flex;flex-direction:column;gap:var(--pd2)}
-/* minmax(0,1fr), e nao 1fr: trilha de grid tem min-width auto, entao o chip
-   mais longo alargaria o quadrante em vez de ser cortado com reticencias */
-.matrix__grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:var(--pd2)}
-.zone{
-  border:1px dashed var(--line);border-radius:var(--br2);padding:var(--pd2);
-  min-height:64px;min-width:0;transition:border-color var(--t),background var(--t);
+   no trilho, um cartao pequeno: o que ela faz, o botao, e o que ja esta
+   marcado para delegar. a matriz em si abre numa caixa larga (portal no
+   body), com os eixos escritos e a fila resultante ao lado — a previa com a
+   linha de corte continua la, porque sem ela os quadrantes teriam
+   capacidade infinita e priorizar voltaria a ser de graca. */
+.matrix-card__title{margin:0 0 4px;font-size:14px;font-weight:600;letter-spacing:-.01em;color:var(--ink)}
+.matrix__note{margin:0 0 var(--pd2);font-size:12px;line-height:1.45;color:var(--ink-30)}
+.dayv .matrix-card__open{width:100%;justify-content:center;height:34px;font-size:12.5px;color:var(--ink)}
+.dayv .matrix-card__open:disabled{opacity:.5;cursor:default}
+.matrix-card__deleg{margin-top:var(--pd);padding-top:var(--pd2);border-top:1px solid var(--line-soft)}
+.matrix-card__sub{margin:0 0 6px;font-size:11.5px;font-weight:500;color:var(--ink-50)}
+.matrix-card__deleg ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:2px}
+.matrix-card__deleg li{display:flex;align-items:center;gap:8px;padding:4px 0;font-size:12.5px;color:var(--ink-70)}
+.matrix-card__deleg li span{flex:1 1 auto;min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.matrix-card__deleg li small{flex:none;font-size:11px;color:var(--ink-30);font-variant-numeric:tabular-nums}
+
+/* a marca de delegavel, na fila e na previa */
+.badge--delegable{border-style:dashed;border-color:color-mix(in srgb,var(--green) 55%,transparent);color:var(--green-ink)}
+.task__badges .badge--delegable{color:var(--green-ink)}
+
+/* a caixa */
+.mx{display:grid;grid-template-columns:minmax(0,1fr) 220px;gap:var(--pd)}
+@media (max-width:760px){.mx{grid-template-columns:1fr}}
+.mx__main{display:flex;flex-direction:column;gap:var(--pd2);min-width:0}
+.mx__grid{display:grid;grid-template-columns:18px minmax(0,1fr) minmax(0,1fr);grid-template-rows:auto 1fr 1fr;gap:8px}
+.mx__axis{font-size:11px;font-weight:500;color:var(--ink-30);text-align:center;align-self:end}
+.mx__axis--row{writing-mode:vertical-rl;transform:rotate(180deg);align-self:center;justify-self:center}
+.mx-zone{
+  display:flex;flex-direction:column;gap:6px;min-width:0;min-height:120px;padding:10px;
+  border-radius:var(--br2);background:var(--fill);border:1px solid var(--line-soft);
+  transition:border-color var(--t),background var(--t);
 }
-.zone[data-target="yes"]{border-color:var(--green);background:var(--fill)}
-.zone--pool{min-height:44px}
-.zone__chips{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:3px;min-height:20px;min-width:0}
+.mx-zone[data-target="yes"]{border-color:var(--green);background:color-mix(in srgb,var(--green) 8%,transparent)}
+.mx-zone--pool{min-height:0;background:transparent;border-style:dashed;border-color:var(--line)}
+.mx-zone--pool .zone__chips{flex-direction:row;flex-wrap:wrap}
+.mx-zone--pool .matrix-chip{max-width:100%}
+.mx-zone--q1{border-color:color-mix(in srgb,var(--green) 30%,transparent)}
+.mx-zone__head{display:flex;align-items:baseline;gap:6px;margin:0;min-width:0}
+.mx-zone__head b{font-size:12.5px;font-weight:600;color:var(--ink)}
+.mx-zone__head small{flex:1 1 auto;min-width:0;font-size:11px;color:var(--ink-30);overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.mx-zone__head kbd{font-size:10px;padding:0 5px;line-height:16px}
+.mx-zone__empty{font-size:11.5px;color:var(--ink-30);padding:4px 0}
+.zone__chips{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:4px;min-height:20px;min-width:0}
 .matrix-chip{
-  display:flex;align-items:center;gap:6px;padding:5px 8px;
-  border-radius:var(--br2);background:var(--fill-hover);
-  font-size:12px;color:var(--ink-70);cursor:grab;touch-action:none;min-width:0;
+  display:flex;align-items:center;gap:8px;padding:6px 9px;
+  border-radius:var(--br2);background:var(--surface);border:1px solid var(--line-soft);
+  font-size:12.5px;color:var(--ink);cursor:grab;touch-action:none;min-width:0;
+  transition:border-color var(--t);
 }
+.matrix-chip:hover{border-color:var(--line)}
+.matrix-chip:focus-visible{outline:none;border-color:var(--green);box-shadow:0 0 0 1px var(--green)}
 .matrix-chip .matrix-chip__name{flex:1 1 auto;min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
-.matrix-chip .matrix-chip__min{flex:0 0 auto;font-family:var(--mono);font-size:9.5px;color:var(--ink-30)}
+.matrix-chip .matrix-chip__min{flex:0 0 auto;font-size:11px;color:var(--ink-30);font-variant-numeric:tabular-nums}
 .matrix-chip.is-dragging{opacity:.45;cursor:grabbing;pointer-events:none}
 
-.preview-label{margin:var(--pd) 0 var(--pd3)}
+.mx__preview{min-width:0;padding-left:var(--pd);border-left:1px solid var(--line-soft)}
+@media (max-width:760px){.mx__preview{padding-left:0;border-left:0;border-top:1px solid var(--line-soft);padding-top:var(--pd2)}}
+.mx__preview-title{margin:0 0 8px;font-size:12px;font-weight:500;color:var(--ink-50)}
 .preview{list-style:none;margin:0;padding:0;counter-reset:p}
-.preview li{
-  display:flex;align-items:center;gap:6px;padding:3px 0;
-  font-size:12px;color:var(--ink-70);
-}
-.preview li::before{
-  counter-increment:p;content:counter(p);
-  flex:0 0 auto;width:14px;font-family:var(--mono);font-size:9.5px;color:var(--ink-30);
-}
+.preview li{display:flex;align-items:center;gap:6px;padding:4px 0;font-size:12.5px;color:var(--ink-70);flex-wrap:wrap}
+.preview li::before{counter-increment:p;content:counter(p);flex:0 0 auto;width:16px;font-size:11px;color:var(--ink-30);font-variant-numeric:tabular-nums}
 .preview .preview__name{flex:1 1 auto;min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.preview .badge{height:17px;font-size:10px;padding:0 6px}
 /* daqui pra baixo o dia nao alcanca — a mesma frase que a fila ja usa */
 .preview li[data-fits="no"]{color:var(--ink-30)}
-.preview li[data-cut="yes"]{
-  border-top:1px solid var(--line);margin-top:var(--pd3);padding-top:var(--pd2);
-}
-.preview li[data-cut="yes"]::after{
-  content:"daqui não dá tempo hoje";
-  font-family:var(--mono);font-size:9px;letter-spacing:.08em;
-  text-transform:uppercase;color:var(--ink-30);flex:0 0 auto;
-}
+.preview li[data-cut="yes"]{border-top:1px solid var(--line);margin-top:6px;padding-top:22px;position:relative}
+.preview li[data-cut="yes"]::after{content:"daqui não dá tempo hoje";position:absolute;top:4px;left:0;font-size:10.5px;color:var(--ink-30)}
 .preview__empty{font-size:12px;color:var(--ink-30);margin:0}
-.matrix__actions{display:flex;align-items:center;gap:var(--pd);margin-top:var(--pd)}
+.preview__empty::before{content:none !important}
 
 /* ---------- os trilhos, quando cabem ----------
    as tres colunas pedem ~1140px de espaco livre. o @media mede a JANELA, e a
@@ -671,6 +690,7 @@
 .month__item.is-reserved:hover{background:var(--fill)}
 .month__item i{width:6px;height:6px;border-radius:50%;background:var(--c,var(--green))}
 .month__item.is-done i{background:var(--ink-30)}
+.month__item.is-reserved .month__clock{color:var(--c,var(--ink-30))}
 /* conteudo que vai ao ar no dia: link, sem fundo, com o play verde */
 .piece-mark{
   display:flex;align-items:center;gap:4px;min-width:0;padding:1px 5px 1px 3px;border-radius:6px;
@@ -690,28 +710,8 @@
 @media (max-width:720px){
   .month__cell{min-height:74px;padding:4px}
   .month__item{font-size:10.5px;padding:2px 4px}
-.month__item.is-reserved .month__clock{color:var(--c,var(--ink-30))}
 }
 
-/* ---------- o que ficou para tras ----------
-   a mesma faixa nas tres visoes: era a "fila de ontem" do dia e os
-   "atrasados" da semana, que eram a mesma pergunta sobre duas listas. */
-.late{
-  display:flex;align-items:center;justify-content:space-between;gap:var(--pd);flex-wrap:wrap;
-  margin:0 0 var(--pd);padding:11px var(--pd);
-  background:var(--surface);border:1px solid var(--line);border-radius:var(--br3);
-}
-.late__text{margin:0;font-size:13px;color:var(--ink-70)}
-.late__text b{color:var(--ink);font-weight:600}
-.late__actions{display:flex;gap:var(--pd2);flex-wrap:wrap}
-
-/* ---------- a caixa da tarefa ----------
-   o titulo e o campo que importa, entao ele e o maior; dia, horario e duracao
-   sao uma frase so ("dia 14, as 14h, por 1h") e ficam na mesma linha. */
-.task-form__title{height:42px;font-size:15px;font-weight:500;letter-spacing:-.01em}
-.task-form__when{display:grid;gap:var(--pd2);grid-template-columns:minmax(0,1.5fr) minmax(0,1fr) minmax(0,1fr)}
-.dialog--form .chips{padding-top:2px}
-.dialog--form .chip[aria-pressed="true"]{color:var(--ink);border-color:var(--ink-30)}
 /* ================================================================
    as agendas
    ================================================================
@@ -795,6 +795,25 @@
   .mini{border-right:0;border-bottom:1px solid var(--line-soft)}
 }
 
+/* ---------- o que ficou para tras ----------
+   a mesma faixa nas tres visoes: era a "fila de ontem" do dia e os
+   "atrasados" da semana, que eram a mesma pergunta sobre duas listas. */
+.late{
+  display:flex;align-items:center;justify-content:space-between;gap:var(--pd);flex-wrap:wrap;
+  margin:0 0 var(--pd);padding:11px var(--pd);
+  background:var(--surface);border:1px solid var(--line);border-radius:var(--br3);
+}
+.late__text{margin:0;font-size:13px;color:var(--ink-70)}
+.late__text b{color:var(--ink);font-weight:600}
+.late__actions{display:flex;gap:var(--pd2);flex-wrap:wrap}
+
+/* ---------- a caixa da tarefa ----------
+   o titulo e o campo que importa, entao ele e o maior; dia, horario e duracao
+   sao uma frase so ("dia 14, as 14h, por 1h") e ficam na mesma linha. */
+.task-form__title{height:42px;font-size:15px;font-weight:500;letter-spacing:-.01em}
+.task-form__when{display:grid;gap:var(--pd2);grid-template-columns:minmax(0,1.5fr) minmax(0,1fr) minmax(0,1fr)}
+.dialog--form .chips{padding-top:2px}
+.dialog--form .chip[aria-pressed="true"]{color:var(--ink);border-color:var(--ink-30)}
 @media (max-width:480px){
   .task-form__when{grid-template-columns:1fr 1fr}
   .task-form__when > :first-child{grid-column:1 / -1}
