@@ -181,9 +181,58 @@
 .fe.is-drawer .fe-panel{bottom:calc(min(46%,440px) + 76px)}
 .fe-add-row{margin-bottom:var(--pd)}
 .fe-drawer .table .input,.fe-drawer .table .select{min-width:120px}
-/* as ações da linha só aparecem quando a linha está sob o mouse; a regra do
-   base.css cobre só a .line, e aqui a linha é um <tr> */
-.fe-drawer .table tr:hover .row-actions,.fe-drawer .table tr:focus-within .row-actions{opacity:1}
+
+/* ---------- o quadro da gaveta ----------
+   uma coluna por etapa, na ordem do funil. o cartão é compacto: nome que se
+   edita no lugar, duas ou três linhas de rótulo + campo, e as ações só com o
+   ponteiro em cima. as sugestões da etapa ficam tracejadas, embaixo. */
+.fb{display:flex;gap:10px;align-items:flex-start;min-height:100%;overflow-x:auto;padding-bottom:4px;scrollbar-width:thin}
+.fb__col{flex:0 0 264px;display:flex;flex-direction:column;gap:6px;padding:8px;border-radius:var(--br3);background:var(--fill);border:1px solid transparent;transition:border-color var(--t),background var(--t)}
+.fb__col.is-over{border-color:var(--green);background:color-mix(in srgb,var(--green) 6%,var(--fill))}
+.fb__head{display:flex;align-items:center;gap:8px;padding:2px 2px 4px}
+.fb__head .ico{width:26px;height:26px;flex:none}
+.fb__name{display:flex;flex-direction:column;min-width:0;flex:1 1 auto;line-height:1.25}
+.fb__name small{font-size:10.5px;color:var(--ink-30)}
+.fb__name b{font-size:12.5px;font-weight:600;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.fb__count{font-family:var(--mono);font-size:10px;color:var(--ink-50);padding:1px 7px;border-radius:100px;background:var(--fill-hover)}
+.fb__cards{display:flex;flex-direction:column;gap:6px}
+.fb__card{position:relative;display:flex;flex-direction:column;gap:4px;padding:7px 8px 8px 16px;border-radius:var(--br2);background:var(--surface);border:1px solid var(--line-soft)}
+.fb__card:hover{border-color:var(--line)}
+.fb__grip{position:absolute;left:3px;top:9px;font-size:9px;letter-spacing:-2px;color:var(--ink-30);cursor:grab;opacity:0;transition:opacity var(--t);user-select:none}
+.fb__card:hover .fb__grip{opacity:1}
+.fb__top{display:flex;align-items:center;gap:4px}
+.fb__title{flex:1 1 auto;min-width:0;background:none;border:0;outline:none;padding:2px 0;font-size:13px;font-weight:500;color:var(--ink)}
+.fb__title::placeholder{color:var(--ink-30)}
+.fb__card .row-actions{opacity:0;transition:opacity var(--t)}
+.fb__card:hover .row-actions,.fb__card:focus-within .row-actions{opacity:1}
+.fb__card .row-actions .action{width:24px;height:24px}
+.fb__line{display:grid;grid-template-columns:56px minmax(0,1fr);align-items:center;gap:6px}
+.fb__line > span{font-size:11px;color:var(--ink-30)}
+.fb__card .input,.fb__card .select{height:28px;min-height:28px;padding:0 8px;font-size:12px;background:transparent;border-color:transparent}
+.fb__card .input:hover,.fb__card .select:hover{border-color:var(--line-soft)}
+.fb__card .input:focus,.fb__card .select:focus{border-color:var(--line);background:var(--fill)}
+.fb__pair{display:grid;grid-template-columns:minmax(0,1fr) 96px;gap:6px}
+.fb__card .chips{gap:4px;margin-top:2px}
+.fb__card .chip{height:22px;padding:0 8px;font-size:11px}
+.fb__ideas{display:flex;flex-direction:column;gap:4px}
+.fb__idea{display:flex;align-items:center;gap:6px;width:100%;padding:6px 8px;border-radius:var(--br2);border:1px dashed var(--line);font-size:11.5px;color:var(--ink-50);text-align:left;transition:color var(--t),border-color var(--t),background var(--t)}
+.fb__idea svg{width:11px;height:11px;flex:none}
+.fb__idea span{min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.fb__idea:hover{color:var(--ink);border-color:var(--green);background:var(--surface)}
+.fb__add{align-self:flex-start;padding:4px 6px;font-size:11.5px;color:var(--ink-30);border-radius:var(--br2)}
+.fb__add:hover{color:var(--ink);background:var(--fill-hover)}
+/* ofertas: o quadro e, do lado, a escada */
+.fb-offers{display:flex;gap:10px;align-items:flex-start;min-height:100%}
+.fb-offers .fb{flex:1 1 auto;min-width:0}
+.fb-ladder{flex:0 0 240px;padding:10px;border-radius:var(--br3);border:1px solid var(--line-soft)}
+.fb-ladder__title{margin:0 0 8px;font-size:11.5px;color:var(--ink-30)}
+.fb-ladder .ladder-item{padding:6px 8px;font-size:12px}
+.fb-ladder .ladder-item .type{width:auto}
+@media (max-width:760px){ .fb-offers{flex-direction:column} .fb-ladder{flex-basis:auto;width:100%} }
+
+/* escolher da lista ou escrever outro: o texto aparece embaixo do select */
+.choice{display:flex;flex-direction:column;gap:6px;min-width:0}
+.fb__card .choice{gap:4px}
 #read-numbers:disabled{opacity:.6;cursor:default}
 
 /* ---------- os nós no svg ---------- */

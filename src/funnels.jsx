@@ -18,7 +18,7 @@ import { NODE_W, NODE_H, computeLayers, layoutNodes } from "./shared/funnel-layo
    pública (share.html) pinta o funil com o mesmo desenho */
 import {
   PORT_Y, NODE_TYPES, typeOf, labelOf, formatNumber, formatRate, formatAvg, truncate,
-  LINKED_GROUPS, linkedCounts, computeProjections, nodeCaption, svgEl, svgText, drawNode, drawEdge
+  LINKED_GROUPS, AUTOMATION_TOOLS, linkedCounts, computeProjections, nodeCaption, svgEl, svgText, drawNode, drawEdge
 } from "./shared/funnel-draw.js";
 
 initPage("funnels");
@@ -108,7 +108,6 @@ function ghostsFor(doc, node) {
     .map(([type, why]) => ({ type, title: "", note: why }));
 }
 
-const SUGGESTED_TRIGGERS = ["escassez", "urgência", "prova social", "autoridade", "reciprocidade", "garantia", "ancoragem"];
 
 /* valores gravados em inglês; o que aparece na tela, em português */
 const CREATIVE_FORMATS = [["image", "imagem"], ["video", "video"], ["carousel", "carrossel"], ["text", "texto"], ["other", "outro"]];
@@ -1137,26 +1136,9 @@ function Editor({ id, funnels }) {
     addItem(group, { id: newId(), node: selected.id, ...NEW_ITEM[group]() }, { undo: true });
     setDrawer(group); // e a gaveta sobe já na linha nova, pra preencher
   };
-  const addTrigger = (name) => {
-    if (docRef.current.triggers.some((g) => g.name.toLowerCase() === name)) return;
-    addItem("triggers", { id: newId(), name, usage: "", node: "" }, { undo: true });
-  };
   const pullCreative = (c) => {
     const d = docRef.current;
     sendToDay({ title: "produzir criativo: " + (c.title || "sem título"), client: d.client, origin: { type: "funnel", id: d.id } });
-  };
-  const suggestRemarketing = () => {
-    const d = docRef.current;
-    const fresh = [];
-    d.nodes.filter((n) => n.type === "lp" || n.type === "checkout" || n.type === "vsl").forEach((n) => {
-      if (d.automations.some((a) => a.node === n.id && /remarketing/i.test(a.name))) return;
-      fresh.push({
-        id: newId(), name: "remarketing de quem viu " + nodeLabel(n) + " e não avançou",
-        trigger: "não avançou em 7 dias", action: "reimpactar com oferta ou prova social", tool: "", status: "idea", node: n.id
-      });
-    });
-    if (fresh.length) update((x) => ({ ...x, automations: [...x.automations, ...fresh] }), { undo: true });
-    notify(fresh.length ? "sugeri " + fresh.length + " automação(ões) de remarketing" : "já havia remarketing sugerido para todo mundo");
   };
 
   /* ---------- o funil em si (painel sem seleção) ---------- */
@@ -1272,7 +1254,7 @@ function Editor({ id, funnels }) {
       onClient={setClient} onChannel={(v) => setFunnelField("channel", v)} onPeriod={setPeriod}
       onCompare={setComparing} onSnapshot={() => setSnapshotForm(true)} onClose={() => showPanel(false)} />;
   }
-  const listActions = { addItem, patchItem, removeItem, addTrigger, pullCreative, suggestRemarketing };
+  const listActions = { addItem, patchItem, removeItem, pullCreative };
 
   return (
     <main className={"fe" + (drawer ? " is-drawer" : "") + (locked ? " is-locked" : "")} id="editor">
@@ -1525,16 +1507,38 @@ function EdgePanel({ edge, doc, onRate, onRemove, onClose }) {
   );
 }
 
+/* escolher da lista OU escrever outro. valor fora da lista (e nao vazio) e
+   "outro": o select mostra "outro…" e o campo de texto aparece com ele.
+   `blank` deixa escolher "nada ainda"; sem ele, vazio cai na primeira opcao. */
+const OTHER = "__other";
+function Choice({ options, value, onValue, blank, other = true, className = "select", placeholder = "qual?" }) {
+  const known = options.some(([val]) => val === value);
+  const [typing, setTyping] = useState(!!value && !known);
+  const [picked, setPicked] = useState(false); // o cursor so pula pro texto quando a pessoa escolheu "outro" agora
+  const shown = typing ? OTHER : (known ? value : (blank ? "" : options[0][0]));
+  return (
+    <div className="choice">
+      <select className={className} value={shown} onChange={(e) => {
+        const val = e.currentTarget.value;
+        if (val === OTHER) { setTyping(true); setPicked(true); onValue(""); return; }
+        setTyping(false);
+        onValue(val);
+      }}>
+        {blank && <option value="">—</option>}
+        {options.map(([val, label]) => <option key={val} value={val}>{label}</option>)}
+        {other && <option value={OTHER}>outro…</option>}
+      </select>
+      {typing && <input className="input" autoFocus={picked} value={known ? "" : (value || "")} placeholder={placeholder} onChange={(e) => onValue(e.currentTarget.value)} />}
+    </div>
+  );
+}
+
 /* um campo do tipo da etapa (origem do tráfego, url, preço...) */
 function TypeField({ def, value, onValue }) {
   const v = value != null ? value : (def.preset || "");
   let control;
   if (def.kind === "select") {
-    control = (
-      <select className="select" value={v || def.options[0][0]} onChange={(e) => onValue(e.currentTarget.value)}>
-        {def.options.map(([val, label]) => <option key={val} value={val}>{label}</option>)}
-      </select>
-    );
+    control = <Choice options={def.options} value={v} onValue={onValue} blank={def.blank} other={!!def.other} />;
   } else if (def.kind === "money") {
     control = <MoneyInput className="input input--num" value={+v || 0} onValue={onValue} />;
   } else if (def.kind === "number") {
@@ -1571,7 +1575,7 @@ function NodePanel({ node, doc, comparing, pendingFocus, onPatch, onType, onNumb
           <NumberInput className="input input--num" id="node-number" min="0" placeholder="—" value={node.number} onValue={onNumber} />
           {compared != null && <span className="small weak">antes {formatNumber(compared)}</span>}
         </div>
-        {def.fields.map((f) => <TypeField key={f.key} def={f} value={node.fields[f.key]} onValue={(v) => onField(f.key, v)} />)}
+        {def.fields.map((f) => <TypeField key={node.id + ":" + node.type + ":" + f.key} def={f} value={node.fields[f.key]} onValue={(v) => onField(f.key, v)} />)}
         <label className="field-label">nota</label>
         <textarea className="textarea" id="node-note" rows="2" value={node.note} onChange={(e) => onPatch({ note: e.currentTarget.value })}></textarea>
         <div className="pn-section"><h4>taxas médias de saída</h4>
@@ -1602,14 +1606,6 @@ function NodePanel({ node, doc, comparing, pendingFocus, onPatch, onType, onNumb
 /* ================================================================
    a gaveta: criativos, automações, ofertas, gatilhos, números
    ================================================================ */
-function NodeSelect({ doc, value, onChange }) {
-  return (
-    <select className="select" value={value} onChange={(e) => onChange(e.currentTarget.value)}>
-      <option value="">sem etapa</option>
-      {doc.nodes.map((n) => <option key={n.id} value={n.id}>{typeLabel(n) + " · " + truncate(n.title || "sem título", 20)}</option>)}
-    </select>
-  );
-}
 function StatusChips({ options, green, value, onPick }) {
   return (
     <div className="chips">
@@ -1617,113 +1613,209 @@ function StatusChips({ options, green, value, onPick }) {
     </div>
   );
 }
-const TrashButton = ({ onClick }) => <button className="action" type="button" title="apagar" onClick={onClick}>{icon("trash")}</button>;
+const TrashButton = ({ onClick }) => <button className="action" type="button" title="apagar" aria-label="Apagar" onClick={onClick}>{icon("trash")}</button>;
+
+/* ---------- o que cada tipo de etapa costuma pedir ----------
+   a gaveta era uma tabela solta, com a etapa numa coluna do fim: nada dizia
+   o que faltava onde. agora cada etapa e uma coluna, e a coluna sugere o que
+   aquele tipo de etapa quase sempre tem — um clique cria ja ligado a ela. */
+const STAGE_SUGGESTIONS = {
+  automations: {
+    capture: [{ name: "boas-vindas ao lead", trigger: "entrou na lista", action: "entregar o prometido e apresentar a marca" }],
+    quiz: [{ name: "resposta por perfil", trigger: "terminou a qualificação", action: "mandar a mensagem do perfil dele" }],
+    dm: [{ name: "resposta por palavra-chave", trigger: "comentou ou mandou a palavra", action: "responder na DM com o link", tool: "Manychat" }],
+    group: [{ name: "boas-vindas no grupo", trigger: "entrou no grupo", action: "mensagem de regras e próximo passo" }],
+    webinar: [{ name: "lembretes do webinar", trigger: "1 dia, 1 hora e ao vivo", action: "lembrete por e-mail e whatsapp" }],
+    lp: [{ name: "remarketing de quem viu e não avançou", trigger: "visitou e não converteu em 7 dias", action: "reimpactar com prova social" }],
+    vsl: [{ name: "remarketing de quem assistiu", trigger: "viu mais de 50% e não clicou", action: "reimpactar com a oferta" }],
+    product: [{ name: "remarketing de quem viu o produto", trigger: "viu e não comprou em 3 dias", action: "anúncio dinâmico do produto" }],
+    booking: [{ name: "lembrete da call", trigger: "24h e 1h antes", action: "lembrete com link da reunião" }],
+    call: [{ name: "follow-up pós-call", trigger: "call terminou", action: "resumo e próximo passo por escrito" }],
+    proposal: [{ name: "follow-up da proposta", trigger: "3 dias sem resposta", action: "mensagem de acompanhamento" }],
+    cart: [{ name: "carrinho abandonado", trigger: "adicionou e não finalizou em 1h", action: "e-mail e whatsapp com o carrinho" }],
+    checkout: [
+      { name: "recuperação de checkout", trigger: "iniciou e não pagou em 1h", action: "whatsapp e e-mail com o link" },
+      { name: "pix ou boleto pendente", trigger: "gerou e não pagou", action: "lembrete antes de vencer" }
+    ],
+    thanks: [{ name: "acesso e boas-vindas", trigger: "compra aprovada", action: "entregar acesso e o primeiro passo" }],
+    onboarding: [{ name: "sequência de ativação", trigger: "comprou e não ativou em 3 dias", action: "empurrão até o marco de ativação" }],
+    repurchase: [{ name: "lembrete de recompra", trigger: "perto do fim do ciclo", action: "oferta de recompra" }]
+  },
+  creatives: {
+    traffic: [{ title: "vídeo de dor", format: "video", angle: "a dor que o produto resolve" }, { title: "depoimento", format: "video", angle: "prova social de cliente" }],
+    impression: [{ title: "carrossel de objeções", format: "carousel", angle: "responder as 3 maiores dúvidas" }],
+    ad: [{ title: "antes e depois", format: "image", angle: "a transformação" }, { title: "ugc", format: "video", angle: "gente comum usando" }],
+    click: [{ title: "criativo de oferta", format: "image", angle: "a oferta e o prazo" }]
+  },
+  offers: {
+    product: [{ name: "oferta principal", type: "main" }],
+    checkout: [{ name: "order bump", type: "bump" }],
+    cart: [{ name: "order bump", type: "bump" }],
+    proposal: [{ name: "oferta principal", type: "main" }],
+    upsell: [{ name: "upsell", type: "upsell" }],
+    downsell: [{ name: "downsell", type: "downsell" }],
+    repurchase: [{ name: "recorrência", type: "recurring" }]
+  },
+  triggers: {
+    lp: [{ name: "prova social" }, { name: "autoridade" }],
+    vsl: [{ name: "autoridade" }, { name: "prova social" }],
+    product: [{ name: "prova social" }, { name: "escassez" }],
+    checkout: [{ name: "garantia" }, { name: "urgência" }],
+    cart: [{ name: "urgência" }],
+    upsell: [{ name: "ancoragem" }],
+    webinar: [{ name: "reciprocidade" }, { name: "escassez" }],
+    proposal: [{ name: "ancoragem" }, { name: "garantia" }]
+  }
+};
+const ITEM_NAME = { creatives: "title", automations: "name", offers: "name", triggers: "name" };
+const DRAG_TYPE = "application/x-merlin-item";
+
+/* o quadro: uma coluna por etapa, na ordem do funil, e "sem etapa" no fim so
+   quando tem alguem la. arrastar o cartão pela alça muda a etapa. */
+function StageBoard({ doc, group, actions, renderCard, addLabel }) {
+  const [over, setOver] = useState(null);
+  const list = doc[group];
+  const nameKey = ITEM_NAME[group];
+  const loose = (x) => !x.node || !doc.nodes.some((n) => n.id === x.node);
+  const columns = orderedNodes(doc).map((n) => ({ id: n.id, node: n }));
+  if (list.some(loose)) columns.push({ id: "", node: null });
+  const add = (node, seed) => actions.addItem(group, { id: newId(), ...NEW_ITEM[group](), ...(seed || {}), node }, { undo: true });
+  if (!columns.length) return <p className="empty">o funil ainda não tem etapas — crie as etapas no palco e elas viram colunas aqui.</p>;
+  return (
+    <div className="fb">
+      {columns.map(({ id, node }) => {
+        const items = list.filter((x) => (id ? x.node === id : loose(x)));
+        const def = node ? typeOf(node) : null;
+        const taken = new Set(items.map((x) => String(x[nameKey] || "").toLowerCase()));
+        const ideas = node ? ((STAGE_SUGGESTIONS[group] || {})[node.type] || []).filter((s) => !taken.has(s[nameKey].toLowerCase())) : [];
+        return (
+          <section key={id || "none"} className={"fb__col" + (over === id ? " is-over" : "")}
+                   onDragOver={(e) => { if (e.dataTransfer.types.includes(DRAG_TYPE)) { e.preventDefault(); setOver(id); } }}
+                   onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget)) setOver((o) => (o === id ? null : o)); }}
+                   onDrop={(e) => {
+                     e.preventDefault(); setOver(null);
+                     const iid = e.dataTransfer.getData(DRAG_TYPE);
+                     if (iid) actions.patchItem(group, iid, { node: id });
+                   }}>
+            <header className="fb__head">
+              {def && <span className={"ico" + (def.conversion ? " is-conversion" : "")}><TypeIcon def={def} /></span>}
+              <span className="fb__name">
+                <small>{def ? def.label : "solto"}</small>
+                <b>{node ? truncate(node.title || def.label, 26) : "sem etapa"}</b>
+              </span>
+              {items.length > 0 && <span className="fb__count">{items.length}</span>}
+            </header>
+            <div className="fb__cards">
+              {items.map((it) => (
+                <article key={it.id} className="fb__card">
+                  <span className="fb__grip" draggable="true" title="arrastar para outra etapa" aria-hidden="true"
+                        onDragStart={(e) => { e.dataTransfer.setData(DRAG_TYPE, it.id); e.dataTransfer.effectAllowed = "move"; }}>⋮⋮</span>
+                  {renderCard(it, (p) => actions.patchItem(group, it.id, p))}
+                </article>
+              ))}
+            </div>
+            {ideas.length > 0 && (
+              <div className="fb__ideas">
+                {ideas.map((s) => (
+                  <button key={s[nameKey]} type="button" className="fb__idea"
+                          title={s.trigger ? "quando: " + s.trigger + " · faz: " + s.action : (s.angle || "")}
+                          onClick={() => add(id, s)}>{icon("plus")}<span>{s[nameKey]}</span></button>
+                ))}
+              </div>
+            )}
+            <button type="button" className="fb__add" onClick={() => add(id)}>+ {addLabel}</button>
+          </section>
+        );
+      })}
+    </div>
+  );
+}
+
+/* o nome do cartão: um campo sem moldura, que parece título e se edita no lugar */
+const CardTitle = ({ value, placeholder, onValue }) => (
+  <input className="fb__title" value={value || ""} placeholder={placeholder} onChange={(e) => onValue(e.currentTarget.value)} />
+);
+const CardLine = ({ label, children }) => <div className="fb__line"><span>{label}</span>{children}</div>;
 
 function CreativesTab({ doc, actions }) {
-  const list = doc.creatives;
-  const patch = (id, p) => actions.patchItem("creatives", id, p);
   return (
-    <>
-      <button className="pill fe-add-row" type="button" id="new-creative" onClick={() => actions.addItem("creatives", { id: newId(), ...NEW_ITEM.creatives(), node: "" }, { undo: true })}>+ novo criativo</button>
-      <div className="table-scroll"><table className="table">
-        <thead><tr><th>título</th><th>formato</th><th>ângulo</th><th>status</th><th>link</th><th>etapa</th><th></th></tr></thead>
-        <tbody>{list.map((c) => (<tr key={c.id}>
-          <td><input className="input" value={c.title} onChange={(e) => patch(c.id, { title: e.currentTarget.value })} /></td>
-          <td><select className="select" value={c.format} onChange={(e) => patch(c.id, { format: e.currentTarget.value })}>{CREATIVE_FORMATS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></td>
-          <td><input className="input" value={c.angle || ""} placeholder="a ideia por trás" onChange={(e) => patch(c.id, { angle: e.currentTarget.value })} /></td>
-          <td><StatusChips options={CREATIVE_STATUS} green="live" value={c.status} onPick={(s) => patch(c.id, { status: s })} /></td>
-          <td><input className="input" value={c.url || ""} placeholder="link" onChange={(e) => patch(c.id, { url: e.currentTarget.value })} /></td>
-          <td><NodeSelect doc={doc} value={c.node} onChange={(v) => patch(c.id, { node: v })} /></td>
-          <td><div className="row-actions">
-            <button className="action" type="button" title="puxar para o dia" onClick={() => actions.pullCreative(c)}>{icon("clock")}</button>
+    <StageBoard doc={doc} group="creatives" actions={actions} addLabel="criativo" renderCard={(c, patch) => (
+      <>
+        <div className="fb__top">
+          <CardTitle value={c.title} placeholder="nome do criativo" onValue={(v) => patch({ title: v })} />
+          <div className="row-actions">
+            <button className="action" type="button" title="puxar para o dia" aria-label="Puxar para o dia" onClick={() => actions.pullCreative(c)}>{icon("clock")}</button>
             <TrashButton onClick={() => actions.removeItem("creatives", c.id)} />
-          </div></td>
-        </tr>))}</tbody>
-      </table></div>
-      {!list.length && <p className="empty">nenhum criativo ainda.</p>}
-    </>
+          </div>
+        </div>
+        <CardLine label="formato"><select className="select" value={c.format} onChange={(e) => patch({ format: e.currentTarget.value })}>{CREATIVE_FORMATS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></CardLine>
+        <CardLine label="ângulo"><input className="input" value={c.angle || ""} placeholder="a ideia por trás" onChange={(e) => patch({ angle: e.currentTarget.value })} /></CardLine>
+        <CardLine label="link"><input className="input" value={c.url || ""} placeholder="drive, meta, figma…" onChange={(e) => patch({ url: e.currentTarget.value })} /></CardLine>
+        <StatusChips options={CREATIVE_STATUS} green="live" value={c.status} onPick={(s) => patch({ status: s })} />
+      </>
+    )} />
   );
 }
 
 function AutomationsTab({ doc, actions }) {
-  const list = doc.automations;
-  const patch = (id, p) => actions.patchItem("automations", id, p);
   return (
-    <>
-      <div className="row fe-add-row">
-        <button className="pill" type="button" id="new-automation" onClick={() => actions.addItem("automations", { id: newId(), ...NEW_ITEM.automations(), node: "" }, { undo: true })}>+ nova automação</button>
-        <button className="pill" type="button" id="suggest-remarketing" onClick={actions.suggestRemarketing}>sugerir remarketing</button>
-      </div>
-      <div className="table-scroll"><table className="table">
-        <thead><tr><th>nome</th><th>gatilho</th><th>ação</th><th>ferramenta</th><th>status</th><th>etapa</th><th></th></tr></thead>
-        <tbody>{list.map((a) => (<tr key={a.id}>
-          <td><input className="input" value={a.name} onChange={(e) => patch(a.id, { name: e.currentTarget.value })} /></td>
-          <td><input className="input" value={a.trigger || ""} onChange={(e) => patch(a.id, { trigger: e.currentTarget.value })} /></td>
-          <td><input className="input" value={a.action || ""} onChange={(e) => patch(a.id, { action: e.currentTarget.value })} /></td>
-          <td><input className="input" value={a.tool || ""} placeholder="Manychat, Make…" onChange={(e) => patch(a.id, { tool: e.currentTarget.value })} /></td>
-          <td><StatusChips options={AUTOMATION_STATUS} green="active" value={a.status} onPick={(s) => patch(a.id, { status: s })} /></td>
-          <td><NodeSelect doc={doc} value={a.node} onChange={(v) => patch(a.id, { node: v })} /></td>
-          <td><TrashButton onClick={() => actions.removeItem("automations", a.id)} /></td>
-        </tr>))}</tbody>
-      </table></div>
-      {!list.length && <p className="empty">nenhuma automação ainda.</p>}
-    </>
+    <StageBoard doc={doc} group="automations" actions={actions} addLabel="automação" renderCard={(a, patch) => (
+      <>
+        <div className="fb__top">
+          <CardTitle value={a.name} placeholder="nome da automação" onValue={(v) => patch({ name: v })} />
+          <div className="row-actions"><TrashButton onClick={() => actions.removeItem("automations", a.id)} /></div>
+        </div>
+        <CardLine label="quando"><input className="input" value={a.trigger || ""} placeholder="o que dispara" onChange={(e) => patch({ trigger: e.currentTarget.value })} /></CardLine>
+        <CardLine label="faz"><input className="input" value={a.action || ""} placeholder="o que acontece" onChange={(e) => patch({ action: e.currentTarget.value })} /></CardLine>
+        <CardLine label="com"><Choice options={AUTOMATION_TOOLS} value={a.tool || ""} blank onValue={(v) => patch({ tool: v })} placeholder="qual ferramenta?" /></CardLine>
+        <StatusChips options={AUTOMATION_STATUS} green="active" value={a.status} onPick={(s) => patch({ status: s })} />
+      </>
+    )} />
   );
 }
 
 function OffersTab({ doc, actions }) {
   const list = doc.offers;
-  const patch = (id, p) => actions.patchItem("offers", id, p);
   const order = (t) => OFFER_TYPES.findIndex(([v]) => v === t);
   const ladder = [...list].sort((a, b) => order(a.type) - order(b.type));
   return (
-    <>
-      <button className="pill fe-add-row" type="button" id="new-offer" onClick={() => actions.addItem("offers", { id: newId(), ...NEW_ITEM.offers(), node: "" }, { undo: true })}>+ nova oferta</button>
-      <div className="table-scroll"><table className="table">
-        <thead><tr><th>nome</th><th>tipo</th><th className="num">preço</th><th>promessa</th><th>garantia</th><th>etapa</th><th></th></tr></thead>
-        <tbody>{list.map((o) => (<tr key={o.id}>
-          <td><input className="input" value={o.name} onChange={(e) => patch(o.id, { name: e.currentTarget.value })} /></td>
-          <td><select className="select" value={o.type} onChange={(e) => patch(o.id, { type: e.currentTarget.value })}>{OFFER_TYPES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></td>
-          <td className="num"><MoneyInput className="input input--num" value={+o.price || 0} onValue={(c) => patch(o.id, { price: c })} /></td>
-          <td><input className="input" value={o.promise || ""} onChange={(e) => patch(o.id, { promise: e.currentTarget.value })} /></td>
-          <td><input className="input" value={o.guarantee || ""} onChange={(e) => patch(o.id, { guarantee: e.currentTarget.value })} /></td>
-          <td><NodeSelect doc={doc} value={o.node} onChange={(v) => patch(o.id, { node: v })} /></td>
-          <td><TrashButton onClick={() => actions.removeItem("offers", o.id)} /></td>
-        </tr>))}</tbody>
-      </table></div>
-      {!list.length && <p className="empty">nenhuma oferta ainda.</p>}
-      <div className="block block--flat mt">
-        <div className="heading"><span className="t-mono">escada de ofertas</span></div>
-        <div className="ladder" id="offer-ladder">
-          {ladder.length ? ladder.map((o) => <div key={o.id} className="ladder-item"><span className="badge type">{labelOf(OFFER_TYPES, o.type)}</span><span className="name">{o.name}</span><span className="price">{brl(o.price)}</span></div>)
-            : <p className="empty">sem ofertas na escada ainda.</p>}
-        </div>
-        <div className="meter"><span className="num" id="offer-ticket">{ladder.length ? brl(ladder.reduce((s, o) => s + (+o.price || 0), 0)) : "—"}</span><span className="legend">ticket máximo (soma de tudo que está na escada)</span></div>
-      </div>
-    </>
+    <div className="fb-offers">
+      <StageBoard doc={doc} group="offers" actions={actions} addLabel="oferta" renderCard={(o, patch) => (
+        <>
+          <div className="fb__top">
+            <CardTitle value={o.name} placeholder="nome da oferta" onValue={(v) => patch({ name: v })} />
+            <div className="row-actions"><TrashButton onClick={() => actions.removeItem("offers", o.id)} /></div>
+          </div>
+          <div className="fb__pair">
+            <select className="select" value={o.type} aria-label="tipo" onChange={(e) => patch({ type: e.currentTarget.value })}>{OFFER_TYPES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select>
+            <MoneyInput className="input input--num" aria-label="preço" value={+o.price || 0} onValue={(c) => patch({ price: c })} />
+          </div>
+          <CardLine label="promessa"><input className="input" value={o.promise || ""} placeholder="o que ele ganha" onChange={(e) => patch({ promise: e.currentTarget.value })} /></CardLine>
+          <CardLine label="garantia"><input className="input" value={o.guarantee || ""} placeholder="7 dias, dinheiro de volta…" onChange={(e) => patch({ guarantee: e.currentTarget.value })} /></CardLine>
+        </>
+      )} />
+      {/* a escada: o que o cliente pode comprar, do principal ao recorrente */}
+      <aside className="fb-ladder" id="offer-ladder">
+        <p className="fb-ladder__title">escada de ofertas</p>
+        {ladder.length ? ladder.map((o) => <div key={o.id} className="ladder-item"><span className="badge type">{labelOf(OFFER_TYPES, o.type)}</span><span className="name">{o.name}</span><span className="price">{brl(o.price)}</span></div>)
+          : <p className="empty">sem ofertas ainda.</p>}
+        <div className="meter"><span className="num" id="offer-ticket">{ladder.length ? brl(ladder.reduce((s, o) => s + (+o.price || 0), 0)) : "—"}</span><span className="legend">ticket máximo</span></div>
+      </aside>
+    </div>
   );
 }
 
 function TriggersTab({ doc, actions }) {
-  const list = doc.triggers;
-  const patch = (id, p) => actions.patchItem("triggers", id, p);
   return (
-    <>
-      <div className="heading"><span className="t-mono">gatilhos mentais</span></div>
-      <div className="chips trigger-chips" id="trigger-chips">
-        {SUGGESTED_TRIGGERS.map((g) => <button key={g} type="button" className={"chip" + (list.some((x) => x.name.toLowerCase() === g) ? " is-on" : "")} onClick={() => actions.addTrigger(g)}>{g}</button>)}
-      </div>
-      <div className="table-scroll"><table className="table">
-        <thead><tr><th>gatilho</th><th>como usa</th><th>etapa</th><th></th></tr></thead>
-        <tbody>{list.map((g) => (<tr key={g.id}>
-          <td><input className="input" value={g.name} onChange={(e) => patch(g.id, { name: e.currentTarget.value })} /></td>
-          <td><input className="input" value={g.usage || ""} placeholder="como usa" onChange={(e) => patch(g.id, { usage: e.currentTarget.value })} /></td>
-          <td><NodeSelect doc={doc} value={g.node} onChange={(v) => patch(g.id, { node: v })} /></td>
-          <td><TrashButton onClick={() => actions.removeItem("triggers", g.id)} /></td>
-        </tr>))}</tbody>
-      </table></div>
-      {!list.length && <p className="empty">nenhum gatilho em uso ainda — clique num chip acima.</p>}
-    </>
+    <StageBoard doc={doc} group="triggers" actions={actions} addLabel="gatilho" renderCard={(g, patch) => (
+      <>
+        <div className="fb__top">
+          <CardTitle value={g.name} placeholder="gatilho" onValue={(v) => patch({ name: v })} />
+          <div className="row-actions"><TrashButton onClick={() => actions.removeItem("triggers", g.id)} /></div>
+        </div>
+        <CardLine label="como"><input className="input" value={g.usage || ""} placeholder="como aparece nesta etapa" onChange={(e) => patch({ usage: e.currentTarget.value })} /></CardLine>
+      </>
+    )} />
   );
 }
 

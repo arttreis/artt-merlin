@@ -15,16 +15,22 @@ export const CTA_FIELDS = [
   { key: "cta", label: "texto do botão", kind: "text" },
   { key: "ctaTarget", label: "destino do botão", kind: "text" }
 ];
+/* campo de escolha com "outro": a lista cobre o comum, e o que nao esta nela
+   se escreve. o valor gravado de uma opcao pronta e a chave; o de "outro" e o
+   proprio texto — por isso o labelOf devolve o valor quando nao acha a chave,
+   e o texto livre de antes (quando o campo era "text") continua valendo. */
+const pick = (...names) => names.map((n) => [n, n]);
+
 export const NODE_TYPES = {
   /* ---- aquisição: onde o lead ainda nem é lead ---- */
   traffic: { label: "tráfego", group: "aquisição", icon: [["path", { d: "M5 19V13M12 19V9M19 19V5" }]],
     fields: [
-      { key: "source", label: "origem", kind: "select", options: [["meta", "meta"], ["google", "google"], ["tiktok", "tiktok"], ["organic", "organico"], ["email", "email"], ["referral", "indicacao"]] },
+      { key: "source", label: "origem", kind: "select", other: true, options: [["meta", "meta"], ["google", "google"], ["tiktok", "tiktok"], ["youtube", "youtube"], ["linkedin", "linkedin"], ["organic", "organico"], ["email", "email"], ["referral", "indicacao"]] },
       { key: "campaign", label: "campanha", kind: "text" },
       { key: "cost", label: "custo no período", kind: "money" }
     ] },
   impression: { label: "impressão", group: "aquisição", icon: [["path", { d: "M2.5 12S6 6 12 6s9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6z" }], ["circle", { cx: 12, cy: 12, r: 2.6 }]],
-    fields: [{ key: "placement", label: "posicionamento", kind: "text" }, { key: "frequency", label: "frequência", kind: "text" }] },
+    fields: [{ key: "placement", label: "posicionamento", kind: "select", other: true, blank: true, options: pick("feed", "stories", "reels", "busca", "youtube", "display") }, { key: "frequency", label: "frequência", kind: "text" }] },
   ad: { label: "anúncio", group: "aquisição", icon: [["path", { d: "M4 10v4h3l5 4V6l-5 4H4z" }], ["path", { d: "M16.5 9a4 4 0 010 6" }]],
     fields: [{ key: "creative", label: "criativo", kind: "text" }, { key: "link", label: "link do anúncio", kind: "text" }] },
   click: { label: "clique", group: "aquisição", icon: [["path", { d: "M7 4l11 8-4.6 1.3L16 19l-2.4 1-2.6-5.6L7 17z" }]],
@@ -39,7 +45,7 @@ export const NODE_TYPES = {
     fields: [{ key: "url", label: "url", kind: "text" }, { key: "when", label: "quando", kind: "text" }, ...CTA_FIELDS] },
   product: { label: "produto", group: "página", icon: [["path", { d: "M12 3l8 4.2v9.6L12 21l-8-4.2V7.2z" }], ["path", { d: "M4 7.2l8 4.2 8-4.2M12 11.4V21" }]],
     fields: [
-      { key: "marketplace", label: "canal", kind: "select", options: [["own", "site proprio"], ["mercadolivre", "mercado livre"], ["shopee", "shopee"], ["tiktok", "tiktok shop"], ["amazon", "amazon"]] },
+      { key: "marketplace", label: "canal", kind: "select", other: true, options: [["own", "site proprio"], ["mercadolivre", "mercado livre"], ["shopee", "shopee"], ["tiktok", "tiktok shop"], ["amazon", "amazon"], ["magalu", "magalu"], ["shein", "shein"]] },
       { key: "sku", label: "sku", kind: "text" },
       { key: "price", label: "preço", kind: "money" },
       ...CTA_FIELDS
@@ -47,26 +53,26 @@ export const NODE_TYPES = {
 
   /* ---- captura: onde ele deixa de ser anônimo ---- */
   capture: { label: "captura", group: "captura", icon: [["rect", { x: 5, y: 4, width: 14, height: 16, rx: 1.5 }], ["path", { d: "M8 9h8M8 13h8M8 17h4" }]],
-    fields: [{ key: "what", label: "o que captura", kind: "text" }, { key: "tool", label: "ferramenta", kind: "text" }] },
+    fields: [{ key: "what", label: "o que captura", kind: "text" }, { key: "tool", label: "ferramenta", kind: "select", other: true, blank: true, options: pick("RD Station", "ActiveCampaign", "HubSpot", "Typeform", "Tally", "Google Forms", "Elementor") }] },
   quiz: { label: "qualificação", group: "captura", icon: [["path", { d: "M4 5h16l-6 7v6l-4 2v-8z" }]],
-    fields: [{ key: "tool", label: "ferramenta", kind: "text" }, { key: "criteria", label: "critério de corte", kind: "text" }] },
+    fields: [{ key: "tool", label: "ferramenta", kind: "select", other: true, blank: true, options: pick("Typeform", "Tally", "Inlead", "Respondi", "Google Forms") }, { key: "criteria", label: "critério de corte", kind: "text" }] },
   dm: { label: "dm", group: "captura", icon: [["path", { d: "M21 4L3 11l7 3 3 7z" }], ["path", { d: "M21 4l-11 10" }]],
     fields: [
-      { key: "channel", label: "canal", kind: "select", options: [["instagram", "instagram"], ["whatsapp", "whatsapp"], ["linkedin", "linkedin"], ["tiktok", "tiktok"]] },
+      { key: "channel", label: "canal", kind: "select", other: true, options: [["instagram", "instagram"], ["whatsapp", "whatsapp"], ["linkedin", "linkedin"], ["tiktok", "tiktok"], ["messenger", "messenger"]] },
       { key: "opener", label: "abertura", kind: "text" }
     ] },
   group: { label: "grupo", group: "captura", icon: [["circle", { cx: 9, cy: 9, r: 3 }], ["path", { d: "M3.5 19a5.5 5.5 0 0111 0" }], ["path", { d: "M16 7.2a3 3 0 010 5.6M17.5 19a5.6 5.6 0 00-2-4.3" }]],
-    fields: [{ key: "platform", label: "plataforma", kind: "text" }, { key: "link", label: "link", kind: "text" }] },
+    fields: [{ key: "platform", label: "plataforma", kind: "select", other: true, blank: true, options: pick("WhatsApp", "Telegram", "Discord", "Skool", "Circle", "canal do Instagram") }, { key: "link", label: "link", kind: "text" }] },
 
   /* ---- relacionamento: onde ele é aquecido ---- */
   email: { label: "e-mail", group: "relacionamento", icon: [["rect", { x: 3.5, y: 5.5, width: 17, height: 13, rx: 1.5 }], ["path", { d: "M4 6.5l8 6.5 8-6.5" }]],
-    fields: [{ key: "sequence", label: "sequência", kind: "text" }, { key: "tool", label: "ferramenta", kind: "text" }] },
+    fields: [{ key: "sequence", label: "sequência", kind: "text" }, { key: "tool", label: "ferramenta", kind: "select", other: true, blank: true, options: pick("ActiveCampaign", "RD Station", "Mailchimp", "Brevo", "Klaviyo", "Kit", "Resend") }] },
   whatsapp: { label: "whatsapp", group: "relacionamento", icon: [["path", { d: "M4 5.5A2.5 2.5 0 016.5 3h11A2.5 2.5 0 0120 5.5v8a2.5 2.5 0 01-2.5 2.5H9l-4 3.5v-3.5H6.5A2.5 2.5 0 014 13.5v-8z" }]],
     fields: [{ key: "number", label: "número", kind: "text" }, { key: "flow", label: "fluxo", kind: "text" }] },
 
   /* ---- venda: o funil de serviço, quando tem gente vendendo ---- */
   booking: { label: "agendamento", group: "venda", icon: [["rect", { x: 3.5, y: 5, width: 17, height: 15, rx: 2 }], ["path", { d: "M3.5 10h17M8 3.5v3M16 3.5v3" }], ["path", { d: "M9.5 14.5l2 2 3.5-3.5" }]],
-    fields: [{ key: "tool", label: "ferramenta", kind: "text" }, { key: "duration", label: "duração", kind: "text" }] },
+    fields: [{ key: "tool", label: "ferramenta", kind: "select", other: true, blank: true, options: pick("Calendly", "Cal.com", "Google Agenda", "Zcal", "TidyCal") }, { key: "duration", label: "duração", kind: "text" }] },
   call: { label: "call", group: "venda", icon: [["path", { d: "M5 4.5h3l1.5 4-2 1.5a11 11 0 005.5 5.5l1.5-2 4 1.5v3a1.5 1.5 0 01-1.6 1.5A15.5 15.5 0 013.5 6.1 1.5 1.5 0 015 4.5z" }]],
     fields: [{ key: "owner", label: "quem faz", kind: "text" }, { key: "script", label: "roteiro", kind: "text" }] },
   proposal: { label: "proposta", group: "venda", icon: [["path", { d: "M6 3h7l5 5v13H6z" }], ["path", { d: "M13 3v5h5" }], ["path", { d: "M9 13h6M9 17h4" }]],
@@ -76,16 +82,16 @@ export const NODE_TYPES = {
 
   /* ---- compra: onde o dinheiro entra ---- */
   cart: { label: "carrinho", group: "compra", icon: [["circle", { cx: 10, cy: 19, r: 1.4 }], ["circle", { cx: 17, cy: 19, r: 1.4 }], ["path", { d: "M3 4h2.2l2.4 11h10.2l1.8-8H6.2" }]],
-    fields: [{ key: "platform", label: "plataforma", kind: "text" }, { key: "ticket", label: "ticket médio", kind: "money" }] },
+    fields: [{ key: "platform", label: "plataforma", kind: "select", other: true, blank: true, options: pick("Shopify", "Nuvemshop", "WooCommerce", "Yampi", "VTEX", "Tray", "Loja Integrada") }, { key: "ticket", label: "ticket médio", kind: "money" }] },
   checkout: { label: "checkout", group: "compra", conversion: true, icon: [["rect", { x: 3, y: 6, width: 18, height: 13, rx: 2 }], ["path", { d: "M3 10h18" }], ["path", { d: "M7 15h4" }]],
     fields: [
-      { key: "platform", label: "plataforma", kind: "text", preset: "Stripe" },
+      { key: "platform", label: "plataforma", kind: "select", other: true, preset: "Stripe", options: pick("Stripe", "Hotmart", "Kiwify", "Eduzz", "Ticto", "Mercado Pago", "Pagar.me", "Asaas", "Yampi", "Shopify") },
       { key: "product", label: "produto", kind: "text" },
       { key: "price", label: "preço", kind: "money" }
     ] },
   payment: { label: "pagamento", group: "compra", conversion: true, icon: [["rect", { x: 3.5, y: 6.5, width: 17, height: 11, rx: 2 }], ["circle", { cx: 12, cy: 12, r: 2.4 }], ["path", { d: "M7 12h.01M17 12h.01" }]],
     fields: [
-      { key: "method", label: "meio", kind: "select", options: [["card", "cartao"], ["pix", "pix"], ["boleto", "boleto"], ["mixed", "misto"]] },
+      { key: "method", label: "meio", kind: "select", other: true, options: [["card", "cartao"], ["pix", "pix"], ["boleto", "boleto"], ["mixed", "misto"]] },
       { key: "revenue", label: "receita no período", kind: "money" }
     ] },
   thanks: { label: "obrigado", group: "compra", icon: [["circle", { cx: 12, cy: 12, r: 8.5 }], ["path", { d: "M8 12.5l2.5 2.5L16 9.5" }]],
@@ -103,6 +109,8 @@ export const NODE_TYPES = {
 
   custom: { label: "personalizado", group: "livre", icon: [["path", { d: "M12 3l2.6 5.6L21 9.3l-4.5 4.2L17.6 20 12 16.9 6.4 20l1.1-6.5L3 9.3l6.4-.7z" }]], fields: [] }
 };
+/* as ferramentas de automacao, na gaveta do funil */
+export const AUTOMATION_TOOLS = pick("Manychat", "Make", "Zapier", "n8n", "ActiveCampaign", "RD Station", "Klaviyo", "Botconversa");
 export const typeOf = (n) => NODE_TYPES[n.type] || NODE_TYPES.custom;
 export const labelOf = (list, value) => { const o = list.find(([v]) => v === value); return o ? o[1] : String(value || ""); };
 
