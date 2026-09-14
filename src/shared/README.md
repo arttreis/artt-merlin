@@ -25,6 +25,12 @@ Vite; o build sai em `server/site/`. O que é comum vive aqui:
   **casca** (sidebar, busca, tema, nuvem, entrar, aviso). É o que uma página importa para
   desenhar. Ele se registra no core com `setShellRenderer`, e é por isso que `initPage(id)` —
   que vem do core — já monta a casca.
+- `client-doc.js` — o **documento de cliente**, que duas páginas gravam: prospecção (status
+  `prospect`, com etapa) e clientes (`active`, `paused`, `closed`); `lost` é quem saiu do funil.
+  A forma mora aqui porque dois normalizadores na mesma coleção apagariam os campos um do outro.
+  `syncNext(c)` põe o próximo passo com data no calendário (uma tarefa por pessoa, origem `next`).
+- `task-form.jsx` — **virar tarefa**: `TaskDialog` (dia, duração, cliente, origem) e `createTask`,
+  usados por notas, clientes, prospecção e conteúdo. Sem data não existe tarefa.
 - `templates.js` — os **modelos**: o vocabulário de canal (tipos, rótulos e o checklist de
   cada um), 39 funis, 19 mapas, 9 tipos de negócio (cliente), 5 esqueletos de mês (financeiro)
   e 15 sugestões de hábito — com `buildFunnel`, `buildMap`, `buildClient` e `buildFinance`
@@ -139,7 +145,7 @@ vezes numa montagem (esvaziar a caixa de entrada, gerar a recorrência da semana
 
 | o quê | para quê |
 | --- | --- |
-| `initPage(id)` | sidebar, clientes, preferências, sessão. `id` é `home, calendar, routine, notes, clients, funnels, maps, finance, habits, plans, profile` |
+| `initPage(id)` | sidebar, clientes, preferências, sessão. `id` é `home, calendar, routine, notes, prospecting, clients, content, funnels, maps, finance, habits, plans, profile` |
 | `collection(type, {normalize})` | fora de componente; dentro use `useCollection` |
 | `newId()`, `today()`, `dayOf(date)`, `isDay(v)`, `dateOf(day)`, `addDays(day, n)`, `mondayOf(day)` | datas como `YYYY-MM-DD` |
 | `dateLabel(day, withYear?)`, `weekdayOf(day)`, `monthLabel("YYYY-MM")` | rótulos |
