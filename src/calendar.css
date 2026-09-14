@@ -675,7 +675,9 @@
 }
 .agenda:hover{background:var(--fill)}
 .agenda label{position:relative;flex:1 1 auto;display:flex;align-items:center;gap:9px;min-width:0;height:32px;cursor:pointer}
-.agenda input{position:absolute;opacity:0;width:1px;height:1px;pointer-events:none}
+/* so o checkbox da agenda: um ".agenda input" solto escondia tambem o campo
+   de hex do seletor de cor, que mora dentro da mesma linha */
+.agenda > label > input{position:absolute;opacity:0;width:1px;height:1px;pointer-events:none}
 .agenda__box{
   display:grid;place-items:center;flex:0 0 auto;width:18px;height:18px;border-radius:5px;
   background:var(--c);border:1.5px solid var(--c);color:#fff;transition:background var(--t);
