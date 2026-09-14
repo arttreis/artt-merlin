@@ -1,18 +1,27 @@
 /* merlin · clientes
-   o cadastro de clientes: cada cliente abre num painel de oito
-   abas, e a pauta da reuniao sai do que estiver escrito nelas. */
+   quem fechou. cada cliente abre numa pagina: o que importa em cima (as
+   propriedades e o que falta), e embaixo as abas — pagina, notas, arquivos,
+   tarefas, historico, canais, objetivos e cofre. quem ainda nao fechou mora
+   em prospeccao.html, no mesmo documento. */
 import "./shared/base.css";
 import "./clients.css";
 import {
-  initPage, collection, newId, notify, sendToDay, api,
-  dateLabel, dayOf, brl, parseMoney, parseDuration, formatMin
+  initPage, collection, newId, notify, api, cloud, newNote, today,
+  dateLabel, dayOf, brl, parseMoney, parseDuration, formatMin,
+  uploadFile, deleteFile, fileUrl, isImage, FILE_TYPES
 } from "./shared/core.js";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useLayoutEffect, Fragment } from "react";
 import {
   mount, useCollection, useHash, setHash, useKeydown, isTyping,
   useFields, Form, Field, Dialog, Markdown, TemplatePicker, EmptyStart, ChannelThumb, icon,
-  useDelegate, DelegateDialog, DateField
+  useDelegate, DelegateDialog, DateField, MoneyInput
 } from "./shared/ui.jsx";
+import {
+  normalize, STATUS_LABEL, CLIENT_STATUSES, RECURRENCES, RECURRENCE_LABEL, FILE_KINDS, kindFromName,
+  isClient, isPipeline, journalEntry, syncNext, waUrl, igUrl, siteUrl
+} from "./shared/client-doc.js";
+import { normalize as normalizeTask } from "./shared/tasks.js";
+import { TaskDialog } from "./shared/task-form.jsx";
 import {
   CHANNEL_TYPES, CHANNEL_LABEL, CHANNEL_CHECKLISTS, FUNNEL_TEMPLATES, funnelGroups, funnelChain, buildFunnel,
   CLIENT_TEMPLATES, clientGroups, clientChannels, buildClient
@@ -24,12 +33,10 @@ initPage("clients");
 /* ---------- forma do documento ----------
    valores de enum em ingles no documento; o rotulo em portugues so na tela. */
 
-const STATUSES = ["prospect", "proposal", "active", "paused", "closed"];
-const STATUS_LABEL = { prospect: "prospecto", proposal: "proposta", active: "ativo", paused: "pausado", closed: "encerrado" };
-const RECURRENCES = ["monthly", "project", "hourly", ""];
-const RECURRENCE_LABEL = { monthly: "mensal", project: "projeto", hourly: "hora" };
 const JOURNAL_TYPES = ["note", "meeting", "decision", "delivery"];
-const JOURNAL_LABEL = { note: "nota", meeting: "reunião", decision: "decisão", delivery: "entrega" };
+/* "event" e o que o sistema escreve sozinho (fechou, mudou de status, subiu
+   contrato): nao aparece na caixa de registrar, so na linha do tempo */
+const JOURNAL_LABEL = { note: "nota", meeting: "reunião", decision: "decisão", delivery: "entrega", event: "marco" };
 
 /* o vocabulario de canal (tipos, rotulos e o checklist de cada um) mora em
    shared/templates.js, junto dos funis de cada canal: e o mesmo assunto. */
@@ -45,54 +52,24 @@ const JOURNAL_LABEL = { note: "nota", meeting: "reunião", decision: "decisão",
    "produto" e "serviço" puxam para catálogo, "bump" e "upsell" para oferta
    comercial. o catálogo tem sistema de registro próprio — o Mercado Livre, a
    Shopify — e uma segunda verdade aqui dentro é uma que ninguém mantém. */
+/* o painel e a ficha sairam: o que eles mostravam subiu para o topo da pagina
+   (as propriedades e o "falta"), que e visto sem clicar em aba nenhuma. o
+   backlog virou "tarefas": o que tem data mora no calendario, e o que ainda
+   nao tem continua aqui, esperando virar tarefa. o diario virou "historico". */
 const TABS = [
-  { id: "dashboard", label: "painel" },
-  { id: "backlog", label: "backlog" },
-  { id: "journal", label: "diário" },
+  { id: "page", label: "página" },
+  { id: "notes", label: "notas" },
+  { id: "files", label: "arquivos" },
+  { id: "tasks", label: "tarefas" },
+  { id: "journal", label: "histórico" },
   { id: "channels", label: "canais" },
   { id: "goals", label: "objetivos" },
-  { id: "profile", label: "ficha" },
   { id: "vault", label: "cofre" }
 ];
+const TAB_IDS = TABS.map((t) => t.id);
 
-const listOrEmpty = (v) => (Array.isArray(v) ? v : []);
-
-function normalize(d) {
-  const contract = d.contract || {};
-  return {
-    id: String(d.id),
-    name: String(d.name || "").slice(0, 120),
-    status: STATUSES.includes(d.status) ? d.status : "prospect",
-    brand: String(d.brand || "").slice(0, 120),
-    summary: String(d.summary || ""),
-    contacts: listOrEmpty(d.contacts),
-    links: listOrEmpty(d.links),
-    contract: {
-      scope: String(contract.scope || ""),
-      value: Math.round(+contract.value) || 0,
-      recurrence: RECURRENCES.includes(contract.recurrence) ? contract.recurrence : "",
-      start: contract.start || "",
-      end: contract.end || "",
-      extras: String(contract.extras || "")
-    },
-    channels: listOrEmpty(d.channels).map((c) => ({ ...c, items: listOrEmpty(c.items) })),
-    goals: listOrEmpty(d.goals).map((g) => ({ ...g, steps: listOrEmpty(g.steps) })),
-    backlog: listOrEmpty(d.backlog),
-    journal: listOrEmpty(d.journal),
-    /* a aba saiu, o campo fica: apagar em silêncio o que alguém cadastrou
-       seria pior que a aba confusa. o painel mostra o que sobrou e oferece
-       levar para o funil, que é onde oferta mora agora. */
-    offers: listOrEmpty(d.offers),
-    /* so rotulo/usuario/url do acesso ficam aqui em claro; segredo e nota
-       vao cifrados (ver "cofre de acessos" mais abaixo). o sal que deriva a
-       chave e unico do sistema, guardado em collection("vault").get("config")
-       — nao por cliente — entao nao repetimos ele aqui. */
-    vault: { items: listOrEmpty(d.vault && d.vault.items) },
-    ideaOrigin: d.ideaOrigin || "",
-    createdAt: +d.createdAt || Date.now(),
-    updatedAt: +d.updatedAt || Date.now()
-  };
-}
+/* a forma do documento mora em shared/client-doc.js: a prospeccao grava na
+   mesma colecao, e dois normalizadores apagariam os campos um do outro. */
 
 /* icones que nao moram no core por serem exclusivos desta pagina */
 const BoltIcon = () => (
@@ -241,7 +218,7 @@ function Clients() {
   const vaultStore = useCollection("vault");
   const hash = useHash();
   const [selectedId, setSelectedId] = useState(null);
-  const [tab, setTab] = useState("dashboard");
+  const [tab, setTab] = useState("page");
   const [newForm, setNewForm] = useState(null);         // { name?, summary?, ideaOrigin?, template? } | null
   const [confirming, setConfirming] = useState(false);
   const [meeting, setMeeting] = useState(null);         // texto da pauta | null
@@ -260,7 +237,8 @@ function Clients() {
   selectedRef.current = selectedId;
 
   const doc = selectedId ? clients.get(selectedId) : null;
-  const list = clients.all().sort(compareClients);
+  /* prospecto e perdido moram na prospeccao: aqui so quem fechou */
+  const list = clients.all().filter(isClient).sort(compareClients);
 
   /* ---------- abrir / fechar o painel ---------- */
 
@@ -269,9 +247,13 @@ function Clients() {
      dispara hashchange */
   const clearHash = () => setHash("");
   const openClient = (id) => {
-    if (!clients.has(id)) return;
+    const c = clients.get(id);
+    if (!c) return;
+    /* um link antigo (busca, nota, tarefa) ainda pode apontar para quem esta
+       no funil: a pagina dele e a da prospeccao */
+    if (!isClient(c)) { location.replace("prospecting.html#" + encodeURIComponent(id)); return; }
     setSelectedId(id);
-    setTab("dashboard");
+    setTab("page");
     if (location.hash.slice(1) !== id) setHash(id);
   };
   const closePanel = () => { setSelectedId(null); clearHash(); };
@@ -344,7 +326,7 @@ function Clients() {
   };
   /* clearOffers e declarado mais abaixo; a seta adia a leitura para a hora do
      clique, em vez de estourar no render por ler um const que ainda nao nasceu. */
-  const ctx = { update, updateItem, removeFrom, funnels, setTab, clearOffers: () => clearOffers() };
+  const ctx = { update, updateItem, removeFrom, funnels, setTab, clearOffers: () => clearOffers(), backToPipeline: () => backToPipeline() };
 
   /* ---------- criar e apagar ---------- */
 
@@ -361,6 +343,8 @@ function Clients() {
       summary: summary || (seed ? seed.summary : ""),
       ideaOrigin: ideaOrigin || "", createdAt: now, updatedAt: now
     });
+    created.journal = [journalEntry(ideaOrigin ? "entrou como cliente, a partir de uma nota" : "entrou direto como cliente, sem passar pela prospecção")];
+    created.wonAt = now;
     clients.save(created);
     setNewForm(null);
     openClient(created.id);
@@ -375,6 +359,15 @@ function Clients() {
     setConfirming(false);
     closePanel();
     notify('cliente "' + name + '" apagado', () => { clients.save(before); openClient(id); });
+  };
+  /* fechou e nao era bem isso: volta para a negociacao, com o que ja se sabe */
+  const backToPipeline = () => {
+    if (!doc) return;
+    const id = doc.id;
+    update((d) => { d.status = "prospect"; d.stage = "negotiation"; d.stageAt = Date.now(); d.journal.push(journalEntry("voltou para a prospecção, em negociação")); });
+    /* sem desfazer: a pagina muda logo em seguida, e o caminho de volta e o
+       "fechou" de la, que registra de novo */
+    location.href = "prospecting.html#" + encodeURIComponent(id);
   };
 
   /* ---------- Merlin: preparar reuniao ---------- */
@@ -409,7 +402,7 @@ function Clients() {
     const text = meeting;
     update((d) => { d.journal.push({ id: newId(), at: Date.now(), type: "meeting", text }); });
     setMeeting(null);
-    notify("pauta guardada no diário");
+    notify("pauta guardada no histórico");
   };
 
   /* ---------- cofre: a chave ---------- */
@@ -448,10 +441,10 @@ function Clients() {
       <div className="header">
         <div>
           <h1>clientes</h1>
-          <p className="sub">ficha, contrato, canais, objetivos, backlog e diário de cada cliente</p>
+          <ClientsSummary list={list} />
         </div>
         <div className="actions">
-          <button className="pill pill--green" type="button" id="new-client-btn" onClick={() => openNew()}>novo cliente</button>
+          <button className="pill pill--green" type="button" id="new-client-btn" onClick={() => openNew()}>{icon("plus")}cliente</button>
         </div>
       </div>
 
@@ -473,9 +466,18 @@ function Clients() {
       ) : (
       <div className="clients-screen" id="screen" data-view={selectedId ? "panel" : "list"}>
         <section className="list-column">
-          <ul className="list" id="client-list">
-            {list.map((c) => <ClientRow key={c.id} c={c} active={c.id === selectedId} onOpen={() => openClient(c.id)} />)}
-          </ul>
+          {CLIENT_STATUSES.map((st) => {
+            const group = list.filter((c) => c.status === st);
+            if (!group.length) return null;
+            return (
+              <div key={st} className="client-group">
+                <p className="client-group__head"><span className="t-mono">{STATUS_LABEL[st]}</span><span className="t-mono">{group.length}</span></p>
+                <ul className="list" id={st === "active" ? "client-list" : undefined}>
+                  {group.map((c) => <ClientRow key={c.id} c={c} active={c.id === selectedId} onOpen={() => openClient(c.id)} />)}
+                </ul>
+              </div>
+            );
+          })}
         </section>
 
         <section className="panel-column">
@@ -499,273 +501,454 @@ function Clients() {
   );
 }
 
+/* ---------- o resumo do cabecalho ----------
+   os numeros moram numa frase, e nao numa fileira de cartoes iguais: a tela
+   de clientes e a lista e a pagina, e o numero so acompanha. */
+function ClientsSummary({ list }) {
+  if (!list.length) return <p className="sub">quem fechou: a página, os arquivos, as tarefas e o histórico de cada um</p>;
+  const active = list.filter((c) => c.status === "active");
+  const monthly = active.filter((c) => c.contract.recurrence === "monthly").reduce((s, c) => s + c.contract.value, 0);
+  const stale = active.filter(isStale).length;
+  const parts = [<><b>{active.length}</b> {active.length === 1 ? "ativo" : "ativos"}</>];
+  if (monthly) parts.push(<><b>{brl(monthly)}</b> por mês em contrato</>);
+  if (stale) parts.push(<><b>{stale}</b> sem registro há mais de 14 dias</>);
+  return <p className="sub sub--numbers">{parts.map((p, i) => <Fragment key={i}>{i ? " · " : ""}{p}</Fragment>)}</p>;
+}
+
+const initial = (name) => ((String(name || "").match(/[a-z0-9à-ÿ]/i) || ["?"])[0]).toUpperCase();
+
 /* ---------- um cliente na lista ----------
-   sem filtro: a lista e curta (ativos primeiro, em ordem alfabetica) e a
-   busca global da sidebar acha qualquer cliente pelo nome */
+   sem filtro: a lista e curta, agrupada por status, e a busca global da
+   sidebar acha qualquer cliente pelo nome */
 function ClientRow({ c, active, onOpen }) {
+  const detail = [String(c.contract.scope || "").split("\n")[0], c.contract.value ? brl(c.contract.value) + (c.contract.recurrence === "monthly" ? "/mês" : "") : ""].filter(Boolean).join(" · ");
   return (
-    <li className={"line" + (active ? " is-active" : "")} data-id={c.id} tabIndex="0" role="button"
+    <li className={"line client-row" + (active ? " is-active" : "")} data-id={c.id} tabIndex="0" role="button"
         onClick={onOpen} onKeyDown={(e) => { if (e.key === "Enter") onOpen(); }}>
-      <span className="name">{c.name}{isStale(c) && <> <span className="weak" title="mais de 14 dias sem entrada no diário">— faz tempo</span></>}</span>
-      <StatusBadge status={c.status} />
+      <span className="avatar" aria-hidden="true">{initial(c.name)}</span>
+      <span className="client-row__text">
+        <span className="name">{c.name}</span>
+        {detail && <small>{detail}</small>}
+      </span>
+      {isStale(c) && <span className="client-row__stale" title="mais de 14 dias sem registro no histórico" />}
     </li>
   );
 }
 
-const StatusBadge = ({ status }) => <span className={"badge" + (status === "active" ? " badge--green" : "")}>{STATUS_LABEL[status] || status}</span>;
-
 /* a barra de cima de cada aba: o rotulo e o "+" que abre a caixa de criar —
    nenhum formulario fica aberto no meio da lista */
 const TabBar = ({ label, button, id, onAdd }) => (
-  <p className="heading mb2"><span className="t-mono">{label}</span><button className="pill pill--mini" type="button" id={id} onClick={onAdd}>{icon("plus")}{button}</button></p>
+  <p className="heading mb2"><span className="t-mono">{label}</span>{onAdd && <button className="pill pill--mini" type="button" id={id} onClick={onAdd}>{icon("plus")}{button}</button>}</p>
 );
 
-/* ---------- o painel do cliente ---------- */
+/* um textarea de uma linha que cresce com o texto: o escopo do contrato as
+   vezes e uma frase, as vezes um paragrafo, e um <input> comeria as quebras */
+function AutoText({ value, onChange, ...rest }) {
+  const ref = useRef(null);
+  useLayoutEffect(() => { const t = ref.current; if (t) { t.style.height = "auto"; t.style.height = t.scrollHeight + "px"; } }, [value]);
+  return <textarea ref={ref} rows="1" {...rest} value={value} onChange={onChange} />;
+}
+
+/* ---------- a pagina do cliente ---------- */
 function Panel({ doc, tab, ctx, vault, thinking, onBack, onDelete, onMeeting }) {
+  const [taskFor, setTaskFor] = useState(null);   // {title, backlogId?} | null
+  const tasks = useCollection("tasks", { normalize: normalizeTask });
+  const openTasks = tasks.all().filter((t) => t.client === doc.id && !t.done).length;
+  const notesCount = collection("notes").all().filter((n) => n.client === doc.id && n.stage !== "archived").length;
+  const counts = { notes: notesCount, files: doc.files.length, tasks: openTasks + doc.backlog.filter((b) => !b.done).length };
   const content =
-    tab === "profile" ? <Profile doc={doc} ctx={ctx} /> :
+    tab === "notes" ? <ClientNotes doc={doc} /> :
+    tab === "files" ? <Files doc={doc} ctx={ctx} /> :
+    tab === "tasks" ? <ClientTasks doc={doc} ctx={ctx} tasks={tasks} onTask={setTaskFor} /> :
+    tab === "journal" ? <Journal doc={doc} ctx={ctx} /> :
     tab === "channels" ? <Channels doc={doc} ctx={ctx} /> :
     tab === "goals" ? <Goals doc={doc} ctx={ctx} /> :
-    tab === "backlog" ? <Backlog doc={doc} ctx={ctx} /> :
-    tab === "journal" ? <Journal doc={doc} ctx={ctx} /> :
     tab === "vault" ? <Vault doc={doc} ctx={ctx} masterKey={vault.key} openDialog={vault.open} lock={vault.lock} /> :
-    <Dashboard doc={doc} setTab={ctx.setTab} onClearOffers={ctx.clearOffers} />;
+    <PageTab doc={doc} ctx={ctx} />;
   return (
-    <div id="client-panel">
+    <div id="client-panel" className="client-page block">
       <div className="panel-head">
         <button className="pill back-btn" type="button" id="back-btn" onClick={onBack}>‹ clientes</button>
-        <div className="client-title">
-          <h2 id="panel-name">{doc.name || "(sem nome)"}</h2>
-          <div className="row" id="panel-badges"><StatusBadge status={doc.status} /></div>
-        </div>
-        <button className="pill" type="button" id="meeting-btn" disabled={thinking} onClick={onMeeting}
-            title="pedir ao Merlin uma pauta a partir da ficha, canais, objetivos e diário">
+        <span className="spacer" />
+        <button className="pill pill--mini" type="button" onClick={() => setTaskFor({ title: "" })}>{icon("plus")}tarefa</button>
+        <button className="pill pill--mini" type="button" id="meeting-btn" disabled={thinking} onClick={onMeeting}
+            title="pedir ao Merlin uma pauta a partir da página, canais, objetivos e histórico">
           {thinking ? "pensando…" : <><BoltIcon /> preparar reunião</>}
         </button>
+        <button className="pill pill--mini" type="button" title="devolve para a prospecção, em negociação" onClick={ctx.backToPipeline}>voltar para a prospecção</button>
         <button className="action" type="button" id="delete-client-btn" title="apagar cliente" aria-label="Apagar cliente" onClick={onDelete}>{icon("trash")}</button>
       </div>
+
+      <div className="client-hero">
+        <span className="avatar avatar--big" aria-hidden="true">{initial(doc.name)}</span>
+        <div className="client-hero__names">
+          <input className="client-hero__name" id="panel-name" aria-label="nome" placeholder="sem nome" value={doc.name}
+                 onChange={(e) => ctx.update((d) => { d.name = e.currentTarget.value.slice(0, 120); })} />
+          <input className="client-hero__brand" aria-label="operação ou marca" placeholder="operação / marca" value={doc.brand}
+                 onChange={(e) => ctx.update((d) => { d.brand = e.currentTarget.value.slice(0, 120); })} />
+        </div>
+      </div>
+
+      <Properties doc={doc} ctx={ctx} />
+      <Pending doc={doc} ctx={ctx} />
+
       <div className="tabs" id="tabs" role="tablist">
-        {TABS.map((t) => <button key={t.id} className="tab" type="button" role="tab" data-tab={t.id} aria-selected={tab === t.id} onClick={() => ctx.setTab(t.id)}>{t.label}</button>)}
+        {TABS.map((t) => (
+          <button key={t.id} className="tab" type="button" role="tab" data-tab={t.id} aria-selected={tab === t.id} onClick={() => ctx.setTab(t.id)}>
+            {t.label}{counts[t.id] ? <span className="tab__count">{counts[t.id]}</span> : null}
+          </button>
+        ))}
       </div>
       <div id="tab-content" role="tabpanel">{content}</div>
+
+      {taskFor && <TaskDialog title={taskFor.title} client={doc.id} origin={{ type: "client", id: doc.id }}
+                              heading={taskFor.backlogId ? "virar tarefa" : "nova tarefa"}
+                              onClose={() => setTaskFor(null)}
+                              onCreated={() => { if (taskFor.backlogId) ctx.update((d) => { d.backlog = d.backlog.filter((b) => b.id !== taskFor.backlogId); }); }} />}
     </div>
   );
 }
 
-/* ---------- aba: painel (resumo) ---------- */
-function Dashboard({ doc, setTab, onClearOffers }) {
-  /* prazo ordena, mas não é ingresso. antes o painel só listava o que tinha
-     data, e um cliente recém-criado por modelo — que nasce com objetivos e
-     backlog sem prazo (templates.js, buildClient) — aterrissava numa tela
-     dizendo "nenhum objetivo em aberto" logo depois de o modelo ter escrito
-     seis coisas. o que tem data vem primeiro; o resto vem embaixo. */
-  const byDue = (a, b) => (a.due ? 0 : 1) - (b.due ? 0 : 1) || String(a.due).localeCompare(String(b.due));
-  const goalsDue = doc.goals.filter((g) => !g.done).sort(byDue);
-  const backlogDue = doc.backlog.filter((b) => !b.done).sort(byDue).slice(0, 6);
-  const incomplete = doc.channels.filter((c) => c.items.some((i) => !i.done));
-  const last = doc.journal.slice().sort((a, b) => b.at - a.at)[0];
+/* ---------- as propriedades ----------
+   o que se consulta toda vez que o cliente abre, numa ficha de duas colunas:
+   o rotulo a esquerda, o valor editavel no lugar a direita. vazio fica cinza
+   e continua clicavel — nao ha modo de edicao, so o campo. */
+const Prop = ({ label, children }) => (
+  <div className="prop"><span className="prop__k">{label}</span><div className="prop__v">{children}</div></div>
+);
+
+function Properties({ doc, ctx }) {
+  const { update } = ctx;
+  const setStatus = (st) => {
+    if (doc.status === st) return;
+    update((d) => { d.status = st; d.journal.push(journalEntry("status: " + STATUS_LABEL[st])); });
+    const now = collection("clients").get(doc.id);
+    if (now) syncNext(now);
+  };
+  const setNext = (patch) => {
+    update((d) => { Object.assign(d, patch); });
+    const now = collection("clients").get(doc.id);
+    if (now) syncNext(now);
+  };
+  const open = (href, label) => href ? <a className="prop__open" href={href} target="_blank" rel="noopener">{label}</a> : null;
+  const origin = doc.ideaOrigin && collection("notes").get(doc.ideaOrigin);
+  const cameFrom = [doc.source, origin ? "nota: " + (origin.title || "sem título") : ""].filter(Boolean).join(" · ");
+  return (
+    <div className="props">
+      <Prop label="status">
+        <div className="chips">
+          {CLIENT_STATUSES.map((st) => (
+            <button key={st} type="button" className={"chip" + (st === "active" ? " chip--green" : "")} aria-pressed={doc.status === st} onClick={() => setStatus(st)}>{STATUS_LABEL[st]}</button>
+          ))}
+        </div>
+      </Prop>
+      <Prop label="o que foi fechado">
+        <AutoText className="prop__input" placeholder="vazio" value={doc.contract.scope}
+                  onChange={(e) => update((d) => { d.contract.scope = e.currentTarget.value; })} />
+      </Prop>
+      <Prop label="valor">
+        <MoneyInput className="prop__input prop__input--money" placeholder="0,00" value={doc.contract.value} onChange={(v) => update((d) => { d.contract.value = v; })} />
+        <select className="prop__select" aria-label="recorrência" value={doc.contract.recurrence} onChange={(e) => update((d) => { d.contract.recurrence = e.currentTarget.value; })}>
+          <option value="">sem recorrência</option>
+          {RECURRENCES.filter(Boolean).map((r) => <option key={r} value={r}>{RECURRENCE_LABEL[r]}</option>)}
+        </select>
+      </Prop>
+      <Prop label="início e fim">
+        <DateField className="prop__date" value={doc.contract.start} onChange={(e) => update((d) => { d.contract.start = e.currentTarget.value; })} />
+        <span className="prop__sep">até</span>
+        <DateField className="prop__date" value={doc.contract.end} onChange={(e) => update((d) => { d.contract.end = e.currentTarget.value; })} />
+      </Prop>
+      <Prop label="whatsapp">
+        <input className="prop__input" id="prop-whatsapp" inputMode="tel" placeholder="vazio" value={doc.whatsapp} onChange={(e) => update((d) => { d.whatsapp = e.currentTarget.value; })} />
+        {open(waUrl(doc.whatsapp), "conversar")}
+      </Prop>
+      <Prop label="e-mail">
+        <input className="prop__input" type="email" placeholder="vazio" value={doc.email} onChange={(e) => update((d) => { d.email = e.currentTarget.value; })} />
+        {doc.email && <a className="prop__open" href={"mailto:" + doc.email}>escrever</a>}
+      </Prop>
+      <Prop label="instagram">
+        <input className="prop__input" placeholder="vazio" value={doc.instagram} onChange={(e) => update((d) => { d.instagram = e.currentTarget.value; })} />
+        {open(igUrl(doc.instagram), "abrir")}
+      </Prop>
+      <Prop label="site">
+        <input className="prop__input" placeholder="vazio" value={doc.site} onChange={(e) => update((d) => { d.site = e.currentTarget.value; })} />
+        {open(siteUrl(doc.site), "abrir")}
+      </Prop>
+      <Prop label="próximo passo">
+        <input className="prop__input prop__input--next" id="prop-next" placeholder="o que move esse cliente agora" value={doc.next}
+               onChange={(e) => update((d) => { d.next = e.currentTarget.value.slice(0, 200); })}
+               onBlur={() => { const now = collection("clients").get(doc.id); if (now) syncNext(now); }} />
+        <DateField className="prop__date" title="quando — vira tarefa no calendário" value={doc.nextDate} onChange={(e) => setNext({ nextDate: e.currentTarget.value })} />
+      </Prop>
+      {!!(cameFrom || doc.wonAt) && (
+        <Prop label="veio de">
+          <span className="prop__text">
+            {origin ? <a className="link" href={"notes.html#" + encodeURIComponent(origin.id)}>{cameFrom}</a> : (cameFrom || "direto")}
+            {doc.wonAt ? " · fechou em " + dateLabel(dayOf(new Date(doc.wonAt)), true) : ""}
+          </span>
+        </Prop>
+      )}
+    </div>
+  );
+}
+
+/* ---------- o que falta ----------
+   eram sete abas vazias e um bloco de "primeiros passos" que sumia por idade.
+   agora e uma linha de botoes: cada um some quando a coisa existe, e leva
+   direto para onde ela se resolve. */
+function Pending({ doc, ctx }) {
+  const focus = (id) => { const el = document.getElementById(id); if (el) { el.focus(); el.scrollIntoView({ block: "center", behavior: "smooth" }); } };
+  const items = [];
+  if (doc.status === "active" && !doc.files.some((f) => f.kind === "contrato")) items.push(["subir contrato", () => ctx.setTab("files")]);
+  if (doc.status === "active" && !doc.next) items.push(["definir próximo passo", () => focus("prop-next")]);
+  if (!doc.whatsapp && !doc.email && !doc.contacts.length) items.push(["cadastrar contato", () => focus("prop-whatsapp")]);
+  if (!doc.journal.some((e) => e.type !== "event")) items.push(["registrar a primeira conversa", () => ctx.setTab("journal")]);
+  if (!items.length) return null;
+  return (
+    <div className="pending">
+      <span className="t-mono">falta</span>
+      {items.map(([label, go]) => <button key={label} className="pill pill--mini pending__item" type="button" onClick={go}>{label}</button>)}
+    </div>
+  );
+}
+
+/* ---------- aba: pagina ----------
+   o texto livre do cliente em markdown, e embaixo quem e quem (pessoas) e os
+   enderecos que se abrem toda semana (links). abre lendo; clicar no texto
+   escreve. */
+function PageTab({ doc, ctx }) {
+  const { update, updateItem, removeFrom } = ctx;
+  const [editing, setEditing] = useState(!doc.summary.trim());
+  const [adding, setAdding] = useState("");
+  const areaRef = useRef(null);
+  useLayoutEffect(() => { const t = areaRef.current; if (t) { t.style.height = "auto"; t.style.height = Math.max(160, t.scrollHeight) + "px"; } }, [editing, doc.summary]);
+  const contactsOf = (d) => d.contacts, linksOf = (d) => d.links;
+  return (
+    <div className="column">
+      <div className="page-text">
+        <p className="heading">
+          <span className="t-mono">página</span>
+          {!!doc.summary.trim() && <button className="link" type="button" onClick={() => setEditing((v) => !v)}>{editing ? "ver formatado" : "editar"}</button>}
+        </p>
+        {editing
+          ? <textarea ref={areaRef} className="page-text__input" autoFocus={!!doc.summary}
+                      placeholder="o que importa sobre esse cliente: contexto, entregas, acessos, combinados. markdown simples vale."
+                      value={doc.summary} onChange={(e) => update((d) => { d.summary = e.currentTarget.value; })} />
+          : <div className="page-text__read" title="clique para editar" onClick={(e) => { if (!e.target.closest("a")) setEditing(true); }}>
+              <Markdown text={doc.summary} />
+            </div>}
+      </div>
+
+      <div className="grid">
+        <div className="col-6">
+          <p className="heading"><span className="t-mono">pessoas</span><button className="pill pill--mini" type="button" id="add-contact" onClick={() => setAdding("contact")}>{icon("plus")}pessoa</button></p>
+          <div id="contact-list" className="column">
+            {doc.contacts.length ? doc.contacts.map((k) => (
+              <div key={k.id} className="editable-line" data-id={k.id}>
+                <input className="input small" placeholder="nome" value={k.name} onChange={(e) => updateItem(contactsOf, k.id, (x) => { x.name = e.currentTarget.value; })} />
+                <input className="input small" placeholder="papel" value={k.role} onChange={(e) => updateItem(contactsOf, k.id, (x) => { x.role = e.currentTarget.value; })} />
+                <input className="input small" placeholder="whatsapp" value={k.whatsapp} onChange={(e) => updateItem(contactsOf, k.id, (x) => { x.whatsapp = e.currentTarget.value; })} />
+                <input className="input small" placeholder="e-mail" value={k.email} onChange={(e) => updateItem(contactsOf, k.id, (x) => { x.email = e.currentTarget.value; })} />
+                <button className="action" type="button" aria-label="Remover pessoa" onClick={() => removeFrom(contactsOf, k.id, "pessoa removida")}>{icon("trash")}</button>
+              </div>)) : <p className="empty">só o contato principal, lá em cima</p>}
+          </div>
+        </div>
+        <div className="col-6">
+          <p className="heading"><span className="t-mono">links</span><button className="pill pill--mini" type="button" id="add-link" onClick={() => setAdding("link")}>{icon("plus")}link</button></p>
+          <div id="link-list" className="column">
+            {doc.links.length ? doc.links.map((k) => (
+              <div key={k.id} className="editable-line" data-id={k.id}>
+                <input className="input small" placeholder="rótulo" value={k.label} onChange={(e) => updateItem(linksOf, k.id, (x) => { x.label = e.currentTarget.value; })} />
+                <input className="input small" placeholder="https://…" value={k.url} onChange={(e) => updateItem(linksOf, k.id, (x) => { x.url = e.currentTarget.value; })} />
+                {siteUrl(k.url) && <a className="action" href={siteUrl(k.url)} target="_blank" rel="noopener" aria-label="Abrir">{icon("link")}</a>}
+                <button className="action" type="button" aria-label="Remover link" onClick={() => removeFrom(linksOf, k.id, "link removido")}>{icon("trash")}</button>
+              </div>)) : <p className="empty">painel, drive, planilha — o que se abre toda semana</p>}
+          </div>
+        </div>
+      </div>
+
+      {!!doc.offers.length && (
+        <div>
+          <p className="heading">
+            <span className="t-mono">ofertas cadastradas aqui antes</span>
+            <button className="pill pill--mini" type="button" onClick={ctx.clearOffers}>já movi, pode limpar</button>
+          </p>
+          <ul className="list">
+            {doc.offers.map((o) => <li key={o.id} className="line"><span className="name">{o.name}</span><span className="measure">{o.price ? brl(o.price) : "—"}</span></li>)}
+          </ul>
+          <p className="note">Oferta agora mora no funil, junto da promessa, da garantia e da escada. Estas continuam guardadas até você mandar limpar.</p>
+        </div>
+      )}
+
+      {adding === "contact" && <ContactForm onClose={() => setAdding("")} onAdd={(k) => update((d) => { d.contacts.push(k); })} />}
+      {adding === "link" && <LinkForm onClose={() => setAdding("")} onAdd={(k) => update((d) => { d.links.push(k); })} />}
+    </div>
+  );
+}
+
+/* ---------- aba: notas ----------
+   as notas ligadas a este cliente. nao ha segunda caixa de notas: a nota
+   continua morando em notes.html, e aqui e so a janela para as dele. */
+function ClientNotes({ doc }) {
+  const notes = useCollection("notes");
+  const [form, setForm] = useState(false);
+  const mine = notes.all().filter((n) => n.client === doc.id && n.stage !== "archived").sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+  const firstLine = (body) => String(body || "").split(/\r?\n/).map((l) => l.replace(/^[#\-*\d.)\s\[\]x]+/i, "").trim()).find(Boolean) || "";
   return (
     <>
-      <div className="grid">
-        <FirstSteps doc={doc} setTab={setTab} />
-        <div className="col-6 block">
-          <p className="heading"><span className="t-mono">objetivos com prazo</span></p>
-          {goalsDue.length
-            ? <ul className="list">{goalsDue.map((g) => <li key={g.id} className="line"><span className="name">{g.text}</span><span className="measure">{dateLabel(g.due)}</span></li>)}</ul>
-            : <p className="empty">nenhum objetivo com prazo em aberto</p>}
-        </div>
-        <div className="col-6 block">
-          <p className="heading"><span className="t-mono">próximos prazos do backlog</span></p>
-          {backlogDue.length
-            ? <ul className="list">{backlogDue.map((b) => <li key={b.id} className="line"><span className="name">{b.text}</span><span className="measure">{dateLabel(b.due)}</span></li>)}</ul>
-            : <p className="empty">nada no backlog com prazo</p>}
-        </div>
-        {!!doc.offers.length && (
-          <div className="col-6 block">
-            <p className="heading">
-              <span className="t-mono">ofertas cadastradas aqui antes</span>
-              <button className="pill pill--mini" type="button" onClick={onClearOffers}>já movi, pode limpar</button>
-            </p>
-            <ul className="list">
-              {doc.offers.map((o) => (
-                <li key={o.id} className="line">
-                  <span className="name">{o.name}</span>
-                  <span className="measure">{o.price ? brl(o.price) : "—"}</span>
-                </li>))}
-            </ul>
-            <p className="note">Oferta agora mora no funil, junto da promessa, da garantia e da
-            escada — e a pauta da reunião passou a ler de lá. Estas continuam guardadas até você
-            mandar limpar.</p>
+      <TabBar label="notas" button="nota" onAdd={() => setForm(true)} />
+      {mine.length
+        ? <div className="note-cards">
+            {mine.map((n) => (
+              <a key={n.id} className="note-card" href={"notes.html#" + encodeURIComponent(n.id)}>
+                <b>{n.title || "sem título"}</b>
+                {firstLine(n.body) && <span>{firstLine(n.body)}</span>}
+                <small className="t-mono">{dateLabel(dayOf(new Date(n.updatedAt || n.createdAt)))}</small>
+              </a>
+            ))}
           </div>
-        )}
-        <div className="col-6 block">
-          <p className="heading"><span className="t-mono">canais incompletos</span></p>
-          {incomplete.length
-            ? <ul className="list">{incomplete.map((c) => {
-                const done = c.items.filter((i) => i.done).length;
-                return (
-                  <li key={c.id} className="line">
-                    <span className="name">{c.name}</span>
-                    <span className="bar" style={{ width: "60px" }}><i style={{ width: Math.round((done / c.items.length) * 100) + "%" }} /></span>
-                    <span className="measure">{done} de {c.items.length}</span>
-                  </li>
-                );
-              })}</ul>
-            : <p className="empty">todos os canais completos, ou nenhum canal ainda</p>}
-        </div>
-        <div className="col-6 block">
-          <p className="heading"><span className="t-mono">contrato</span></p>
-          <div className="meter"><span className="num">{brl(doc.contract.value)}</span><span className="legend">{RECURRENCE_LABEL[doc.contract.recurrence] || "sem recorrência definida"}</span></div>
-          <p className="small weak mt2">último contato: {last ? journalDate(last.at) + " · " + (JOURNAL_LABEL[last.type] || last.type) : "nenhum registro no diário"}</p>
-        </div>
-      </div>
-      <div className="row mt">
-        <button className="pill" type="button" onClick={() => setTab("backlog")}>+ item no backlog</button>
-        <button className="pill" type="button" onClick={() => setTab("journal")}>+ nota no diário</button>
-        <button className="pill" type="button" onClick={() => setTab("channels")}>ver canais</button>
-      </div>
+        : <p className="empty">reunião, ideia, o que ele falou na call — nota com este cliente aparece aqui</p>}
+      {form && <ClientNoteForm onClose={() => setForm(false)} onCreate={(title) => {
+        const n = newNote({ title, client: doc.id });
+        if (n) location.href = "notes.html#" + encodeURIComponent(n.id);
+      }} />}
     </>
   );
 }
 
-/* ---------- campo de dinheiro ----------
-   mostra o valor formatado, mas guarda o que esta sendo digitado em estado
-   proprio: reformatar a cada tecla brigaria com o cursor. quando o valor
-   muda por fora (sincronia), o texto acompanha. */
-function MoneyInput({ value, onChange, ...rest }) {
-  const format = (v) => brl(v).replace("R$ ", "");
-  const [text, setText] = useState(() => format(value));
-  useEffect(() => { if (parseMoney(text) !== value) setText(format(value)); }, [value]);
-  return <input className="input input--num" {...rest} value={text}
-    onChange={(e) => { setText(e.currentTarget.value); onChange(parseMoney(e.currentTarget.value)); }} />;
-}
-
-/* ---------- os primeiros passos ----------
-   o que fazer depois de criar um cliente era uma pergunta sem resposta: a tela
-   abria em sete abas vazias e cabia a quem chegou adivinhar por onde começar.
-   este bloco responde, e some sozinho — de duas formas, porque só uma não
-   bastaria.
-
-   por CONTEÚDO: cada passo desaparece quando é dado.
-   por IDADE: o bloco inteiro só existe na primeira semana do cliente. sem
-   isso, "ainda não tem contato" seria verdade para sempre num cliente de
-   meses que nunca teve um — e o bloco nasceria na base inteira no dia em que
-   este código subisse, em vez de acompanhar quem está começando. */
-const FRESH_DAYS = 7;
-
-function FirstSteps({ doc, setTab }) {
-  const age = Date.now() - (doc.createdAt || 0);
-  if (age > FRESH_DAYS * 86400000) return null;
-  const steps = [
-    { id: "channels", done: doc.channels.length > 0, tab: "channels",
-      label: "diga onde esse cliente vende",
-      note: "cada canal nasce com o checklist do tipo dele — o que precisa existir antes de qualquer campanha" },
-    { id: "goals", done: doc.goals.length > 0, tab: "goals",
-      label: "escreva o que ele precisa alcançar",
-      note: "um objetivo, com o número que diz se aconteceu" },
-    { id: "backlog", done: doc.backlog.length > 0, tab: "backlog",
-      label: "liste o que está travando agora",
-      note: "daqui as coisas são puxadas para o seu dia, uma por vez" },
-    { id: "journal", done: doc.journal.length > 0, tab: "journal",
-      label: "registre a primeira conversa",
-      note: "é do diário que a pauta da próxima reunião sai pronta" }
-  ];
-  const left = steps.filter((s) => !s.done);
-  if (!left.length) return null;
+function ClientNoteForm({ onClose, onCreate }) {
+  const [v, bind] = useFields({ title: "" });
+  const submit = () => { const t = v.title.trim(); if (!t) { notify("a nota precisa de um título"); return false; } onCreate(t); };
   return (
-    <div className="col-12 block first-steps">
-      <p className="heading">
-        <span className="t-mono">por onde começar</span>
-        <span className="t-mono t-mute">{steps.length - left.length} de {steps.length}</span>
-      </p>
-      <div className="first-steps__grid">
-        {steps.map((s) => (
-          <button key={s.id} className={"first-step" + (s.done ? " is-done" : "")} type="button"
-                  onClick={() => setTab(s.tab)}>
-            <span className="mark" aria-hidden="true">{icon("check")}</span>
-            <span className="first-step__text">
-              <b>{s.label}</b>
-              <small>{s.note}</small>
-            </span>
-          </button>
-        ))}
-      </div>
-    </div>
+    <Form title="nova nota" sub="nasce ligada a este cliente e abre em notas" submit="criar e abrir" onSubmit={submit} onClose={onClose}>
+      <Field label="título" full><input className="input" required maxLength="300" {...bind("title")} /></Field>
+    </Form>
   );
 }
 
-/* ---------- aba: ficha ---------- */
-function Profile({ doc, ctx }) {
-  const { update, updateItem, removeFrom } = ctx;
-  const contactsOf = (d) => d.contacts, linksOf = (d) => d.links;
-  /* "+ contato" e "+ link" empurravam uma linha VAZIA de campos para dentro da
-     lista. quem clicasse sem querer ficava com um contato fantasma que só some
-     se for apagado — e a regra da casa é que criar é sempre botão e caixa. */
-  const [adding, setAdding] = useState("");
+/* ---------- aba: arquivos ----------
+   contrato, proposta, nota fiscal. o binario vai para o R2 (o mesmo dos prints
+   das notas); o documento guarda o bilhete e o tipo, que sai do nome do arquivo
+   e da para trocar. */
+function Files({ doc, ctx }) {
+  const [busy, setBusy] = useState(0);
+  const [over, setOver] = useState(false);
+  const inputRef = useRef(null);
+  const order = (k) => { const i = FILE_KINDS.indexOf(k); return i < 0 ? 99 : i; };
+  const files = doc.files.slice().sort((a, b) => order(a.kind) - order(b.kind) || b.at - a.at);
+  const take = async (list) => {
+    const chosen = Array.from(list || []).filter((f) => f && f.size);
+    if (!chosen.length) return;
+    if (!cloud.signedIn) { notify("entre para subir arquivos — eles precisam de onde morar"); return; }
+    setBusy((n) => n + chosen.length);
+    const added = [];
+    for (const f of chosen) {
+      try { const up = await uploadFile(f); added.push({ ...up, kind: kindFromName(f.name) }); }
+      catch (e) { notify(e.message || "não consegui subir " + f.name); }
+      finally { setBusy((n) => n - 1); }
+    }
+    if (added.length) ctx.update((d) => {
+      d.files = d.files.concat(added);
+      added.forEach((f) => d.journal.push(journalEntry("arquivo: " + f.name + " (" + f.kind + ")")));
+    });
+  };
+  const remove = (f) => {
+    ctx.update((d) => { d.files = d.files.filter((x) => x.id !== f.id); });
+    deleteFile(f.id);
+    notify("arquivo apagado");
+  };
   return (
-    <div className="grid">
-      <div className="col-6 block column">
-        <label className="field-label">nome</label>
-        <input className="input" id="f-name" value={doc.name} onChange={(e) => update((d) => { d.name = e.currentTarget.value.slice(0, 120); })} />
-        <label className="field-label">marca</label>
-        <input className="input" id="f-brand" value={doc.brand} onChange={(e) => update((d) => { d.brand = e.currentTarget.value.slice(0, 120); })} />
-        <label className="field-label">resumo</label>
-        <textarea className="textarea" id="f-summary" value={doc.summary} onChange={(e) => update((d) => { d.summary = e.currentTarget.value; })} />
-        <label className="field-label">status</label>
-        <select className="select" id="f-status" value={doc.status} onChange={(e) => update((d) => { d.status = e.currentTarget.value; })}>
-          {STATUSES.map((s) => <option key={s} value={s}>{STATUS_LABEL[s]}</option>)}
-        </select>
-      </div>
-      <div className="col-6 block column">
-        <p className="heading"><span className="t-mono">contrato</span></p>
-        <label className="field-label">escopo</label>
-        <textarea className="textarea" id="f-scope" value={doc.contract.scope} onChange={(e) => update((d) => { d.contract.scope = e.currentTarget.value; })} />
-        <div className="form-grid">
-          <div><label className="field-label">valor (r$)</label><MoneyInput id="f-value" value={doc.contract.value} onChange={(v) => update((d) => { d.contract.value = v; })} /></div>
-          <div><label className="field-label">recorrência</label>
-            <select className="select" id="f-recurrence" value={doc.contract.recurrence} onChange={(e) => update((d) => { d.contract.recurrence = e.currentTarget.value; })}>
-              <option value="">—</option>
-              {RECURRENCES.filter(Boolean).map((r) => <option key={r} value={r}>{RECURRENCE_LABEL[r]}</option>)}
-            </select></div>
-          <div><label className="field-label">início</label><DateField id="f-start" value={doc.contract.start} onChange={(e) => update((d) => { d.contract.start = e.currentTarget.value; })} /></div>
-          <div><label className="field-label">fim</label><DateField id="f-end" value={doc.contract.end} onChange={(e) => update((d) => { d.contract.end = e.currentTarget.value; })} /></div>
-        </div>
-        <label className="field-label">extras</label>
-        <textarea className="textarea" id="f-extras" value={doc.contract.extras} onChange={(e) => update((d) => { d.contract.extras = e.currentTarget.value; })} />
-      </div>
-      <div className="col-6 block">
-        <p className="heading"><span className="t-mono">contatos</span><button className="pill pill--mini" type="button" id="add-contact" onClick={() => setAdding("contact")}>+ contato</button></p>
-        <div id="contact-list" className="column">
-          {doc.contacts.length ? doc.contacts.map((k) => (
-            <div key={k.id} className="editable-line" data-id={k.id}>
-              <input className="input small" placeholder="nome" value={k.name} onChange={(e) => updateItem(contactsOf, k.id, (x) => { x.name = e.currentTarget.value; })} />
-              <input className="input small" placeholder="papel" value={k.role} onChange={(e) => updateItem(contactsOf, k.id, (x) => { x.role = e.currentTarget.value; })} />
-              <input className="input small" placeholder="whatsapp" value={k.whatsapp} onChange={(e) => updateItem(contactsOf, k.id, (x) => { x.whatsapp = e.currentTarget.value; })} />
-              <input className="input small" placeholder="e-mail" value={k.email} onChange={(e) => updateItem(contactsOf, k.id, (x) => { x.email = e.currentTarget.value; })} />
-              <button className="action" type="button" aria-label="Remover contato" onClick={() => removeFrom(contactsOf, k.id, "contato removido")}>{icon("trash")}</button>
-            </div>)) : <p className="empty">nenhum contato ainda</p>}
-        </div>
-      </div>
-      <div className="col-6 block">
-        <p className="heading"><span className="t-mono">links</span><button className="pill pill--mini" type="button" id="add-link" onClick={() => setAdding("link")}>+ link</button></p>
-        <div id="link-list" className="column">
-          {doc.links.length ? doc.links.map((k) => (
-            <div key={k.id} className="editable-line" data-id={k.id}>
-              <input className="input small" placeholder="rótulo" value={k.label} onChange={(e) => updateItem(linksOf, k.id, (x) => { x.label = e.currentTarget.value; })} />
-              <input className="input small" placeholder="https://…" value={k.url} onChange={(e) => updateItem(linksOf, k.id, (x) => { x.url = e.currentTarget.value; })} />
-              <button className="action" type="button" aria-label="Remover link" onClick={() => removeFrom(linksOf, k.id, "link removido")}>{icon("trash")}</button>
-            </div>)) : <p className="empty">nenhum link ainda</p>}
-        </div>
-      </div>
-      {adding === "contact" && (
-        <ContactForm onClose={() => setAdding("")}
-          onAdd={(k) => update((d) => { d.contacts.push(k); })} />
-      )}
-      {adding === "link" && (
-        <LinkForm onClose={() => setAdding("")}
-          onAdd={(k) => update((d) => { d.links.push(k); })} />
-      )}
-    </div>
+    <>
+      <label className={"drop" + (over ? " is-over" : "")}
+             onDragOver={(e) => { e.preventDefault(); setOver(true); }}
+             onDragLeave={() => setOver(false)}
+             onDrop={(e) => { e.preventDefault(); setOver(false); take(e.dataTransfer.files); }}>
+        <input ref={inputRef} type="file" multiple hidden accept={FILE_TYPES.join(",")}
+               onChange={(e) => { take(e.currentTarget.files); e.currentTarget.value = ""; }} />
+        <b>{busy ? "subindo " + busy + (busy === 1 ? " arquivo…" : " arquivos…") : "arraste arquivos aqui"}</b>
+        <span>{busy ? "" : "ou clique para escolher · pdf e imagem, até 8 MB"}</span>
+      </label>
+      {!cloud.signedIn && <p className="note mt2">entre para subir arquivos — eles moram na nuvem, não neste navegador.</p>}
+      {files.length
+        ? <ul className="list mt">
+            {files.map((f) => (
+              <li key={f.id} className={"line file-line" + (f.kind === "contrato" ? " is-contract" : "")}>
+                <span className="file-line__ext">{isImage(f.type) ? "img" : (String(f.name).split(".").pop() || "").slice(0, 4)}</span>
+                <a className="name" href={fileUrl(f.id)} target="_blank" rel="noopener">{f.name || "arquivo"}</a>
+                <select className="file-line__kind" aria-label="tipo" value={f.kind}
+                        onChange={(e) => { const kind = e.currentTarget.value; ctx.update((d) => { const x = d.files.find((y) => y.id === f.id); if (x) x.kind = kind; }); }}>
+                  {FILE_KINDS.map((k) => <option key={k} value={k}>{k}</option>)}
+                </select>
+                <span className="measure">{f.at ? dateLabel(dayOf(new Date(f.at))) : ""}</span>
+                <div className="row-actions">
+                  <button className="action" type="button" aria-label={"Apagar " + f.name} onClick={() => remove(f)}>{icon("trash")}</button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        : <p className="empty">nada guardado ainda. contrato primeiro.</p>}
+    </>
+  );
+}
+
+/* ---------- aba: tarefas ----------
+   duas listas, porque sao duas coisas: o que ja tem dia (mora no calendario, e
+   aqui so aparece) e o que ainda nao tem (o antigo backlog, que espera virar
+   tarefa). so o dia tem minutos — a lista sem data nao cobra nenhum. */
+function ClientTasks({ doc, ctx, tasks, onTask }) {
+  const [form, setForm] = useState(false);
+  const delegate = useDelegate();
+  const { updateItem, removeFrom } = ctx;
+  const backlogOf = (d) => d.backlog;
+  const t0 = today();
+  const dated = tasks.all().filter((t) => t.client === doc.id)
+    .sort((a, b) => (a.done - b.done) || (a.done ? b.date.localeCompare(a.date) : a.date.localeCompare(b.date)));
+  const open = dated.filter((t) => !t.done), done = dated.filter((t) => t.done).slice(0, 5);
+  const undated = doc.backlog.filter((b) => !b.done).sort(compareBacklog);
+  const ask = (b) => delegate.ask({
+    id: b.id, title: b.text, min: b.min, due: b.due, client: doc.id,
+    about: aboutClient(doc), where: "as tarefas sem data do cliente", origin: { type: "client", id: doc.id }
+  });
+  const toggle = (t) => tasks.save({ ...t, done: !t.done, updatedAt: Date.now() });
+  const whenOf = (t) => t.date === t0 ? "hoje" : dateLabel(t.date);
+  return (
+    <>
+      <p className="heading mb2"><span className="t-mono">com dia</span><button className="pill pill--mini" type="button" onClick={() => onTask({ title: "" })}>{icon("plus")}tarefa</button></p>
+      {open.length || done.length
+        ? <ul className="list">
+            {open.concat(done).map((t) => (
+              <li key={t.id} className={"line" + (t.done ? " is-done" : "")}>
+                <button className="action mark" type="button" data-done={t.done} aria-label="Marcar feita" onClick={() => toggle(t)}>{icon("check")}</button>
+                <span className="name">{t.title}</span>
+                {t.min > 0 && <span className="measure">{formatMin(t.min)}</span>}
+                <a className={"measure task-when" + (!t.done && t.date < t0 ? " is-late" : "")} href={"calendar.html#" + t.date} title="abrir no calendário">{whenOf(t)}</a>
+              </li>
+            ))}
+          </ul>
+        : <p className="empty">nenhuma tarefa com dia para este cliente</p>}
+
+      <p className="heading mt mb2"><span className="t-mono">sem dia</span><button className="pill pill--mini" type="button" id="add-backlog" onClick={() => setForm(true)}>{icon("plus")}sem dia</button></p>
+      {undated.length
+        ? <ul className="list" id="backlog-list">
+            {undated.map((b) => (
+              <li key={b.id} className="line" data-id={b.id}>
+                <button className="action mark" type="button" data-done={b.done} aria-label="Marcar feito" onClick={() => updateItem(backlogOf, b.id, (x) => { x.done = !x.done; })}>{icon("check")}</button>
+                <span className="name">{b.text}</span>
+                {b.min > 0 && <span className="measure">{formatMin(b.min)}</span>}
+                {b.due && <span className="measure" title="prazo">{dateLabel(b.due)}</span>}
+                <div className="row-actions">
+                  <button className="action" type="button" disabled={!!delegate.busy} data-thinking={delegate.busy === b.id ? "yes" : null}
+                    title={delegate.busy === b.id ? "pensando…" : "perguntar ao merlin: dá pra fazer com o Claude?"}
+                    aria-label="Perguntar ao merlin se dá para fazer com o Claude" onClick={() => ask(b)}>{icon("spark")}</button>
+                  <button className="action" type="button" title="virar tarefa com dia" aria-label="Virar tarefa" onClick={() => onTask({ title: b.text + (b.min ? " " + formatMin(b.min) : ""), backlogId: b.id })}>{icon("task")}</button>
+                  <button className="action" type="button" aria-label="Remover" onClick={() => removeFrom(backlogOf, b.id, "item removido")}>{icon("trash")}</button>
+                </div>
+              </li>))}
+          </ul>
+        : <p className="empty" id="backlog-empty">nada esperando dia</p>}
+      {form && <BacklogForm onClose={() => setForm(false)} onAdd={(item) => ctx.update((d) => { d.backlog.push(item); })} />}
+      {delegate.answer && <DelegateDialog answer={delegate.answer} onClose={delegate.close} />}
+    </>
   );
 }
 
@@ -1002,9 +1185,9 @@ function Goal({ g, ctx }) {
   );
 }
 
-/* ---------- aba: backlog ----------
+/* ---------- o que ainda nao tem dia ----------
    e aqui que a demanda do cliente aparece antes de custar minuto: ao lado de
-   "puxar para o dia" mora a outra pergunta, a de quem talvez nao precise puxar
+   "virar tarefa" mora a outra pergunta, a de quem talvez nao precise virar
    nada — "da pra fazer com Claude?". */
 
 /* o que o merlin precisa saber do cliente para julgar a demanda: quem e, o que
@@ -1013,44 +1196,6 @@ const aboutClient = (c) => [
   c.name + (c.summary ? " — " + c.summary : ""),
   c.channels.length ? "canais: " + c.channels.map((ch) => ch.name).join(", ") : ""
 ].filter(Boolean).join(" · ");
-
-function Backlog({ doc, ctx }) {
-  const [form, setForm] = useState(false);
-  const delegate = useDelegate();
-  const { updateItem, removeFrom } = ctx;
-  const backlogOf = (d) => d.backlog;
-  const items = doc.backlog.slice().sort(compareBacklog);
-  const pull = (b) => sendToDay({ title: b.text, min: b.min, client: doc.id, origin: { type: "client", id: doc.id } });
-  const ask = (b) => delegate.ask({
-    id: b.id, title: b.text, min: b.min, due: b.due, client: doc.id,
-    about: aboutClient(doc), where: "o backlog do cliente", origin: { type: "client", id: doc.id }
-  });
-  return (
-    <>
-      <TabBar label="backlog" button="tarefa" id="add-backlog" onAdd={() => setForm(true)} />
-      {items.length
-        ? <ul className="list" id="backlog-list">
-            {items.map((b) => (
-              <li key={b.id} className={"line" + (b.done ? " is-done" : "")} data-id={b.id}>
-                <button className="action mark" type="button" data-done={b.done} aria-label="Marcar feito" onClick={() => updateItem(backlogOf, b.id, (x) => { x.done = !x.done; })}>{icon("check")}</button>
-                <span className="name">{b.text}</span>
-                {b.min > 0 && <span className="measure">{formatMin(b.min)}</span>}
-                <DateField className="backlog-due" title="prazo" value={b.due} onChange={(e) => updateItem(backlogOf, b.id, (x) => { x.due = e.currentTarget.value; })} />
-                <div className="row-actions">
-                  <button className="action" type="button" disabled={!!delegate.busy} data-thinking={delegate.busy === b.id ? "yes" : null}
-                    title={delegate.busy === b.id ? "pensando…" : "perguntar ao merlin: dá pra fazer com o Claude?"}
-                    aria-label="Perguntar ao merlin se dá para fazer com o Claude" onClick={() => ask(b)}>{icon("spark")}</button>
-                  <button className="action" type="button" title="puxar para o dia" aria-label="Puxar para o dia" onClick={() => pull(b)}>{icon("clock")}</button>
-                  <button className="action" type="button" aria-label="Remover" onClick={() => removeFrom(backlogOf, b.id, "item removido do backlog")}>{icon("trash")}</button>
-                </div>
-              </li>))}
-          </ul>
-        : <p className="empty" id="backlog-empty">nada no backlog ainda</p>}
-      {form && <BacklogForm onClose={() => setForm(false)} onAdd={(item) => ctx.update((d) => { d.backlog.push(item); })} />}
-      {delegate.answer && <DelegateDialog answer={delegate.answer} onClose={delegate.close} />}
-    </>
-  );
-}
 
 function BacklogForm({ onClose, onAdd }) {
   const [v, bind] = useFields({ text: "", duration: "", due: "" });
@@ -1062,7 +1207,7 @@ function BacklogForm({ onClose, onAdd }) {
     onAdd({ id: newId(), text, min, due: v.due || "", done: false, createdAt: Date.now() });
   };
   return (
-    <Form title="nova tarefa do backlog" sub="sem hora: ela só ganha minutos quando for puxada para o dia" submit="adicionar" onSubmit={submit} onClose={onClose}>
+    <Form title="sem dia, por enquanto" sub="fica na lista do cliente até virar tarefa com dia" submit="adicionar" onSubmit={submit} onClose={onClose}>
       <Field label="tarefa" full><input className="input" required maxLength="200" placeholder="o que fazer · 45m" {...bind("text")} /></Field>
       <Field label="duração"><input className="input input--mono" placeholder="45m, 1h30" {...bind("duration")} /></Field>
       <Field label="prazo"><DateField {...bind("due")} /></Field>
@@ -1070,21 +1215,24 @@ function BacklogForm({ onClose, onAdd }) {
   );
 }
 
-/* ---------- aba: diário (só acrescenta) ---------- */
+/* ---------- aba: historico (so acrescenta) ----------
+   o que aconteceu, numa linha do tempo. o que o sistema escreve sozinho
+   (fechou, mudou de status, subiu arquivo) e um marco curto; o que a pessoa
+   registra (reuniao, decisao, entrega) ganha o texto inteiro. */
 function Journal({ doc, ctx }) {
   const [form, setForm] = useState(false);
   const entries = doc.journal.slice().sort((a, b) => b.at - a.at);
   return (
     <>
-      <TabBar label="diário" button="registro" id="add-journal" onAdd={() => setForm(true)} />
+      <TabBar label="histórico" button="registro" id="add-journal" onAdd={() => setForm(true)} />
       {entries.length
-        ? <ul className="list" id="journal-list">
+        ? <ol className="timeline" id="journal-list">
             {entries.map((e) => (
-              <li key={e.id} className="block block--flat">
-                <p className="heading"><span className="badge">{JOURNAL_LABEL[e.type] || e.type}</span><span className="t-mono weak">{journalDate(e.at)}</span></p>
-                <Markdown className="journal-text" text={e.text} />
+              <li key={e.id} className={"timeline__item" + (e.type === "event" ? " is-event" : "")}>
+                <p className="timeline__head"><span className="t-mono">{journalDate(e.at)}</span>{e.type !== "event" && <span className="badge">{JOURNAL_LABEL[e.type] || e.type}</span>}</p>
+                {e.type === "event" ? <p className="timeline__event">{e.text}</p> : <Markdown className="journal-text" text={e.text} />}
               </li>))}
-          </ul>
+          </ol>
         : <p className="empty" id="journal-empty">nada registrado ainda</p>}
       {form && <JournalForm onClose={() => setForm(false)} onAdd={(entry) => ctx.update((d) => { d.journal.push(entry); })} />}
     </>
@@ -1099,7 +1247,7 @@ function JournalForm({ onClose, onAdd }) {
     onAdd({ id: newId(), at: Date.now(), type: v.type, text });
   };
   return (
-    <Form title="registrar no diário" sub="só acrescenta: o que aconteceu, com data de hoje" submit="registrar" onSubmit={submit} onClose={onClose}>
+    <Form title="registrar no histórico" sub="só acrescenta: o que aconteceu, com data de hoje" submit="registrar" onSubmit={submit} onClose={onClose}>
       <Field label="tipo" full><select className="select" {...bind("type")}>{JOURNAL_TYPES.map((t) => <option key={t} value={t}>{JOURNAL_LABEL[t]}</option>)}</select></Field>
       <Field label="o que aconteceu" full><textarea className="textarea" required placeholder="markdown simples vale" {...bind("text")} /></Field>
     </Form>
@@ -1240,7 +1388,7 @@ function VaultPasswordForm({ isNew, error, onUnlock, onClose }) {
 function MeetingDialog({ text, onClose, onKeep }) {
   return (
     <Dialog title="pauta da reunião" label="Preparar reunião" wide onClose={onClose}
-        actions={<><button className="pill" type="button" onClick={onClose}>fechar</button><button className="pill pill--green" type="button" id="keep-meeting-btn" onClick={onKeep}>guardar no diário</button></>}>
+        actions={<><button className="pill" type="button" onClick={onClose}>fechar</button><button className="pill pill--green" type="button" id="keep-meeting-btn" onClick={onKeep}>guardar no histórico</button></>}>
       <Markdown className="meeting-text" text={text} />
     </Dialog>
   );
@@ -1249,7 +1397,7 @@ function MeetingDialog({ text, onClose, onKeep }) {
 /* ---------- caixa: novo cliente ---------- */
 function ClientForm({ prefill, onCreate, onClose }) {
   const first = CLIENT_TEMPLATES.find((t) => t.id === prefill.template);
-  const [v, bind, set] = useFields({ name: prefill.name || (first ? first.name : ""), status: "prospect" });
+  const [v, bind, set] = useFields({ name: prefill.name || (first ? first.name : ""), status: "active" });
   /* o modelo é o TIPO DE NEGÓCIO, não um cliente de mentira: ele traz os
      canais com o checklist de cada um, os objetivos que aquele tipo de
      operação persegue e o backlog do que precisa existir antes. depois de
@@ -1278,7 +1426,7 @@ function ClientForm({ prefill, onCreate, onClose }) {
   return (
     <Form title="novo cliente" sub={chosen ? (tpl ? "modelo: " + tpl.name : "em branco") : undefined} submit="criar" onSubmit={submit} onClose={onClose}>
       <Field label="nome" full><input className="input" required {...bind("name")} /></Field>
-      <Field label="status" full><select className="select" {...bind("status")}>{STATUSES.map((s) => <option key={s} value={s}>{STATUS_LABEL[s]}</option>)}</select></Field>
+      <Field label="status" full><select className="select" {...bind("status")}>{CLIENT_STATUSES.map((s) => <option key={s} value={s}>{STATUS_LABEL[s]}</option>)}</select></Field>
       {(!chosen || tpl) && (
         <Field label={chosen ? "o que ele traz" : "modelo"} full>
           {!chosen && <TemplatePicker groups={clientGroups()} empty="em branco" value={tplId} onChange={choose} id="client-tpl" />}

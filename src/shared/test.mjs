@@ -653,6 +653,36 @@ const dataLeft = () => globalThis.localStorage.keys().filter((k) => k in DATA);
   }
 }
 
+/* ---- o documento de cliente, que duas páginas gravam ----
+   prospecção e clientes escrevem na mesma coleção. se o normalizador de uma
+   jogasse fora o que só a outra conhece, cada edição apagaria em silêncio o
+   funil (ou o contrato). e o próximo passo com data é a única ponte entre o
+   documento e o calendário: ela precisa mover, e não duplicar. */
+{
+  globalThis.localStorage = makeStorage({});
+  const D = await import("./client-doc.js?n=" + (++n));
+  const { tasks } = await import("./tasks.js?n=" + n);
+
+  const won = D.normalize({ id: "c1", name: "loja", status: "active", contract: { value: 300000 }, pain: "não sabe de onde vem a venda", stage: "negotiation", futureField: 7 });
+  check("cliente: o que veio do funil continua no cliente", won.pain === "não sabe de onde vem a venda" && won.stage === "negotiation");
+  check("cliente: campo desconhecido atravessa o normalizador", won.futureField === 7);
+  check("cliente: o contrato também continua", won.contract.value === 300000);
+  const legacy = D.normalize({ id: "c2", status: "proposal" });
+  check("cliente: status antigo de proposta vira prospecto na etapa de proposta", legacy.status === "prospect" && legacy.stage === "proposal", legacy.status + "/" + legacy.stage);
+  check("cliente: perdido não é cliente nem funil", !D.isClient({ status: "lost" }) && !D.isPipeline({ status: "lost" }));
+  check("cliente: arquivo ganha tipo pelo nome", D.normalize({ id: "c3", files: [{ id: "f", name: "Contrato-assinado.pdf" }] }).files[0].kind === "contrato");
+
+  const store = tasks();
+  const p = D.normalize({ id: "p1", name: "Bruna", status: "prospect", next: "mandar proposta", nextDate: "2026-09-20" });
+  D.syncNext(p);
+  D.syncNext({ ...p, nextDate: "2026-09-22" });
+  const mine = store.all().filter((t) => t.origin && t.origin.type === "next" && t.origin.id === "p1");
+  check("próximo passo: mudar a data move a tarefa, não cria outra", mine.length === 1 && mine[0].date === "2026-09-22", mine.map((t) => t.date).join());
+  check("próximo passo: a tarefa diz o que e com quem", mine[0].title === "mandar proposta · Bruna" && mine[0].client === "p1", mine[0].title);
+  D.syncNext({ ...p, status: "lost" });
+  check("próximo passo: perdido tira a tarefa do calendário", !store.all().some((t) => t.origin && t.origin.id === "p1"));
+}
+
 
 console.log("\n" + passed + " passaram, " + failures.length + " falharam");
 if (failures.length) { console.log("\nFALHAS:"); failures.forEach((f) => console.log("  - " + f)); process.exit(1); }

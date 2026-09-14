@@ -252,7 +252,11 @@ export const PAGES = [
      tarefa quando o calendario abre a semana */
   { id: "routine", label: "rotina", href: "routine.html" },
   { id: "notes", label: "notas", href: "notes.html" },
+  /* a prospeccao vem antes de clientes porque e de onde eles chegam; o
+     conteudo vem logo depois, porque e o que traz quem entra na prospeccao */
+  { id: "prospecting", label: "prospecção", href: "prospecting.html" },
   { id: "clients", label: "clientes", href: "clients.html" },
+  { id: "content", label: "conteúdo", href: "content.html" },
   { id: "funnels", label: "funis", href: "funnels.html" },
   { id: "maps", label: "mapas", href: "maps.html" },
   { id: "finance", label: "financeiro", href: "finance.html" },
@@ -275,7 +279,9 @@ export function toggleSidebar() {
 const SEARCH_SOURCES = [
   { type: "bookmarks", label: "site", field: "name", href: (d) => d.url },
   { type: "notes", label: "nota", field: "title", href: (d) => "notes.html#" + encodeURIComponent(d.id) },
-  { type: "clients", label: "cliente", field: "name", href: (d) => "clients.html#" + encodeURIComponent(d.id) },
+  { type: "clients", label: "cliente", field: "name", filter: (d) => d.status !== "prospect" && d.status !== "lost", href: (d) => "clients.html#" + encodeURIComponent(d.id) },
+  { type: "clients", label: "prospecto", field: "name", filter: (d) => d.status === "prospect" || d.status === "lost", href: (d) => "prospecting.html#" + encodeURIComponent(d.id) },
+  { type: "content", label: "conteúdo", field: "title", href: (d) => "content.html#" + encodeURIComponent(d.id) },
   { type: "tasks", label: "tarefa", field: "title", href: (d) => "calendar.html#" + encodeURIComponent(d.date || ""), filter: (d) => !d.done },
   { type: "maps", label: "mapa", field: "name", href: (d) => "maps.html#" + encodeURIComponent(d.id) },
   { type: "funnels", label: "funil", field: "name", href: (d) => "funnels.html#" + encodeURIComponent(d.id) },
@@ -858,7 +864,7 @@ document.addEventListener("visibilitychange", () => {
    nao baixou espera a proxima sincronizacao, e a marca de "feito" so e
    gravada quando todas fecharam. depois disso ela nunca mais faz nada. */
 const FRONTS_PURGED = "merlin:fronts-removed";
-const PURGE_TYPES = ["notes", "clients", "tasks", "week", "maps", "funnels", "finance", "habits", "plans", "bookmarks"];
+const PURGE_TYPES = ["notes", "clients", "tasks", "week", "maps", "funnels", "finance", "habits", "plans", "bookmarks", "content"];
 function stripFront(value) {
   if (Array.isArray(value)) return value.map(stripFront).some(Boolean);
   if (!value || typeof value !== "object") return false;
@@ -1016,7 +1022,8 @@ export function savePrefs(patch) {
 /* clientes: o indice leve que os outros modulos usam para selo e escolha.
    a colecao inteira mora em clientes.html; aqui so o que e comum. */
 export const clients = () => collection("clients");
-export const listClients = () => clients().all().filter((c) => c.status !== "closed").sort((a, b) => String(a.name).localeCompare(String(b.name)));
+/* perdido sai dos seletores junto com encerrado: nenhum dos dois recebe tarefa nova */
+export const listClients = () => clients().all().filter((c) => c.status !== "closed" && c.status !== "lost").sort((a, b) => String(a.name).localeCompare(String(b.name)));
 export const clientName = (id) => { const c = id && clients().get(id); return c ? c.name : ""; };
 /* ---------- @cliente no texto ----------
    "@lojax" liga o que esta sendo escrito a um cliente. compara sem acento, sem
