@@ -134,15 +134,27 @@ function monthGrid(month) {
    nada: a conta dele e sobre o dia inteiro, e esconder uma tarefa ali
    mentiria sobre o tempo que sobra. */
 const AGENDA_COLORS = ["#8b5cf6", "#f59e0b", "#14b8a6", "#f43f5e", "#3b82f6", "#ec4899", "#f97316", "#06b6d4"];
+/* desde 14/09/2026 a pessoa escolhe a cor de cada agenda. a do cliente grava
+   no proprio cliente (`color`), e vale em todo aparelho; a da agenda pessoal
+   grava nas preferencias (`personalColor`). sem escolha, a regra de antes. */
+const PICK_COLORS = ["#3b82f6", "#06b6d4", "#14b8a6", "#22c55e", "#84cc16", "#f59e0b", "#f97316", "#f43f5e", "#ec4899", "#8b5cf6", "#a3a3a3"];
+const isHex = (v) => /^#[0-9a-f]{6}$/i.test(String(v || ""));
 const agendaColor = (client) => {
+  if (!client) return readPrefs().personalColor;
   const c = clients().get(client);
-  if (c && c.color) return c.color;
+  if (c && isHex(c.color)) return c.color;
   const order = clients().all().sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0) || String(a.id).localeCompare(String(b.id)));
   const i = order.findIndex((x) => x.id === client);
   return AGENDA_COLORS[(i < 0 ? 0 : i) % AGENDA_COLORS.length];
 };
-/* o estilo que leva a cor: sem cliente nao ha variavel, e o CSS cai no verde */
-const agendaStyle = (client) => (client ? { "--c": agendaColor(client) } : {});
+const setAgendaColor = (client, color) => {
+  if (!client) { savePrefs({ personalColor: color }); return; }
+  const c = clients().get(client);
+  if (c) clients().save({ ...c, color, updatedAt: Date.now() });
+};
+/* o estilo que leva a cor: sem cor escolhida na pessoal nao ha variavel, e o
+   CSS cai no verde da casa */
+const agendaStyle = (client) => { const c = agendaColor(client); return c ? { "--c": c } : {}; };
 const HIDDEN_KEY = "merlin:calendar:hidden";
 const SIDE_KEY = "merlin:calendar:side";
 const readHidden = () => { try { const v = JSON.parse(localStorage.getItem(HIDDEN_KEY) || "[]"); return Array.isArray(v) ? v : []; } catch (e) { return []; } };
@@ -227,6 +239,7 @@ function Calendar() {
   const store = useCollection("tasks", { normalize });
   const notesCol = useCollection("notes", { normalize: normalizeNote });
   const routineCol = useCollection("routine", { normalize: normalizeBlock });
+  useCollection("prefs"); /* a cor da agenda pessoal mora ali: mudou, repinta */
   /* o conteudo com dia de ir ao ar: so leitura aqui. a peca nao e tarefa (nao
      tem duracao, nao se conclui no dia) — ela aparece como marca do dia, e o
      trabalho de gravar e editar vira tarefa la em conteudo. */
@@ -1562,6 +1575,39 @@ function PieceMark({ p }) {
    um mes pequeno para pular de data, e a lista das agendas com a caixa na
    cor de cada uma. o numero ao lado e quantas tarefas ela tem no periodo
    aberto — conta, nao duracao: so o dia tem minutos. */
+/* a cor de uma agenda: o botao aparece no hover, como o "so", e abre as
+   cores. "outra" e o seletor do sistema, pra quem quer a cor exata da marca */
+function AgendaColor({ agenda }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+  useEffect(() => {
+    if (!open) return;
+    const away = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    const esc = (e) => { if (e.key === "Escape") setOpen(false); };
+    document.addEventListener("pointerdown", away);
+    document.addEventListener("keydown", esc);
+    return () => { document.removeEventListener("pointerdown", away); document.removeEventListener("keydown", esc); };
+  }, [open]);
+  const current = agendaColor(agenda.key);
+  const pick = (c) => { setAgendaColor(agenda.key, c); setOpen(false); };
+  return (
+    <span className="agenda__color" ref={ref}>
+      <button className="agenda__paint" type="button" title={"cor de " + agenda.name} aria-label={"Cor de " + agenda.name}
+              aria-expanded={open} onClick={() => setOpen((o) => !o)} />
+      {open && (
+        <span className="swatches" role="dialog" aria-label={"Cor de " + agenda.name}>
+          {PICK_COLORS.map((c) => (
+            <button key={c} type="button" className="swatch" style={{ "--s": c }} aria-label={c} aria-pressed={current === c} onClick={() => pick(c)} />
+          ))}
+          <label className="swatch swatch--other" title="outra cor">
+            <input type="color" value={isHex(current) ? current : "#22c55e"} onChange={(e) => setAgendaColor(agenda.key, e.currentTarget.value)} />
+          </label>
+        </span>
+      )}
+    </span>
+  );
+}
+
 function CalSide({ anchor, view, weekStart, all, clients, off, onPick, onToggle, onOnly, onShowAll }) {
   const [month, setMonth] = useState(monthOf(anchor));
   useEffect(() => { setMonth(monthOf(anchor)); }, [anchor]);
@@ -1611,6 +1657,7 @@ function CalSide({ anchor, view, weekStart, all, clients, off, onPick, onToggle,
                 <span className="agenda__box" aria-hidden="true">{icon("check")}</span>
                 <span className="agenda__name">{a.name}</span>
               </label>
+              <AgendaColor agenda={a} />
               <button className="agenda__only" type="button" title={"mostrar só " + a.name} onClick={() => onOnly(a.key)}>só</button>
               <span className="agenda__n t-mono">{counts.get(a.key) || ""}</span>
             </li>

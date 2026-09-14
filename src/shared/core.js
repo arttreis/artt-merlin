@@ -1028,7 +1028,11 @@ export function readPrefs() {
   const dayStart = inRange(d.dayStart, 0, 1440, DEFAULT_PREFS.dayStart);
   let dayEnd = inRange(d.dayEnd, 0, 1440, DEFAULT_PREFS.dayEnd);
   if (dayEnd <= dayStart) dayEnd = Math.min(dayStart + 600, 1440);
-  return { dayStart, dayEnd, guess: inRange(d.guess, 5, 240, DEFAULT_PREFS.guess) };
+  return {
+    dayStart, dayEnd, guess: inRange(d.guess, 5, 240, DEFAULT_PREFS.guess),
+    /* a cor da agenda pessoal no calendario; vazio e o verde da casa */
+    personalColor: /^#[0-9a-f]{6}$/i.test(String(d.personalColor || "")) ? d.personalColor : ""
+  };
 }
 
 export function savePrefs(patch) {

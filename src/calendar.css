@@ -636,7 +636,8 @@
 .calbody__main{min-width:0}
 .calside{
   display:flex;flex-direction:column;min-width:0;
-  background:var(--surface);border:1px solid var(--line-soft);border-radius:var(--br3);overflow:hidden;
+  /* sem overflow:hidden: as amostras de cor da ultima agenda passam da borda */
+  background:var(--surface);border:1px solid var(--line-soft);border-radius:var(--br3);
 }
 
 .mini{padding:10px 10px 12px;border-bottom:1px solid var(--line-soft)}
@@ -685,6 +686,22 @@
 .agenda.is-off .agenda__box{background:none}
 .agenda.is-off .agenda__box svg{opacity:0}
 .agenda.is-off .agenda__name{color:var(--ink-30)}
+/* a cor da agenda: bolinha que aparece no hover e abre as amostras */
+.agenda__color{position:relative;flex:0 0 auto;display:flex}
+.agenda__paint{width:20px;height:20px;border-radius:6px;display:grid;place-items:center;opacity:0;transition:opacity var(--t),background var(--t)}
+.agenda__paint::before{content:"";width:10px;height:10px;border-radius:50%;background:var(--c);box-shadow:0 0 0 1.5px var(--surface),0 0 0 2.5px var(--line)}
+.agenda:hover .agenda__paint,.agenda__paint:focus-visible,.agenda__paint[aria-expanded="true"]{opacity:1}
+.agenda__paint:hover{background:var(--fill-hover)}
+.swatches{
+  position:absolute;right:0;top:calc(100% + 4px);z-index:20;display:grid;grid-template-columns:repeat(6,22px);gap:6px;
+  padding:8px;border-radius:var(--br3);background:var(--surface-2);border:1px solid var(--line);box-shadow:var(--sombra-2);
+}
+.swatch{width:22px;height:22px;border-radius:50%;background:var(--s);border:0;cursor:pointer;position:relative;transition:transform var(--t)}
+.swatch:hover{transform:scale(1.12)}
+.swatch[aria-pressed="true"]{box-shadow:0 0 0 2px var(--surface-2),0 0 0 3.5px var(--ink)}
+.swatch--other{background:conic-gradient(#f43f5e,#f59e0b,#84cc16,#06b6d4,#3b82f6,#8b5cf6,#f43f5e);overflow:hidden}
+.swatch--other input{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer;border:0;padding:0}
+@media (hover:none){.agenda__paint{opacity:.7}}
 .agenda__n{flex:0 0 auto;font-size:10px;color:var(--ink-30);min-width:12px;text-align:right}
 /* "so": aparece no hover, e no toque fica sempre la, apagado */
 .agenda__only{
