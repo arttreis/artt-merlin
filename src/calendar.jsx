@@ -17,6 +17,7 @@
    a semana e o mes mostram o que ha em cada data, sem prometer que cabe. */
 import "./shared/base.css";
 import "./calendar.css";
+import "./shared/week-grid.css";
 import {
   initPage, newId, today, isDay, dateOf, dayOf, addDays, sundayOf, dateLabel, monthLabel,
   api, cloud, notify, readDuration, formatMin, parseDuration, readPrefs, savePrefs,
@@ -31,6 +32,7 @@ import {
 import {
   normalize, onDate, inRange, overdue, dayDoc, topOrder, newTask, migrateTasks, layoutDay, readClock
 } from "./shared/tasks.js";
+import { normalize as normalizeBlock, copyRoutine } from "./shared/routine.js";
 import {
   pendingOf, doneOf, reservesOf, costOf, guessMin, budget, fmt, longFmt, clock
 } from "./shared/day.js";
@@ -184,13 +186,14 @@ const readView = () => {
 /* de onde uma tarefa pode ter vindo. o selo anuncia o FIO, nao "isto entrou
    sozinho": e o que separa uma tarefa que voce escreveu de uma que tem um
    objetivo, uma nota ou um cliente preso do outro lado. */
-const ORIGIN_LABEL = { note: "nota", habit: "hábito", client: "cliente", plan: "plano", funnel: "funil" };
+const ORIGIN_LABEL = { note: "nota", habit: "hábito", client: "cliente", plan: "plano", funnel: "funil", routine: "rotina" };
 
 /* ================================================================
    a pagina
    ================================================================ */
 function Calendar() {
   const store = useCollection("tasks", { normalize });
+  const routineCol = useCollection("routine", { normalize: normalizeBlock });
   const notesCol = useCollection("notes", { normalize: normalizeNote });
   useClients();
   const hash = useHash();
@@ -398,9 +401,11 @@ function Calendar() {
      mes); na visao do dia, para o dia aberto. */
   const clip = useRef(null);
   const pointed = useRef({ task: "", day: "" });
+  /* a copia de uma copia da rotina nao leva o fio: o bloco trataria as duas
+     como dele, e mudar o bloco mexeria na que voce criou a mao */
   const copyOf = (t, date, order) => newTask({
     title: t.title, date, at: t.at, min: t.min, reserved: t.reserved,
-    clickup: t.clickup, client: t.client, origin: t.origin, order
+    clickup: t.clickup, client: t.client, origin: t.origin && t.origin.type === "routine" ? null : t.origin, order
   });
   const copyTask = (id) => {
     const t = store.get(id);
@@ -572,32 +577,6 @@ function Calendar() {
     if (parts.length) showToast("chegou de outro módulo: " + parts.join(" e "));
   };
 
-  /* ---------- recorrencia ----------
-     so a origem espalha copia; a copia carrega recurringSource e nunca vira,
-     ela mesma, uma nova origem. so em semana atual ou futura — reabrir uma
-     semana passada nao inventa tarefa nela. */
-  const spawnRecurring = (weekStart) => {
-    if (weekStart < sundayOf(today())) return;
-    const list = store.all();
-    const week = new Set(WEEK_DAYS(weekStart));
-    const inWeek = list.filter((t) => week.has(t.date));
-    const fresh = [];
-    list.forEach((t) => {
-      if (!t.recurring || t.recurringSource) return;
-      const sourceStart = sundayOf(t.date);
-      if (sourceStart === weekStart) return;
-      if (inWeek.some((x) => x.title === t.title)) return;
-      const offset = Math.round((dateOf(t.date) - dateOf(sourceStart)) / 86400000);
-      const copy = newTask({
-        title: t.title, date: addDays(weekStart, offset), min: t.min, client: t.client, at: t.at, reserved: t.reserved,
-        recurring: true, recurringSource: t.id, order: t.order
-      });
-      fresh.push(copy);
-      inWeek.push(copy);
-    });
-    if (fresh.length) store.saveMany(fresh);
-  };
-
   /* ---------- resumir a semana com o merlin ---------- */
   const weekStart = sundayOf(anchor);
   const askSummary = async () => {
@@ -726,7 +705,17 @@ function Calendar() {
     migrateTasks(true);
     return cloud.onChange(() => migrateTasks(true));
   }, []);
-  useEffect(() => { spawnRecurring(weekStart); }, [weekStart, store]);
+  /* a rotina: os blocos moram em routine.html, e o calendario os copia para
+     a semana aberta (quem decide o que copiar e o shared/routine.js). de novo
+     a cada mudanca: a volta da nuvem e o que destrava a primeira copia, e um
+     bloco criado em outra aba tem que chegar sem recarregar. a segunda
+     passada nao acha nada — a semana ja esta marcada. */
+  useEffect(() => {
+    const run = () => copyRoutine(routineCol, store, weekStart);
+    run();
+    const offs = [store.onChange(run), routineCol.onChange(run), cloud.onStatus(run)];
+    return () => offs.forEach((off) => off());
+  }, [weekStart, store]);
   useEffect(() => {
     const f = (e) => { if (e.key === "merlin:inbox") emptyInbox(); };
     window.addEventListener("storage", f);
@@ -1134,11 +1123,10 @@ function TaskRow({ t, start, slot, fits, dragging, leaving, actions }) {
             : <button className="task__time" type="button" data-missing={t.min ? null : "yes"}
                 aria-label={t.min ? "Duração: " + longFmt(t.min) + ". Alterar" : "Sem duração, contando " + longFmt(guessMin()) + " como palpite. Definir"}
                 onClick={() => setEditingTime(true)}>{icon("clock")}<span>{(t.min ? fmt(t.min) : "definir duração · contando " + fmt(guessMin())) + partial}</span></button>}
-          {(!!client || !!t.origin || t.recurring) && (
+          {(!!client || !!t.origin) && (
             <div className="task__badges">
               <ClientBadge id={t.client} />
               {t.origin && ORIGIN_LABEL[t.origin.type] && <span className="badge">{ORIGIN_LABEL[t.origin.type]}</span>}
-              {t.recurring && <span className="badge">toda semana</span>}
             </div>
           )}
         </div>
@@ -1588,8 +1576,7 @@ function TaskForm({ store, id, presetDate, presetAt, onClose, onRemove, onDuplic
     at: c ? (c.at != null ? clock(c.at) : "") : (presetAt != null ? clock(presetAt) : ""),
     duration: c && c.min ? formatMin(c.min) : "",
     client: c ? c.client : "",
-    reserved: !!(c && c.reserved),
-    recurring: !!(c && c.recurring)
+    reserved: !!(c && c.reserved)
   });
   const touchedReserve = useRef(!!c);
   if (id && !c) return null;
@@ -1604,8 +1591,8 @@ function TaskForm({ store, id, presetDate, presetAt, onClose, onRemove, onDuplic
     const min = parseDuration(v.duration).min || parsed.min;
     const client = v.client || found.client;
     const reserved = touchedReserve.current ? v.reserved : (v.reserved || isReserve(title));
-    if (c) store.save({ ...c, title, date: v.date, at, client, min, reserved, recurring: v.recurring, updatedAt: Date.now() });
-    else store.save(newTask({ title, date: v.date, at, client, min, reserved, recurring: v.recurring }));
+    if (c) store.save({ ...c, title, date: v.date, at, client, min, reserved, updatedAt: Date.now() });
+    else store.save(newTask({ title, date: v.date, at, client, min, reserved }));
   };
   return (
     <Form title={c ? "tarefa" : "nova tarefa"} submit={c ? "salvar" : "adicionar"} remove={c ? "apagar" : ""}
@@ -1624,8 +1611,9 @@ function TaskForm({ store, id, presetDate, presetAt, onClose, onRemove, onDuplic
       <div className="full chips">
         <button className="chip" type="button" aria-pressed={v.reserved} title="ocupa o tempo, mas não é trabalho para concluir"
                 onClick={() => { touchedReserve.current = true; set("reserved", !v.reserved); }}>reunião ou pausa</button>
-        <button className="chip" type="button" aria-pressed={v.recurring}
-                onClick={() => set("recurring", !v.recurring)}>toda semana</button>
+        {/* o que se repete toda semana mora na rotina, e nao numa tarefa: a
+            copia so aponta para la */}
+        {c && c.origin && c.origin.type === "routine" && <a className="chip" href="routine.html" title="mudar aqui muda só esta semana">vem da rotina</a>}
       </div>
     </Form>
   );

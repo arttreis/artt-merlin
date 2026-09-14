@@ -23,6 +23,7 @@ import {
 } from "./shared/core.js";
 import { budget, pendingOf, costOf, fmt, longFmt, clock } from "./shared/day.js";
 import { normalize as normalizeTask, dayDoc, overdue } from "./shared/tasks.js";
+import { normalize as normalizeBlock, copyRoutine } from "./shared/routine.js";
 import { useState, useEffect, useLayoutEffect } from "react";
 import { mount, useCollection, useCloud, useClients, Form, Field, useFields, icon } from "./shared/ui.jsx";
 import { NAV_ICONS, LOGO } from "./shared/icons.jsx";
@@ -264,6 +265,7 @@ function DayBlock({ doc, late }) {
    um relatório em vez de um lugar de onde se parte. */
 const QUICK = [
   { id: "calendar", label: "calendário", href: "calendar.html", n: "dayOpen" },
+  { id: "routine", label: "rotina", href: "routine.html", n: "" },
   { id: "notes", label: "notas", href: "notes.html", n: "notes" },
   { id: "clients", label: "clientes", href: "clients.html", n: "clients" },
   { id: "funnels", label: "funis", href: "funnels.html", n: "funnels" },
@@ -434,6 +436,16 @@ function Home() {
   const plans = useCollection("plans");
   const clientsCol = useCollection("clients");
   const bookmarks = useCollection("bookmarks");
+  const routine = useCollection("routine", { normalize: normalizeBlock });
+
+  /* o início mostra o dia, e o dia pode ter reunião da rotina: copia a semana
+     daqui também, senão ela só apareceria depois de abrir o calendário */
+  useEffect(() => {
+    const run = () => copyRoutine(routine, tasks);
+    run();
+    const offs = [tasks.onChange(run), routine.onChange(run), c.onStatus(run)];
+    return () => offs.forEach((off) => off());
+  }, []);
 
   /* o dia virou uma consulta na coleção de tarefas: a coleção já avisa quando
      muda (outra aba, nuvem), então aqui só resta o relógio — a barra se gasta

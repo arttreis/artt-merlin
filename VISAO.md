@@ -438,6 +438,37 @@ trimestre / no meu mês / na minha semana" visível de um lugar só.
 O que fica fora, de propósito: metas com número (OKR com percentual), lembrete/notificação e
 qualquer gráfico antes de existir um mês inteiro de marcas.
 
+### 4.11 Rotina (`routine.html`) — 13/09/2026
+
+A **semana de sempre**: o que se repete toda semana, com dia e hora. Pedido do Arthur, que
+escolheu "semana-modelo" entre três leituras de rotina (sequência de blocos, semana-modelo,
+checklist recorrente).
+
+Ela já existia espalhada: o botão **"toda semana"** fazia de uma tarefa a mãe que se copiava
+para a semana aberta. Não havia onde ver a rotina inteira, mudar a mãe não mudava as cópias e
+a cópia era reconhecida pelo título. O botão saiu, e as mães viraram blocos numa migração
+(`fromRecurring`, que roda sozinha no calendário e no início).
+
+- **A tela** é a grade de horas da semana sem datas, dom a sáb (a folha é a mesma:
+  `shared/week-grid.css`). Clicar num espaço vazio cria ali; arrastar muda dia e hora; a borda
+  de baixo muda a duração. Tela vazia oferece blocos prontos (daily, almoço, weekly…).
+- **Um bloco, vários dias.** "Almoço 12h, seg a sex" é um bloco só: mudar a hora muda todos
+  os dias, porque é isso que a frase quer dizer. Quem quer a sexta diferente tira a sexta do
+  bloco e cria outro.
+- **Vira tarefa quando a semana chega.** O calendário (e o início) copia os blocos para a
+  semana atual ou futura que abre, com `origin:{type:"routine", id}`. Cada bloco guarda em
+  `weeks` os domingos em que já se copiou: apagar a cópia de uma quinta não a faz renascer.
+  Dia que já passou não ganha cópia.
+- **Mudar o bloco muda daqui pra frente, menos o que você mexeu.** Mexer é a cópia ter título,
+  hora, duração, cliente ou "reunião" diferente do bloco de antes. Apagar o bloco leva as
+  cópias futuras intocadas, com desfazer.
+- **Só o dia tem minutos** continua valendo: a rotina é mais um reservatório, e a cópia é uma
+  tarefa comum — a semana mostra, o dia cobra.
+- **Uma rotina só.** "Semana normal" e "semana de lançamento" ficam para quando fizer falta.
+- Coleção `routine` (`merlin:routine`), um documento por bloco:
+  `{id, title, days:[0-6], at, min, reserved, client, weeks:{'YYYY-MM-DD': true},
+  createdAt, updatedAt}`. A regra inteira mora em `shared/routine.js`, pura e testada.
+
 ---
 
 ## 5. Ordem de construção
@@ -457,6 +488,7 @@ qualquer gráfico antes de existir um mês inteiro de marcas.
 | 10 | Migração para o Preact e para o inglês (`MIGRATION.md`) | feito |
 | 11 | Hábitos (`habits.html`) e Planos (`plans.html`) | feito |
 | 12 | Segunda migração: Preact → React 19 com Vite (`MIGRATION.md`, seção 10) | feito |
+| 12b | Rotina (`routine.html`), no lugar do "toda semana" da tarefa (seção 4.11) | feito |
 | 13 | Entrada em linguagem natural para o sistema todo (seção 4.8) | depois |
 
 ---

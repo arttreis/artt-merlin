@@ -1,0 +1,22 @@
+/* merlin · o CSS da rotina
+   a grade vem inteira do shared/week-grid.css. aqui fica o que so a rotina
+   tem: o dia da semana sem numero no cabecalho, e a caixa do bloco. */
+
+/* sem data, o cabecalho e so o nome do dia. hoje continua marcado: a coluna
+   de hoje e onde o olho confere se a rotina bate com o dia que esta vivendo */
+.rt__dayname{display:block;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-50);padding:4px 0 2px}
+.rt .wk__day.is-today .rt__dayname{color:var(--green-ink)}
+.rt .wk__scroll{max-height:calc(100dvh - var(--nav-h) - 150px)}
+
+/* ---------- a caixa do bloco ---------- */
+.rt-form__when{display:grid;gap:var(--pd2);grid-template-columns:1fr 1fr}
+
+/* os dias como pilulas: a mesma do habito, que mora no habits.css */
+.weekday-picker{display:flex;gap:4px;flex-wrap:wrap}
+.weekday-picker label{
+  display:inline-flex;align-items:center;justify-content:center;width:34px;height:28px;border-radius:var(--br-pill);
+  border:1px solid var(--line-soft);background:var(--fill);font-size:11px;color:var(--ink-50);cursor:pointer;
+  transition:background var(--t),color var(--t),border-color var(--t);
+}
+.weekday-picker input{position:absolute;opacity:0;width:1px;height:1px}
+.weekday-picker label.is-on{background:var(--green);color:var(--on-green);border-color:var(--green)}

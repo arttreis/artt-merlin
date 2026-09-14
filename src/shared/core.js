@@ -248,6 +248,9 @@ export const PAGES = [
      visoes de uma so, e dois itens levando ao mesmo lugar seriam duas portas
      para a mesma sala. */
   { id: "calendar", label: "calendário", href: "calendar.html" },
+  /* logo abaixo do calendario porque e dele que ela vive: a rotina so vira
+     tarefa quando o calendario abre a semana */
+  { id: "routine", label: "rotina", href: "routine.html" },
   { id: "notes", label: "notas", href: "notes.html" },
   { id: "clients", label: "clientes", href: "clients.html" },
   { id: "funnels", label: "funis", href: "funnels.html" },
@@ -278,6 +281,7 @@ const SEARCH_SOURCES = [
   { type: "funnels", label: "funil", field: "name", href: (d) => "funnels.html#" + encodeURIComponent(d.id) },
   { type: "finance", label: "R$", field: "name", href: () => "finance.html", filter: (d) => d.type === "entry" || d.type === "fixed" || d.type === "debt" || d.type === "card" },
   { type: "habits", label: "hábito", field: "name", href: () => "habits.html", filter: (d) => !d.archived },
+  { type: "routine", label: "rotina", field: "title", href: () => "routine.html" },
   /* os objetivos moram dentro do documento do periodo: `each` abre o doc em varios achados */
   { type: "plans", label: "objetivo", href: () => "plans.html", each: (d) => (d.goals || []).map((g) => g.text) }
 ];

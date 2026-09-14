@@ -1239,6 +1239,42 @@ export const habitGroups = () => HABIT_GROUPS
   .filter((g) => g.items.length);
 
 /* ================================================================
+   rotina
+   ================================================================
+   a semana de sempre vazia é uma grade de 168 horas em branco, e ninguém
+   lembra da própria semana começando pela meia-noite de domingo. estes são
+   os blocos que quase toda semana tem, com dia, hora e duração escolhidos —
+   o que muda de pessoa para pessoa é a hora, e ela se arrasta depois.
+
+     days: 0 é domingo · at: minutos desde a meia-noite · reserved: ocupa
+     sem ser trabalho (reunião, almoço), como na tarefa
+   ================================================================ */
+
+export const ROUTINE_GROUPS = [
+  { key: "meetings", label: "reuniões", note: "o que já tem hora marcada com outras pessoas" },
+  { key: "breaks", label: "pausas", note: "o que tira tempo do dia sem ser trabalho" },
+  { key: "work", label: "trabalho", note: "o que você faz toda semana e sempre esquece de reservar" }
+];
+
+const WEEKDAYS_ONLY = [1, 2, 3, 4, 5];
+export const ROUTINE_SUGGESTIONS = [
+  { id: "daily", group: "meetings", title: "daily", days: WEEKDAYS_ONLY, at: 540, min: 15, reserved: true },
+  { id: "weekly", group: "meetings", title: "weekly do time", days: [1], at: 600, min: 60, reserved: true },
+  { id: "one-on-one", group: "meetings", title: "1:1", days: [3], at: 900, min: 30, reserved: true },
+  { id: "clients", group: "meetings", title: "call de acompanhamento com cliente", days: [4], at: 840, min: 60, reserved: true },
+  { id: "lunch", group: "breaks", title: "almoço", days: WEEKDAYS_ONLY, at: 720, min: 60, reserved: true },
+  { id: "gym", group: "breaks", title: "academia", days: [1, 3, 5], at: 420, min: 60, reserved: true },
+  { id: "plan", group: "work", title: "planejar a semana", days: [1], at: 480, min: 30, reserved: false },
+  { id: "inbox", group: "work", title: "zerar a caixa de entrada", days: WEEKDAYS_ONLY, at: 510, min: 20, reserved: false },
+  { id: "report", group: "work", title: "relatório dos clientes", days: [5], at: 840, min: 60, reserved: false },
+  { id: "review", group: "work", title: "revisar a semana", days: [5], at: 1020, min: 30, reserved: false }
+];
+
+export const routineGroups = () => ROUTINE_GROUPS
+  .map((g) => ({ ...g, items: ROUTINE_SUGGESTIONS.filter((s) => s.group === g.key) }))
+  .filter((g) => g.items.length);
+
+/* ================================================================
    financeiro
    ================================================================
    o esqueleto de um mês: o que se repete todo mês, com o dia do vencimento

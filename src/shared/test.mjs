@@ -414,6 +414,52 @@ const dataLeft = () => globalThis.localStorage.keys().filter((k) => k in DATA);
   }
 
   {
+    /* a rotina: o bloco se copia uma vez por semana, nunca para trás, e mudar
+       o bloco só mexe no que ninguém mexeu. a semana de 13/09/2026 começa no
+       domingo 13; "hoje" nos casos é a quarta, 16. */
+    await load();
+    const R = await import("./routine.js?n=" + (++n));
+    const { normalize: task } = await import("./tasks.js?n=" + n);
+    const now = "2026-09-16", week = "2026-09-13";
+    const block = R.normalize({ id: "b1", title: "daily", days: [1, 3, 5], at: 540, min: 15, reserved: true });
+
+    const s = R.spawnWeek([block], [], week, now);
+    check("rotina: dia que já passou não ganha cópia", s.tasks.length === 2, s.tasks.map((t) => t.date).join(","));
+    check("rotina: a cópia cai no dia da semana, com a hora do bloco", s.tasks[0].date === "2026-09-16" && s.tasks[0].at === 540 && s.tasks[0].reserved);
+    check("rotina: a cópia carrega o fio", R.isCopyOf(s.tasks[0], "b1"));
+    check("rotina: o bloco ganha a marca da semana", s.blocks[0].weeks[week] === true);
+    check("rotina: semana marcada não copia de novo (apagar não ressuscita)", R.spawnWeek(s.blocks, [], week, now).tasks.length === 0);
+    check("rotina: semana passada não ganha nada", R.spawnWeek([block], [], "2026-09-06", now).tasks.length === 0);
+    check("rotina: cópia que chegou de outro aparelho não duplica",
+      R.spawnWeek([block], s.tasks, week, now).tasks.length === 0);
+
+    const marked = s.blocks[0];
+    const moved = task({ ...s.tasks[1], at: 660 });           /* a sexta foi empurrada para as 11h */
+    const tasks = [s.tasks[0], moved];
+    const after = { ...marked, title: "daily do time", days: [1, 3, 4] };
+    const p = R.propagate(marked, after, tasks, now);
+    check("rotina: mudar o bloco muda a cópia intocada", p.save.length === 1 && p.save[0].title === "daily do time");
+    check("rotina: a cópia mexida fica como está", !p.save.some((t) => t.id === moved.id) && !p.remove.includes(moved.id));
+    check("rotina: dia que entrou ganha cópia na semana já copiada", p.create.length === 1 && p.create[0].date === "2026-09-17", p.create.map((t) => t.date).join(","));
+    const q = R.propagate(marked, { ...marked, days: [1, 5] }, [s.tasks[0]], now);
+    check("rotina: dia que saiu leva a cópia intocada", q.remove.length === 1 && q.remove[0] === s.tasks[0].id);
+    check("rotina: apagar o bloco leva só o intocado", R.orphansOf(marked, tasks, now).length === 1);
+
+    const mon = task({ id: "m", title: "weekly", date: "2026-09-07", at: 600, min: 60, recurring: true });
+    const tue = task({ id: "t", title: "weekly", date: "2026-09-08", at: 600, min: 60, recurring: true });
+    const copy = task({ id: "c", title: "weekly", date: "2026-09-14", at: 600, min: 60, recurring: true, recurringSource: "m" });
+    const lone = task({ id: "o", title: "órfã", date: "2026-09-14", recurring: true, recurringSource: "sumiu" });
+    const m = R.fromRecurring([mon, tue, copy, lone]);
+    check("rotina: mães iguais viram um bloco com vários dias", m.blocks.length === 1 && m.blocks[0].days.join() === "1,2");
+    check("rotina: o id do bloco sai da mãe", m.blocks[0].id === "r-m");
+    check("rotina: a semana da cópia já conta como copiada", m.blocks[0].weeks[week] === true);
+    check("rotina: mães e cópias perdem o selo e ganham o fio",
+      m.tasks.filter((t) => t.id !== "o").every((t) => !t.recurring && R.isCopyOf(t, "r-m")));
+    check("rotina: cópia sem mãe só perde o selo", m.tasks.some((t) => t.id === "o" && !t.recurring && !t.origin));
+    check("rotina: rodar de novo não acha mais nada", R.fromRecurring(m.tasks).blocks.length === 0);
+  }
+
+  {
     /* dois aparelhos: cada um tem o seu merlin:day, e os dois são lidos. sem
        isso, migrar num navegador deixaria para trás a fila que ficou no outro. */
     const { mergeInto } = await load();

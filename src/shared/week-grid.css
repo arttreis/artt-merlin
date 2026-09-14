@@ -1,0 +1,107 @@
+/* merlin · a grade de horas
+   saiu do calendar.css em 13/09/2026 porque a rotina desenha a mesma grade:
+   a semana com datas e a semana de sempre sao a mesma folha. */
+
+/* ---------- a grade de horas da semana ----------
+   uma coluna de horas e sete de dias. o cabeçalho fica fora da rolagem, e a
+   rolagem é da grade: o dia tem vinte e quatro horas, a tela não. a janela do
+   dia (o começo e o fim que o perfil guarda) é um fundo um tom acima — o
+   resto das horas existe, mas é madrugada. */
+.wk{
+  --wk-gutter:52px;
+  display:flex;flex-direction:column;min-width:0;
+  background:var(--surface);border:1px solid var(--line-soft);border-radius:var(--br3);overflow:hidden;
+}
+.wk__head,.wk__body{display:grid;grid-template-columns:var(--wk-gutter) repeat(7,minmax(96px,1fr))}
+.wk__head{border-bottom:1px solid var(--line-soft);background:var(--surface)}
+.wk__corner{border-right:1px solid var(--line-soft)}
+.wk__day{padding:8px 8px 7px;min-width:0;border-right:1px solid var(--line-soft);text-align:center}
+.wk__day:last-child{border-right:0}
+.wk__dayname{display:inline-flex;flex-direction:column;align-items:center;gap:2px;background:none;border:0;padding:0;cursor:pointer;color:var(--ink-50)}
+.wk__dayname .t-mono{font-size:10px;letter-spacing:.08em;text-transform:uppercase}
+.wk__dayname b{
+  display:grid;place-items:center;width:34px;height:34px;border-radius:50%;
+  font-size:19px;font-weight:500;letter-spacing:-.02em;color:var(--ink);transition:background var(--t);
+}
+.wk__dayname:hover b{background:var(--fill-hover)}
+.wk__day.is-today .wk__dayname{color:var(--green-ink)}
+.wk__day.is-today .wk__dayname b{background:var(--green);color:var(--on-green)}
+.wk__sum{margin:3px 0 0;display:flex;flex-direction:column;font-size:9.5px;line-height:1.35;color:var(--ink-30)}
+.wk__sum span{overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.wk__sum-meet{color:var(--ink-50)}
+
+.wk__scroll{position:relative;overflow:auto;max-height:calc(100dvh - var(--nav-h) - 170px);min-height:380px;background:var(--bg)}
+/* o cabecalho mora dentro da rolagem, grudado no topo: fora dela, rolar para
+   o lado no celular desalinhava os dias das colunas */
+.wk__head{position:sticky;top:0;z-index:6}
+/* a coluna de horas gruda na esquerda pelo mesmo motivo */
+.wk__corner,.wk__hours{position:sticky;left:0;z-index:5;background:var(--surface)}
+.wk__body{position:relative;min-width:calc(var(--wk-gutter) + 7 * 96px)}
+.wk__head{min-width:calc(var(--wk-gutter) + 7 * 96px)}
+.wk__hours{position:relative;border-right:1px solid var(--line-soft)}
+.wk__hours span{
+  position:absolute;right:8px;transform:translateY(-50%);
+  font-family:var(--mono);font-size:9.5px;color:var(--ink-30);
+}
+.wk__lane{
+  position:relative;min-width:0;border-right:1px solid var(--line-soft);cursor:cell;
+  background:
+    repeating-linear-gradient(to bottom,var(--line-soft) 0 1px,transparent 1px 44px),
+    linear-gradient(to bottom,transparent var(--win-from),var(--surface) var(--win-from),var(--surface) var(--win-to),transparent var(--win-to));
+}
+.wk__lane:last-child{border-right:0}
+.wk__lane.is-today{background:
+    repeating-linear-gradient(to bottom,var(--line-soft) 0 1px,transparent 1px 44px),
+    linear-gradient(to bottom,transparent var(--win-from),color-mix(in srgb,var(--green) 5%,var(--surface)) var(--win-from),color-mix(in srgb,var(--green) 5%,var(--surface)) var(--win-to),transparent var(--win-to))}
+.wk__now{position:absolute;left:0;right:0;height:2px;background:var(--green);pointer-events:none;z-index:3}
+.wk__now::before{content:"";position:absolute;left:-4px;top:-3px;width:8px;height:8px;border-radius:50%;background:var(--green)}
+
+/* o bloco. tarefa é cheia; reunião e pausa são apagadas, com o relógio no
+   lugar da caixa de marcar — é o que separa, de longe, o que você FAZ do que
+   só ocupa o seu tempo. a tarefa em fila (sem horário) tem a borda da
+   esquerda tracejada: a hora dela é onde ela cairia, não um compromisso. */
+.wk__block{
+  position:absolute;z-index:1;display:flex;align-items:flex-start;gap:6px;overflow:hidden;
+  padding:4px 6px 4px 6px;border-radius:7px;cursor:grab;
+  font-size:11.5px;line-height:1.25;
+  transition:box-shadow var(--t),opacity var(--t);
+}
+.wk__block:focus-visible{outline:none;box-shadow:0 0 0 2px var(--green)}
+.wk__block:hover{z-index:2;box-shadow:var(--sombra)}
+.wk__block.is-task{
+  background:color-mix(in srgb,var(--green) 16%,var(--surface-2));
+  border:1px solid color-mix(in srgb,var(--green) 34%,transparent);
+  border-left:3px solid var(--green);color:var(--ink);
+}
+.wk__block.is-task.is-loose{border-left-style:dashed}
+.wk__block.is-reserved{
+  background:var(--fill-hover);border:1px solid var(--line);border-left:3px solid var(--ink-30);color:var(--ink-70);
+}
+.wk__block.is-done{opacity:.55}
+.wk__block.is-done .wk__text b{text-decoration:line-through}
+.wk__block.is-dragging{opacity:.35}
+.wk__check{width:15px;height:15px;flex:0 0 auto;margin-top:1px;border-radius:5px}
+.wk__check svg{width:9px;height:9px}
+.wk__icon{display:flex;flex:0 0 auto;margin-top:1px;color:var(--ink-30)}
+.wk__icon svg{width:12px;height:12px}
+.wk__text{display:flex;flex-direction:column;min-width:0}
+.wk__text b{font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.wk__text .t-mono{font-size:9.5px;color:var(--ink-50);white-space:nowrap}
+.wk__block.is-short{align-items:center;padding-top:1px;padding-bottom:1px}
+.wk__block.is-short .wk__text{flex-direction:row;gap:6px;align-items:baseline}
+/* estreito (dividindo a hora com outro): o nome vale mais que a hora, que ja
+   esta no title e na linha da grade */
+.wk__block.is-narrow.is-short .wk__text .t-mono{display:none}
+.wk__block.is-narrow{padding-left:4px;padding-right:4px;gap:4px}
+.wk__resize{position:absolute;left:0;right:0;bottom:0;height:7px;cursor:ns-resize}
+.wk__drop{
+  position:absolute;left:2px;right:2px;z-index:4;pointer-events:none;
+  border:1.5px dashed var(--green);border-radius:7px;background:color-mix(in srgb,var(--green) 10%,transparent);
+}
+.wk__drop span{position:absolute;left:6px;top:3px;font-size:9.5px;color:var(--green-ink)}
+
+@media (max-width:640px){
+  .wk{--wk-gutter:40px}
+  .wk__head,.wk__body{grid-template-columns:var(--wk-gutter) repeat(7,minmax(84px,1fr))}
+  .wk__body,.wk__head{min-width:calc(var(--wk-gutter) + 7 * 84px)}
+}

@@ -139,7 +139,7 @@ vezes numa montagem (esvaziar a caixa de entrada, gerar a recorrência da semana
 
 | o quê | para quê |
 | --- | --- |
-| `initPage(id)` | sidebar, clientes, preferências, sessão. `id` é `home, calendar, notes, clients, funnels, maps, finance, habits, plans, profile` |
+| `initPage(id)` | sidebar, clientes, preferências, sessão. `id` é `home, calendar, routine, notes, clients, funnels, maps, finance, habits, plans, profile` |
 | `collection(type, {normalize})` | fora de componente; dentro use `useCollection` |
 | `newId()`, `today()`, `dayOf(date)`, `isDay(v)`, `dateOf(day)`, `addDays(day, n)`, `mondayOf(day)` | datas como `YYYY-MM-DD` |
 | `dateLabel(day, withYear?)`, `weekdayOf(day)`, `monthLabel("YYYY-MM")` | rótulos |
@@ -215,13 +215,14 @@ Um documento é um objeto JSON plano. Coloque nele o que o módulo precisa, mas 
 | --- | --- | --- |
 | `clients` | clients.html | `{id, name, status, channels:[{id, type, name, items:[{id, text, done}]}], goals:[…], backlog:[…], journal:[…], contract:{…}, contacts:[…], links:[…], offers:[…]}` |
 | `notes` | notes.html | `{id, title, body, stage, client, steps:[{id, text, done}], files:[{id, name, type, size}], outputs:[{type, id, at}], history:[{type:'stage'\|'step', …, at}]}` |
-| `tasks` | calendar.html | `{id, title, date ('YYYY-MM-DD'), min, done, reserved, client, order, recurring, origin}` — o dia, a semana e o mês são três visões dela |
+| `tasks` | calendar.html | `{id, title, date ('YYYY-MM-DD'), min, done, reserved, client, order, at, origin}` — o dia, a semana e o mês são três visões dela |
 | `maps` | maps.html | `{id, name, root:{id, title, note, color, collapsed, children:[…]}, client, idea, funnel}` |
 | `funnels` | funnels.html | `{id, name, client, channel, nodes:[{id, type, title, x, y, fields:{}, number}], edges:[{from, to}], creatives:[…], automations:[…], offers:[…], triggers:[…], snapshots:[…]}` |
 | `finance` | finance.html | vários docs: `{id, type:'entry'|'fixed'|'card'|'debt'|'config', …}` (`card` é uma compra parcelada: `{name, card, total, installments, start:'YYYY-MM', dayOfMonth}`) |
 | `vault` | clients.html | um doc `{id:'config', salt}` — só o sal do cofre; o segredo vai cifrado dentro do cliente |
 | `habits` | habits.html | `{id, name, schedule:{type:'daily'|'perWeek'|'weekdays', times, weekdays:[0-6]}, min, color, order, archived, marks:{'YYYY-MM-DD':true}}` |
 | `plans` | plans.html | um doc por período, id `kind:period`: `{id, kind:'quarter'|'month'|'week', period:'2026-Q4'|'2026-09'|'2026-W37', goals:[{id, text, client, done, parent, card, order}], review:{went, didnt, next}}` |
+| `routine` | routine.html | um doc por bloco: `{id, title, days:[0-6], at, min, reserved, client, weeks:{'YYYY-MM-DD':true}}` — vira tarefa com `origin:{type:'routine', id}` (shared/routine.js) |
 
 Ligações entre módulos são **por id**, nunca por cópia. Para abrir outra página num item:
 `clients.html#<id>`, `maps.html#<id>`, `funnels.html#<id>`, `notes.html#<id>`. Cada
