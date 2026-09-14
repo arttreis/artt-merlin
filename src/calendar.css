@@ -671,6 +671,17 @@
 .month__item.is-reserved:hover{background:var(--fill)}
 .month__item i{width:5px;height:5px;border-radius:50%;background:var(--green)}
 .month__item.is-done i{background:var(--ink-30)}
+/* conteudo que vai ao ar no dia: link, sem fundo, com o play verde */
+.piece-mark{
+  display:flex;align-items:center;gap:4px;min-width:0;padding:1px 5px 1px 3px;border-radius:6px;
+  font-size:10.5px;line-height:1.4;color:var(--ink-70);text-decoration:none;white-space:nowrap;
+}
+.piece-mark svg{width:9px;height:9px;flex:0 0 auto;color:var(--green-ink)}
+.piece-mark span{min-width:0;overflow:hidden;text-overflow:ellipsis}
+.piece-mark:hover{background:var(--fill);color:var(--ink)}
+.piece-mark.is-done{color:var(--ink-30);text-decoration:line-through}
+.piece-mark.is-done svg{color:var(--ink-30)}
+.wk__day .piece-mark{justify-content:center;margin-top:2px}
 .month__more{
   background:none;border:0;padding:2px 5px;cursor:pointer;text-align:left;
   font-family:var(--mono);font-size:9.5px;color:var(--ink-30);

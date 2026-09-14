@@ -186,7 +186,7 @@ const readView = () => {
 /* de onde uma tarefa pode ter vindo. o selo anuncia o FIO, nao "isto entrou
    sozinho": e o que separa uma tarefa que voce escreveu de uma que tem um
    objetivo, uma nota ou um cliente preso do outro lado. */
-const ORIGIN_LABEL = { note: "nota", habit: "hábito", client: "cliente", plan: "plano", funnel: "funil", routine: "rotina" };
+const ORIGIN_LABEL = { note: "nota", habit: "hábito", client: "cliente", plan: "plano", funnel: "funil", routine: "rotina", next: "próximo passo", content: "conteúdo" };
 
 /* ================================================================
    a pagina
@@ -195,6 +195,11 @@ function Calendar() {
   const store = useCollection("tasks", { normalize });
   const routineCol = useCollection("routine", { normalize: normalizeBlock });
   const notesCol = useCollection("notes", { normalize: normalizeNote });
+  /* o conteudo com dia de ir ao ar: so leitura aqui. a peca nao e tarefa (nao
+     tem duracao, nao se conclui no dia) — ela aparece como marca do dia, e o
+     trabalho de gravar e editar vira tarefa la em conteudo. */
+  const contentCol = useCollection("content");
+  const pieces = contentCol.all().filter((c) => c.date && c.title);
   useClients();
   const hash = useHash();
   const delegate = useDelegate();
@@ -846,13 +851,13 @@ function Calendar() {
       )}
 
       {view === "week" && (
-        <WeekGrid all={all} weekStart={weekStart} prefs={prefs} actions={actions}
+        <WeekGrid all={all} pieces={pieces} weekStart={weekStart} prefs={prefs} actions={actions}
           onNew={(date, at) => setForm({ id: "", date, at })} onOpenDay={(date) => { setAnchor(date); chooseView("day"); }}
           onMove={moveTo} />
       )}
 
       {view === "month" && (
-        <MonthView all={all} month={monthOf(anchor)} target={target} actions={actions}
+        <MonthView all={all} pieces={pieces} month={monthOf(anchor)} target={target} actions={actions}
           onNew={(date) => setForm({ id: "", date })} onOpenDay={(date) => { setAnchor(date); chooseView("day"); }}
           onEnter={setTarget} onLeave={(d) => setTarget((cur) => (cur === d ? "" : cur))} onDrop={onDropOn} />
       )}
@@ -1354,7 +1359,7 @@ const snap = (min) => Math.round(min / SNAP) * SNAP;
 const clampMin = (min) => Math.max(0, Math.min(1440 - SNAP, min));
 const nowMinutes = () => { const d = new Date(); return d.getHours() * 60 + d.getMinutes(); };
 
-function WeekGrid({ all, weekStart, prefs, actions, onNew, onOpenDay, onMove }) {
+function WeekGrid({ all, pieces = [], weekStart, prefs, actions, onNew, onOpenDay, onMove }) {
   const days = WEEK_DAYS(weekStart);
   const t = today();
   const scrollRef = useRef(null);
@@ -1388,6 +1393,7 @@ function WeekGrid({ all, weekStart, prefs, actions, onNew, onOpenDay, onMove }) 
                 <span>{open.length ? open.length + (open.length === 1 ? " tarefa" : " tarefas") : " "}</span>
                 <span className="wk__sum-meet">{meetings.length ? fmt(meetMin || meetings.length * 30) + " em reuniões" : " "}</span>
               </p>
+              {pieces.filter((p) => p.date === day).map((p) => <PieceMark key={p.id} p={p} />)}
             </div>
           );
         })}
@@ -1505,7 +1511,18 @@ function WeekBlock({ b, actions, onGrab, onRelease }) {
    lista disputavam as tres vagas da celula com o trabalho. */
 const MONTH_MAX = 3;
 
-function MonthView({ all, month, target, actions, onNew, onOpenDay, onEnter, onLeave, onDrop }) {
+/* a peca de conteudo que vai ao ar naquele dia: um link para ela, com o play
+   no lugar da bolinha. publicada fica apagada, como tarefa feita. */
+const PLAY = <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5.5v13l10.5-6.5z" /></svg>;
+function PieceMark({ p }) {
+  return (
+    <a className={"piece-mark" + (p.stage === "published" ? " is-done" : "")} href={"content.html#" + encodeURIComponent(p.id)} title={"conteúdo: " + p.title}>
+      {PLAY}<span>{p.title}</span>
+    </a>
+  );
+}
+
+function MonthView({ all, pieces = [], month, target, actions, onNew, onOpenDay, onEnter, onLeave, onDrop }) {
   const weeks = monthGrid(month);
   const t = today();
   const item = (x) => (
@@ -1540,6 +1557,7 @@ function MonthView({ all, month, target, actions, onNew, onOpenDay, onEnter, onL
               <span className="month__n">{dayNumber(day)}</span>
               {work.length > 0 && <span className="month__count">{openWork || "✓"}</span>}
             </button>
+            {pieces.filter((p) => p.date === day).map((p) => <PieceMark key={p.id} p={p} />)}
             {meetings.length > 0 && (
               <div className="month__meetings">
                 {meetings.slice(0, 2).map(item)}

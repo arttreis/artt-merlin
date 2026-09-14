@@ -1,0 +1,93 @@
+/* merlin · conteudo
+   seis colunas estreitas (o titulo de um video cabe em tres linhas) e a peca
+   aberta num painel largo do lado, porque ali o que se faz e escrever. */
+
+.sub--numbers b{color:var(--ink);font-weight:500}
+
+.board-c{
+  display:grid;grid-template-columns:repeat(6,minmax(170px,1fr));gap:var(--pd2);
+  overflow-x:auto;padding-bottom:var(--pd2);align-items:start;
+  scrollbar-width:thin;scrollbar-color:var(--line) transparent;
+}
+.col-c{
+  display:flex;flex-direction:column;gap:8px;min-height:320px;padding:10px;
+  background:var(--fill);border:1px solid var(--line-soft);border-radius:var(--br);
+  transition:border-color var(--t),background var(--t);
+}
+.col-c.is-over{border-color:var(--green);background:color-mix(in srgb,var(--green) 6%,var(--fill))}
+.col-c__head{display:flex;align-items:center;gap:6px;padding:2px 2px 4px 6px;min-height:28px}
+.col-c__name{font-size:13px;font-weight:600;letter-spacing:-.01em;color:var(--ink)}
+.col-c__count{font-size:11.5px;color:var(--ink-30);font-variant-numeric:tabular-nums}
+.col-c__add{margin-left:auto;opacity:0;transition:opacity var(--t)}
+.col-c:hover .col-c__add,.col-c__add:focus-visible{opacity:1}
+@media (hover:none){.col-c__add{opacity:1}}
+.col-c__cards{display:flex;flex-direction:column;gap:8px}
+
+.piece{
+  display:flex;flex-direction:column;gap:8px;padding:10px 12px;cursor:grab;
+  background:var(--surface);border:1px solid var(--line-soft);border-radius:var(--br3);
+  box-shadow:var(--sombra);transition:border-color var(--t),opacity var(--t);
+}
+.piece:hover{border-color:var(--line)}
+.piece.is-active{border-color:var(--ink-30)}
+.piece.is-dragging{opacity:.4}
+.piece:focus-visible{outline:none;box-shadow:0 0 0 2px var(--green)}
+.piece__title{margin:0;font-size:13px;font-weight:600;line-height:1.35;color:var(--ink)}
+.piece__meta{display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:11.5px;color:var(--ink-50)}
+.piece__date{font-variant-numeric:tabular-nums}
+.piece__date.is-late{color:var(--ink);background:var(--fill-hover);border-radius:6px;padding:1px 6px}
+.piece__script{display:inline-flex;align-items:center;gap:3px;margin-left:auto;color:var(--ink-30)}
+.piece__script svg{width:12px;height:12px}
+
+/* o formato: um rotulo com a bolinha na frente. todos com o mesmo fundo — a
+   cor fica na bolinha, e so o video (o formato longo) leva o verde */
+.fmt{display:inline-flex;align-items:center;gap:5px;padding:2px 8px 2px 7px;border-radius:var(--br-pill);background:var(--fill-hover);color:var(--ink-70);white-space:nowrap}
+.fmt::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--ink-30)}
+.fmt--youtube::before{background:var(--green)}
+.fmt--reels::before,.fmt--story::before{background:var(--ink-70)}
+.fmt--carousel::before{background:transparent;box-shadow:inset 0 0 0 1.5px var(--ink-50)}
+.fmt--email::before{background:var(--ink-50)}
+
+.content-empty{max-width:540px;margin:clamp(20px,6vh,60px) auto;text-align:center;display:flex;flex-direction:column;align-items:center;gap:10px}
+.content-empty__title{margin:0;font-size:18px;font-weight:600;letter-spacing:-.02em}
+.content-empty__text{margin:0 0 6px;font-size:13px;line-height:1.5;color:var(--ink-50)}
+
+/* ---------- a peca aberta ---------- */
+.piece-panel{position:fixed;inset:0;z-index:60;display:flex;justify-content:flex-end}
+.piece-panel__veil{position:absolute;inset:0;background:color-mix(in srgb,#000 35%,transparent)}
+.piece-panel__box{
+  position:relative;width:min(820px,100%);height:100%;display:flex;flex-direction:column;
+  background:var(--surface-2);border-left:1px solid var(--line);box-shadow:var(--sombra-2);
+}
+.piece-panel__bar{display:flex;align-items:center;gap:6px;padding:12px 16px;border-bottom:1px solid var(--line-soft)}
+.piece-panel__where{font-size:12px;color:var(--ink-50)}
+.piece-panel__body{flex:1 1 auto;overflow-y:auto;padding:22px clamp(18px,3vw,36px) 60px;display:flex;flex-direction:column;gap:20px}
+.piece-panel__title{
+  width:100%;background:none;border:0;outline:none;padding:0;color:var(--ink);
+  font-size:clamp(20px,2.4vw,26px);font-weight:600;letter-spacing:-.03em;line-height:1.2;
+}
+.piece-panel__title::placeholder{color:var(--ink-30)}
+
+.piece-sheet{display:grid;grid-template-columns:90px minmax(0,1fr);gap:10px 12px;align-items:center;padding:14px 0;border-top:1px solid var(--line-soft);border-bottom:1px solid var(--line-soft)}
+.piece-sheet__k{font-size:12.5px;color:var(--ink-50)}
+.piece-sheet__row{display:flex;gap:var(--pd2);flex-wrap:wrap}
+.piece-sheet__row .datefield{flex:0 0 170px}
+.piece-sheet__client{flex:0 1 220px;width:auto}
+
+.script__head{display:flex;align-items:center;gap:12px;margin:0 0 10px;font-size:12.5px;color:var(--ink-50)}
+.script__input{
+  width:100%;min-height:280px;background:none;border:0;outline:none;resize:none;padding:0;
+  font-family:inherit;font-size:14px;line-height:1.7;color:var(--ink);
+}
+.script__input::placeholder{color:var(--ink-30)}
+.script__read{cursor:text;font-size:14.5px;line-height:1.7;color:var(--ink-70)}
+.script__read h3{margin:0 0 12px;font-size:19px;font-weight:600;letter-spacing:-.02em;color:var(--ink)}
+.script__read h4{margin:18px 0 6px;font-size:14px;font-weight:600;color:var(--ink)}
+.script__read p{margin:0 0 8px}
+.script__read ul,.script__read ol{margin:0 0 8px;padding-left:20px}
+.script__read li{margin:2px 0}
+
+@media (max-width:640px){
+  .piece-sheet{grid-template-columns:1fr}
+  .piece-sheet__k{margin-top:4px}
+}
