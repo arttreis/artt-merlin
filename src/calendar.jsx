@@ -36,8 +36,10 @@ import {
 import { useHourScale } from "./shared/hour-scale.js";
 import { normalize as normalizeBlock, copyRoutine, endFrom, allCopiesOf } from "./shared/routine.js";
 import {
-  pendingOf, doneOf, reservesOf, costOf, guessMin, budget, fmt, longFmt, clock
+  pendingOf, doneOf, reservesOf, liveReservesOf, costOf, guessMin, budget, fmt, longFmt, clock
 } from "./shared/day.js";
+import { isClient } from "./shared/client-doc.js";
+import { MiniMonth, monthGrid, monthOf } from "./shared/mini-month.jsx";
 
 initPage("calendar");
 
@@ -93,7 +95,6 @@ const dateStamp = (day) =>
   new Intl.DateTimeFormat("pt-BR", { weekday: "short", day: "2-digit", month: "short" })
     .format(dateAtNoon(day)).replace(/\./g, "").replace(",", " ·").toUpperCase();
 const weekdayName = (day) => new Intl.DateTimeFormat("pt-BR", { weekday: "long" }).format(dateAtNoon(day));
-const monthOf = (day) => day.slice(0, 7);
 const dayNumber = (day) => dateOf(day).getDate();
 
 /* "8–14 set" quando cabe no mesmo mes; "29 ago–4 set" quando vira o mes */
@@ -106,18 +107,7 @@ function weekRange(weekStart) {
 const WEEKDAYS = ["dom", "seg", "ter", "qua", "qui", "sex", "sáb"];
 const WEEK_DAYS = (weekStart) => Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
 
-/* a grade do mes comeca no domingo da semana do dia 1 e vai ate o sabado da
-   semana do ultimo dia: e por isso que ela sempre tem semanas inteiras, e por
-   isso que as pontas mostram dias do mes vizinho. */
-function monthGrid(month) {
-  const first = month + "-01";
-  const start = sundayOf(first);
-  const last = new Date(dateOf(first).getFullYear(), dateOf(first).getMonth() + 1, 0);
-  const end = sundayOf(dayOf(last));
-  const weeks = [];
-  for (let m = start; m <= end; m = addDays(m, 7)) weeks.push(WEEK_DAYS(m));
-  return weeks;
-}
+/* a grade do mes (monthGrid) e a folhinha moram em shared/mini-month.jsx */
 
 /* ================================================================
    as agendas: cada cliente e uma
@@ -287,22 +277,25 @@ function Calendar() {
 
   /* ---------- as agendas ----------
      so vale esconder o que ainda tem botao para voltar: cliente encerrado
-     some da barra, e as tarefas dele nao podem sumir junto sem saida. */
-  const off = new Set(hidden.filter((k) => k === "" || clientList.some((c) => c.id === k)));
+     some da barra, e as tarefas dele nao podem sumir junto sem saida.
+     lead nao e agenda (o Arthur, 14/09/2026): quem esta na prospeccao so
+     ganha agenda quando fecha — a tarefa dele aparece, mas sem botao. */
+  const agendaClients = clientList.filter(isClient);
+  const off = new Set(hidden.filter((k) => k === "" || agendaClients.some((c) => c.id === k)));
   const visible = off.size ? all.filter((t) => !off.has(t.client || "")) : all;
   const saveHidden = (list) => {
     setHidden(list);
     try { localStorage.setItem(HIDDEN_KEY, JSON.stringify(list)); } catch (e) {}
   };
   const toggleAgenda = (key) => saveHidden(off.has(key) ? [...off].filter((k) => k !== key) : [...off, key]);
-  const onlyAgenda = (key) => saveHidden(["", ...clientList.map((c) => c.id)].filter((k) => k !== key));
+  const onlyAgenda = (key) => saveHidden(["", ...agendaClients.map((c) => c.id)].filter((k) => k !== key));
   const toggleSide = () => setSide((v) => {
     try { localStorage.setItem(SIDE_KEY, v ? "closed" : "open"); } catch (e) {}
     return !v;
   });
   /* com uma agenda de cliente so ligada, tarefa nova ja nasce dela */
   const soloClient = (() => {
-    const on = ["", ...clientList.map((c) => c.id)].filter((k) => !off.has(k));
+    const on = ["", ...agendaClients.map((c) => c.id)].filter((k) => !off.has(k));
     return on.length === 1 ? on[0] : "";
   })();
 
@@ -395,6 +388,19 @@ function Calendar() {
     if (t) save({ ...t, done: false, order: topOrder(store.all(), t.date) });
   };
   const toggleDone = (t, value) => (value ? complete(t.id) : reopen(t.id));
+  /* reuniao e pausa nao se concluem para ganhar tempo, mas acabam: finalizada
+     ela fica na lista, riscada, e para de contar no dia — sem precisar apagar
+     o registro de que aconteceu. marcar de novo desfaz. */
+  const finishReserve = (id) => {
+    const t = store.get(id);
+    if (!t) return;
+    if (t.done) { save({ ...t, done: false }); return; }
+    withUndo("“" + shortTitle(t.title) + "” finalizada", () => {
+      const now = store.get(id);
+      if (now && !now.done) save({ ...now, done: true });
+      flashReceipt();
+    });
+  };
 
   /* voce ve o dia devolvendo o tempo: e o unico recibo que importa */
   const flashReceipt = () => {
@@ -862,7 +868,15 @@ function Calendar() {
     complete, reopen, remove, rename, move, setDuration, applyOrder, dragStart,
     delegate: askDelegate, thinking: delegate.busy, toggleDone, setDate,
     edit: (id) => setForm({ id }), editing, setEditing, store, dragging,
-    onDragStart, onDragEnd, save, duplicate, copy: copyTask
+    onDragStart, onDragEnd, save, duplicate, copy: copyTask, finishReserve
+  };
+  /* na semana, puxar uma nota abre o dia: e so la que existe o pedagio de
+     duracao. vai para hoje se hoje estiver na semana aberta. */
+  const pullFromWeek = (id) => {
+    const t = today();
+    if (t >= weekStart && t <= addDays(weekStart, 6)) setAnchor(t);
+    chooseView("day");
+    pullNote(id);
   };
 
   const period = view === "day" ? dateStamp(anchor).toLowerCase() : weekRange(weekStart);
@@ -931,8 +945,9 @@ function Calendar() {
       {view !== "day" && (
         <div className={"calbody" + (side ? " has-side" : "")}>
           {side && (
-            <CalSide anchor={anchor} view={view} weekStart={weekStart} all={all} clients={clientList} off={off}
-              onPick={setAnchor} onToggle={toggleAgenda} onOnly={onlyAgenda} onShowAll={() => saveHidden([])} />
+            <CalSide anchor={anchor} view={view} weekStart={weekStart} all={all} clients={agendaClients} off={off}
+              onPick={setAnchor} onToggle={toggleAgenda} onOnly={onlyAgenda} onShowAll={() => saveHidden([])}
+              notes={<NotesBox notes={notes} compact onCreate={createNote} onPull={pullFromWeek} onRemove={removeNote} />} />
           )}
           <div className="calbody__main">
             {view === "week" && (
@@ -947,7 +962,7 @@ function Calendar() {
       {toast != null && (
         <div className="toast" role="status" aria-live="polite">
           <span>{toast}</span>
-          <button type="button" onClick={undo}>desfazer</button>
+          <button className="toast__undo" type="button" title="desfazer" aria-label="Desfazer" onClick={undo}>{icon("undo")}</button>
         </div>
       )}
 
@@ -1018,7 +1033,7 @@ function DayView({
           <Headline doc={doc} b={b} done={done} date={date} />
           <Track b={b} slots={slots} trackRef={trackRef} />
           {windowOpen && <WindowEditor doc={doc} onSave={onSaveWindow} onClose={onCloseWindow} />}
-          {reserves.length > 0 && <Reserves list={reserves} onRemove={actions.remove} onDuplicate={actions.duplicate} onEdit={actions.edit} />}
+          {reserves.length > 0 && <Reserves list={reserves} live={liveReservesOf(doc)} onFinish={actions.finishReserve} onRemove={actions.remove} onDuplicate={actions.duplicate} onEdit={actions.edit} />}
           {open.length > 0 && <p className="section-label"><span className="t-mono">{open.length + (open.length === 1 ? " coisa na fila" : " coisas na fila")}</span></p>}
           <ul className="queue" ref={listRef}>{rows}</ul>
           {!open.length && <EmptyState doc={doc} b={b} />}
@@ -1122,7 +1137,7 @@ function WindowEditor({ doc, onSave, onClose }) {
     <div className="window-editor" onKeyDown={(e) => { if (e.key === "Escape") onClose(); }}>
       <label>de <input ref={startRef} type="time" id="window-start" step="300" value={start} onChange={(e) => setStart(e.currentTarget.value)} /></label>
       <label>até <input type="time" id="window-end" step="300" value={end} onChange={(e) => setEnd(e.currentTarget.value)} /></label>
-      <button type="button" id="window-save" onClick={() => onSave(start, end)}>salvar</button>
+      <button className="action" type="button" id="window-save" title="salvar" aria-label="Salvar a janela do dia" onClick={() => onSave(start, end)}>{icon("check")}</button>
     </div>
   );
 }
@@ -1137,18 +1152,25 @@ const clickupLink = (t) => t.clickup && (
 /* ---------- o que ocupa o dia sem ser trabalho ----------
    fica acima da fila porque acontece antes dela na conta: e o dia que voce ja
    nao tem. sem check, porque nao se conclui almoco para ganhar tempo. */
-function Reserves({ list, onRemove, onDuplicate, onEdit }) {
-  const total = list.reduce((s, t) => s + t.min, 0);
-  /* com horario, na ordem do relogio; sem, na ordem da fila, depois */
-  list = list.slice().sort((a, b) => (a.at ?? 9999) - (b.at ?? 9999));
+function Reserves({ list, live, onFinish, onRemove, onDuplicate, onEdit }) {
+  /* so a que nao foi finalizada conta: e a mesma regra da conta do dia */
+  const total = live.reduce((s, t) => s + t.min, 0);
+  /* com horario, na ordem do relogio; sem, na ordem da fila, depois. as
+     finalizadas descem para o fim */
+  list = list.slice().sort((a, b) => (a.done - b.done) || (a.at ?? 9999) - (b.at ?? 9999));
   return (
     <section className="reserves">
-      <p className="section-label"><span className="t-mono">{longFmt(total) + " fora do trabalho"}</span></p>
+      <p className="section-label"><span className="t-mono">{total ? longFmt(total) + " fora do trabalho" : "tudo finalizado"}</span></p>
       <ul className="reserve-list">
         {list.map((t) => (
-          <li key={t.id} className="reserve" data-id={t.id} data-task={t.id} tabIndex="0"
+          <li key={t.id} className={"reserve" + (t.done ? " is-done" : "")} data-id={t.id} data-task={t.id} tabIndex="0"
               onKeyDown={(e) => { if (e.target === e.currentTarget && e.key === "Enter") onEdit(t.id); }}>
-            <span className="reserve__mark">{icon("clock")}</span>
+            {/* o relogio vira o botao: no hover mostra o check que finaliza */}
+            <button className="reserve__mark" type="button" aria-pressed={String(!!t.done)}
+                    title={t.done ? "finalizada — reabrir" : "finalizar — para de contar no dia"}
+                    aria-label={(t.done ? "Reabrir: " : "Finalizar: ") + t.title} onClick={() => onFinish(t.id)}>
+              <span className="reserve__clock">{icon("clock")}</span><span className="reserve__check">{icon("check")}</span>
+            </button>
             {t.at != null && <span className="reserve__time">{clock(t.at)}</span>}
             <span className="reserve__name">{t.title}</span>
             <span className="reserve__time">{fmt(t.min)}</span>
@@ -1398,27 +1420,31 @@ function Chips({ pending, slack, onPick, onOther, onEscape }) {
 /* ---------- caixa de notas ----------
    linha mais leve que a da tarefa de proposito: nota nao tem duracao, entao
    ela nao tem a coluna de medida que toda tarefa tem. */
-function NotesBox({ notes, onCreate, onPull, onRemove }) {
+/* `compact` e a mesma caixa dentro da barra das agendas (14/09/2026): sem o
+   ladrilho, sem a frase de explicacao, e mostrando so as mais recentes */
+const COMPACT_NOTES = 6;
+function NotesBox({ notes, compact, onCreate, onPull, onRemove }) {
   const [text, setText] = useState("");
   const submit = (e) => {
     e.preventDefault();
     const m = parseMentions(text);
     if (onCreate(m.title, m)) setText("");
   };
+  const shown = compact ? notes.slice(0, COMPACT_NOTES) : notes;
   return (
-    <section className="block" id="notes">
+    <section className={compact ? "calnotes notesbox" : "block notesbox"} id={compact ? "side-notes" : "notes"}>
       <p className="section-label">
-        <span className="t-mono">{notes.length ? notes.length + (notes.length === 1 ? " nota" : " notas") : "notas"}</span>
-        <a className="text-link" href="notes.html">todas</a>
+        <span className={compact ? "calnotes__title" : "t-mono"}>{notes.length ? notes.length + (notes.length === 1 ? " nota" : " notas") : "notas"}</span>
+        <a className="action" href="notes.html" title="ver todas as notas" aria-label="Ver todas as notas">{icon("arrow")}</a>
       </p>
-      <p className="notes__note">não custam minuto nenhum até virarem tarefa</p>
-      {!notes.length && <p className="notes__empty">Nada aqui. Escreva embaixo o que ainda não é tarefa.</p>}
+      {!compact && <p className="notes__note">não custam minuto nenhum até virarem tarefa</p>}
+      {!notes.length && !compact && <p className="notes__empty">Nada aqui. Escreva embaixo o que ainda não é tarefa.</p>}
       <ul className="note-list">
-        {notes.map((i) => (
+        {shown.map((i) => (
           <li key={i.id} className="note" data-id={i.id}>
             <span className="note__name">{i.title}</span>
             <span className="note__actions">
-              <a className="note__action" href={"notes.html#" + encodeURIComponent(i.id)} title="abrir a nota" aria-label={'Abrir "' + i.title + '"'}>{icon("link")}</a>
+              <a className="note__action" href={"notes.html#" + encodeURIComponent(i.id)} title="abrir a nota" aria-label={'Abrir "' + i.title + '"'}>{icon("open")}</a>
               <button className="note__action" type="button" title="apagar" aria-label={'Apagar "' + i.title + '"'} onClick={() => onRemove(i.id)}>{icon("trash")}</button>
             </span>
             <button className="note__pull" type="button" title="puxar para o dia — ela vai pedir a duração"
@@ -1427,7 +1453,7 @@ function NotesBox({ notes, onCreate, onPull, onRemove }) {
         ))}
       </ul>
       <form className="note-form" autoComplete="off" onSubmit={submit}>
-        <input id="note-field" maxLength="300" placeholder="uma nota" aria-label="Nova nota" value={text} onChange={(e) => setText(e.currentTarget.value)} />
+        <input id={compact ? "side-note-field" : "note-field"} maxLength="300" placeholder={compact ? "anotar rápido" : "uma nota"} aria-label="Nova nota" value={text} onChange={(e) => setText(e.currentTarget.value)} />
       </form>
     </section>
   );
@@ -1668,46 +1694,24 @@ function AgendaColor({ agenda }) {
   );
 }
 
-function CalSide({ anchor, view, weekStart, all, clients, off, onPick, onToggle, onOnly, onShowAll }) {
-  const [month, setMonth] = useState(monthOf(anchor));
-  useEffect(() => { setMonth(monthOf(anchor)); }, [anchor]);
-  const shiftMonth = (n) => {
-    const d = dateOf(month + "-01");
-    setMonth(monthOf(dayOf(new Date(d.getFullYear(), d.getMonth() + n, 1))));
-  };
-  const t = today();
+function CalSide({ anchor, view, weekStart, all, clients, off, notes, onPick, onToggle, onOnly, onShowAll }) {
   const weekEnd = addDays(weekStart, 6);
   const grid = monthGrid(monthOf(anchor));
   const [from, to] = view === "week" ? [weekStart, weekEnd] : [grid[0][0], grid[grid.length - 1][6]];
   const counts = new Map();
   inRange(all, from, to).forEach((x) => { const k = x.client || ""; counts.set(k, (counts.get(k) || 0) + 1); });
-  const busy = new Set(all.filter((x) => monthOf(x.date || "") === month).map((x) => x.date));
+  const busy = new Set(all.map((x) => x.date));
   const agendas = [{ key: "", name: "pessoal" }, ...clients.map((c) => ({ key: c.id, name: c.name }))];
-  const y = month.slice(0, 4);
 
   return (
     <aside className="calside" aria-label="Agendas">
-      <div className="mini">
-        <div className="mini__head">
-          <button className="action" type="button" aria-label="Mês anterior" onClick={() => shiftMonth(-1)}>{icon("chevronLeft")}</button>
-          <b>{monthLabel(month).replace(/\s*\d{4}$/, "")} <span>{y}</span></b>
-          <button className="action" type="button" aria-label="Próximo mês" onClick={() => shiftMonth(1)}>{icon("chevronRight")}</button>
-        </div>
-        <div className="mini__grid">
-          {WEEKDAYS.map((w) => <span key={w} className="mini__wd" aria-hidden="true">{w.slice(0, 1)}</span>)}
-          {monthGrid(month).flat().map((day) => (
-            <button key={day} type="button" data-day={day} aria-label={dateLabel(day)} aria-pressed={String(day === anchor)}
-                    className={"mini__day" + (day.slice(0, 7) !== month ? " is-out" : "") + (day === t ? " is-today" : "")
-                      + (view === "week" && day >= weekStart && day <= weekEnd ? " is-in" : "") + (busy.has(day) ? " is-busy" : "")}
-                    onClick={() => onPick(day)}>{dayNumber(day)}</button>
-          ))}
-        </div>
-      </div>
+      <MiniMonth anchor={anchor} onPick={onPick} busy={(day) => busy.has(day)}
+                 band={(day) => view === "week" && day >= weekStart && day <= weekEnd} />
 
       <div className="agendas">
         <p className="agendas__title">
           <span>agendas</span>
-          {off.size > 0 && <button className="text-link" type="button" onClick={onShowAll}>mostrar todas</button>}
+          {off.size > 0 && <button className="action" type="button" title="mostrar todas" aria-label="Mostrar todas as agendas" onClick={onShowAll}>{icon("eye")}</button>}
         </p>
         <ul>
           {agendas.map((a) => (
@@ -1723,8 +1727,14 @@ function CalSide({ anchor, view, weekStart, all, clients, off, onPick, onToggle,
             </li>
           ))}
         </ul>
-        {!clients.length && <p className="agendas__hint">cada cliente vira uma agenda com cor própria. <a href="clients.html">cadastrar clientes</a></p>}
+        {!clients.length && (
+          <p className="agendas__hint">
+            <span>cada cliente vira uma agenda com cor própria.</span>
+            <a className="action" href="clients.html" title="cadastrar clientes" aria-label="Cadastrar clientes">{icon("plus")}</a>
+          </p>
+        )}
       </div>
+      {notes}
     </aside>
   );
 }
@@ -1769,8 +1779,8 @@ function TaskForm({ store, id, presetDate, presetAt, presetClient, onClose, onRe
   return (
     <Form title={c ? "tarefa" : "nova tarefa"} submit={c ? "salvar" : "adicionar"} remove={c ? "apagar" : ""}
           onRemove={() => { onRemove(id); onClose(); }} onClose={onClose} onSubmit={submit}
-          aside={c && <button className="link" type="button" title="Ctrl+D duplica · Ctrl+C e Ctrl+V copiam e colam"
-                              onClick={() => { onDuplicate(id); onClose(); }}>duplicar</button>}>
+          aside={c && <button className="dialog__remove" type="button" title="duplicar · Ctrl+D duplica, Ctrl+C e Ctrl+V copiam e colam" aria-label="Duplicar"
+                              onClick={() => { onDuplicate(id); onClose(); }}>{icon("copy")}</button>}>
       <input className="input task-form__title full" maxLength="300" required aria-label="título"
              placeholder="o que fazer · @cliente · 45m" {...bind("title")}
              onBlur={(e) => { if (!touchedReserve.current) set("reserved", isReserve(e.currentTarget.value)); }} />

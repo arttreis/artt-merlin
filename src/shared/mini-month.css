@@ -1,0 +1,28 @@
+/* merlin · o mes pequeno
+   saiu da barra das agendas do calendario quando o diario precisou do mesmo
+   (14/09/2026). a borda e o espaco em volta ficam com quem usa. */
+.mini__head{display:flex;align-items:center;justify-content:space-between;gap:6px;margin-bottom:6px}
+.mini__head b{font-size:13.5px;font-weight:500;color:var(--ink);text-transform:lowercase}
+.mini__head b span{color:var(--ink-30);font-weight:400}
+.mini__head .action{width:28px;height:28px;border-radius:50%;border:1px solid var(--line-soft)}
+.mini__head .action svg{width:13px;height:13px}
+.mini__grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));row-gap:2px}
+.mini__wd{text-align:center;font-family:var(--mono);font-size:9.5px;color:var(--ink-30);padding:2px 0 4px;text-transform:uppercase}
+.mini__day{
+  position:relative;height:28px;border:0;border-radius:8px;background:none;cursor:pointer;
+  font-size:12px;color:var(--ink-70);font-variant-numeric:tabular-nums;
+  transition:background var(--t),color var(--t);
+}
+.mini__day:hover{background:var(--fill-hover);color:var(--ink)}
+.mini__day.is-out{color:var(--ink-30)}
+/* a semana aberta e uma faixa: os sete dias com o mesmo fundo, cantos so nas pontas */
+.mini__day.is-in{background:var(--fill);border-radius:0}
+.mini__day.is-in:nth-child(7n+1){border-radius:8px 0 0 8px}
+.mini__day.is-in:nth-child(7n){border-radius:0 8px 8px 0}
+.mini__day.is-busy::after{content:"";position:absolute;left:50%;bottom:3px;width:3px;height:3px;margin-left:-1.5px;border-radius:50%;background:var(--ink-30)}
+/* o dia escolhido: no calendario so negrito (a faixa ja diz a semana); onde
+   se escolhe um dia so, `mini--pick` da o anel */
+.mini__day[aria-pressed="true"]{color:var(--ink);font-weight:600}
+.mini--pick .mini__day[aria-pressed="true"]{box-shadow:inset 0 0 0 1.5px var(--ink-30)}
+.mini__day.is-today{background:var(--green);color:var(--on-green);font-weight:600;border-radius:8px}
+.mini__day.is-today::after{background:var(--on-green)}

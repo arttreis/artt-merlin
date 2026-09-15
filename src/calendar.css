@@ -130,7 +130,7 @@
   background:var(--fill);border:1px solid var(--line);border-radius:var(--br2);
   padding:5px 8px;font-family:var(--mono);font-size:11px;color:var(--ink);
 }
-.window-editor button{color:var(--green);text-decoration:underline;text-underline-offset:3px}
+.window-editor .action{color:var(--green)}
 
 .section-label{
   margin:calc(var(--pd) * 1.25) 0 var(--pd2);color:var(--ink-50);
@@ -293,13 +293,18 @@
 .reserve .actions{opacity:0}
 .reserve:hover .actions,.reserve:focus-within .actions{opacity:1}
 
-/* link em texto, tinta baixa: "todas" na caixa de notas, "descartar" na matriz */
-.text-link{
-  font-size:11.5px;color:var(--ink-50);
-  text-decoration:underline;text-underline-offset:3px;text-decoration-color:var(--line);
-  transition:color var(--t);
-}
-.text-link:hover{color:var(--ink)}
+/* finalizar a reuniao (14/09/2026): o relogio e o botao. no hover ele vira o
+   check; finalizada, fica o check e a linha risca e apaga */
+.reserve .reserve__mark{border-radius:50%;transition:color var(--t),background var(--t)}
+.reserve .reserve__mark:hover{color:var(--green-ink);background:var(--fill-hover)}
+.reserve__check{display:none}
+.reserve__mark:hover .reserve__clock,.reserve.is-done .reserve__clock{display:none}
+.reserve__mark:hover .reserve__check,.reserve.is-done .reserve__check{display:grid}
+.reserve__clock,.reserve__check{place-items:center}
+.reserve__clock{display:grid}
+.reserve.is-done{opacity:.6}
+.reserve.is-done .reserve__mark{color:var(--green-ink)}
+.reserve.is-done .reserve__name{text-decoration:line-through;text-decoration-color:var(--line)}
 
 /* ---------- pilula do composer ---------- */
 .composer{flex:0 0 auto;padding:var(--pd2) calc(var(--pd) * 1.25) calc(var(--pd) * 1.25)}
@@ -375,9 +380,11 @@
 }
 .toast span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .toast button{
-  flex:0 0 auto;color:var(--green);font-size:12.5px;
-  text-decoration:underline;text-underline-offset:3px;padding:var(--pd3) 2px;
+  flex:0 0 auto;width:30px;height:30px;display:grid;place-items:center;border-radius:50%;
+  color:var(--green);background:var(--fill);transition:background var(--t);
 }
+.toast button:hover{background:var(--fill-hover)}
+.toast button svg{width:15px;height:15px}
 
 /* no celular o aparelho vira a tela inteira */
 /* ---------- bento ----------
@@ -408,17 +415,17 @@
 @container (max-width: 320px){.note__pull span{display:none}.note__pull{padding:0 7px}}
 .notes__note{margin:0 0 var(--pd2);font-size:12px;color:var(--ink-30)}
 .notes__empty{margin:0 0 var(--pd2);font-size:13px;color:var(--ink-30)}
-.dayv .note-list{list-style:none;margin:0 0 var(--pd2);padding:0;display:flex;flex-direction:column;gap:var(--pd3)}
-.dayv .note{
+.notesbox .note-list{list-style:none;margin:0 0 var(--pd2);padding:0;display:flex;flex-direction:column;gap:var(--pd3)}
+.notesbox .note{
   display:flex;align-items:center;gap:var(--pd2);padding:6px 6px 6px 12px;
   border-radius:var(--br2);background:var(--fill);border:1px solid var(--line-soft);
 }
-.dayv .note .note__name{
+.notesbox .note .note__name{
   flex:1 1 auto;min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;
   font-size:13px;color:var(--ink-70);
 }
-.dayv .note .note__actions{flex:0 0 auto;display:flex;align-items:center;gap:2px;opacity:0;transition:opacity var(--t)}
-.dayv .note:hover .note__actions,.dayv .note:focus-within .note__actions{opacity:1}
+.notesbox .note .note__actions{flex:0 0 auto;display:flex;align-items:center;gap:2px;opacity:0;transition:opacity var(--t)}
+.notesbox .note:hover .note__actions,.notesbox .note:focus-within .note__actions{opacity:1}
 .note__action{
   width:26px;height:26px;display:grid;place-items:center;border-radius:var(--br2);
   color:var(--ink-30);transition:color var(--t),background var(--t);
@@ -436,11 +443,11 @@
 .note__pull svg{width:13px;height:13px;flex:none}
 /* sem hover no toque, as acoes ficam sempre visiveis */
 @media (hover:none){.note .note__actions{opacity:1}}
-.dayv .note-form input{
+.notesbox .note-form input{
   width:100%;background:var(--fill);border:1px solid var(--line);
   border-radius:var(--br-pill);padding:8px 14px;font-size:13px;color:var(--ink);
 }
-.dayv .note-form input::placeholder{color:var(--ink-30)}
+.notesbox .note-form input::placeholder{color:var(--ink-30)}
 
 /* ---------- matriz de eisenhower ----------
    no trilho, um cartao pequeno: o que ela faz, o botao, e o que ja esta
@@ -640,33 +647,12 @@
   background:var(--surface);border:1px solid var(--line-soft);border-radius:var(--br3);
 }
 
+/* o mes pequeno mora em shared/mini-month.css; aqui so o lugar dele na barra */
 .mini{padding:10px 10px 12px;border-bottom:1px solid var(--line-soft)}
-.mini__head{display:flex;align-items:center;justify-content:space-between;gap:6px;margin-bottom:6px}
-.mini__head b{font-size:13.5px;font-weight:500;color:var(--ink);text-transform:lowercase}
-.mini__head b span{color:var(--ink-30);font-weight:400}
-.mini__head .action{width:28px;height:28px;border-radius:50%;border:1px solid var(--line-soft)}
-.mini__head .action svg{width:13px;height:13px}
-.mini__grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));row-gap:2px}
-.mini__wd{text-align:center;font-family:var(--mono);font-size:9.5px;color:var(--ink-30);padding:2px 0 4px;text-transform:uppercase}
-.mini__day{
-  position:relative;height:28px;border:0;border-radius:8px;background:none;cursor:pointer;
-  font-size:12px;color:var(--ink-70);font-variant-numeric:tabular-nums;
-  transition:background var(--t),color var(--t);
-}
-.mini__day:hover{background:var(--fill-hover);color:var(--ink)}
-.mini__day.is-out{color:var(--ink-30)}
-/* a semana aberta e uma faixa: os sete dias com o mesmo fundo, cantos so nas pontas */
-.mini__day.is-in{background:var(--fill);border-radius:0}
-.mini__day.is-in:nth-child(7n+1){border-radius:8px 0 0 8px}
-.mini__day.is-in:nth-child(7n){border-radius:0 8px 8px 0}
-.mini__day.is-busy::after{content:"";position:absolute;left:50%;bottom:3px;width:3px;height:3px;margin-left:-1.5px;border-radius:50%;background:var(--ink-30)}
-.mini__day[aria-pressed="true"]{color:var(--ink);font-weight:600}
-.mini__day.is-today{background:var(--green);color:var(--on-green);font-weight:600;border-radius:8px}
-.mini__day.is-today::after{background:var(--on-green)}
 
 .agendas{padding:12px 10px 10px}
 .agendas__title{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:0 4px 6px;font-size:13.5px;font-weight:500;color:var(--ink)}
-.agendas__title .text-link{font-size:11.5px}
+
 .agendas ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:1px}
 .agenda{
   --c:var(--green);
@@ -726,8 +712,24 @@
 }
 .agenda:hover .agenda__only,.agenda__only:focus-visible{opacity:1}
 .agenda__only:hover{background:var(--fill-hover);color:var(--ink)}
-.agendas__hint{margin:8px 4px 0;font-size:12px;line-height:1.45;color:var(--ink-30)}
-.agendas__hint a{color:var(--ink-70)}
+.agendas__hint{display:flex;align-items:center;gap:6px;margin:8px 4px 0;font-size:12px;line-height:1.45;color:var(--ink-30)}
+.agendas__hint .action{flex:none;width:26px;height:26px}
+.agendas__title .action{width:24px;height:24px}
+.agendas__title .action svg{width:14px;height:14px}
+
+/* as notas rapidas na barra (14/09/2026): a mesma caixa do dia, sem o
+   ladrilho — e mais uma secao da barra, separada por uma linha */
+.calnotes{padding:10px 10px 12px;border-top:1px solid var(--line-soft);container-type:inline-size}
+.calnotes .section-label{margin:2px 4px 6px}
+.calnotes__title{font-size:13.5px;font-weight:500;color:var(--ink)}
+.calnotes .section-label .action{width:24px;height:24px}
+.calnotes .section-label .action svg{width:14px;height:14px}
+.calnotes .note-list{gap:4px;margin-bottom:8px}
+.calnotes .note{padding:4px 4px 4px 10px}
+.calnotes .note .note__name{font-size:12.5px}
+.calnotes .note__pull span{display:none}
+.calnotes .note__pull{padding:0 7px}
+.calnotes .note-form input{padding:7px 12px;font-size:12.5px}
 
 @media (hover:none){.agenda__only{opacity:.7}}
 @media (max-width:999px){

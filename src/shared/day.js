@@ -27,6 +27,9 @@ export const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 export const pendingOf = (doc) => doc.tasks.filter((t) => !t.done && !t.reserved);
 export const doneOf = (doc) => doc.tasks.filter((t) => t.done && !t.reserved);
 export const reservesOf = (doc) => doc.tasks.filter((t) => t.reserved);
+/* reuniao finalizada (14/09/2026) continua na lista, riscada, mas para de
+   ocupar o dia: acabou antes da hora, o tempo que sobrou volta */
+export const liveReservesOf = (doc) => reservesOf(doc).filter((t) => !t.done);
 
 /* ---------- a conta inteira do produto, em minutos ----------
    nenhum pixel entra aqui. */
@@ -54,7 +57,7 @@ export function budget(doc, open) {
   /* reserva sai da janela ANTES de qualquer promessa de folga: a diferenca
      entre "cabem 4h" e "cabem 4h se voce nao almocar" e o que separa um
      medidor de um otimista. so a reserva que ainda nao passou e descontada. */
-  const reserved = reservesOf(doc).reduce((s, t) => s + t.min, 0);
+  const reserved = liveReservesOf(doc).reduce((s, t) => s + t.min, 0);
   const liveReserve = Math.max(0, Math.min(reserved, window - elapsed));
   const remaining = window - elapsed - liveReserve;
   return {

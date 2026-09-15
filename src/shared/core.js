@@ -255,7 +255,10 @@ export const PAGE_GROUPS = [
     /* logo abaixo do calendario porque e dele que ela vive: a rotina so vira
        tarefa quando o calendario abre a semana */
     { id: "routine", label: "rotina", href: "routine.html" },
-    { id: "notes", label: "notas", href: "notes.html" }
+    { id: "notes", label: "notas", href: "notes.html" },
+    /* o diario (14/09/2026): a nota e o que ainda vai virar alguma coisa; a
+       pagina do diario e o que o dia foi */
+    { id: "journal", label: "diário", href: "journal.html" }
   ] },
   { id: "business", label: "negócio", pages: [
     /* a prospeccao vem antes de clientes porque e de onde eles chegam; o
@@ -305,6 +308,8 @@ const SEARCH_SOURCES = [
   { type: "wishlist", label: "vitrine", field: "name", href: (d) => "wishlist.html#" + encodeURIComponent(d.list || ""), filter: (d) => d.type === "item" && !d.bought },
   { type: "habits", label: "hábito", field: "name", href: () => "habits.html", filter: (d) => !d.archived },
   { type: "routine", label: "rotina", field: "title", href: () => "routine.html" },
+  /* a pagina do diario e texto corrido: acha no corpo, mostra a data e o trecho */
+  { type: "journal", label: "diário", href: (d) => "journal.html#" + encodeURIComponent(d.id), each: (d) => [String(d.body || "").replace(/\s+/g, " ").trim()], clip: true },
   /* os objetivos moram dentro do documento do periodo: `each` abre o doc em varios achados */
   { type: "plans", label: "objetivo", href: () => "plans.html", each: (d) => (d.goals || []).map((g) => g.text) }
 ];
@@ -318,7 +323,9 @@ export function search(term) {
       const texts = src.each ? src.each(d) : [d[src.field]];
       texts.forEach((t) => {
         const text = String(t || "");
-        if (foldKey(text).includes(k)) hits.push({ label: src.label, text, href: src.href(d) });
+        if (!foldKey(text).includes(k)) return;
+        /* texto longo aparece como trecho: o comeco dele, que e o que se lembra */
+        hits.push({ label: src.label, text: src.clip && text.length > 80 ? text.slice(0, 80) + "…" : text, href: src.href(d) });
       });
     });
   });
