@@ -124,7 +124,6 @@
 .body-md li.chk.is-done::before{content:"☑ ";color:var(--green-ink)}
 .body-md li.chk.is-done{color:var(--ink-30);text-decoration:line-through}
 .saved{font-size:11.5px;color:var(--ink-30);opacity:0;transition:opacity .3s var(--ease);margin-right:8px}
-.panel__bar .link{padding:0 6px}
 .saved.is-visible{opacity:1}
 
 /* a ficha: rotulo a esquerda, valor a direita, como a tabela de metadados

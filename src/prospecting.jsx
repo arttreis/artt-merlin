@@ -313,10 +313,10 @@ function Drawer({ c, update, onClose, onStage, onWon, onLost, onTask, onRemove }
           <section className="drawer__sec">
             <p className="t-mono">contato</p>
             <div className="form-grid">
-              <div><label className="field-label">whatsapp {waUrl(c.whatsapp) && <a className="link" href={waUrl(c.whatsapp)} target="_blank" rel="noopener">conversar</a>}</label><input className="input" inputMode="tel" {...txt("whatsapp")} /></div>
-              <div><label className="field-label">e-mail {c.email && <a className="link" href={"mailto:" + c.email}>escrever</a>}</label><input className="input" type="email" {...txt("email")} /></div>
-              <div><label className="field-label">instagram {igUrl(c.instagram) && <a className="link" href={igUrl(c.instagram)} target="_blank" rel="noopener">abrir</a>}</label><input className="input" placeholder="@" {...txt("instagram")} /></div>
-              <div><label className="field-label">site {siteUrl(c.site) && <a className="link" href={siteUrl(c.site)} target="_blank" rel="noopener">abrir</a>}</label><input className="input" {...txt("site")} /></div>
+              <div><label className="field-label">whatsapp {waUrl(c.whatsapp) && <a className="action" href={waUrl(c.whatsapp)} target="_blank" rel="noopener" title="conversar no whatsapp" aria-label="Conversar no WhatsApp">{icon("chat")}</a>}</label><input className="input" inputMode="tel" {...txt("whatsapp")} /></div>
+              <div><label className="field-label">e-mail {c.email && <a className="action" href={"mailto:" + c.email} title="escrever um e-mail" aria-label="Escrever um e-mail">{icon("mail")}</a>}</label><input className="input" type="email" {...txt("email")} /></div>
+              <div><label className="field-label">instagram {igUrl(c.instagram) && <a className="action" href={igUrl(c.instagram)} target="_blank" rel="noopener" title="abrir o instagram" aria-label="Abrir o Instagram">{icon("open")}</a>}</label><input className="input" placeholder="@" {...txt("instagram")} /></div>
+              <div><label className="field-label">site {siteUrl(c.site) && <a className="action" href={siteUrl(c.site)} target="_blank" rel="noopener" title="abrir o site" aria-label="Abrir o site">{icon("open")}</a>}</label><input className="input" {...txt("site")} /></div>
             </div>
           </section>
 
@@ -341,7 +341,7 @@ function Drawer({ c, update, onClose, onStage, onWon, onLost, onTask, onRemove }
                 <input className="input" value={c.proposal.scope} onChange={(e) => { const v = e.currentTarget.value; set((d) => { d.proposal.scope = v; }); }} /></div>
               <div><label className="field-label">valor</label><MoneyInput value={c.proposal.value} onChange={(v) => set((d) => { d.proposal.value = v; })} /></div>
               <div><label className="field-label">enviada em</label><DateField value={c.proposal.sentAt} onChange={(e) => { const v = e.currentTarget.value; set((d) => { d.proposal.sentAt = v; }); }} /></div>
-              <div className="full"><label className="field-label">link {siteUrl(c.proposal.link) && <a className="link" href={siteUrl(c.proposal.link)} target="_blank" rel="noopener">abrir</a>}</label>
+              <div className="full"><label className="field-label">link {siteUrl(c.proposal.link) && <a className="action" href={siteUrl(c.proposal.link)} target="_blank" rel="noopener" title="abrir a proposta" aria-label="Abrir a proposta">{icon("open")}</a>}</label>
                 <input className="input" placeholder="https://" value={c.proposal.link} onChange={(e) => { const v = e.currentTarget.value; set((d) => { d.proposal.link = v; }); }} /></div>
             </div>
           </section>

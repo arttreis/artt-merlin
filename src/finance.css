@@ -20,6 +20,10 @@
   border:1px dashed var(--line);border-radius:var(--br2);
   color:var(--ink-50);font-size:12.5px;
 }
+/* a frase com o botao de icone no fim (14/09/2026): o gesto nao e mais
+   palavra sublinhada, e o icone fica na mesma linha do texto */
+.note--act{display:flex;align-items:center;gap:2px;flex-wrap:wrap}
+.heading__acts{display:inline-flex;align-items:center;gap:2px}
 
 /* o numero do medidor nunca quebra em duas linhas: menor que o clamp de
    base.css, que foi feito para dois ou tres numeros por linha, nao seis */

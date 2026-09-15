@@ -105,8 +105,8 @@ body::after{
 .pill--green:hover{background:var(--green);border-color:var(--green);filter:brightness(1.08)}
 .pill--mini{height:26px;padding:0 10px;font-size:11.5px}
 .pill[aria-pressed="true"],.pill.is-on{background:var(--fill-hover);border-color:var(--line);color:var(--ink)}
-.link{color:var(--green-ink);text-decoration:underline;text-underline-offset:3px;font-size:12.5px}
-.link:hover{filter:brightness(1.1)}
+/* o link sublinhado fazendo papel de botao saiu da aplicacao em 14/09/2026:
+   todo gesto e botao com icone. nao recrie a classe .link */
 .action{
   width:28px;height:28px;display:inline-grid;place-items:center;border-radius:var(--br2);
   color:var(--ink-30);transition:color var(--t),background var(--t);flex:0 0 auto;
@@ -236,7 +236,8 @@ input[type=checkbox],input[type=radio]{accent-color:var(--green)}
   font-size:13px;color:var(--ink);box-shadow:var(--sombra-2);
 }
 .notice span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.notice button{flex:0 0 auto;color:var(--green-ink);font-size:12.5px;text-decoration:underline;text-underline-offset:3px;padding:var(--pd3) 2px}
+.notice .action{color:var(--green-ink)}
+.notice .action:hover{color:var(--ink)}
 
 /* ---------- abas ---------- */
 .tabs{display:flex;gap:2px;border-bottom:1px solid var(--line-soft);margin:0 0 var(--pd);overflow-x:auto;scrollbar-width:none}
@@ -309,8 +310,7 @@ kbd{font-family:var(--mono);font-size:10.5px;padding:1px 6px;border-radius:5px;b
   .start__row{grid-template-columns:minmax(170px,230px) 1fr;gap:clamp(20px,4cqi,48px)}
 }
 .start__grid{display:grid;gap:18px 14px;grid-template-columns:repeat(auto-fill,minmax(168px,1fr));align-items:start}
-.start__foot{margin:var(--pd) 0 0;font-size:12.5px;color:var(--ink-30)}
-.start__foot .link{background:none;border:0;padding:0;cursor:pointer}
+.start__foot{margin:var(--pd) 0 0;font-size:12.5px;color:var(--ink-30);display:flex;align-items:center;gap:4px;flex-wrap:wrap}
 
 /* a opção. com miniatura, o cartão É a miniatura, com o nome e o resumo por
    baixo e fora dela: uma caixa em volta da miniatura fazia duas bordas
@@ -429,6 +429,5 @@ kbd{font-family:var(--mono);font-size:10.5px;padding:1px 6px;border-radius:5px;b
 .datepop__day.is-today{box-shadow:inset 0 0 0 1px var(--ink-30);color:var(--ink)}
 .datepop__day.is-on,.datepop__day.is-on:hover{background:var(--green);color:var(--on-green);font-weight:600;box-shadow:none;opacity:1}
 .datepop__foot{display:flex;align-items:center;gap:8px;margin-top:10px;padding-top:10px;border-top:1px solid var(--line-soft)}
-.datepop__foot .link{font-size:12px;background:none;border:0;padding:0;cursor:pointer}
 
 }

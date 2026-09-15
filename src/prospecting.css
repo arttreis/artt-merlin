@@ -86,7 +86,10 @@
 .drawer__name::placeholder,.drawer__brand::placeholder{color:var(--ink-30)}
 .drawer__sec{display:flex;flex-direction:column;gap:10px}
 .drawer__sec > .t-mono{margin:0;color:var(--ink-30)}
-.drawer__sec .field-label .link{margin-left:6px;font-size:10.5px;text-transform:none;letter-spacing:0;font-family:inherit}
+/* o gesto ao lado do rotulo (conversar, escrever, abrir): icone pequeno, sem
+   empurrar a altura da linha */
+.drawer__sec .field-label .action{width:20px;height:20px;margin:-4px 0 -4px 4px;vertical-align:middle}
+.drawer__sec .field-label .action svg{width:13px;height:13px}
 .drawer__next{display:grid;grid-template-columns:minmax(0,1fr) 160px;gap:var(--pd2)}
 .drawer__log{display:flex;gap:var(--pd2)}
 .drawer__journal{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}

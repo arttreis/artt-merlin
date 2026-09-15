@@ -261,8 +261,8 @@ function Piece({ c, update, onClose, onStage, onTask, onRemove }) {
           <div className="script">
             <p className="script__head">
               <span>roteiro</span>
-              {!!draft.trim() && <button className="link" type="button" onClick={() => { if (editing) flush(); setEditing((v) => !v); }}>{editing ? "ver formatado" : "editar"}</button>}
-              {!draft.trim() && <button className="link" type="button" onClick={() => { const m = SCRIPT_MOLD(c.title); setDraft(m); set((d) => { d.script = m; }); setEditing(true); }}>usar o esqueleto</button>}
+              {!!draft.trim() && <button className="action" type="button" title={editing ? "ver formatado" : "editar"} aria-label={editing ? "Ver formatado" : "Editar"} onClick={() => { if (editing) flush(); setEditing((v) => !v); }}>{icon(editing ? "eye" : "pencil")}</button>}
+              {!draft.trim() && <button className="action" type="button" title="usar o esqueleto" aria-label="Usar o esqueleto" onClick={() => { const m = SCRIPT_MOLD(c.title); setDraft(m); set((d) => { d.script = m; }); setEditing(true); }}>{icon("file")}</button>}
             </p>
             {editing
               ? <textarea ref={areaRef} className="script__input" placeholder="o roteiro em tópicos. # título, ## seção, - tópico"

@@ -10,6 +10,7 @@ import {
   mount, useCollection, useClients, useHash, useKeydown, isTyping, useFields,
   Form, Field, Dialog, Markdown, EmptyStart, MapThumb, ShareDialog, icon
 } from "./shared/ui.jsx";
+import { NAV_ICONS } from "./shared/icons.jsx";
 import { MAP_TEMPLATES, mapGroups, mapBranches, mapShape, mapSize, buildMap } from "./shared/templates.js";
 import { parseMermaid, toMermaid } from "./shared/mermaid.js";
 /* o layout e o desenho moram no map-draw: a pagina publica pinta o mesmo mapa */
@@ -638,8 +639,8 @@ function MapList({ maps }) {
           blankRow blankLabel="mapa em branco" blankNote="um nó no meio da tela, e só" />
       )}
       {!all.length && (
-        <p className="mp-import-hint">o mapa já existe numa conversa com uma IA?{" "}
-          <button className="link" type="button" onClick={() => setImporting(true)}>cole o mermaid dele</button></p>
+        <p className="mp-import-hint">o mapa já existe numa conversa com uma IA? cole o mermaid dele
+          <button className="action" type="button" title="colar o mermaid" aria-label="Colar o mermaid" onClick={() => setImporting(true)}>{icon("copy")}</button></p>
       )}
       {form && <MapForm maps={maps} template={form.template} onClose={() => setForm(false)} />}
       {importing && <MermaidDialog onImport={importMap} onClose={() => setImporting(false)} />}
@@ -663,9 +664,9 @@ function MapRow({ m, notes, funnels, maps, renaming, onRename, onRenamed, onDupl
       <span className="measure t-mono">{n + (n === 1 ? " nó" : " nós")}</span>
       <span className="measure t-mono">{"editado há " + relativeTime(m.updatedAt)}</span>
       <span className="mp-links">
-        {note && <a className="link" href={"notes.html#" + m.idea} onClick={stop}>{note.title || "nota"}</a>}
-        {m.client && <a className="link" href={"clients.html#" + m.client} onClick={stop}>{clientName(m.client) || "cliente"}</a>}
-        {funnel && <a className="link" href={"funnels.html#" + m.funnel} onClick={stop}>{funnel.name || "funil"}</a>}
+        {note && <a className="pill pill--mini" href={"notes.html#" + m.idea} title="abrir a nota" onClick={stop}>{NAV_ICONS.notes}{note.title || "nota"}</a>}
+        {m.client && <a className="pill pill--mini" href={"clients.html#" + m.client} title="abrir o cliente" onClick={stop}>{NAV_ICONS.clients}{clientName(m.client) || "cliente"}</a>}
+        {funnel && <a className="pill pill--mini" href={"funnels.html#" + m.funnel} title="abrir o funil" onClick={stop}>{NAV_ICONS.funnels}{funnel.name || "funil"}</a>}
       </span>
       <span className="row-actions">
         <button className="action" type="button" title="abrir">{icon("arrow")}</button>

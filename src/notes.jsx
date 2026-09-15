@@ -982,7 +982,8 @@ function SuggestionsDialog({ items, onToggle, onAdd, onClose }) {
   return (
     <Dialog title="sugestões do merlin" sub="escolha o que vira passo ou entra no corpo — nada muda sem confirmar" label="Sugestões do Merlin" onClose={onClose}
         actions={<>
-          <button className="link" type="button" onClick={onClose}>descartar</button>
+          <button className="dialog__remove" type="button" title="descartar as sugestões" aria-label="Descartar as sugestões" onClick={onClose}>{icon("trash")}</button>
+          <span className="spacer" />
           <button className="pill pill--green" type="button" id="suggestions-add" disabled={n === 0} onClick={onAdd}>{"adicionar" + (n ? " " + n : "")}</button>
         </>}>
       {groups.length ? groups.map((g) => (

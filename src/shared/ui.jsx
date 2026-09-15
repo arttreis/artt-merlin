@@ -336,7 +336,7 @@ export function EmptyStart({ title, text, groups, note, onPick, onBlank, blankLa
           {onBlank && (
             <>
               {note ? " " : null}
-              <button className="link" type="button" onClick={onBlank}>{blankLabel || "começar do zero"}</button>
+              <button className="action" type="button" title={blankLabel || "começar do zero"} aria-label={blankLabel || "começar do zero"} onClick={onBlank}>{icon("plus")}</button>
             </>
           )}
         </p>
@@ -643,7 +643,7 @@ function DatePopover({ anchor, popRef, value, required, onPick, onClose }) {
         ))}
       </div>
       <div className="datepop__foot">
-        {!required && <button className="link" type="button" onClick={() => onPick("")}>limpar</button>}
+        {!required && <button className="action" type="button" title="limpar" aria-label="Limpar a data" onClick={() => onPick("")}>{icon("x")}</button>}
         <span className="spacer" />
         <button className="pill pill--mini" type="button" onClick={() => onPick(todayIso)}>hoje</button>
       </div>
@@ -707,7 +707,7 @@ function DomPopover({ anchor, popRef, day, required, onKey, onPick, onClose }) {
       </div>
       {(!required || day > 28) && (
         <div className="datepop__foot">
-          {!required && <button className="link" type="button" onClick={() => onPick("")}>limpar</button>}
+          {!required && <button className="action" type="button" title="limpar" aria-label="Limpar o dia" onClick={() => onPick("")}>{icon("x")}</button>}
           <span className="spacer" />
           {day > 28 && <span className="small weak">em mês mais curto, cai no último dia</span>}
         </div>
@@ -985,7 +985,7 @@ function CloudCard({ page }) {
           <span className="who"><b id="sb-name">{email ? email.split("@")[0] : "só você"}</b><span id="sb-email">{email || "sem sessão"}</span></span>
         </a>
         <ThemeButton />
-        {c.signedIn && <button type="button" id="cloud-signout" onClick={() => c.signOut()}>sair</button>}
+        {c.signedIn && <button type="button" className="sb__mode" id="cloud-signout" title="sair" aria-label="Sair" onClick={() => c.signOut()}>{icon("logout")}</button>}
       </div>
     </>
   );
@@ -1093,7 +1093,7 @@ function SignInDialog() {
             <p className="dialog__title">confira seu e-mail</p>
             <p className="dialog__sub">
               se <b className="signin-email">{email}</b> puder entrar, o código chega em alguns segundos.{" "}
-              <button className="signin-link" type="button" onClick={changeEmail}>trocar e-mail</button>
+              <button className="action signin-act" type="button" title="trocar e-mail" aria-label="Trocar e-mail" onClick={changeEmail}>{icon("pencil")}</button>
             </p>
             {/* as seis casas são desenho: o campo de verdade é um só, por cima
                 delas, para colar e o preenchimento automático do celular
@@ -1114,7 +1114,7 @@ function SignInDialog() {
             <p className="signin-foot">
               {wait
                 ? <span>não chegou? dá para mandar de novo em {wait}s</span>
-                : <>não chegou? <button className="signin-link" type="button" disabled={busy} onClick={request}>mandar de novo</button></>}
+                : <>não chegou? mandar de novo <button className="action signin-act" type="button" title="mandar de novo" aria-label="Mandar o código de novo" disabled={busy} onClick={request}>{icon("mail")}</button></>}
             </p>
           </form>
         )}
@@ -1131,7 +1131,7 @@ function Notice() {
   return (
     <div className="notice" role="status">
       <span>{notice.text}</span>
-      {notice.undo && <button type="button" onClick={() => { const f = notice.undo; closeNotice(); f(); }}>desfazer</button>}
+      {notice.undo && <button className="action" type="button" title="desfazer" aria-label="Desfazer" onClick={() => { const f = notice.undo; closeNotice(); f(); }}>{icon("undo")}</button>}
     </div>
   );
 }

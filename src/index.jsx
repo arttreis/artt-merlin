@@ -590,7 +590,7 @@ function Home() {
       </section>
 
       <p className="hm-foot">
-        <a href="index.html#apresentacao" onClick={(e) => { e.preventDefault(); setTour(true); }}>a apresentação</a>
+        <a className="pill pill--mini" href="index.html#apresentacao" title="ver a apresentação" onClick={(e) => { e.preventDefault(); setTour(true); }}>{icon("eye")}a apresentação</a>
       </p>
 
       {tour && <Tour onClose={closeTour} />}

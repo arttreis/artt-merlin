@@ -347,7 +347,7 @@ function ItemForm({ store, id, listId, lists, onRemove, onUnbuy, onClose }) {
 
   return (
     <Form title={it ? "item" : "novo item"} submit={it ? "salvar" : "guardar"} remove={it ? "apagar" : ""}
-        aside={it && it.bought ? <button className="link" type="button" onClick={() => { onClose(); onUnbuy(it); }}>desfazer compra</button> : null}
+        aside={it && it.bought ? <button className="dialog__remove" type="button" title="desfazer compra" aria-label="Desfazer compra" onClick={() => { onClose(); onUnbuy(it); }}>{icon("undo")}</button> : null}
         onRemove={() => onRemove(it)} onClose={onClose} onSubmit={submit}>
       <Field label="nome" full><input className="input" maxLength="140" required placeholder="cadeira, fone, tênis…" {...bind("name")} /></Field>
       <Field label="preço"><MoneyInput placeholder="0,00" value={v.price} onChange={(c) => set("price", c)} /></Field>

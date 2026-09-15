@@ -16,6 +16,7 @@ import {
   useFields, Form, Field, Dialog, Markdown, TemplatePicker, EmptyStart, ChannelThumb, icon,
   useDelegate, DelegateDialog, DateField, MoneyInput
 } from "./shared/ui.jsx";
+import { NAV_ICONS } from "./shared/icons.jsx";
 import {
   normalize, STATUS_LABEL, CLIENT_STATUSES, RECURRENCES, RECURRENCE_LABEL, FILE_KINDS, kindFromName,
   isClient, isPipeline, journalEntry, syncNext, waUrl, igUrl, siteUrl
@@ -632,7 +633,8 @@ function Properties({ doc, ctx }) {
   };
   const recurring = !!doc.contract.recurrence;
   const [endOpen, setEndOpen] = useState(false);
-  const open = (href, label) => href ? <a className="prop__open" href={href} target="_blank" rel="noopener">{label}</a> : null;
+  /* botao com icone, igual a prospeccao (14/09/2026): nada de texto fazendo papel de botao */
+  const open = (href, label, name) => href ? <a className="action prop__act" href={href} target="_blank" rel="noopener" title={label} aria-label={label}>{icon(name)}</a> : null;
   const origin = doc.ideaOrigin && collection("notes").get(doc.ideaOrigin);
   const cameFrom = [doc.source, origin ? "nota: " + (origin.title || "sem título") : ""].filter(Boolean).join(" · ");
   return (
@@ -663,7 +665,10 @@ function Properties({ doc, ctx }) {
       <Prop label={recurring && !doc.contract.end && !endOpen ? "desde" : "início e fim"}>
         <DateField className="prop__date" value={doc.contract.start} onChange={(e) => update((d) => { d.contract.start = e.currentTarget.value; })} />
         {recurring && !doc.contract.end && !endOpen
-          ? <button className="prop__open" type="button" title="marcar quando o contrato acaba" onClick={() => setEndOpen(true)}>sem fim · definir</button>
+          ? <>
+              <span className="prop__sep">sem fim</span>
+              <button className="action prop__act" type="button" title="marcar quando o contrato acaba" aria-label="Marcar quando o contrato acaba" onClick={() => setEndOpen(true)}>{icon("pencil")}</button>
+            </>
           : <>
               <span className="prop__sep">até</span>
               <DateField className="prop__date" value={doc.contract.end} onChange={(e) => update((d) => { d.contract.end = e.currentTarget.value; })} />
@@ -679,24 +684,26 @@ function Properties({ doc, ctx }) {
       <div className="props__col">
       <Prop label="whatsapp">
         <input className="prop__input" id="prop-whatsapp" inputMode="tel" placeholder="vazio" value={doc.whatsapp} onChange={(e) => update((d) => { d.whatsapp = e.currentTarget.value; })} />
-        {open(waUrl(doc.whatsapp), "conversar")}
+        {open(waUrl(doc.whatsapp), "conversar no whatsapp", "chat")}
       </Prop>
       <Prop label="e-mail">
         <input className="prop__input" type="email" placeholder="vazio" value={doc.email} onChange={(e) => update((d) => { d.email = e.currentTarget.value; })} />
-        {doc.email && <a className="prop__open" href={"mailto:" + doc.email}>escrever</a>}
+        {doc.email && <a className="action prop__act" href={"mailto:" + doc.email} title="escrever um e-mail" aria-label="Escrever um e-mail">{icon("mail")}</a>}
       </Prop>
       <Prop label="instagram">
         <input className="prop__input" placeholder="vazio" value={doc.instagram} onChange={(e) => update((d) => { d.instagram = e.currentTarget.value; })} />
-        {open(igUrl(doc.instagram), "abrir")}
+        {open(igUrl(doc.instagram), "abrir o instagram", "open")}
       </Prop>
       <Prop label="site">
         <input className="prop__input" placeholder="vazio" value={doc.site} onChange={(e) => update((d) => { d.site = e.currentTarget.value; })} />
-        {open(siteUrl(doc.site), "abrir")}
+        {open(siteUrl(doc.site), "abrir o site", "open")}
       </Prop>
       {!!(cameFrom || doc.wonAt) && (
         <Prop label="veio de">
           <span className="prop__text">
-            {origin ? <a className="link" href={"notes.html#" + encodeURIComponent(origin.id)}>{cameFrom}</a> : (cameFrom || "direto")}
+            {origin
+              ? <>{doc.source ? doc.source + " · " : ""}<a className="pill pill--mini" href={"notes.html#" + encodeURIComponent(origin.id)} title="abrir a nota de origem">{NAV_ICONS.notes}{origin.title || "sem título"}</a></>
+              : (cameFrom || "direto")}
             {doc.wonAt ? " · fechou em " + dateLabel(dayOf(new Date(doc.wonAt)), true) : ""}
           </span>
         </Prop>
@@ -742,7 +749,7 @@ function PageTab({ doc, ctx }) {
       <div className="page-text">
         <p className="heading">
           <span className="t-mono">página</span>
-          {!!doc.summary.trim() && <button className="link" type="button" onClick={() => setEditing((v) => !v)}>{editing ? "ver formatado" : "editar"}</button>}
+          {!!doc.summary.trim() && <button className="action" type="button" title={editing ? "ver formatado" : "editar"} aria-label={editing ? "Ver formatado" : "Editar"} onClick={() => setEditing((v) => !v)}>{icon(editing ? "eye" : "pencil")}</button>}
         </p>
         {editing
           ? <textarea ref={areaRef} className="page-text__input" autoFocus={!!doc.summary}
@@ -1083,7 +1090,7 @@ function Channel({ doc, ch, ctx }) {
       <div className="channel-funnels">
         <p className="heading"><span className="t-mono">funis</span><button className="pill pill--mini" type="button" onClick={() => setFunnelForm(true)}>novo funil</button></p>
         {channelFunnels.length
-          ? <ul className="list">{channelFunnels.map((f) => <li key={f.id} className="line"><a className="link name" href={"funnels.html#" + f.id}>{f.name}</a></li>)}</ul>
+          ? <ul className="list">{channelFunnels.map((f) => <li key={f.id} className="line"><span className="name">{f.name}</span><a className="action" href={"funnels.html#" + f.id} title="abrir o funil" aria-label={"Abrir o funil " + f.name}>{icon("open")}</a></li>)}</ul>
           : <p className="empty">nenhum funil ligado a este canal</p>}
       </div>
       {funnelForm && <ChannelFunnelForm doc={doc} ch={ch} funnels={funnels} onClose={() => setFunnelForm(false)} />}
@@ -1374,7 +1381,7 @@ function VaultItem({ item, plain, onEdit, onRemove }) {
         <button className="action" type="button" aria-label="Mostrar senha" onClick={() => setShown((s) => !s)}><EyeIcon /></button>
         <button className="action" type="button" aria-label="Copiar senha" onClick={() => copyText(plain.secret, "senha copiada")}><CopyIcon /></button>
       </div>
-      {item.url && <div className="vault-line"><span className="t-mono weak">link</span><a className="link vault-value" href={item.url} target="_blank" rel="noopener">{item.url}</a></div>}
+      {item.url && <div className="vault-line"><span className="t-mono weak">link</span><span className="vault-value">{item.url}</span><a className="action" href={item.url} target="_blank" rel="noopener" title="abrir o link" aria-label="Abrir o link">{icon("open")}</a></div>}
       {plain.note && <p className="small weak mt2">{plain.note}</p>}
     </div>
   );

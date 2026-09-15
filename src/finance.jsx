@@ -466,7 +466,7 @@ function Finance() {
       {!virgin && !cfg.startBalance && (
         <p className="invite" id="invite">
           <span>ainda não tenho um saldo inicial pra partir a conta — sem ele o saldo começa do zero.</span>
-          <button className="link" type="button" onClick={() => setForm({ type: "config" })}>definir agora</button>
+          <button className="action" type="button" title="definir o saldo inicial" aria-label="Definir o saldo inicial" onClick={() => setForm({ type: "config" })}>{icon("pencil")}</button>
         </p>)}
 
       {!virgin && <>
@@ -551,8 +551,8 @@ function TodayView({ ctx, cfg, month, onOpenMonth, onNewEntry, onEditEntry, onTo
         <div className="fin-sum__cell">
           <p className="fin-sum__label">na conta hoje</p>
           <p className={"fin-sum__num" + (real < 0 ? " is-negative" : "")}>{brl(real, true)}</p>
-          <p className="note">{!cfg.startBalance
-            ? <>sem saldo inicial a conta parte do zero. <button className="link" type="button" onClick={onConfig}>definir</button></>
+          <p className={"note" + (!cfg.startBalance ? " note--act" : "")}>{!cfg.startBalance
+            ? <>sem saldo inicial a conta parte do zero. <button className="action" type="button" title="definir o saldo inicial" aria-label="Definir o saldo inicial" onClick={onConfig}>{icon("pencil")}</button></>
             : pending.length
               ? pending.length + (pending.length === 1 ? " item" : " itens") + " a confirmar (" + brl(pendingNet, true) + ")"
               : "só o que já aconteceu"}</p>
@@ -593,7 +593,10 @@ function TodayView({ ctx, cfg, month, onOpenMonth, onNewEntry, onEditEntry, onTo
             </div>)}
           <p className="heading">
             <span className="t-mono">próximos sete dias</span>
-            <button className="action" type="button" title="novo lançamento (n)" aria-label="novo lançamento" onClick={() => onNewEntry(t)}>{icon("plus")}</button>
+            <span className="heading__acts">
+              <button className="action" type="button" title="ver o mês dia a dia" aria-label="Ver o mês dia a dia" onClick={onOpenMonth}>{icon("calendar")}</button>
+              <button className="action" type="button" title="novo lançamento (n)" aria-label="novo lançamento" onClick={() => onNewEntry(t)}>{icon("plus")}</button>
+            </span>
           </p>
           {soon.length
             ? soon.map((d) => (
@@ -610,9 +613,9 @@ function TodayView({ ctx, cfg, month, onOpenMonth, onNewEntry, onEditEntry, onTo
               <ul className="list">
                 {suggested.slice(0, SHOWN).map((p) => <SuggestionItem key={p.it.id} it={p.it} day={p.day} onLaunch={onLaunch} />)}
               </ul>
-              {suggested.length > SHOWN && <p className="note mt2"><button className="link" type="button" onClick={onOpenMonth}>mais {suggested.length - SHOWN} no mês</button></p>}
+              {suggested.length > SHOWN && <p className="note note--act mt2">mais {suggested.length - SHOWN} no mês
+                <button className="action" type="button" title="ver no mês, dia a dia" aria-label="Ver as outras sugestões no mês" onClick={onOpenMonth}>{icon("calendar")}</button></p>}
             </div>)}
-          <p className="note mt2"><button className="link" type="button" onClick={onOpenMonth}>ver o mês dia a dia</button></p>
         </section>
 
         <section className="block col-5">

@@ -364,7 +364,7 @@ function HabitForm({ habits, id, onClose, onArchive, onSuggest }) {
   };
   return (
     <Form title={h ? "hábito" : "novo hábito"} submit={h ? "salvar" : "criar"} remove={h ? "arquivar" : ""} removeIcon="archive"
-        aside={!h && onSuggest ? <button className="link" type="button" onClick={onSuggest}>ver sugestões</button> : null}
+        aside={!h && onSuggest ? <button className="dialog__remove" type="button" title="ver sugestões" aria-label="Ver sugestões" onClick={onSuggest}>{icon("spark")}</button> : null}
         onRemove={() => onArchive(h)} onClose={onClose} onSubmit={submit}>
       <Field label="nome" full><input className="input" maxLength="80" required placeholder="treino, leitura, água…" {...bind("name")} /></Field>
       <Field label="frequência">

@@ -20,7 +20,7 @@ import "./funnels.css";
 import "./share.css";
 import { readShared } from "./shared/core.js";
 import { useState, useEffect, useLayoutEffect, useRef, useMemo } from "react";
-import { mount, Markdown } from "./shared/ui.jsx";
+import { mount, Markdown, icon } from "./shared/ui.jsx";
 import { LOGO } from "./shared/icons.jsx";
 import { computeLayout, svgNode, svgEdgesOf, svgGrid, findNodeIn } from "./shared/map-draw.jsx";
 import { NODE_W, NODE_H } from "./shared/funnel-layout.js";
@@ -269,7 +269,7 @@ function MapStage({ doc }) {
       <Zoom pz={pz} />
       {reading && (
         <Reader kind="nó" title={reading.title || "sem título"} onClose={() => setOpen(null)}>
-          {reading.link && <p className="shv-link"><a className="link" href={reading.link} target="_blank" rel="noreferrer noopener">{reading.link}</a></p>}
+          {reading.link && <p className="shv-link"><a className="pill pill--mini" href={reading.link} target="_blank" rel="noreferrer noopener" title="abrir o link">{icon("open")}<span>{reading.link}</span></a></p>}
           {reading.note && <Markdown className="shv-note" text={reading.note} />}
         </Reader>
       )}
