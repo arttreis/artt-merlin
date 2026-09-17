@@ -1172,7 +1172,20 @@ export function md(text) {
 let renderShell = null;
 export function setShellRenderer(fn) { renderShell = fn; }
 
+/* o que a tela atual sabe, pro assistente usar sem perguntar de novo — o
+   funil/mapa/cliente aberto, por exemplo. cada pagina chama isto quando tem
+   algo relevante (e chama de novo, ou com null, quando deixa de ter); quem
+   nao chama nunca, o assistente pergunta em vez de adivinhar. e so um valor
+   por vez, porque so uma tela esta aberta por vez. */
+let pageContext = null;
+export function setPageContext(fn) { pageContext = typeof fn === "function" ? fn : null; }
+export function getPageContext() { try { return pageContext ? pageContext() : null; } catch (e) { return null; } }
+
+let currentPage = "";
+export const getCurrentPage = () => currentPage;
+
 export function initPage(id) {
+  currentPage = String(id || "");
   if (renderShell) renderShell(id);
   clients();
   prefsStore();   /* a janela do dia sai daqui, e o dia pinta antes da nuvem */

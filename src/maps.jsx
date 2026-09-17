@@ -2,7 +2,7 @@
    lista de mapas e um editor com layout automatico, teclado, arrasto e zoom. */
 import "./shared/base.css";
 import "./maps.css";
-import { initPage, newId, notify, sendToDay, api, collection, clientName } from "./shared/core.js";
+import { initPage, newId, notify, sendToDay, api, collection, clientName, setPageContext } from "./shared/core.js";
 import { useState, useEffect, useLayoutEffect, useRef, useMemo } from "react";
 import { createRoot } from "react-dom/client";
 import { flushSync } from "react-dom";
@@ -812,6 +812,16 @@ function Editor({ id, maps }) {
   useClients();
   const [doc, setDoc] = useState(() => maps.get(id));
   const docRef = useRef(doc); docRef.current = doc;
+
+  /* o mapa aberto no editor, pro assistente saber onde propor um onboarding
+     personalizado sem perguntar de novo o que ja esta desenhado */
+  useEffect(() => {
+    setPageContext(() =>
+      "Mapa aberto: " + doc.name + (doc.client ? " · cliente: " + clientName(doc.client) + " (id " + doc.client + ")" : "") + ". " +
+      "Nó raiz: " + doc.root.title + ". Ramos: " + (doc.root.children.length ? doc.root.children.map((n) => n.title).join("; ") : "nenhum ainda")
+    );
+    return () => setPageContext(null);
+  }, [doc.id, doc.updatedAt]);
   const [selectedId, setSelectedId] = useState(() => doc.root.id);
   const [editing, setEditing] = useState(null);         // { id, initial } | null
   const [panelOpen, setPanelOpen] = useState(false);

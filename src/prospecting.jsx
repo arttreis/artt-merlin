@@ -8,7 +8,7 @@
    apaga: o motivo fica, e da para trazer de volta. */
 import "./shared/base.css";
 import "./prospecting.css";
-import { initPage, newId, notify, brl, dateLabel, dayOf, today } from "./shared/core.js";
+import { initPage, newId, notify, brl, dateLabel, dayOf, today, setPageContext } from "./shared/core.js";
 import { useState, useEffect, useRef, Fragment } from "react";
 import {
   mount, useCollection, useHash, setHash, useKeydown, isTyping,
@@ -47,6 +47,17 @@ function Prospecting() {
   const pipeline = all.filter(isPipeline);
   const lostList = all.filter((c) => c.status === "lost").sort((a, b) => b.lostAt - a.lostAt);
   const open = openId ? clients.get(openId) : null;
+
+  /* o prospecto aberto na gaveta, pro assistente usar em "atualizar cliente"
+     e no onboarding de mapa/funil sem perguntar o que ja esta na ficha */
+  useEffect(() => {
+    if (!open) { setPageContext(null); return () => setPageContext(null); }
+    setPageContext(() =>
+      "Prospecto aberto: " + open.name + (open.brand ? " (" + open.brand + ")" : "") + ". id: " + open.id + ". etapa: " + stageLabel(open.stage) + ". temperatura: " + tempLabel(open.temperature) + ". " +
+      (open.summary ? "Página: " + open.summary.slice(0, 900) : "sem página escrita ainda")
+    );
+    return () => setPageContext(null);
+  }, [open && open.id, open && open.updatedAt]);
 
   /* ---------- a gaveta segue o #id ---------- */
   const openDrawer = (id) => { setOpenId(id); setHash(id); };

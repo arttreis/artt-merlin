@@ -53,6 +53,12 @@
 .wish-bought__toggle:hover{color:var(--ink)}
 .wish-bought__toggle svg{width:14px;height:14px}
 
+/* ---------- compras: as mesmas coisas, uma secao por categoria ---------- */
+.shopping-group{margin:0 0 calc(var(--pd) * 1.5)}
+.shopping-group__head{display:flex;align-items:baseline;gap:8px;margin:0 0 var(--pd2);color:var(--ink-30)}
+.shopping-group__head .t-mono{color:var(--ink-50);font-size:12.5px}
+.wish__qty{margin-right:5px;color:var(--ink-50);font-family:var(--mono);font-weight:500}
+
 /* ---------- a foto dentro da caixa ---------- */
 .wish-photo{
   display:flex;flex-direction:column;gap:8px;padding:10px;border:1px dashed var(--line);border-radius:var(--br2);

@@ -5,7 +5,7 @@ import "./shared/base.css";
 import "./funnels.css";
 import {
   initPage, newId, today, dayOf, dateLabel, notify, sendToDay, api, brl, parseMoney, parseMentions, foldKey,
-  clients, clientName, debounce
+  clients, clientName, debounce, setPageContext
 } from "./shared/core.js";
 import { useState, useEffect, useLayoutEffect, useRef, useMemo, createElement } from "react";
 import {
@@ -946,6 +946,17 @@ function Stage(props) {
 function Editor({ id, funnels }) {
   const [doc, setDoc] = useState(() => funnels.get(id));
   const docRef = useRef(doc);
+
+  /* o funil aberto no palco, pro assistente saber onde propor um onboarding
+     personalizado sem perguntar de novo o que ja esta desenhado */
+  useEffect(() => {
+    if (!doc) { setPageContext(null); return () => setPageContext(null); }
+    setPageContext(() =>
+      "Funil aberto: " + doc.name + (doc.client ? " · cliente: " + clientName(doc.client) + " (id " + doc.client + ")" : "") + ". " +
+      "Etapas: " + (doc.nodes.length ? doc.nodes.map((n) => n.title || labelOf(n.type)).join(" → ") : "nenhuma ainda")
+    );
+    return () => setPageContext(null);
+  }, [doc && doc.id, doc && doc.updatedAt]);
   const undoRef = useRef([]);        // documentos anteriores, até 50, para Ctrl+Z
   const pendingFocus = useRef(null); // id da etapa recém-criada, cujo título deve ganhar o cursor
   const stage = useRef({});          // a api do palco: zoom, enquadrar, coordenadas

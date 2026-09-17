@@ -17,14 +17,15 @@
 import "./shared/base.css";
 import "./index.css";
 import {
-  initPage, today, dateOf, sundayOf, addDays, newId, notify, signIn,
+  initPage, today, dateOf, newId, notify, signIn,
   sendToDay, newNote, parseMentions, readDuration, clientName, seen, markSeen,
   isNewHere, safeUrl, hostOf, readPrefs
 } from "./shared/core.js";
 import { budget, pendingOf, costOf, fmt, longFmt, clock } from "./shared/day.js";
 import { normalize as normalizeTask, dayDoc, overdue } from "./shared/tasks.js";
 import { normalize as normalizeBlock, copyRoutine } from "./shared/routine.js";
-import { useState, useEffect, useLayoutEffect } from "react";
+import { normalize as normalizeHabit, isExpected, toggleMark } from "./shared/habits-data.js";
+import { useState, useEffect, useLayoutEffect, useRef } from "react";
 import { mount, useCollection, useCloud, useClients, Form, Field, useFields, icon } from "./shared/ui.jsx";
 import { NAV_ICONS, LOGO } from "./shared/icons.jsx";
 
@@ -333,33 +334,52 @@ function DayBlock({ doc, late }) {
   );
 }
 
-/* os atalhos em grade de ícones. o número vivo vira uma bolinha no canto, e
-   não uma frase embaixo do nome: nove frases era o que fazia a home parecer
-   um relatório em vez de um lugar de onde se parte. */
-const QUICK = [
-  { id: "calendar", label: "calendário", href: "calendar.html", n: "dayOpen" },
-  { id: "routine", label: "rotina", href: "routine.html", n: "" },
-  { id: "notes", label: "notas", href: "notes.html", n: "notes" },
-  { id: "clients", label: "clientes", href: "clients.html", n: "clients" },
-  { id: "funnels", label: "funis", href: "funnels.html", n: "funnels" },
-  { id: "maps", label: "mapas", href: "maps.html", n: "maps" },
-  { id: "finance", label: "financeiro", href: "finance.html", n: "" },
-  { id: "habits", label: "hábitos", href: "habits.html", n: "habits" },
-  { id: "plans", label: "planos", href: "plans.html", n: "goals" }
-];
-function QuickBlock({ counts }) {
+/* o que se repete todo dia: os hábitos esperados de hoje, com um toque para
+   marcar, e a página do diário de hoje, escrevendo sem sair da home. era a
+   grade de 9 atalhos — trocada porque atalho não é tarefa, e o que a pessoa
+   precisa cadastrar todo dia (o que fez, o que viveu) merecia o lugar de
+   maior destaque, não uma página a mais para abrir. as outras páginas
+   continuam a um clique pela barra lateral. */
+function TodayBlock({ habits, journal, t }) {
+  const list = habits.all()
+    .filter((h) => !h.archived && isExpected(h, t))
+    .sort((a, b) => a.order - b.order || a.createdAt - b.createdAt);
+  const entry = journal.get(t);
+  const [draft, setDraft] = useState(() => (entry && entry.body) || "");
+  const draftRef = useRef(draft);
+  draftRef.current = draft;
+  const timer = useRef(null);
+  useEffect(() => { setDraft((entry && entry.body) || ""); }, [entry && entry.body]);
+  const write = (v) => {
+    setDraft(v);
+    clearTimeout(timer.current);
+    timer.current = setTimeout(() => {
+      journal.save({ id: t, body: draftRef.current, createdAt: (entry && entry.createdAt) || Date.now(), updatedAt: Date.now() });
+    }, 700);
+  };
   return (
-    <section className="bx bx--quick">
-      <p className="bx__head"><span className="t-mono">atalhos</span></p>
-      <div className="quick">
-        {QUICK.map((q) => (
-          <a key={q.id} className="quick__item" href={q.href}
-             title={q.n && counts[q.n] ? q.label + " · " + counts[q.n] : q.label}>
-            <span className="quick__icon">{NAV_ICONS[q.id]}</span>
-            <span className="quick__name">{q.label}</span>
-            {!!(q.n && counts[q.n]) && <i className="quick__badge">{counts[q.n]}</i>}
-          </a>))}
-      </div>
+    <section className="bx bx--today">
+      <p className="bx__head">
+        <span className="t-mono">hoje</span>
+        <a className="bx__aside" href="habits.html">ver hábitos e diário</a>
+      </p>
+      {list.length
+        ? <ul className="today-habits">
+            {list.map((h) => (
+              <li key={h.id}>
+                <button type="button" className={"today-habits__check" + (h.marks[t] ? " is-done" : "")}
+                        aria-label={(h.marks[t] ? "desmarcar " : "marcar ") + h.name}
+                        onClick={() => toggleMark(habits, h, t, t)}>
+                  {h.marks[t] && icon("check")}
+                </button>
+                <span className="today-habits__name">{h.name}</span>
+              </li>))}
+          </ul>
+        : <p className="bx__empty">nenhum hábito esperado hoje</p>}
+      <label className="today-journal">
+        <span className="t-mono today-journal__label">diário de hoje</span>
+        <textarea rows={3} placeholder="como foi o dia?" value={draft} onChange={(e) => write(e.target.value)} />
+      </label>
     </section>
   );
 }
@@ -503,11 +523,8 @@ function Home() {
   useClients();
   const tasks = useCollection("tasks", { normalize: normalizeTask });
   const notes = useCollection("notes");
-  const funnels = useCollection("funnels");
-  const maps = useCollection("maps");
-  const habits = useCollection("habits");
-  const plans = useCollection("plans");
-  const clientsCol = useCollection("clients");
+  const habits = useCollection("habits", { normalize: normalizeHabit });
+  const journal = useCollection("journal");
   const bookmarks = useCollection("bookmarks");
   const routine = useCollection("routine", { normalize: normalizeBlock });
 
@@ -545,21 +562,9 @@ function Home() {
   }, []);
 
   const t = today();
-  const weekStart = sundayOf(t);
-  const weekDays = new Set(Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)));
   const allTasks = tasks.all();
   const today_ = dayDoc(allTasks, t, readPrefs());
   const late = overdue(allTasks, t).length;
-  const counts = {
-    dayOpen: pendingOf(today_).length,
-    weekOpen: allTasks.filter((x) => !x.done && !x.reserved && weekDays.has(x.date)).length,
-    notes: notes.all().filter((n) => n.stage !== "archived").length,
-    clients: clientsCol.all().filter((x) => x.status !== "closed").length,
-    funnels: funnels.all().length,
-    maps: maps.all().length,
-    habits: habits.all().filter((h) => !h.archived && !(h.marks && h.marks[t])).length,
-    goals: plans.all().reduce((s, p) => s + (p.goals || []).filter((g) => !g.done).length, 0)
-  };
 
   const now = new Date();
   const name = c.signedIn && c.email ? String(c.email).split("@")[0] : "";
@@ -583,7 +588,7 @@ function Home() {
 
       <section className="hm-bento">
         <FavBlock bookmarks={bookmarks} />
-        <QuickBlock counts={counts} />
+        <TodayBlock habits={habits} journal={journal} t={t} />
         <DayBlock doc={today_} late={late} />
         <NoteBlock notes={notes} />
         <QuoteBlock />

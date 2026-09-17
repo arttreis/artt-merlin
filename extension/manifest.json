@@ -1,0 +1,18 @@
+{
+  "manifest_version": 3,
+  "name": "Merlin — nota rápida",
+  "version": "1.0.0",
+  "description": "Guarda uma nota no Merlin sem abrir o site.",
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Nota rápida no Merlin (Alt+Shift+N)"
+  },
+  "permissions": ["storage"],
+  "host_permissions": ["https://merlin.arttreis.com.br/*"],
+  "commands": {
+    "_execute_action": {
+      "suggested_key": { "default": "Alt+Shift+N" },
+      "description": "abrir a nota rápida do Merlin"
+    }
+  }
+}

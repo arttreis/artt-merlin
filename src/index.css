@@ -121,31 +121,27 @@ a.bx__aside:hover{color:var(--ink-70)}
 a.bx--day{transition:border-color var(--t)}
 a.bx--day:hover{border-color:var(--ink-30)}
 
-/* os atalhos: grade de icones, nao lista de frases */
-.bx--quick{grid-column:span 2}
-.quick{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
-.quick__item{
-  position:relative;display:flex;flex-direction:column;align-items:center;gap:7px;
-  padding:12px 6px 10px;border-radius:var(--br3);
-  color:var(--ink-50);transition:background var(--t),color var(--t);
+/* hoje: os habitos esperados, um toque pra marcar, e o diario do dia logo
+   embaixo — o lugar que era da grade de atalhos */
+.bx--today{grid-column:span 2}
+.today-habits{list-style:none;margin:0 0 12px;padding:0;display:flex;flex-direction:column;gap:1px}
+.today-habits li{display:flex;align-items:center;gap:10px;padding:5px 2px;min-width:0}
+.today-habits__check{
+  flex:none;width:20px;height:20px;border-radius:7px;display:grid;place-items:center;
+  border:1px solid var(--line);color:transparent;transition:background var(--t),border-color var(--t),color var(--t);
 }
-.quick__item:hover{background:var(--fill);color:var(--ink)}
-.quick__icon{
-  display:grid;place-items:center;width:34px;height:34px;border-radius:11px;
-  background:var(--fill);border:1px solid var(--line-soft);color:var(--ink-70);
-  transition:border-color var(--t),color var(--t);
+.today-habits__check:hover{border-color:var(--ink-30)}
+.today-habits__check svg{width:12px;height:12px}
+.today-habits__check.is-done{background:var(--green);border-color:var(--green);color:var(--on-green)}
+.today-habits__name{font-size:13px;color:var(--ink-70);overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.today-journal{display:flex;flex-direction:column;gap:6px;flex:1 1 auto}
+.today-journal__label{color:var(--ink-30)}
+.today-journal textarea{
+  flex:1 1 auto;resize:none;border:1px solid var(--line-soft);border-radius:var(--br2);
+  background:var(--surface-2);padding:8px 9px;font:inherit;font-size:12.5px;color:var(--ink);
+  min-height:60px;
 }
-.quick__item:hover .quick__icon{border-color:var(--ink-30);color:var(--green-ink)}
-.quick__icon svg{width:16px;height:16px}
-.quick__name{font-size:11px;letter-spacing:-.01em}
-/* a bolinha diz que ha algo esperando ali, sem gastar uma frase */
-.quick__badge{
-  position:absolute;top:8px;right:calc(50% - 24px);
-  min-width:16px;height:16px;padding:0 4px;border-radius:100px;
-  background:var(--green);color:var(--on-green);
-  font-family:var(--mono);font-size:9.5px;font-style:normal;
-  display:grid;place-items:center;
-}
+.today-journal textarea:focus{outline:none;border-color:var(--ink-30)}
 
 /* favoritos: marca com a inicial, nome e dominio */
 .favs{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:1px}
@@ -202,7 +198,7 @@ a.bx--day:hover{border-color:var(--ink-30)}
 
 @media (max-width:900px){
   .hm-bento{grid-template-columns:repeat(2,minmax(0,1fr))}
-  .bx,.bx--day,.bx--quick,.bx--quote{grid-column:span 2;grid-row:auto}
+  .bx,.bx--day,.bx--today,.bx--quote{grid-column:span 2;grid-row:auto}
 }
 
 /* ================================================================

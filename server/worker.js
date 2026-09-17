@@ -120,6 +120,13 @@ const readCookie = (req, name) => {
   return found ? found.slice(name.length + 1) : null;
 };
 
+/* o token da sessao: cookie para o site (mesmo dominio, SameSite=Lax
+   resolve sozinho), ou o cabecalho para quem nao e o site — a extensao de
+   quick notes, cuja origem e chrome-extension://, nao o dominio do worker.
+   nao muda nada pra quem ja usa cookie: o cabecalho so existe quando quem
+   pediu o mandou. */
+const sessionToken = (req) => req.headers.get("x-merlin-token") || readCookie(req, "session");
+
 /* SameSite=Lax e possivel porque o Worker vive no mesmo dominio do site, numa
    rota /api/*. em dominios diferentes seria SameSite=None, que Safari bloqueia. */
 const sessionCookie = (token) =>
@@ -314,13 +321,16 @@ async function signIn(req, env) {
   }
 
   const token = await signSession(person.id, env.SESSION_SECRET);
-  return json({ ok: true, email }, 200, { "set-cookie": sessionCookie(token) });
+  /* o token tambem vai no corpo: o cookie serve o site (mesmo dominio), o
+     corpo serve quem nao pode contar com cookie entre origens — a extensao
+     guarda isso e manda de volta em x-merlin-token */
+  return json({ ok: true, email, token }, 200, { "set-cookie": sessionCookie(token) });
 }
 
 const signOut = () => json({ ok: true }, 200, { "set-cookie": deadCookie() });
 
 async function whoAmI(req, env) {
-  const person = await readSession(readCookie(req, "session"), env.SESSION_SECRET);
+  const person = await readSession(sessionToken(req), env.SESSION_SECRET);
   if (!person) return json({ signedIn: false });
   const row = await env.DB.prepare("SELECT email FROM people WHERE id = ?").bind(person).first();
   return json({ signedIn: true, email: row ? row.email : null });
@@ -416,6 +426,31 @@ async function uploadDoc(req, env, person) {
     ok: false, reason: "servidor está na frente",
     server: current ? { id: body.id, v: current.v, doc: JSON.parse(current.doc) } : null
   }, 409);
+}
+
+/* ---------- a nota rapida ----------
+   a unica coisa que a extensao de quick notes sabe fazer: mandar um texto.
+   o resto — id, titulo (a primeira linha), o resto da forma de notes.jsx —
+   o worker decide aqui. nao expoe /docs inteiro pra extensao nao precisar
+   entender carimbo (v) nem resolucao de conflito; ela so autentica e manda
+   POST com {text}. quando o site abrir depois, a nota ja esta na proxima
+   leitura normal da colecao "notes". */
+async function quickNote(req, env, person) {
+  const body = await req.json().catch(() => null);
+  const text = String((body && body.text) || "").trim().slice(0, 4000);
+  if (!text) return fail("nota vazia");
+  const id = crypto.randomUUID();
+  const now = Date.now();
+  const title = text.split(/\r?\n/)[0].slice(0, 300) || "nota rápida";
+  const doc = {
+    id, title, body: text, stage: "seed", client: "", pinned: false,
+    steps: [], files: [], outputs: [], history: [], createdAt: now, updatedAt: now
+  };
+  await env.DB.prepare(
+    "INSERT INTO docs (person, type, id, doc, v) VALUES (?, 'notes', ?, ?, ?) " +
+    "ON CONFLICT(person, type, id) DO UPDATE SET doc = excluded.doc, v = excluded.v WHERE excluded.v > docs.v"
+  ).bind(person, id, JSON.stringify(doc), now).run();
+  return json({ ok: true, id });
 }
 
 /* ---------- o link publico ----------
@@ -782,6 +817,48 @@ const TEXT_TASKS = {
   })
 };
 
+/* ---------- assistente: uma proposta de acao por vez, nunca executada aqui ----------
+   o catalogo e fechado de proposito: nao e function-calling generico, e um
+   enum pequeno com um formato de payload por tipo — cabe num prompt so, e o
+   pedido nunca sai maior que um segundo turno pediria. actionType fora
+   desta lista e descartado; os campos do payload sao filtrados pelos
+   permitidos aqui, o resto do JSON da IA nunca chega perto de um save(). */
+const ASSISTANT_ACTIONS = {
+  task: { collection: "tasks", fields: ["title", "date", "min", "client"] },
+  note: { collection: "notes", fields: ["title", "body", "client"] },
+  "routine-block": { collection: "routine", fields: ["title", "days", "at", "min"] },
+  "lead-update": { collection: "clients", fields: ["id", "stage", "temperature", "note"] },
+  "onboarding-map": { collection: "maps", fields: ["name", "tree"] },
+  "onboarding-funnel": { collection: "funnels", fields: ["name", "stages"] },
+  script: { collection: "content", fields: ["contentId", "script"] },
+  "wishlist-item": { collection: "wishlist", fields: ["list", "name", "price", "bucket", "qty"] }
+};
+const ASSISTANT_ACTION_TYPES = Object.keys(ASSISTANT_ACTIONS).join(", ");
+
+LIST_TASKS.assistant = (c) => ({
+  instruction:
+    "Você é o assistente do Merlin, acionado pela busca. A pessoa mandou uma mensagem livre; proponha NO MÁXIMO UMA ação que ajude — você nunca executa nada, só descreve uma proposta que a pessoa confirma ou descarta. " +
+    "Escolha actionType dentre exatamente estes valores: " + ASSISTANT_ACTION_TYPES + ". " +
+    "Preencha payload só com os campos válidos daquele tipo, e nada além deles: " +
+    "task {title, date (AAAA-MM-DD ou vazio), min (minutos, número), client (nome ou vazio)}; " +
+    "note {title, body, client (nome ou vazio)}; " +
+    "routine-block {title, days (números de 0 a 6, domingo=0), at (HH:MM), min}; " +
+    "lead-update {id (o id do cliente/prospecto do contexto — NUNCA invente um; sem id no contexto, não proponha este tipo), stage, temperature (frio, morno ou quente), note}; " +
+    "onboarding-map {name, tree: {title, note, children:[{title, note, children:[...]}]} — no máximo 3 níveis, 6 filhos por nó}; " +
+    "onboarding-funnel {name, stages: lista de {nodeType (um de " + NODE_TYPES + "), title}}; " +
+    "script {contentId (o id da peça de conteúdo do contexto — NUNCA invente um; sem id no contexto, não proponha este tipo), script (roteiro em markdown: # título, ## gancho, ## desenvolvimento, ## fechamento, com bullets, não texto corrido)}; " +
+    "wishlist-item {list (id da coletânea do contexto, ou vazio), name, price (centavos, número, ou 0), bucket (um de asap, longterm, online, presencial, mercado, ou vazio), qty (ex. \"2x\", \"~1\", ou vazio)}. " +
+    "Se a mensagem for uma PERGUNTA (inclusive financeira — \"posso gastar X\", \"dá pra fazer Y\") em vez de um pedido de ação, devolva suggestions vazio e responda a pergunta direto em clarify, usando só o que está no contexto da tela (ex. saldo e fixos, quando a tela for o financeiro); se faltar dado pra responder com segurança, diga o que falta em vez de estimar. " +
+    "Se a mensagem não corresponder a nenhuma ação nem a uma pergunta respondível, devolva suggestions vazio e clarify com UMA pergunta curta que ajudaria a decidir — nunca invente uma ação só para responder algo. " +
+    "clarify tem até 400 caracteres. title e note do topo (fora do payload) até 120 e 300 caracteres. " +
+    'Formato: {"suggestions":[{"actionType":"…","title":"…","note":"…","payload":{...}}],"clarify":"…"}',
+  context:
+    "Mensagem: " + String(c.message || "").slice(0, 1000) + "\n" +
+    "Tela atual: " + String(c.page || "nenhuma").slice(0, 40) + "\n" +
+    (c.pageContext ? "Contexto da tela: " + String(c.pageContext).slice(0, 1200) + "\n" : "") +
+    (c.recent ? "Já existe (não repita nem duplique): " + String(c.recent).slice(0, 400) + "\n" : "")
+});
+
 /* tira o objeto JSON de uma resposta que pode vir com texto em volta */
 function extractJson(text) {
   const a = text.indexOf("{"), b = text.lastIndexOf("}");
@@ -843,6 +920,29 @@ async function advise(req, env, person) {
     if (!data || typeof data.text !== "string" || !data.text.trim()) return fail("o Merlin respondeu fora do formato", 502);
     return json({ text: data.text.slice(0, 4000) });
   }
+  if (name === "assistant") {
+    if (!data) return fail("o Merlin respondeu fora do formato", 502);
+    /* nunca confia no JSON da IA indo direto pra um save(): actionType tem
+       que estar no catalogo fechado, e so os campos que aquele tipo aceita
+       sobrevivem — o resto do que a IA mandou e descartado aqui mesmo. */
+    const raw = Array.isArray(data.suggestions) ? data.suggestions[0] : null;
+    const spec = raw && ASSISTANT_ACTIONS[raw.actionType];
+    let suggestions = [];
+    if (spec && raw.title) {
+      const rawPayload = raw.payload && typeof raw.payload === "object" ? raw.payload : {};
+      const payload = {};
+      spec.fields.forEach((k) => { if (rawPayload[k] != null) payload[k] = rawPayload[k]; });
+      if (JSON.stringify(payload).length <= 8000) {
+        suggestions = [{
+          actionType: String(raw.actionType),
+          title: String(raw.title || "").slice(0, 120),
+          note: String(raw.note || "").slice(0, 300),
+          payload
+        }];
+      }
+    }
+    return json({ suggestions, clarify: String(data.clarify || "").slice(0, 400) });
+  }
   if (!data || !Array.isArray(data.suggestions)) return fail("o Merlin respondeu fora do formato", 502);
   return json({
     suggestions: data.suggestions.slice(0, MAX_SUGGESTIONS).map((s) => ({
@@ -894,14 +994,18 @@ export default {
       /* rota que nao existe e 404 antes de ser 401: pedir login para um
          caminho inexistente mente sobre a causa do erro */
       if (base !== "/days" && base !== "/docs" && base !== "/merlin" && base !== "/share"
-          && base !== "/files" && base !== "/files/:id") return fail("não existe", 404);
+          && base !== "/files" && base !== "/files/:id" && base !== "/quick-note") return fail("não existe", 404);
 
       /* daqui pra baixo, so quem entrou */
-      const person = await readSession(readCookie(req, "session"), env.SESSION_SECRET);
+      const person = await readSession(sessionToken(req), env.SESSION_SECRET);
       if (!person) return fail("entre primeiro", 401);
 
       if (route === "/merlin") {
         if (req.method === "POST") return await advise(req, env, person);
+        return fail("método não serve aqui", 405);
+      }
+      if (route === "/quick-note") {
+        if (req.method === "POST") return await quickNote(req, env, person);
         return fail("método não serve aqui", 405);
       }
       if (route === "/docs") {

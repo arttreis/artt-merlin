@@ -12,44 +12,17 @@ import {
   useFields, Form, Field, Dialog, Markdown, EmptyStart, PeriodNav, icon
 } from "./shared/ui.jsx";
 import { HABIT_SUGGESTIONS, habitGroups } from "./shared/templates.js";
+import { SCHEDULES, COLORS, normalize, isExpected, toggleMark } from "./shared/habits-data.js";
 
 initPage("habits");
 
 /* ---------- o habito ----------
    nao e tarefa: nao tem hora nem duracao obrigatoria, tem frequencia e um
    registro por dia. as marcas moram dentro do documento porque um mes cabe em
-   poucos bytes e um habito e editado por uma pessoa so. */
-const SCHEDULES = [
-  { id: "daily", label: "todo dia" },
-  { id: "perWeek", label: "vezes por semana" },
-  { id: "weekdays", label: "dias da semana" }
-];
+   poucos bytes e um habito e editado por uma pessoa so.
+   normalize/SCHEDULES/COLORS/isExpected/toggleMark moram em
+   shared/habits-data.js — a home usa as mesmas para marcar direto no bento. */
 const WEEKDAY_NAMES = ["dom", "seg", "ter", "qua", "qui", "sex", "sáb"];
-const COLORS = [
-  { id: 5, label: "verde" }, { id: 1, label: "azul" }, { id: 2, label: "laranja" },
-  { id: 3, label: "rosa" }, { id: 4, label: "roxo" }, { id: 6, label: "ciano" }
-];
-
-function normalize(d) {
-  const s = d.schedule && typeof d.schedule === "object" ? d.schedule : {};
-  return {
-    id: d.id,
-    name: String(d.name || "").slice(0, 80),
-    schedule: {
-      type: SCHEDULES.some((x) => x.id === s.type) ? s.type : "daily",
-      times: Math.min(7, Math.max(1, Math.round(+s.times || 3))),
-      weekdays: Array.isArray(s.weekdays) ? s.weekdays.map(Number).filter((n) => n >= 0 && n <= 6) : [1, 2, 3, 4, 5]
-    },
-    min: Math.max(0, Math.round(+d.min || 0)),
-    color: +d.color || 5,
-    order: Number.isFinite(+d.order) ? +d.order : 0,
-    archived: !!d.archived,
-    marks: d.marks && typeof d.marks === "object" ? d.marks : {},
-    createdAt: +d.createdAt || Date.now(),
-    updatedAt: +d.updatedAt || +d.createdAt || Date.now()
-  };
-}
-
 
 /* ---------- meses e dias ---------- */
 const monthOf = (day) => day.slice(0, 7);
@@ -91,15 +64,6 @@ function suggestionGroups(existing) {
         .map((s) => ({ ...s, line: scheduleLabel(s) + (s.min ? " · " + formatMin(s.min) : "") }))
     }))
     .filter((g) => g.items.length);
-}
-
-/* o dia e "esperado" quando a frequencia pede marca nele. quem e N vezes por
-   semana nao tem dia fixo: nenhum e esperado, e a conta e por semana. */
-function isExpected(h, day) {
-  const s = h.schedule;
-  if (s.type === "daily") return true;
-  if (s.type === "weekdays") return s.weekdays.includes(dateOf(day).getDay());
-  return false;
 }
 
 /* feitos e esperados no mes, do dia 1 ate hoje (ou o mes inteiro, se ja
@@ -176,12 +140,7 @@ function Habits() {
   const totals = list.reduce((acc, h) => { const s = monthStats(h, month); acc.done += s.done; acc.expected += s.expected; return acc; }, { done: 0, expected: 0 });
 
   /* ---------- acoes ---------- */
-  const toggle = (h, day) => {
-    if (day > t) return;
-    const marks = { ...h.marks };
-    if (marks[day]) delete marks[day]; else marks[day] = true;
-    habits.save({ ...h, marks, updatedAt: Date.now() });
-  };
+  const toggle = (h, day) => toggleMark(habits, h, day, t);
   const archive = (h) => {
     habits.save({ ...h, archived: true, updatedAt: Date.now() });
     notify("hábito arquivado", () => habits.save({ ...h, archived: false, updatedAt: Date.now() }));

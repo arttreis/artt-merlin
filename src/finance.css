@@ -43,8 +43,8 @@
 .table tr:hover .row-actions{opacity:1}
 
 /* ---------- ano: doze meses lado a lado, como a aba anual da planilha ----------
-   cada mes e uma coluna estreita com o saldo de cada dia, pintado nas
-   faixas da planilha (balanceTone no finance.jsx). rola por dentro do
+   cada mes e uma coluna estreita com o saldo de cada dia, pintado numa
+   escala continua (balanceStyle no finance.jsx). rola por dentro do
    proprio envoltorio para o body nunca ganhar barra horizontal. */
 .year-scroll{overflow-x:auto;padding-bottom:6px;margin:0 -2px}
 .year{display:grid;grid-template-columns:repeat(12,minmax(118px,1fr));gap:6px;padding:0 2px}
@@ -66,17 +66,31 @@
 .year__day i{font-style:normal;color:var(--ink-30)}
 .year__day.has-moves{color:var(--ink)}
 
-/* as cores do saldo, as da formatacao condicional da planilha: vermelho
-   abaixo de zero, verde claro, verde cheio a partir de R$ 1.500 e ciano a
-   partir de R$ 2.500. valem no ano e na coluna de saldo do mes. */
-.year__day.is-positive,.balance-cell.is-positive{background:color-mix(in srgb,#4ade80 12%,transparent)}
-.year__day.is-high,.balance-cell.is-high{background:color-mix(in srgb,#22c55e 34%,transparent);color:var(--ink)}
-.year__day.is-top,.balance-cell.is-top{background:color-mix(in srgb,#22d3ee 34%,transparent);color:var(--ink)}
+/* as cores do saldo: vermelho categorico abaixo de zero; acima disso, um
+   gradiente continuo de verde a ciano que escala com --tone (0 a 1, posto
+   pelo balanceStyle no finance.jsx conforme o saldo do dia cresce perto do
+   maior saldo do proprio mes/ano aberto) — nao ha mais um teto absoluto
+   onde tudo vira a mesma cor. valem no ano e na coluna de saldo do mes. */
+.year__day.is-positive,.balance-cell.is-positive{
+  background:color-mix(in srgb,color-mix(in srgb,#4ade80 calc((1 - var(--tone,0)) * 100%),#22d3ee calc(var(--tone,0) * 100%)) calc(12% + var(--tone,0) * 28%),transparent);
+  color:var(--ink)
+}
 .year__day.is-negative,.balance-cell.is-negative{background:color-mix(in srgb,#f87171 18%,transparent);color:#f87171}
 .year__day.is-negative i{color:color-mix(in srgb,#f87171 60%,transparent)}
 /* no mes, o dia futuro apaga a tinta da linha inteira; o saldo negativo
    continua vermelho */
 .table td.balance-cell.is-negative{color:#f87171}
+/* a diferenca do investimento: vermelho quando o saldo atual ficou abaixo
+   do aportado, verde quando ficou acima — fora do grid do saldo, entao sem
+   o fundo do balance-cell, so a cor do texto */
+.table td.is-negative{color:#f87171}
+.table td.is-green{color:var(--green-ink)}
+
+/* ---------- simular: o "e se" que nao grava ---------- */
+.sim-panel .heading .total{font-family:var(--mono);font-size:12.5px}
+.sim-panel__hint{margin:0 0 var(--pd2);font-size:12px}
+.sim-panel__add{flex-wrap:wrap}
+.sim-panel__add > input.input{flex:1 1 160px;min-width:120px}
 .year__day.is-today{box-shadow:inset 0 0 0 1px var(--green)}
 .year__day.is-empty{visibility:hidden}
 

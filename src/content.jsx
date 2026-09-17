@@ -9,7 +9,7 @@
    tarefa" — o cartao nao cobra minuto nenhum sozinho. */
 import "./shared/base.css";
 import "./content.css";
-import { initPage, newId, notify, today, dateLabel, dayOf, isDay, parseMentions } from "./shared/core.js";
+import { initPage, newId, notify, today, dateLabel, dayOf, isDay, parseMentions, clientName, setPageContext } from "./shared/core.js";
 import { useState, useEffect, useRef, useLayoutEffect, Fragment } from "react";
 import {
   mount, useCollection, useClients, useHash, setHash, useKeydown, isTyping,
@@ -81,6 +81,16 @@ function Content() {
 
   const all = store.all();
   const open = openId ? store.get(openId) : null;
+
+  /* a peca aberta, pro assistente propor um roteiro sem perguntar o id */
+  useEffect(() => {
+    if (!open) { setPageContext(null); return () => setPageContext(null); }
+    setPageContext(() =>
+      "Peça de conteúdo aberta: " + open.title + (open.client ? " · cliente: " + clientName(open.client) + " (id " + open.client + ")" : "") + ". id: " + open.id + ". etapa: " + open.stage + ". " +
+      (open.script.trim() ? "já tem roteiro (" + open.script.length + " caracteres)" : "ainda sem roteiro")
+    );
+    return () => setPageContext(null);
+  }, [open && open.id, open && open.updatedAt]);
 
   const openPiece = (id) => { setOpenId(id); setHash(id); };
   const closePiece = () => { setOpenId(null); setHash(""); };

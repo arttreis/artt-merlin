@@ -8,7 +8,7 @@ import "./clients.css";
 import {
   initPage, collection, newId, notify, api, cloud, newNote, today,
   dateLabel, dayOf, brl, parseMoney, parseDuration, formatMin,
-  uploadFile, deleteFile, fileUrl, isImage, FILE_TYPES
+  uploadFile, deleteFile, fileUrl, isImage, FILE_TYPES, setPageContext
 } from "./shared/core.js";
 import { useState, useEffect, useRef, useLayoutEffect, Fragment } from "react";
 import {
@@ -240,6 +240,17 @@ function Clients() {
   const doc = selectedId ? clients.get(selectedId) : null;
   /* prospecto e perdido moram na prospeccao: aqui so quem fechou */
   const list = clients.all().filter(isClient).sort(compareClients);
+
+  /* o cliente aberto, pro assistente usar em "atualizar cliente" e nos
+     onboardings de mapa/funil sem perguntar o que ja esta na ficha */
+  useEffect(() => {
+    if (!doc) { setPageContext(null); return () => setPageContext(null); }
+    setPageContext(() =>
+      "Cliente aberto: " + doc.name + (doc.brand ? " (" + doc.brand + ")" : "") + ". id: " + doc.id + ". status: " + doc.status + ". etapa: " + doc.stage + ". " +
+      (doc.summary ? "Página: " + doc.summary.slice(0, 900) : "sem página escrita ainda")
+    );
+    return () => setPageContext(null);
+  }, [doc && doc.id, doc && doc.updatedAt]);
 
   /* ---------- abrir / fechar o painel ---------- */
 

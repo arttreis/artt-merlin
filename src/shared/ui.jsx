@@ -18,12 +18,13 @@ import { createRoot } from "react-dom/client";
 import { createPortal } from "react-dom";
 import {
   collection, cloud, clients, listClients, clientName, md, brl, parseMoney,
-  api, notify, sendToDay, formatMin, readDuration,
+  api, notify, sendToDay, formatMin, readDuration, newId,
   PAGE_GROUPS, CLOUD_STATUS, search, signIn, currentNotice, onNotice, closeNotice,
   toggleSidebar, setShellRenderer, currentBrand, share, shareOf, unshare, shareUrl,
-  currentTheme, toggleTheme
+  currentTheme, toggleTheme, getPageContext, getCurrentPage
 } from "./core.js";
 import { LOGO, GL_LOGO, GL_MARK, ICONS, NAV_ICONS, icon } from "./icons.jsx";
+import { ACTION_COLLECTIONS, ACTION_LABELS, ACTION_FIELDS, buildDoc, previewOf } from "./assistant-actions.js";
 
 /* o CSS entra pela pagina, nao por aqui: base.css ja puxa o shell.css na
    ordem certa, e o dia carrega so o shell. */
@@ -903,19 +904,133 @@ function useRootClass(name, on) {
 }
 
 /* ---------- busca global ---------- */
+/* ---------- o assistente ----------
+   a IA nunca grava sozinha: `assistant`/`/api/merlin` devolve no máximo uma
+   proposta, e esta caixa é o único jeito dela virar documento — um Form
+   comum, como qualquer criação manual, só que os campos já vêm preenchidos.
+   confirmar chama collection.save() local-first, igual a criar à mão: some
+   quando a rede volta, sincroniza sozinho, pode ser desfeito como qualquer
+   outra gravação. */
+function ProposalDialog({ proposal, onClose }) {
+  const { actionType, payload, note } = proposal;
+  const collectionName = ACTION_COLLECTIONS[actionType];
+  const store = useCollection(collectionName || "tasks");
+  const fields = ACTION_FIELDS[actionType] || [];
+  const initial = {};
+  fields.forEach((f) => { const v = (payload || {})[f.key]; initial[f.key] = v == null ? "" : v; });
+  const [v, bind] = useFields(initial);
+  if (!collectionName) return null;
+  const submit = () => {
+    const { doc, error } = buildDoc(actionType, payload, v, store);
+    if (error) { notify(error); return false; }
+    store.save(doc);
+    notify("feito");
+  };
+  return (
+    <Form title={ACTION_LABELS[actionType] || "proposta"} sub={previewOf(actionType, payload) || note}
+        submit={actionType === "lead-update" || actionType === "script" ? "aplicar" : "criar"}
+        onSubmit={submit} onClose={onClose}>
+      {fields.map((f) => (
+        <Field key={f.key} label={f.label} full={f.type === "textarea"}>
+          {f.type === "textarea"
+            ? <textarea className="textarea" rows="4" {...bind(f.key)} />
+            : <input className="input" type={f.type === "number" ? "number" : f.type === "date" ? "date" : "text"} {...bind(f.key)} />}
+        </Field>
+      ))}
+    </Form>
+  );
+}
+
+/* o painel de chat: mensagem livre entra, o Merlin responde com uma
+   proposta (que abre o ProposalDialog pra confirmar) ou uma pergunta curta
+   quando não deu pra decidir uma ação. conversa em memória só — não é dado
+   do produto, não sincroniza, some ao fechar. */
+function AssistantPanel({ initial, onClose }) {
+  const [messages, setMessages] = useState([]); // { from: "me"|"merlin", text } | { from: "merlin", proposal }
+  const [input, setInput] = useState("");
+  const [thinking, setThinking] = useState(false);
+  const [proposal, setProposal] = useState(null);
+  const sentInitial = useRef(false);
+  const listRef = useRef(null);
+
+  const ask = async (message) => {
+    if (!message.trim() || thinking) return;
+    setMessages((m) => m.concat([{ from: "me", text: message }]));
+    setInput("");
+    setThinking(true);
+    try {
+      const r = await api("/merlin", { method: "POST", body: JSON.stringify({
+        task: "assistant",
+        context: { message, page: getCurrentPage(), pageContext: getPageContext() }
+      }) });
+      if (r.ok) {
+        const s = (r.body.suggestions || [])[0];
+        if (s) setMessages((m) => m.concat([{ from: "merlin", proposal: s }]));
+        else setMessages((m) => m.concat([{ from: "merlin", text: r.body.clarify || "não entendi bem — pode dizer de outro jeito?" }]));
+      } else if (r.status === 401) {
+        setMessages((m) => m.concat([{ from: "merlin", text: "entre para usar o Merlin" }]));
+      } else {
+        setMessages((m) => m.concat([{ from: "merlin", text: r.body.error || "não consegui pensar nisso agora" }]));
+      }
+    } catch (e) {
+      setMessages((m) => m.concat([{ from: "merlin", text: "não consegui falar com o Merlin" }]));
+    } finally { setThinking(false); }
+  };
+
+  useEffect(() => {
+    if (sentInitial.current) return;
+    sentInitial.current = true;
+    if (initial && initial.trim()) ask(initial); else setInput(initial || "");
+  }, []);
+  useEffect(() => { if (listRef.current) listRef.current.scrollTop = listRef.current.scrollHeight; }, [messages, thinking]);
+  useEscape(onClose);
+
+  return (
+    <div className="dialog assistant-panel" role="dialog" aria-modal="true" aria-label="Assistente"
+         onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="dialog__box assistant-panel__box">
+        <button className="dialog__close" type="button" aria-label="Fechar" onClick={onClose}>{icon("x")}</button>
+        <p className="dialog__title">merlin</p>
+        <div className="assistant-panel__log" ref={listRef}>
+          {!messages.length && <p className="assistant-panel__hint">peça uma tarefa, uma nota, ajuda com a rotina, um roteiro, um lead, ou pergunte algo do financeiro.</p>}
+          {messages.map((m, i) => (
+            <div key={i} className={"assistant-panel__msg" + (m.from === "me" ? " is-me" : "")}>
+              {m.proposal
+                ? <button className="pill pill--green" type="button" onClick={() => setProposal(m.proposal)}>{icon("spark")}{m.proposal.title}</button>
+                : <p>{m.text}</p>}
+            </div>
+          ))}
+          {thinking && <div className="assistant-panel__msg"><p className="weak">pensando…</p></div>}
+        </div>
+        <form className="assistant-panel__input" onSubmit={(e) => { e.preventDefault(); ask(input); }}>
+          <input className="input" autoFocus placeholder="escreva…" value={input} onChange={(e) => setInput(e.currentTarget.value)} />
+          <button className="pill pill--green" type="submit" disabled={thinking || !input.trim()}>{icon("arrow")}</button>
+        </form>
+      </div>
+      {proposal && <ProposalDialog proposal={proposal} onClose={() => setProposal(null)} />}
+    </div>
+  );
+}
+
 function SearchBox({ onNavigate }) {
   const [term, setTerm] = useState("");
   const [open, setOpen] = useState(false);
   const [focus, setFocus] = useState(-1);
+  const [assistant, setAssistant] = useState(null); // string (mensagem inicial) | null
   const ref = useRef(null);
   const hits = term.trim() ? search(term) : [];
 
-  /* Ctrl+K de qualquer lugar */
+  const openAssistant = (msg) => { setOpen(false); setAssistant(msg || ""); };
+
+  /* Ctrl+K foca a busca; Ctrl+J abre o assistente direto, de qualquer lugar */
   useKeydown((e) => {
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
       e.preventDefault();
       ref.current.focus(); ref.current.select();
       setOpen(true);
+    } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "j") {
+      e.preventDefault();
+      openAssistant(term);
     }
   });
   useEffect(() => {
@@ -945,6 +1060,7 @@ function SearchBox({ onNavigate }) {
         <input ref={ref} id="sb-search" type="search" placeholder="buscar…" autoComplete="off" aria-label="Buscar em tudo"
                value={term} onChange={(e) => { setTerm(e.currentTarget.value); setOpen(true); setFocus(-1); }}
                onFocus={() => { if (term.trim()) setOpen(true); }} onKeyDown={onKeyDown} />
+        <button type="button" className="sb__assistant" title="perguntar ao Merlin (ctrl j)" aria-label="Perguntar ao Merlin" onClick={() => openAssistant(term)}>{icon("spark")}</button>
         <kbd>ctrl k</kbd>
       </label>
       {open && term.trim() && (
@@ -955,8 +1071,10 @@ function SearchBox({ onNavigate }) {
                   <span className="t-mono">{hit.label}</span><span>{hit.text}</span>
                 </a>))
             : <p>nada com esse nome</p>}
+          <button type="button" className="sb__ask" onClick={() => openAssistant(term)}>{icon("spark")}perguntar ao Merlin</button>
         </div>
       )}
+      {assistant != null && <AssistantPanel initial={assistant} onClose={() => setAssistant(null)} />}
     </div>
   );
 }
