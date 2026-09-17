@@ -382,7 +382,19 @@ tracejada no próprio palco, onde ela nasceria, e um clique é que a torna real.
   um botão manda **isso** — o que precisa ser montado, não a demanda — para a caixa de entrada
   do dia, sem duração, porque minutos são assunto do dia. Quando não dá, não há linha nem
   botão: o Merlin não inventa trabalho para justificar a própria resposta.
-- **Depois**: entrada em linguagem natural para o sistema todo.
+- **O assistente da busca**, decidido em 17/09/2026: a tarefa `assistant` recebe mensagem livre
+  e propõe no máximo uma ação de um catálogo fechado de oito tipos (tarefa, nota, bloco de
+  rotina, atualização de lead, mapa ou funil de onboarding, roteiro, item de vitrine) —
+  `ASSISTANT_ACTIONS` no worker sanitiza tipo e campos antes de qualquer coisa chegar perto de
+  um `save()`. A busca global da sidebar parou de filtrar por nome: virou só a porta de entrada
+  dessa conversa.
+- **Tela própria e histórico real**, também 17/09/2026: o que antes era uma caixa em cima da
+  busca (parecia chat, mas cada turno subia sozinho pro servidor) virou `assistant.html`, com
+  entrada própria na barra. Ela manda o histórico da conversa a cada pergunta, e é o worker quem
+  monta os turnos de verdade pro Claude — sem tabela nova no D1, porque a conversa continua não
+  sendo dado do produto: mora só na tela, e some ao navegar para outro lugar. Mapa e funil de
+  onboarding, quando confirmados, levam direto ao documento pronto em vez de voltar pra
+  conversa. Isso fecha o item 13 da ordem de construção (§5).
 
 ---
 
@@ -489,7 +501,7 @@ a cópia era reconhecida pelo título. O botão saiu, e as mães viraram blocos 
 | 11 | Hábitos (`habits.html`) e Planos (`plans.html`) | feito |
 | 12 | Segunda migração: Preact → React 19 com Vite (`MIGRATION.md`, seção 10) | feito |
 | 12b | Rotina (`routine.html`), no lugar do "toda semana" da tarefa (seção 4.11) | feito |
-| 13 | Entrada em linguagem natural para o sistema todo (seção 4.8) | depois |
+| 13 | Entrada em linguagem natural para o sistema todo (seção 4.8) | feito |
 
 ---
 

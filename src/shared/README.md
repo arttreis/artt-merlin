@@ -301,7 +301,8 @@ toca no documento do dia. O aviso já é mostrado pelo core.
 - Atalhos de teclado onde faz sentido; `Esc` fecha diálogos.
 - Estado vazio explica o que a tela faz em uma frase, sem tutorial.
 - Minimalismo antes de tudo: sem filtros, sem formulário aberto na tela, um botão "+" por
-  coisa que se cria. A busca global da sidebar substitui qualquer filtro por nome.
+  coisa que se cria. A busca global da sidebar (17/09/2026) não filtra mais por nome — vira a
+  primeira mensagem de uma conversa em `assistant.html`.
 - Comentários no código explicam **por quê**, não o quê, como no `index.html`.
 - **Cor nova sai de token, nunca de hex na regra.** São duas marcas agora (`:root` é o Merlin,
   `html.gl` é a Guessless), e um `#2EE86B` escrito à mão numa página não troca junto — vira um

@@ -1,0 +1,27 @@
+/* merlin · a tela do assistente
+   o mesmo vocabulario visual do antigo painel em dialogo (.assistant-panel__*
+   no shell.css, agora removido) — so que esticado para a altura da pagina em
+   vez de um dialogo com teto de altura. */
+
+.asst{
+  max-width:720px;margin:0 auto;
+  display:flex;flex-direction:column;
+  height:calc(100dvh - var(--nav-h) - var(--pd) * 5);
+  min-height:360px;
+}
+.asst__log{
+  flex:1 1 auto;overflow:auto;
+  display:flex;flex-direction:column;gap:10px;
+  padding-right:2px;margin-bottom:var(--pd);
+}
+.asst__starters{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:4px}
+.asst__msg{display:flex}
+.asst__msg p{margin:0;padding:9px 12px;border-radius:var(--br2);background:var(--fill);font-size:13.5px;max-width:88%;line-height:1.5}
+.asst__msg.is-me{justify-content:flex-end}
+.asst__msg.is-me p{background:var(--green);color:var(--on-green)}
+.asst__input{display:flex;gap:8px;flex:none}
+.asst__input .input{flex:1 1 auto;height:42px}
+
+@media (max-width:640px){
+  .asst{height:calc(100dvh - var(--nav-h) - var(--pd) * 4)}
+}

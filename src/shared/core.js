@@ -258,7 +258,12 @@ export const PAGE_GROUPS = [
     { id: "notes", label: "notas", href: "notes.html" },
     /* o diario (14/09/2026): a nota e o que ainda vai virar alguma coisa; a
        pagina do diario e o que o dia foi */
-    { id: "journal", label: "diário", href: "journal.html" }
+    { id: "journal", label: "diário", href: "journal.html" },
+    /* o merlin (17/09/2026): antes era uma caixa em cima da busca, e uma barra
+       de navegacao nao leva a caixas — foi tentado e desfeito por isso (ver
+       VISAO.md §7.3). agora e uma tela de verdade, com URL e historico de
+       navegador: voltou a fazer sentido estar aqui. */
+    { id: "assistant", label: "merlin", href: "assistant.html" }
   ] },
   { id: "business", label: "negócio", pages: [
     /* a prospeccao vem antes de clientes porque e de onde eles chegam; o
@@ -290,47 +295,6 @@ export function toggleSidebar() {
   setTimeout(() => window.dispatchEvent(new Event("resize")), 320);
 }
 
-/* ---------- busca global ----------
-   procura por titulo em tudo que mora no navegador: notas, clientes,
-   cartoes da semana, mapas, funis, lancamentos, habitos e objetivos. nao e indice: e um filtro
-   sobre o que ja esta em memoria, e por isso e instantaneo. */
-const SEARCH_SOURCES = [
-  { type: "bookmarks", label: "site", field: "name", href: (d) => d.url },
-  { type: "notes", label: "nota", field: "title", href: (d) => "notes.html#" + encodeURIComponent(d.id) },
-  { type: "clients", label: "cliente", field: "name", filter: (d) => d.status !== "prospect" && d.status !== "lost", href: (d) => "clients.html#" + encodeURIComponent(d.id) },
-  { type: "clients", label: "prospecto", field: "name", filter: (d) => d.status === "prospect" || d.status === "lost", href: (d) => "prospecting.html#" + encodeURIComponent(d.id) },
-  { type: "content", label: "conteúdo", field: "title", href: (d) => "content.html#" + encodeURIComponent(d.id) },
-  { type: "tasks", label: "tarefa", field: "title", href: (d) => "calendar.html#" + encodeURIComponent(d.date || ""), filter: (d) => !d.done },
-  { type: "maps", label: "mapa", field: "name", href: (d) => "maps.html#" + encodeURIComponent(d.id) },
-  { type: "funnels", label: "funil", field: "name", href: (d) => "funnels.html#" + encodeURIComponent(d.id) },
-  { type: "finance", label: "R$", field: "name", href: () => "finance.html", filter: (d) => d.type === "entry" || d.type === "fixed" || d.type === "debt" || d.type === "card" },
-  { type: "wishlist", label: "coletânea", field: "name", href: (d) => "wishlist.html#" + encodeURIComponent(d.id), filter: (d) => d.type === "list" },
-  { type: "wishlist", label: "vitrine", field: "name", href: (d) => "wishlist.html#" + encodeURIComponent(d.list || ""), filter: (d) => d.type === "item" && !d.bought },
-  { type: "habits", label: "hábito", field: "name", href: () => "habits.html", filter: (d) => !d.archived },
-  { type: "routine", label: "rotina", field: "title", href: () => "routine.html" },
-  /* a pagina do diario e texto corrido: acha no corpo, mostra a data e o trecho */
-  { type: "journal", label: "diário", href: (d) => "journal.html#" + encodeURIComponent(d.id), each: (d) => [String(d.body || "").replace(/\s+/g, " ").trim()], clip: true },
-  /* os objetivos moram dentro do documento do periodo: `each` abre o doc em varios achados */
-  { type: "plans", label: "objetivo", href: () => "plans.html", each: (d) => (d.goals || []).map((g) => g.text) }
-];
-export function search(term) {
-  const k = foldKey(term);
-  if (!k || k.length < 2) return [];
-  const hits = [];
-  SEARCH_SOURCES.forEach((src) => {
-    collection(src.type).all().forEach((d) => {
-      if (src.filter && !src.filter(d)) return;
-      const texts = src.each ? src.each(d) : [d[src.field]];
-      texts.forEach((t) => {
-        const text = String(t || "");
-        if (!foldKey(text).includes(k)) return;
-        /* texto longo aparece como trecho: o comeco dele, que e o que se lembra */
-        hits.push({ label: src.label, text: src.clip && text.length > 80 ? text.slice(0, 80) + "…" : text, href: src.href(d) });
-      });
-    });
-  });
-  return hits.slice(0, 12);
-}
 /* ---------- aviso com desfazer ----------
    o core so guarda qual e o aviso da vez e por quanto tempo; quem desenha e
    a casca, no ui.js. `notify` continua com a mesma assinatura de sempre. */

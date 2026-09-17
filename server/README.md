@@ -140,7 +140,7 @@ SESSION_SECRET=qualquer-coisa-longa-em-desenvolvimento
 | `POST /api/days` | grava um dia; recusa se o servidor estiver na frente |
 | `GET /api/docs?type=T&since=V` | os documentos do tipo `T` com carimbo maior que `V` |
 | `POST /api/docs` | grava um documento `{type, id, v, doc}`; 409 com `server` se estiver na frente |
-| `POST /api/merlin` | `{task, context}`; tarefas `branches, funnel, nextStage, expand, week, meeting, habits, review, numbers, delegate` |
+| `POST /api/merlin` | `{task, context}`; tarefas `branches, funnel, nextStage, expand, assistant, week, meeting, habits, review, numbers, delegate`. Só `assistant` aceita `context.history` (array `{role, content}`) — as outras nunca mandam esse campo, e continuam um turno só. |
 
 ## Decisões que valem saber
 

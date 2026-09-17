@@ -120,10 +120,12 @@ function run(sql, a, mode) {
 /* intercepta o Resend para capturar o codigo em vez de mandar e-mail */
 let claudeAnswer = null;
 let claudeAsked = null;   /* o ultimo pedido que subiu, para conferir o contexto */
+let claudeMessages = null;   /* o array `messages` inteiro, para conferir o historico do assistente */
 globalThis.fetch = async (url, opts) => {
   if (String(url).includes("api.anthropic.com")) {
     const request = JSON.parse(opts.body);
-    claudeAsked = request.messages[0].content;
+    claudeMessages = request.messages;
+    claudeAsked = request.messages.at(-1).content;
     check("merlin manda a chave", opts.headers["x-api-key"] === "sk-teste");
     check("merlin pede JSON no sistema", /JSON/.test(request.system));
     return new Response(JSON.stringify(claudeAnswer), { status: 200 });
@@ -408,6 +410,38 @@ check("merlin revisa o periodo", r.status === 200 && /MVP/.test(body.text), JSON
 claudeAnswer = { stop_reason: "refusal", content: [] };
 r = await call("POST", "/merlin", { task: "funnel", context: { name: "f", stages: ["lp"] } }, cookie);
 check("merlin repassa a recusa", r.status === 422);
+
+/* ---- 13e-bis. o assistente (busca -> chat) ----
+   mesma rota, mesma sanitizacao de sempre — o que muda e que a tela agora
+   manda o historico da conversa, e o servidor monta turnos de verdade em vez
+   de um pedido isolado. sem `history` (as outras nove tarefas), continua
+   sendo um turno so. */
+claudeAnswer = { stop_reason: "end_turn", content: [{ type: "text", text: '{"suggestions":[{"actionType":"task","title":"ligar pro cliente","note":"","payload":{"title":"ligar pro cliente","date":"","min":15,"client":""}}],"clarify":""}' }] };
+r = await call("POST", "/merlin", { task: "assistant", context: { message: "lembra de ligar pro cliente amanhã, uns 15 min" } }, cookie);
+body = await r.json();
+check("assistente propõe uma ação", r.status === 200 && body.suggestions.length === 1 && body.suggestions[0].actionType === "task", JSON.stringify(body));
+check("sem histórico, continua um turno só", claudeMessages.length === 1, String(claudeMessages.length));
+
+claudeAnswer = { stop_reason: "end_turn", content: [{ type: "text", text: '{"suggestions":[],"clarify":"e pra qual etapa?"}' }] };
+r = await call("POST", "/merlin", { task: "assistant", context: {
+  message: "e essa etapa que faltou",
+  history: [
+    { role: "user", content: "monta um funil de captura" },
+    { role: "assistant", content: "[propôs onboarding-funnel: 'funil de captura']" }
+  ]
+} }, cookie);
+body = await r.json();
+check("assistente responde com o histórico", r.status === 200 && body.clarify === "e pra qual etapa?", JSON.stringify(body));
+check("o histórico vira turnos de verdade", claudeMessages.length === 3 && claudeMessages[0].role === "user" && claudeMessages[1].role === "assistant", JSON.stringify(claudeMessages));
+
+const bigHistory = Array.from({ length: 30 }, (_, i) => ({ role: i % 2 ? "assistant" : "user", content: "turno " + i }));
+r = await call("POST", "/merlin", { task: "assistant", context: { message: "e agora?", history: bigHistory } }, cookie);
+check("histórico grande demais é cortado", claudeMessages.length === 13, String(claudeMessages.length));
+
+claudeAnswer = { stop_reason: "end_turn", content: [{ type: "text", text: '{"suggestions":[{"actionType":"nao-existe","title":"x","payload":{}}],"clarify":""}' }] };
+r = await call("POST", "/merlin", { task: "assistant", context: { message: "qualquer coisa" } }, cookie);
+body = await r.json();
+check("tipo de ação fora do catálogo é descartado", r.status === 200 && body.suggestions.length === 0, JSON.stringify(body));
 
 /* ---- 13f. o teto do conselheiro ----
    a chave da Anthropic e uma so para o time. o teto e por pessoa e por hora:

@@ -19,7 +19,7 @@ import { createPortal } from "react-dom";
 import {
   collection, cloud, clients, listClients, clientName, md, brl, parseMoney,
   api, notify, sendToDay, formatMin, readDuration, newId,
-  PAGE_GROUPS, CLOUD_STATUS, search, signIn, currentNotice, onNotice, closeNotice,
+  PAGE_GROUPS, CLOUD_STATUS, signIn, currentNotice, onNotice, closeNotice,
   toggleSidebar, setShellRenderer, currentBrand, share, shareOf, unshare, shareUrl,
   currentTheme, toggleTheme, getPageContext, getCurrentPage
 } from "./core.js";
@@ -903,15 +903,17 @@ function useRootClass(name, on) {
   useLayoutEffect(() => { document.documentElement.classList.toggle(name, !!on); }, [name, on]);
 }
 
-/* ---------- busca global ---------- */
 /* ---------- o assistente ----------
    a IA nunca grava sozinha: `assistant`/`/api/merlin` devolve no máximo uma
    proposta, e esta caixa é o único jeito dela virar documento — um Form
    comum, como qualquer criação manual, só que os campos já vêm preenchidos.
    confirmar chama collection.save() local-first, igual a criar à mão: some
    quando a rede volta, sincroniza sozinho, pode ser desfeito como qualquer
-   outra gravação. */
-function ProposalDialog({ proposal, onClose }) {
+   outra gravação. exportado porque a tela do assistente (assistant.jsx) é
+   quem monta este diálogo agora — o painel embutido na busca saiu. */
+const CREATE_LABELS = { "onboarding-map": "gerar mapa", "onboarding-funnel": "gerar funil" };
+const CREATE_HREF = { "onboarding-map": "maps.html#", "onboarding-funnel": "funnels.html#" };
+export function ProposalDialog({ proposal, onClose }) {
   const { actionType, payload, note } = proposal;
   const collectionName = ACTION_COLLECTIONS[actionType];
   const store = useCollection(collectionName || "tasks");
@@ -924,11 +926,16 @@ function ProposalDialog({ proposal, onClose }) {
     const { doc, error } = buildDoc(actionType, payload, v, store);
     if (error) { notify(error); return false; }
     store.save(doc);
+    /* mapa e funil de onboarding entregam um documento pronto pra olhar — o
+       gesto certo é já estar nele, não voltar pra conversa e ter que ir
+       buscar. os outros tipos são leves o bastante pra fazer sentido ficar. */
+    const goTo = CREATE_HREF[actionType];
+    if (goTo) { location.href = goTo + doc.id; return; }
     notify("feito");
   };
   return (
     <Form title={ACTION_LABELS[actionType] || "proposta"} sub={previewOf(actionType, payload) || note}
-        submit={actionType === "lead-update" || actionType === "script" ? "aplicar" : "criar"}
+        submit={CREATE_LABELS[actionType] || (actionType === "lead-update" || actionType === "script" ? "aplicar" : "criar")}
         onSubmit={submit} onClose={onClose}>
       {fields.map((f) => (
         <Field key={f.key} label={f.label} full={f.type === "textarea"}>
@@ -941,141 +948,47 @@ function ProposalDialog({ proposal, onClose }) {
   );
 }
 
-/* o painel de chat: mensagem livre entra, o Merlin responde com uma
-   proposta (que abre o ProposalDialog pra confirmar) ou uma pergunta curta
-   quando não deu pra decidir uma ação. conversa em memória só — não é dado
-   do produto, não sincroniza, some ao fechar. */
-function AssistantPanel({ initial, onClose }) {
-  const [messages, setMessages] = useState([]); // { from: "me"|"merlin", text } | { from: "merlin", proposal }
-  const [input, setInput] = useState("");
-  const [thinking, setThinking] = useState(false);
-  const [proposal, setProposal] = useState(null);
-  const sentInitial = useRef(false);
-  const listRef = useRef(null);
-
-  const ask = async (message) => {
-    if (!message.trim() || thinking) return;
-    setMessages((m) => m.concat([{ from: "me", text: message }]));
-    setInput("");
-    setThinking(true);
-    try {
-      const r = await api("/merlin", { method: "POST", body: JSON.stringify({
-        task: "assistant",
-        context: { message, page: getCurrentPage(), pageContext: getPageContext() }
-      }) });
-      if (r.ok) {
-        const s = (r.body.suggestions || [])[0];
-        if (s) setMessages((m) => m.concat([{ from: "merlin", proposal: s }]));
-        else setMessages((m) => m.concat([{ from: "merlin", text: r.body.clarify || "não entendi bem — pode dizer de outro jeito?" }]));
-      } else if (r.status === 401) {
-        setMessages((m) => m.concat([{ from: "merlin", text: "entre para usar o Merlin" }]));
-      } else {
-        setMessages((m) => m.concat([{ from: "merlin", text: r.body.error || "não consegui pensar nisso agora" }]));
-      }
-    } catch (e) {
-      setMessages((m) => m.concat([{ from: "merlin", text: "não consegui falar com o Merlin" }]));
-    } finally { setThinking(false); }
-  };
-
-  useEffect(() => {
-    if (sentInitial.current) return;
-    sentInitial.current = true;
-    if (initial && initial.trim()) ask(initial); else setInput(initial || "");
-  }, []);
-  useEffect(() => { if (listRef.current) listRef.current.scrollTop = listRef.current.scrollHeight; }, [messages, thinking]);
-  useEscape(onClose);
-
-  return (
-    <div className="dialog assistant-panel" role="dialog" aria-modal="true" aria-label="Assistente"
-         onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className="dialog__box assistant-panel__box">
-        <button className="dialog__close" type="button" aria-label="Fechar" onClick={onClose}>{icon("x")}</button>
-        <p className="dialog__title">merlin</p>
-        <div className="assistant-panel__log" ref={listRef}>
-          {!messages.length && <p className="assistant-panel__hint">peça uma tarefa, uma nota, ajuda com a rotina, um roteiro, um lead, ou pergunte algo do financeiro.</p>}
-          {messages.map((m, i) => (
-            <div key={i} className={"assistant-panel__msg" + (m.from === "me" ? " is-me" : "")}>
-              {m.proposal
-                ? <button className="pill pill--green" type="button" onClick={() => setProposal(m.proposal)}>{icon("spark")}{m.proposal.title}</button>
-                : <p>{m.text}</p>}
-            </div>
-          ))}
-          {thinking && <div className="assistant-panel__msg"><p className="weak">pensando…</p></div>}
-        </div>
-        <form className="assistant-panel__input" onSubmit={(e) => { e.preventDefault(); ask(input); }}>
-          <input className="input" autoFocus placeholder="escreva…" value={input} onChange={(e) => setInput(e.currentTarget.value)} />
-          <button className="pill pill--green" type="submit" disabled={thinking || !input.trim()}>{icon("arrow")}</button>
-        </form>
-      </div>
-      {proposal && <ProposalDialog proposal={proposal} onClose={() => setProposal(null)} />}
-    </div>
-  );
-}
-
+/* ---------- busca global ----------
+   deixou de filtrar localmente (17/09/2026): o campo é só a porta de entrada
+   do assistente — tudo que se digita aqui vira a primeira mensagem da tela
+   `assistant.html`. o que a tela atual sabe (`getPageContext()`) viaja junto
+   pela sessão, porque navegar troca de documento e apagaria esse contexto. */
+const ENTRY_KEY = "merlin:assistant:entry";
 function SearchBox({ onNavigate }) {
   const [term, setTerm] = useState("");
-  const [open, setOpen] = useState(false);
-  const [focus, setFocus] = useState(-1);
-  const [assistant, setAssistant] = useState(null); // string (mensagem inicial) | null
   const ref = useRef(null);
-  const hits = term.trim() ? search(term) : [];
 
-  const openAssistant = (msg) => { setOpen(false); setAssistant(msg || ""); };
+  const go = (message) => {
+    try {
+      sessionStorage.setItem(ENTRY_KEY, JSON.stringify({
+        message: message || "", page: getCurrentPage(), pageContext: getPageContext()
+      }));
+    } catch (e) {}
+    if (onNavigate) onNavigate();
+    location.href = "assistant.html";
+  };
 
-  /* Ctrl+K foca a busca; Ctrl+J abre o assistente direto, de qualquer lugar */
+  /* Ctrl+K foca o campo; Ctrl+J vai direto pro assistente em branco */
   useKeydown((e) => {
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
       e.preventDefault();
       ref.current.focus(); ref.current.select();
-      setOpen(true);
     } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "j") {
       e.preventDefault();
-      openAssistant(term);
+      go("");
     }
   });
-  useEffect(() => {
-    const f = (e) => { if (!e.target.closest(".sb__search")) setOpen(false); };
-    document.addEventListener("click", f);
-    return () => document.removeEventListener("click", f);
-  }, []);
-
-  const onKeyDown = (e) => {
-    if (e.key === "ArrowDown" || e.key === "ArrowUp") {
-      e.preventDefault();
-      if (!hits.length) return;
-      setFocus((i) => (i + (e.key === "ArrowDown" ? 1 : hits.length - 1) + (i < 0 ? 1 : 0)) % hits.length);
-    } else if (e.key === "Enter") {
-      const hit = hits[focus >= 0 ? focus : 0];
-      if (hit) { if (onNavigate) onNavigate(); location.href = hit.href; }
-    } else if (e.key === "Escape") {
-      e.stopPropagation();
-      setTerm(""); setOpen(false); ref.current.blur();
-    }
-  };
 
   return (
-    <div className="sb__search">
+    <form className="sb__search" onSubmit={(e) => { e.preventDefault(); go(term); }}>
       <label className="sb__search-field">
         {NAV_ICONS.search}
-        <input ref={ref} id="sb-search" type="search" placeholder="buscar…" autoComplete="off" aria-label="Buscar em tudo"
-               value={term} onChange={(e) => { setTerm(e.currentTarget.value); setOpen(true); setFocus(-1); }}
-               onFocus={() => { if (term.trim()) setOpen(true); }} onKeyDown={onKeyDown} />
-        <button type="button" className="sb__assistant" title="perguntar ao Merlin (ctrl j)" aria-label="Perguntar ao Merlin" onClick={() => openAssistant(term)}>{icon("spark")}</button>
+        <input ref={ref} id="sb-search" type="search" placeholder="pergunte ao merlin…" autoComplete="off" aria-label="Falar com o Merlin"
+               value={term} onChange={(e) => setTerm(e.currentTarget.value)} />
+        <button type="button" className="sb__assistant" title="conversar com o Merlin (ctrl j)" aria-label="Conversar com o Merlin" onClick={() => go(term)}>{icon("spark")}</button>
         <kbd>ctrl k</kbd>
       </label>
-      {open && term.trim() && (
-        <div className="sb__results" id="sb-results">
-          {hits.length
-            ? hits.map((hit, i) => (
-                <a key={hit.href + i} href={hit.href} className={i === focus ? "is-focus" : undefined} onClick={onNavigate}>
-                  <span className="t-mono">{hit.label}</span><span>{hit.text}</span>
-                </a>))
-            : <p>nada com esse nome</p>}
-          <button type="button" className="sb__ask" onClick={() => openAssistant(term)}>{icon("spark")}perguntar ao Merlin</button>
-        </div>
-      )}
-      {assistant != null && <AssistantPanel initial={assistant} onClose={() => setAssistant(null)} />}
-    </div>
+    </form>
   );
 }
 
@@ -1321,9 +1234,11 @@ function Brand() {
           {PAGE_GROUPS.map((g) => <NavGroup key={g.id} group={g} page={page} />)}
         </nav>
         {/* aqui havia uma segunda lista, com "merlin" e "perfil". as duas
-            saíram: o perfil virou o próprio cartão de quem está aqui, e o
-            merlin não é uma página — é o que ele faz NESTA, e por isso mora
-            junto do que ele lê. */}
+            saíram: o perfil virou o próprio cartão de quem está aqui. o
+            merlin saiu por um motivo que não vale mais (17/09/2026): quando
+            ele só abria uma caixa em cima da tela atual, não era um lugar —
+            agora é uma conversa com URL própria, então voltou pra lista de
+            módulos de cima, como qualquer outra página. */}
         <div className="sb__spacer" />
         <CloudCard page={page} />
       </aside>

@@ -859,6 +859,29 @@ LIST_TASKS.assistant = (c) => ({
     (c.recent ? "Já existe (não repita nem duplique): " + String(c.recent).slice(0, 400) + "\n" : "")
 });
 
+/* o assistente manda o historico inteiro a cada turno — nao ha memoria no
+   servidor, so o que a propria tela ja guarda (`conversa em memoria so`, ver
+   assistant.jsx). as outras nove tarefas nunca mandam `history`, entao para
+   elas nada muda: um turno so, como sempre foi. cortado por turnos e por
+   tamanho porque o historico cresce e o request nao pode. */
+const MAX_HISTORY_TURNS = 12;
+const MAX_HISTORY_CHARS = 6000;
+function buildMessages(name, ctx, instruction, context) {
+  const raw = name === "assistant" && Array.isArray(ctx.history) ? ctx.history : [];
+  const turns = [];
+  let used = 0;
+  for (let i = Math.max(0, raw.length - MAX_HISTORY_TURNS); i < raw.length; i++) {
+    const t = raw[i];
+    const content = String((t && t.content) || "").slice(0, 800);
+    if (!content) continue;
+    used += content.length;
+    if (used > MAX_HISTORY_CHARS) break;
+    turns.push({ role: t && t.role === "assistant" ? "assistant" : "user", content });
+  }
+  turns.push({ role: "user", content: instruction + "\n\n" + context });
+  return turns;
+}
+
 /* tira o objeto JSON de uma resposta que pode vir com texto em volta */
 function extractJson(text) {
   const a = text.indexOf("{"), b = text.lastIndexOf("}");
@@ -905,7 +928,7 @@ async function advise(req, env, person) {
       /* sugestao curta nao precisa do maximo de raciocinio: medio segura o custo */
       output_config: { effort: "medium" },
       system: SYSTEM,
-      messages: [{ role: "user", content: instruction + "\n\n" + context }]
+      messages: buildMessages(name, body.context, instruction, context)
     })
   });
   if (!r.ok) {
