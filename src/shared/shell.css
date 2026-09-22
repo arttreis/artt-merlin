@@ -244,6 +244,20 @@ html.sidebar-closed .sb__logo--gl .gl-mark{display:block}
 .sb__search-field input{flex:1 1 auto;min-width:0;background:none;border:0;outline:0;font-size:13px;color:var(--ink)}
 .sb__search-field input::placeholder{color:var(--ink-30)}
 .sb__search-field kbd{flex:none}
+.sb__results{
+  position:absolute;left:0;right:0;top:calc(100% + 6px);z-index:5;
+  max-height:60vh;overflow:auto;padding:6px;
+  background:var(--surface-2);border:1px solid var(--line);border-radius:var(--br3);
+  box-shadow:var(--sombra-2);
+}
+.sb__results a{display:flex;align-items:center;gap:8px;padding:7px 8px;border-radius:var(--br2);font-size:13px;color:var(--ink)}
+.sb__results a:hover,.sb__results a.is-focus{background:var(--fill-hover)}
+.sb__results a .t-mono{color:var(--ink-30);flex:none}
+.sb__results a span:not(.t-mono){flex:1 1 auto;min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.sb__results p{margin:0;padding:8px;font-size:12px;color:var(--ink-30)}
+.sb__ask{display:flex;align-items:center;gap:8px;width:100%;padding:7px 8px;margin-top:2px;border-top:1px solid var(--line-soft);border-radius:var(--br2);font-size:12.5px;color:var(--ink-50)}
+.sb__ask:hover{background:var(--fill-hover);color:var(--ink)}
+.sb__ask svg{width:14px;height:14px;color:var(--green-ink)}
 
 /* o botao de faisca dentro do campo de busca, que leva pro assistente com o
    que ja foi digitado */

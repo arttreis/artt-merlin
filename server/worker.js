@@ -850,12 +850,17 @@ LIST_TASKS.assistant = (c) => ({
     "wishlist-item {list (id da coletânea do contexto, ou vazio), name, price (centavos, número, ou 0), bucket (um de asap, longterm, online, presencial, mercado, ou vazio), qty (ex. \"2x\", \"~1\", ou vazio)}. " +
     "Se a mensagem for uma PERGUNTA (inclusive financeira — \"posso gastar X\", \"dá pra fazer Y\") em vez de um pedido de ação, devolva suggestions vazio e responda a pergunta direto em clarify, usando só o que está no contexto da tela (ex. saldo e fixos, quando a tela for o financeiro); se faltar dado pra responder com segurança, diga o que falta em vez de estimar. " +
     "Se a mensagem não corresponder a nenhuma ação nem a uma pergunta respondível, devolva suggestions vazio e clarify com UMA pergunta curta que ajudaria a decidir — nunca invente uma ação só para responder algo. " +
-    "clarify tem até 400 caracteres. title e note do topo (fora do payload) até 120 e 300 caracteres. " +
+    "Quando houver turnos anteriores, leia-os antes de decidir: a mensagem nova costuma completar a anterior (\"o segundo\", \"muda pra terça\") em vez de começar um pedido do zero. " +
+    "clarify tem até 1200 caracteres e a tela o lê como markdown simples: quando a resposta tiver partes (uma conta, uma lista de fixos, dois caminhos), use lista com \"- \", **negrito** no número que importa e \"## \" no título de cada parte. Uma frase só continua sendo uma frase só, sem enfeite. " +
+    "title e note do topo (fora do payload) até 120 e 300 caracteres. " +
     'Formato: {"suggestions":[{"actionType":"…","title":"…","note":"…","payload":{...}}],"clarify":"…"}',
   context:
     "Mensagem: " + String(c.message || "").slice(0, 1000) + "\n" +
     "Tela atual: " + String(c.page || "nenhuma").slice(0, 40) + "\n" +
     (c.pageContext ? "Contexto da tela: " + String(c.pageContext).slice(0, 1200) + "\n" : "") +
+    /* o que ja foi dito nao entra aqui: `history` vira turno de verdade no
+       buildMessages(), logo abaixo. colado neste texto, a conversa seria uma
+       citacao dentro do pedido em vez da conversa. */
     (c.recent ? "Já existe (não repita nem duplique): " + String(c.recent).slice(0, 400) + "\n" : "")
 });
 
@@ -964,7 +969,9 @@ async function advise(req, env, person) {
         }];
       }
     }
-    return json({ suggestions, clarify: String(data.clarify || "").slice(0, 400) });
+    /* 1200 e nao 400 desde 22/09/2026: a resposta virou markdown na tela do
+       assistente, e uma conta com duas ou tres linhas nao cabia em 400 */
+    return json({ suggestions, clarify: String(data.clarify || "").slice(0, 1200) });
   }
   if (!data || !Array.isArray(data.suggestions)) return fail("o Merlin respondeu fora do formato", 502);
   return json({

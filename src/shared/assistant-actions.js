@@ -132,3 +132,58 @@ export function buildDoc(actionType, payload, v, store) {
       return { error: "tipo de ação desconhecido" };
   }
 }
+
+/* ---------- as conversas ----------
+   ate 22/09/2026 o chat era so memoria: fechava, sumia. agora cada conversa
+   e um documento da colecao `chats`, local-first como todo o resto — sobe
+   pra nuvem, volta no outro aparelho, e apagar e apagar. so texto e proposta
+   entram; o que a IA mandou alem disso ja foi descartado no worker. */
+export const MAX_TURNS = 40;
+
+function normalizeProposal(p) {
+  if (!p || typeof p !== "object" || !ACTION_COLLECTIONS[p.actionType]) return null;
+  return {
+    actionType: String(p.actionType),
+    title: String(p.title || "").slice(0, 120),
+    note: String(p.note || "").slice(0, 300),
+    payload: p.payload && typeof p.payload === "object" ? p.payload : {}
+  };
+}
+
+export function normalizeChat(d) {
+  const messages = (Array.isArray(d.messages) ? d.messages : []).slice(-MAX_TURNS).map((m) => {
+    const proposal = normalizeProposal(m && m.proposal);
+    return proposal
+      ? { from: "merlin", proposal }
+      : { from: m && m.from === "me" ? "me" : "merlin", text: String((m && m.text) || "").slice(0, 4000) };
+  });
+  return {
+    id: String(d.id || ""),
+    title: String(d.title || "").slice(0, 80) || "conversa",
+    messages,
+    createdAt: Number.isFinite(+d.createdAt) ? +d.createdAt : Date.now(),
+    updatedAt: Number.isFinite(+d.updatedAt) ? +d.updatedAt : Date.now()
+  };
+}
+
+/* o titulo e a primeira coisa que a pessoa escreveu — e assim que ela
+   reconhece a conversa na lista, e nao por um resumo que a IA inventaria
+   (e que custaria outra chamada) */
+export function chatTitle(list) {
+  const first = list.find((m) => m.from === "me" && m.text);
+  return String(first ? first.text : "conversa").replace(/\s+/g, " ").trim().slice(0, 80);
+}
+
+/* o que ja foi dito, no formato que a API de mensagens espera. o worker
+   monta os turnos de verdade com isto (buildMessages, em server/worker.js) em
+   vez de colar a conversa dentro do texto do pedido — e ele quem corta por
+   turno e por tamanho, entao aqui so se traduz. proposta vira uma linha:
+   o que importa pro turno seguinte e que ela foi feita, nao o payload. */
+export function turnsOf(list) {
+  return list.map((m) => ({
+    role: m.from === "me" ? "user" : "assistant",
+    content: m.proposal
+      ? "[propôs " + m.proposal.actionType + ": '" + m.proposal.title + "']"
+      : String(m.text || "")
+  })).filter((t) => t.content);
+}

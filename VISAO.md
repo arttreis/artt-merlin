@@ -386,15 +386,23 @@ tracejada no próprio palco, onde ela nasceria, e um clique é que a torna real.
   e propõe no máximo uma ação de um catálogo fechado de oito tipos (tarefa, nota, bloco de
   rotina, atualização de lead, mapa ou funil de onboarding, roteiro, item de vitrine) —
   `ASSISTANT_ACTIONS` no worker sanitiza tipo e campos antes de qualquer coisa chegar perto de
-  um `save()`. A busca global da sidebar parou de filtrar por nome: virou só a porta de entrada
-  dessa conversa.
+  um `save()`. A busca global da sidebar ganhou uma faísca que leva o que está escrito para essa
+  conversa — ela chegou a perder o filtro por nome nesse dia, e o recuperou em 22/09: achar pelo
+  nome e perguntar são dois gestos, e um não faz o trabalho do outro.
 - **Tela própria e histórico real**, também 17/09/2026: o que antes era uma caixa em cima da
   busca (parecia chat, mas cada turno subia sozinho pro servidor) virou `assistant.html`, com
   entrada própria na barra. Ela manda o histórico da conversa a cada pergunta, e é o worker quem
-  monta os turnos de verdade pro Claude — sem tabela nova no D1, porque a conversa continua não
-  sendo dado do produto: mora só na tela, e some ao navegar para outro lugar. Mapa e funil de
-  onboarding, quando confirmados, levam direto ao documento pronto em vez de voltar pra
-  conversa. Isso fecha o item 13 da ordem de construção (§5).
+  monta os turnos de verdade pro Claude — sem tabela nova no D1. Mapa e funil de onboarding,
+  quando confirmados, levam direto ao documento pronto em vez de voltar pra conversa. Isso fecha
+  o item 13 da ordem de construção (§5).
+- **A conversa passou a ficar**, em 22/09/2026: ela era só estado do React e sumia ao navegar —
+  o que transformava cada pergunta num recomeço. Virou a coleção `chats`, local-first como
+  todas as outras (nenhuma tabela nova: `docs` guarda documento de qualquer tipo), com endereço
+  por conversa e histórico numa coluna ao lado. Junto vieram três começos na tela vazia (mapa
+  mental, funil, simulação financeira), que não executam nada — só prefixam a mensagem —, a
+  resposta lida como markdown, e o saldo do financeiro disponível de qualquer tela
+  (`shared/finance-data.js`), pra "posso assumir 3 mil por mês?" ter resposta sem a pessoa
+  precisar abrir o financeiro antes.
 
 ---
 

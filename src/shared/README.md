@@ -230,6 +230,7 @@ Um documento é um objeto JSON plano. Coloque nele o que o módulo precisa, mas 
 | `habits` | habits.html | `{id, name, schedule:{type:'daily'|'perWeek'|'weekdays', times, weekdays:[0-6]}, min, color, order, archived, marks:{'YYYY-MM-DD':true}}` |
 | `plans` | plans.html | um doc por período, id `kind:period`: `{id, kind:'quarter'|'month'|'week', period:'2026-Q4'|'2026-09'|'2026-W37', goals:[{id, text, client, done, parent, card, order}], review:{went, didnt, next}}` |
 | `routine` | routine.html | um doc por bloco: `{id, title, days:[0-6], at, min, reserved, client, weeks:{'YYYY-MM-DD':true}}` — vira tarefa com `origin:{type:'routine', id}` (shared/routine.js) |
+| `chats` | assistant.html | uma conversa com o Merlin: `{id, title, messages:[{from:'me'\|'merlin', text}\|{from:'merlin', proposal:{actionType, title, note, payload}}]}` — a proposta fica guardada como veio; quem a transforma em documento é o `buildDoc()` do shared/assistant-actions.js, depois de a pessoa confirmar |
 
 Ligações entre módulos são **por id**, nunca por cópia. Para abrir outra página num item:
 `clients.html#<id>`, `maps.html#<id>`, `funnels.html#<id>`, `notes.html#<id>`. Cada
@@ -301,8 +302,9 @@ toca no documento do dia. O aviso já é mostrado pelo core.
 - Atalhos de teclado onde faz sentido; `Esc` fecha diálogos.
 - Estado vazio explica o que a tela faz em uma frase, sem tutorial.
 - Minimalismo antes de tudo: sem filtros, sem formulário aberto na tela, um botão "+" por
-  coisa que se cria. A busca global da sidebar (17/09/2026) não filtra mais por nome — vira a
-  primeira mensagem de uma conversa em `assistant.html`.
+  coisa que se cria. A busca global da sidebar acha por nome, e a faísca ao lado dela leva o
+  que está escrito para uma conversa em `assistant.html` — dois gestos no mesmo campo (ela
+  chegou a ser só a porta da conversa, em 17/09/2026, e voltou a achar em 22/09).
 - Comentários no código explicam **por quê**, não o quê, como no `index.html`.
 - **Cor nova sai de token, nunca de hex na regra.** São duas marcas agora (`:root` é o Merlin,
   `html.gl` é a Guessless), e um `#2EE86B` escrito à mão numa página não troca junto — vira um

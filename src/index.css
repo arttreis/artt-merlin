@@ -54,12 +54,20 @@
   transition:border-color var(--t),box-shadow var(--t);
 }
 .hm-capture__field:focus-within{border-color:var(--ink-30);box-shadow:var(--sombra-2)}
-.hm-capture__field > svg{width:16px;height:16px;flex:none;color:var(--ink-30)}
+.hm-capture__field > svg{width:16px;height:16px;flex:none;color:var(--green-ink)}
 .hm-capture__field input{
   flex:1 1 auto;min-width:0;background:none;border:0;outline:none;
   font-size:15px;color:var(--ink);
 }
 .hm-capture__field input::placeholder{color:var(--ink-30)}
+/* guardar como tarefa ou nota: o que o Enter fazia ate 22/09/2026 e agora e
+   um botao, porque o Enter passou a abrir a conversa */
+.hm-capture__keep{
+  flex:none;width:32px;height:32px;display:grid;place-items:center;border-radius:50%;
+  color:var(--ink-30);transition:color var(--t),background var(--t);
+}
+.hm-capture__keep:hover{color:var(--ink);background:var(--fill-hover)}
+.hm-capture__keep svg{width:16px;height:16px}
 .hm-capture__field kbd{flex:none;opacity:0;transition:opacity var(--t)}
 .hm-capture__field:focus-within kbd{opacity:1}
 .hm-ghost{margin:11px 0 0;text-align:center;font-size:12.5px;line-height:1.4;color:var(--ink-30)}

@@ -26,6 +26,7 @@ está em [MIGRATION.md](MIGRATION.md).
 | --- | --- |
 | `index.html` | o início: um campo no meio, as notas e os favoritos numa faixa, e os atalhos embaixo dizendo o número que faria você abrir cada um. Para quem nunca esteve aqui, é a porta — com o gesto de começar sem conta. |
 | `calendar.html` | o calendário: **uma** coleção de tarefas com data, e três jeitos de olhar para ela. O **dia** é a fila de hoje, com a barra que se gasta e a sobra — o único lugar com minutos. A **semana** são sete colunas. O **mês** é a grade. `day.html` e `week.html` continuam existindo e encaminham para cá. |
+| `assistant.html` | a conversa com o Merlin: os três começos (mapa mental, funil, simulação financeira), a conversa no meio e o histórico à direita. O campo da home e a busca da sidebar desaguam aqui. Cada resposta é no máximo uma **proposta** — ela só vira documento quando você confirma numa caixa com os campos. |
 | `notes.html` | o que ainda não é tarefa, numa caixa de entrada: lista por dia à esquerda, a nota aberta à direita com corpo, estágio, checklist e histórico. |
 | `clients.html` | clientes com canais (Mercado Livre, Shopee, TikTok Shop…), backlog, diário, objetivos, ficha e cofre. Um cliente novo abre com os primeiros passos. |
 | `funnels.html` | funil como grafo com tipos de nó, vazão por etapa, criativos, automações, ofertas e gatilhos. |

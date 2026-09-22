@@ -19,11 +19,14 @@ import { createPortal } from "react-dom";
 import {
   collection, cloud, clients, listClients, clientName, md, brl, parseMoney,
   api, notify, sendToDay, formatMin, readDuration, newId,
-  PAGE_GROUPS, CLOUD_STATUS, signIn, currentNotice, onNotice, closeNotice,
+  PAGE_GROUPS, CLOUD_STATUS, search, signIn, currentNotice, onNotice, closeNotice,
   toggleSidebar, setShellRenderer, currentBrand, share, shareOf, unshare, shareUrl,
-  currentTheme, toggleTheme, getPageContext, getCurrentPage
+  currentTheme, toggleTheme, askMerlin
 } from "./core.js";
 import { LOGO, GL_LOGO, GL_MARK, ICONS, NAV_ICONS, icon } from "./icons.jsx";
+/* o ProposalDialog mora aqui, e nao na tela do assistente, porque ele e um
+   Form como qualquer outro do sistema — e porque qualquer tela que um dia
+   receba uma proposta usa o mesmo. */
 import { ACTION_COLLECTIONS, ACTION_LABELS, ACTION_FIELDS, buildDoc, previewOf } from "./assistant-actions.js";
 
 /* o CSS entra pela pagina, nao por aqui: base.css ja puxa o shell.css na
@@ -948,47 +951,71 @@ export function ProposalDialog({ proposal, onClose }) {
   );
 }
 
-/* ---------- busca global ----------
-   deixou de filtrar localmente (17/09/2026): o campo é só a porta de entrada
-   do assistente — tudo que se digita aqui vira a primeira mensagem da tela
-   `assistant.html`. o que a tela atual sabe (`getPageContext()`) viaja junto
-   pela sessão, porque navegar troca de documento e apagaria esse contexto. */
-const ENTRY_KEY = "merlin:assistant:entry";
+/* ---------- busca global ---------- */
+/* a conversa com o Merlin tem tela propria (assistant.html) desde
+   22/09/2026, e nao mais uma caixa por cima desta pagina: o askMerlin()
+   leva pra la a pergunta e o que esta tela sabia. */
+
 function SearchBox({ onNavigate }) {
   const [term, setTerm] = useState("");
+  const [open, setOpen] = useState(false);
+  const [focus, setFocus] = useState(-1);
   const ref = useRef(null);
+  const hits = term.trim() ? search(term) : [];
 
-  const go = (message) => {
-    try {
-      sessionStorage.setItem(ENTRY_KEY, JSON.stringify({
-        message: message || "", page: getCurrentPage(), pageContext: getPageContext()
-      }));
-    } catch (e) {}
-    if (onNavigate) onNavigate();
-    location.href = "assistant.html";
-  };
-
-  /* Ctrl+K foca o campo; Ctrl+J vai direto pro assistente em branco */
+  /* Ctrl+K foca a busca; Ctrl+J vai pro Merlin direto, de qualquer lugar */
   useKeydown((e) => {
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
       e.preventDefault();
       ref.current.focus(); ref.current.select();
+      setOpen(true);
     } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "j") {
       e.preventDefault();
-      go("");
+      askMerlin(term);
     }
   });
+  useEffect(() => {
+    const f = (e) => { if (!e.target.closest(".sb__search")) setOpen(false); };
+    document.addEventListener("click", f);
+    return () => document.removeEventListener("click", f);
+  }, []);
+
+  const onKeyDown = (e) => {
+    if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+      e.preventDefault();
+      if (!hits.length) return;
+      setFocus((i) => (i + (e.key === "ArrowDown" ? 1 : hits.length - 1) + (i < 0 ? 1 : 0)) % hits.length);
+    } else if (e.key === "Enter") {
+      const hit = hits[focus >= 0 ? focus : 0];
+      if (hit) { if (onNavigate) onNavigate(); location.href = hit.href; }
+    } else if (e.key === "Escape") {
+      e.stopPropagation();
+      setTerm(""); setOpen(false); ref.current.blur();
+    }
+  };
 
   return (
-    <form className="sb__search" onSubmit={(e) => { e.preventDefault(); go(term); }}>
+    <div className="sb__search">
       <label className="sb__search-field">
         {NAV_ICONS.search}
-        <input ref={ref} id="sb-search" type="search" placeholder="pergunte ao merlin…" autoComplete="off" aria-label="Falar com o Merlin"
-               value={term} onChange={(e) => setTerm(e.currentTarget.value)} />
-        <button type="button" className="sb__assistant" title="conversar com o Merlin (ctrl j)" aria-label="Conversar com o Merlin" onClick={() => go(term)}>{icon("spark")}</button>
+        <input ref={ref} id="sb-search" type="search" placeholder="buscar…" autoComplete="off" aria-label="Buscar em tudo"
+               value={term} onChange={(e) => { setTerm(e.currentTarget.value); setOpen(true); setFocus(-1); }}
+               onFocus={() => { if (term.trim()) setOpen(true); }} onKeyDown={onKeyDown} />
+        <button type="button" className="sb__assistant" title="perguntar ao Merlin (ctrl j)" aria-label="Perguntar ao Merlin" onClick={() => askMerlin(term)}>{icon("spark")}</button>
         <kbd>ctrl k</kbd>
       </label>
-    </form>
+      {open && term.trim() && (
+        <div className="sb__results" id="sb-results">
+          {hits.length
+            ? hits.map((hit, i) => (
+                <a key={hit.href + i} href={hit.href} className={i === focus ? "is-focus" : undefined} onClick={onNavigate}>
+                  <span className="t-mono">{hit.label}</span><span>{hit.text}</span>
+                </a>))
+            : <p>nada com esse nome</p>}
+          <button type="button" className="sb__ask" onClick={() => askMerlin(term)}>{icon("spark")}perguntar ao Merlin</button>
+        </div>
+      )}
+    </div>
   );
 }
 

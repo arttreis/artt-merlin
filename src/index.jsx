@@ -19,7 +19,7 @@ import "./index.css";
 import {
   initPage, today, dateOf, newId, notify, signIn,
   sendToDay, newNote, parseMentions, readDuration, clientName, seen, markSeen,
-  isNewHere, safeUrl, hostOf, readPrefs
+  isNewHere, safeUrl, hostOf, readPrefs, askMerlin
 } from "./shared/core.js";
 import { budget, pendingOf, costOf, fmt, longFmt, clock } from "./shared/day.js";
 import { normalize as normalizeTask, dayDoc, overdue } from "./shared/tasks.js";
@@ -247,9 +247,13 @@ function TourArt({ step }) {
 }
 
 /* ---------- o campo do meio ----------
-   o análogo da barra de endereço: uma linha só, e o Enter decide o destino.
-   com duração no texto, entra na fila de hoje; sem duração, vira nota na hora.
-   a gramática é a estrita do core — a mesma que o dia usa. */
+   o analogo da barra de endereco. ate 22/09/2026 o Enter dele guardava: com
+   duracao no texto virava tarefa do dia, sem duracao virava nota. agora o
+   Enter CONVERSA — leva o que esta escrito pra tela do Merlin, que e de onde
+   quase tudo comeca — e guardar passou a ser o botao de "+" do lado, com a
+   mesma gramatica estrita do core e a mesma linha fantasma dizendo onde
+   aquilo vai cair. o gesto mais comum ficou no Enter; o outro continua a um
+   toque de distancia, e nenhum dos dois virou menu. */
 function Capture() {
   const [text, setText] = useState("");
   const read = (raw) => {
@@ -258,26 +262,30 @@ function Capture() {
     return { title: title.trim(), min, client: m.client || "" };
   };
   const ghost = text.trim() ? read(text) : null;
-  const submit = (e) => {
-    e.preventDefault();
+  const keep = () => {
     const r = read(text);
     if (!r.title) return;
     sendToDay({ title: r.title, min: r.min, client: r.client });
     setText("");
   };
   return (
-    <form className="hm-capture" autoComplete="off" onSubmit={submit}>
+    <form className="hm-capture" autoComplete="off"
+          onSubmit={(e) => { e.preventDefault(); if (text.trim()) askMerlin(text); }}>
       <label className="hm-capture__field">
-        {icon("plus")}
-        <input id="hm-field" maxLength="300" placeholder="escreva o que apareceu…" aria-label="Escreva uma tarefa ou uma nota"
+        {icon("spark")}
+        <input id="hm-field" maxLength="300" placeholder="escreva o que apareceu…"
+               aria-label="Escreva para o Merlin, ou guarde como tarefa ou nota"
                value={text} onChange={(e) => setText(e.currentTarget.value)} />
+        <button type="button" className="hm-capture__keep" title="guardar como tarefa ou nota"
+                aria-label="Guardar como tarefa ou nota" onClick={keep}>{icon("plus")}</button>
         <kbd>enter</kbd>
       </label>
       {ghost && ghost.title && (
         <p className="hm-ghost">
+          <b>enter</b> conversa com o Merlin · o <b>+</b>{" "}
           {ghost.min
-            ? <>entra na <b>fila de hoje</b> quando você abrir o dia, ocupando {longFmt(ghost.min)}</>
-            : <>vira <b>uma nota</b> — sem duração, não custa minuto nenhum</>}
+            ? <>põe na <b>fila de hoje</b>, ocupando {longFmt(ghost.min)}</>
+            : <>guarda como <b>uma nota</b> — sem duração, não custa minuto nenhum</>}
           {ghost.client && clientName(ghost.client) ? <> · {clientName(ghost.client)}</> : null}
         </p>
       )}

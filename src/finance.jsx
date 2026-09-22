@@ -13,15 +13,20 @@ import {
   mount, useCollection, useKeydown, isTyping,
   useFields, Form, Field, EmptyStart, icon, DateField, DayOfMonthField
 } from "./shared/ui.jsx";
+/* o saldo e a normalizacao moram no shared desde 22/09/2026: o assistente
+   tambem os usa, de qualquer tela */
+import {
+  pad, INVEST_CATEGORIES,
+  daysInMonth, effectiveDay, cardInstallment, installmentNumber,
+  projectionsOf, oldestDay, balanceUntil, realBalanceUntil,
+  normalize, byType, configOf, saveConfig, contextOf, financeBrief
+} from "./shared/finance-data.js";
 
 initPage("finance");
 
-const pad = (n) => String(n).padStart(2, "0");
 const inReais = (cents) => cents ? (cents / 100).toFixed(2).replace(".", ",") : "";
 const SHORT_MONTHS = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
 
-/* categorias padrao: as da planilha, ate a config guardar a lista propria */
-const DEFAULT_CATEGORIES = ["Básicas/PF", "Básicas/PJ", "Lazer", "Recorrente", "Ferramentas", "Freela", "Investimento", "Outros"];
 
 const TABS = [
   { id: "today", label: "hoje" },
@@ -30,131 +35,7 @@ const TABS = [
   { id: "panel", label: "fixos" },
   { id: "invest", label: "investimentos" }
 ];
-/* categorias do investimento: so o suficiente pra separar por tipo de ativo,
-   sem cotacao automatica nem historico — aporte e saldo atual, na mao */
-const INVEST_CATEGORIES = ["renda fixa", "ações", "fundos", "cripto", "outros"];
 
-/* ================================================================
-   o coracao do modulo: saldo e projecoes
-   ================================================================
-   estas funcoes sao puras — recebem tudo que precisam em `ctx` e nao leem
-   a colecao nem o DOM. e o que permite chamar a mesma conta de varios
-   lugares (o medidor do mes, a tabela dia a dia, os doze meses do ano) sem
-   arriscar que cada um implemente sua propria versao e um dia elas
-   divirjam; e testar com `node` puro, porque um numero errado aqui e
-   dinheiro errado.
-   ================================================================ */
-
-function daysInMonth(year, month) {
-  /* dia 0 do mes seguinte (1-based) e o ultimo dia do mes atual — cobre
-     fevereiro de ano bissexto sem precisar de tabela de excecoes */
-  return new Date(year, month, 0).getDate();
-}
-function effectiveDay(year, month, dayOfMonth) {
-  /* fixo/divida/parcela com dayOfMonth 31 cai no ultimo dia do mes nos
-     meses que nao tem 31 — nunca "vaza" pro dia 1 do mes seguinte */
-  return Math.min(dayOfMonth, daysInMonth(year, month));
-}
-/* meses entre "2026-09" e "2026-12" = 3; negativo se `to` vem antes */
-function monthsBetween(from, to) {
-  const [y1, m1] = from.split("-").map(Number), [y2, m2] = to.split("-").map(Number);
-  return (y2 - y1) * 12 + (m2 - m1);
-}
-const cardInstallment = (c) => c.installments ? Math.round(c.total / c.installments) : 0;
-/* que numero de parcela cai no mes `yyyymm`: 1 na primeira, 0 antes dela,
-   acima de `installments` depois da ultima */
-const installmentNumber = (c, yyyymm) => c.start ? monthsBetween(c.start, yyyymm) + 1 : 0;
-
-/* uma projecao ja virou lancamento real naquele mes? sem isso, confirmar
-   um fixo faria ele contar duas vezes: uma como lancamento pago, outra
-   como projecao do mesmo dia */
-function alreadyEntered(entries, originType, id, day) {
-  const month = day.slice(0, 7);
-  return (entries || []).some((e) =>
-    e.origin && e.origin.type === originType && e.origin.id === id && e.day.slice(0, 7) === month);
-}
-
-/* as SUGESTOES do dia: o que os fixos e as parcelas do cartao dizem que
-   cairia em `day` e ainda nao foi lancado. desde 13/09/2026 elas nao entram
-   em conta nenhuma — nem saldo, nem previsto, nem categoria. o Arthur: "pode
-   sugerir, mas nao pode considerar previsao". previsao e so o que a pessoa
-   lancou como nao pago; a sugestao vira lancamento quando ela lanca.
-   em 14/09/2026 isso mudou em parte: de hoje em diante a sugestao soma no
-   saldo do mes e do ano (ver balanceUntil). o real, as categorias e as
-   somas de entrada/saida do hoje continuam sem ela.
-
-   tudo que o dia `day` teria alem dos lancamentos ja gravados: a
-   recorrencia dos fixos e a parcela de uma compra no cartao (enquanto houver
-   parcela). a divida NAO entra: desde 13/09/2026 ela e so um registro do que
-   se deve, que a pessoa regula a mao no painel — nao desconta do saldo, nao
-   aparece nos proximos dias nem nas categorias.
-   nada aqui grava documento nenhum — e so a pergunta "o que cai neste
-   dia?" respondida sem efeito colateral, pra poder chamar de novo a
-   vontade (o mes inteiro, o balanceUntil, o ano). */
-function projectionsOf(day, ctx) {
-  const [year, month, dayNum] = day.split("-").map(Number);
-  const yyyymm = day.slice(0, 7);
-  const proj = [];
-
-  (ctx.fixed || []).forEach((f) => {
-    if (!f.active || !f.amount) return; /* fixo sem valor nao sugere nada */
-    if (effectiveDay(year, month, f.dayOfMonth) !== dayNum) return;
-    if (alreadyEntered(ctx.entries, "fixed", f.id, day)) return;
-    proj.push({
-      id: "proj-fixed-" + f.id + "-" + day, name: f.name, amount: f.amount, kind: f.kind,
-      category: f.category, origin: { type: "fixed", id: f.id }
-    });
-  });
-
-  (ctx.cards || []).forEach((c) => {
-    const n = installmentNumber(c, yyyymm);
-    if (n < 1 || n > c.installments) return;
-    if (effectiveDay(year, month, c.dayOfMonth) !== dayNum) return;
-    if (alreadyEntered(ctx.entries, "card", c.id, day)) return;
-    proj.push({
-      id: "proj-card-" + c.id + "-" + day, name: c.name + " · " + n + "/" + c.installments, amount: cardInstallment(c),
-      kind: "out", category: "Cartão", origin: { type: "card", id: c.id }
-    });
-  });
-
-  return proj;
-}
-
-/* a data mais antiga entre os lancamentos: usada so quando ainda nao existe
-   startBalance, pra a tela nao ficar zerada por falta de configuracao */
-function oldestDay(entries) {
-  let oldest = null;
-  (entries || []).forEach((e) => { if (!oldest || e.day < oldest) oldest = e.day; });
-  return oldest;
-}
-
-/* saldo previsto no fim do dia `day`: parte do saldo inicial e anda dia a
-   dia, somando os lancamentos, pagos ou nao — um lancamento nao pago ja e a
-   propria previsao. sugestao nao entra. e dia a dia, e nao "soma tudo com data <= dia",
-   porque so assim o effectiveDay se aplica mes a mes igual um calendario.
-   `suggestFrom` (um dia, opcional): dali em diante as sugestoes tambem somam.
-   o ano, o mes e o hoje passam `today()` — o Arthur, em 14/09/2026: "na
-   visualizacao de ano ele tem que considerar os fixos", e o mes foi junto
-   pra os dois nao discordarem. */
-function balanceUntil(day, ctx, suggestFrom) {
-  const oldest = oldestDay(ctx.entries);
-  const cfg = ctx.startBalance || (oldest ? { day: oldest, amount: 0 } : null);
-  if (!cfg) return 0;
-  if (day < cfg.day) return cfg.amount;
-  let balance = cfg.amount;
-  let d = cfg.day;
-  while (d <= day) {
-    (ctx.entries || []).forEach((e) => {
-      if (e.day !== d) return;
-      balance += e.kind === "in" ? e.amount : -e.amount;
-    });
-    if (suggestFrom && d >= suggestFrom) {
-      projectionsOf(d, ctx).forEach((p) => { balance += p.kind === "in" ? p.amount : -p.amount; });
-    }
-    d = addDays(d, 1);
-  }
-  return balance;
-}
 
 /* a cor do saldo escala com o proprio conjunto visivel (o mes ou o ano
    aberto), nao com faixas fixas — senao um saldo de R$ 3 mil e um de
@@ -178,17 +59,6 @@ const brlBalance = (cents) => cents < 0 ? "(" + brl(cents) + ")" : brl(cents);
    somados num numero so, eles faziam o "saldo de hoje" mentir. */
 const isForecast = (it) => !it.paid;
 
-/* o que esta na conta no fim do dia `day`: o saldo inicial e so o que foi
-   pago de verdade. o balanceUntil soma as projecoes tambem, e responde outra
-   pergunta — onde a conta vai estar. */
-function realBalanceUntil(day, ctx) {
-  const oldest = oldestDay(ctx.entries);
-  const cfg = ctx.startBalance || (oldest ? { day: oldest, amount: 0 } : null);
-  if (!cfg) return 0;
-  return (ctx.entries || [])
-    .filter((e) => e.paid && e.day >= cfg.day && e.day <= day)
-    .reduce((s, e) => s + (e.kind === "in" ? e.amount : -e.amount), cfg.amount);
-}
 
 /* o previsto cujo dia ja passou: a pessoa disse que ia acontecer, e ninguem
    confirmou se aconteceu */
@@ -235,117 +105,6 @@ function adjacentMonth(yyyymm, delta) {
   return y + "-" + pad(m);
 }
 
-/* ---------- colecao e normalizacao ----------
-   uma colecao so, varios tipos — o proprio documento diz o que ele e, e a
-   normalizacao decide os campos por tipo. os tipos sao os quatro blocos da
-   planilha (fixo de saida/entrada, cartao, divida), mais o lancamento do
-   dia a dia e a config. */
-
-function normalizeOrigin(o) {
-  if (!o || !o.type) return null;
-  return { type: String(o.type), id: String(o.id || "") };
-}
-
-function normalize(d) {
-  const base = {
-    id: String(d.id || ""),
-    type: String(d.type || ""),
-    createdAt: Number.isFinite(+d.createdAt) ? +d.createdAt : Date.now(),
-    updatedAt: Number.isFinite(+d.updatedAt) ? +d.updatedAt : Date.now()
-  };
-  const clampDay = (v, fallback) => Math.min(31, Math.max(1, Math.round(+v) || fallback));
-  switch (base.type) {
-    case "entry":
-      return {
-        ...base,
-        day: isDay(d.day) ? d.day : today(),
-        name: String(d.name || "").slice(0, 140),
-        amount: Math.round(Math.abs(+d.amount)) || 0,
-        kind: d.kind === "in" ? "in" : "out",
-        category: String(d.category || ""),
-        paid: !!d.paid,
-        origin: normalizeOrigin(d.origin)
-      };
-    case "fixed":
-      return {
-        ...base,
-        name: String(d.name || "").slice(0, 140),
-        amount: Math.round(Math.abs(+d.amount)) || 0,
-        kind: d.kind === "in" ? "in" : "out",
-        category: String(d.category || ""),
-        dayOfMonth: clampDay(d.dayOfMonth, 1),
-        active: d.active !== false
-      };
-    case "card":
-      /* uma compra parcelada no cartao: total, quantas parcelas, em que mes
-         cai a primeira e em que dia vence — a parcela sai do total */
-      return {
-        ...base,
-        name: String(d.name || "").slice(0, 140),
-        card: String(d.card || "").slice(0, 40),
-        total: Math.round(Math.abs(+d.total)) || 0,
-        installments: Math.max(1, Math.round(+d.installments) || 1),
-        start: /^\d{4}-\d{2}$/.test(d.start) ? d.start : today().slice(0, 7),
-        dayOfMonth: clampDay(d.dayOfMonth, 10)
-      };
-    case "debt":
-      return {
-        ...base,
-        name: String(d.name || "").slice(0, 140),
-        creditor: String(d.creditor || "").slice(0, 80),
-        total: Math.round(Math.abs(+d.total)) || 0,
-        paid: Math.max(0, Math.round(+d.paid) || 0),
-        installment: Math.round(Math.abs(+d.installment)) || 0,
-        dayOfMonth: clampDay(d.dayOfMonth, 1)
-      };
-    case "invest":
-      return {
-        ...base,
-        name: String(d.name || "").slice(0, 140),
-        category: INVEST_CATEGORIES.includes(d.category) ? d.category : INVEST_CATEGORIES[0],
-        contributed: Math.round(Math.abs(+d.contributed)) || 0,
-        current: Math.round(Math.abs(+d.current)) || 0,
-        order: Number.isFinite(+d.order) ? +d.order : 0
-      };
-    case "config":
-      return {
-        ...base,
-        id: "config",
-        startBalance: d.startBalance && isDay(d.startBalance.day)
-          ? { day: d.startBalance.day, amount: Math.round(+d.startBalance.amount) || 0 }
-          : null,
-        percents: {
-          expenses: Number.isFinite(+((d.percents || {}).expenses)) ? +d.percents.expenses : 50,
-          spending: Number.isFinite(+((d.percents || {}).spending)) ? +d.percents.spending : 30,
-          assets: Number.isFinite(+((d.percents || {}).assets)) ? +d.percents.assets : 20
-        },
-        categories: Array.isArray(d.categories) && d.categories.length ? d.categories.map(String) : DEFAULT_CATEGORIES.slice(),
-        /* a meta de gasto do mes por categoria, em centavos: { "Lazer": 50000 }.
-           vale para todo mes igual — meta que muda todo mes vira planilha. */
-        budgets: Object.fromEntries(Object.entries(d.budgets && typeof d.budgets === "object" ? d.budgets : {})
-          .map(([k, v]) => [String(k), Math.round(Math.abs(+v)) || 0]).filter(([, v]) => v > 0))
-      };
-    default:
-      return { ...base, ...d };
-  }
-}
-
-const byType = (finance, type) => finance.all().filter((d) => d.type === type);
-const configOf = (finance) => finance.get("config") || normalize({ id: "config", type: "config" });
-function saveConfig(finance, partial) {
-  const current = configOf(finance);
-  finance.save({ ...current, ...partial, id: "config", type: "config", updatedAt: Date.now() });
-}
-function contextOf(finance) {
-  return {
-    entries: byType(finance, "entry"),
-    fixed: byType(finance, "fixed"),
-    debts: byType(finance, "debt"),
-    cards: byType(finance, "card"),
-    invests: byType(finance, "invest"),
-    startBalance: configOf(finance).startBalance
-  };
-}
 /* o <select> de categoria e controlado: quando o valor pedido nao esta na
    lista (categoria apagada, ou nenhuma ainda), fica a primeira — que e o
    que o navegador fazia sozinho no formulario por string */
@@ -370,21 +129,13 @@ function Finance() {
 
   /* o que o assistente sabe sem perguntar de novo, quando a pergunta for do
      financeiro ("posso gastar X?") — so o que ja esta na tela, nunca uma
-     simulacao nova por conta propria */
+     simulacao nova por conta propria. a frase e a do financeBrief(), a mesma
+     que o assistente monta sozinho quando a pergunta vem de outra tela; aqui
+     ela so passa a valer sem o card de simulacao. */
   useEffect(() => {
-    if (virgin) { setPageContext(null); return () => setPageContext(null); }
-    const t = today();
-    const balanceToday = realBalanceUntil(t, ctx);
-    const [y, m] = t.slice(0, 7).split("-").map(Number);
-    const monthEnd = t.slice(0, 7) + "-" + String(daysInMonth(y, m)).padStart(2, "0");
-    const balanceEnd = balanceUntil(monthEnd, ctx, t);
-    const fixedLines = ctx.fixed.filter((f) => f.active).map((f) => f.name + " · " + f.category + " · " + (f.kind === "in" ? "+" : "−") + brl(f.amount));
-    setPageContext(() =>
-      "Financeiro. Saldo hoje: " + brl(balanceToday) + ". Previsto fim do mês: " + brl(balanceEnd) + ". " +
-      (fixedLines.length ? "Fixos do mês: " + fixedLines.join("; ") + "." : "sem fixos cadastrados.")
-    );
+    setPageContext(financeBrief);
     return () => setPageContext(null);
-  }, [ctx, cfg, virgin]);
+  }, []);
 
   /* ---------- navegacao ---------- */
   const openTab = (id) => { setTab(id); setOpenDay(""); };
