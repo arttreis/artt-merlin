@@ -1191,16 +1191,32 @@ function Editor({ id, maps }) {
     };
     img.src = url;
   };
-  const exportOutline = () => {
+  /* a arvore como lista indentada — o mesmo texto que sai no arquivo e que vai
+     pra area de transferencia */
+  const outlineOf = () => {
     const lines = [];
     (function walk(node, depth) {
       lines.push("  ".repeat(depth) + "- " + (node.title || "(sem título)"));
       (node.children || []).forEach((c) => walk(c, depth + 1));
     })(doc.root, 0);
-    download(new Blob([lines.join("\n") + "\n"], { type: "text/markdown;charset=utf-8" }), (doc.name || "mapa") + ".md");
+    return lines.join("\n") + "\n";
+  };
+  const exportOutline = () => {
+    download(new Blob([outlineOf()], { type: "text/markdown;charset=utf-8" }), (doc.name || "mapa") + ".md");
   };
   const exportMermaid = () => {
     download(new Blob([toMermaid(doc.root)], { type: "text/plain;charset=utf-8" }), (doc.name || "mapa") + ".mmd");
+  };
+
+  /* copiar, e nao so baixar (22/09/2026): levar o mapa pra uma conversa com
+     uma IA, pra outro mapa ou pra um documento e colar. baixar um .mmd pra
+     abrir no bloco de notas e achar o texto que ja estava aqui era o caminho
+     mais longo pro gesto mais comum. o mermaid e o que volta inteiro ("colar
+     mermaid como ramo", logo abaixo no menu); a outline e pra ler e escrever
+     em qualquer lugar. */
+  const copyText = async (text, what) => {
+    try { await navigator.clipboard.writeText(text); notify(what + " copiado"); }
+    catch (e) { notify("não consegui copiar"); }
   };
 
   /* colar mermaid como ramo: a raiz colada vira o ultimo filho do no
@@ -1322,6 +1338,8 @@ function Editor({ id, maps }) {
       {menuOpen && (
         <Dialog title="mais" onClose={() => setMenuOpen(false)}>
           <div className="mp-menu">
+            <button className="pill" type="button" onClick={() => { setMenuOpen(false); copyText(toMermaid(doc.root), "mermaid"); }}>{icon("copy")}copiar mermaid</button>
+            <button className="pill" type="button" onClick={() => { setMenuOpen(false); copyText(outlineOf(), "outline"); }}>{icon("copy")}copiar outline</button>
             <button className="pill" type="button" onClick={() => { setMenuOpen(false); exportPng(); }}>exportar png</button>
             <button className="pill" type="button" onClick={() => { setMenuOpen(false); exportOutline(); }}>exportar outline</button>
             <button className="pill" type="button" onClick={() => { setMenuOpen(false); exportMermaid(); }}>exportar mermaid</button>
