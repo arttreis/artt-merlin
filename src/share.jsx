@@ -23,6 +23,9 @@ import { useState, useEffect, useLayoutEffect, useRef, useMemo } from "react";
 import { mount, Markdown, icon } from "./shared/ui.jsx";
 import { LOGO } from "./shared/icons.jsx";
 import { computeLayout, svgNode, svgEdgesOf, svgGrid, findNodeIn } from "./shared/map-draw.jsx";
+/* o quadro livre em volta da arvore: pintado pelas mesmas funcoes do editor */
+import { normalizeItems, bboxOf } from "./shared/board.js";
+import { svgBoardLayers } from "./shared/board-draw.jsx";
 import { NODE_W, NODE_H } from "./shared/funnel-layout.js";
 import {
   typeOf, labelOf, formatNumber, LINKED_GROUPS, linkedCounts, computeProjections, drawNode, drawEdge
@@ -217,13 +220,20 @@ function MapStage({ doc }) {
   const [open, setOpen] = useState(null);
   const wrapRef = useRef(null), worldRef = useRef(null), gridRef = useRef(null);
   const layout = useMemo(() => computeLayout(root), [root]);
+  const items = useMemo(() => normalizeItems(doc.items, () => Math.random().toString(36).slice(2)), [doc]);
+  /* a ponta de uma seta presa: num item do quadro ou num no da arvore */
+  const boxOf = (id) => {
+    const it = items.find((x) => x.id === id);
+    if (it) return it.type === "line" || it.type === "pen" ? null : { ...bboxOf(it, boxOf), shape: it.shape };
+    const info = layout.get(id);
+    return info ? { x: info.x - info.w / 2, y: info.y - info.h / 2, w: info.w, h: info.h } : null;
+  };
 
   const bounds = () => {
     let b = null;
-    layout.forEach((i) => {
-      const box = [i.x - i.w / 2, i.y - i.h / 2, i.x + i.w / 2, i.y + i.h / 2];
-      b = b ? [Math.min(b[0], box[0]), Math.min(b[1], box[1]), Math.max(b[2], box[2]), Math.max(b[3], box[3])] : box;
-    });
+    const add = (box) => { b = b ? [Math.min(b[0], box[0]), Math.min(b[1], box[1]), Math.max(b[2], box[2]), Math.max(b[3], box[3])] : box; };
+    layout.forEach((i) => add([i.x - i.w / 2, i.y - i.h / 2, i.x + i.w / 2, i.y + i.h / 2]));
+    items.forEach((it) => { const r = bboxOf(it, boxOf); add([r.x, r.y, r.x + r.w, r.y + r.h]); });
     return b;
   };
   /* abrir e fechar galho é leitura, não edição: muda o desenho aqui e em
@@ -236,6 +246,9 @@ function MapStage({ doc }) {
     wrapRef, worldRef, bounds,
     onView: (v) => { if (gridRef.current) gridRef.current.style.opacity = v.k < 0.3 ? "0" : "1"; },
     onTap: (target) => {
+      /* o documento do quadro se le aqui mesmo, como a nota de um no */
+      const docEl = target && target.closest ? target.closest(".bd-doc") : null;
+      if (docEl) { setOpen("item:" + docEl.dataset.item); return; }
       const g = target && target.closest ? target.closest(".mp-node") : null;
       if (!g) { setOpen(null); return; }
       if (target.closest("[data-toggle]")) { toggle(g.dataset.id); return; }
@@ -256,14 +269,16 @@ function MapStage({ doc }) {
     }
     nodes.push(svgNode(info, node, node.id === root.id, posOf(info), open, null));
   });
-  const reading = open ? findNodeIn(root, open) : null;
+  const board = svgBoardLayers(items, boxOf, {});
+  const docOpen = open && open.indexOf("item:") === 0 ? items.find((it) => it.id === open.slice(5)) : null;
+  const reading = open && !docOpen ? findNodeIn(root, open) : null;
 
   return (
     <div className="shv-stage shv-stage--map" ref={wrapRef}>
       <svg className="mp-svg" xmlns="http://www.w3.org/2000/svg">
         <g ref={worldRef}>
           <g ref={gridRef}>{svgGrid("1")}</g>
-          <g>{edges}</g><g>{nodes}</g>
+          <g>{board.back}</g><g>{edges}</g><g>{nodes}</g><g>{board.front}</g>
         </g>
       </svg>
       <Zoom pz={pz} />
@@ -271,6 +286,11 @@ function MapStage({ doc }) {
         <Reader kind="nó" title={reading.title || "sem título"} onClose={() => setOpen(null)}>
           {reading.link && <p className="shv-link"><a className="pill pill--mini" href={reading.link} target="_blank" rel="noreferrer noopener" title="abrir o link">{icon("open")}<span>{reading.link}</span></a></p>}
           {reading.note && <Markdown className="shv-note" text={reading.note} />}
+        </Reader>
+      )}
+      {docOpen && (
+        <Reader kind="documento" title={docOpen.title || "documento"} onClose={() => setOpen(null)}>
+          {docOpen.text ? <Markdown className="shv-note" text={docOpen.text} /> : <p className="shv-note">vazio</p>}
         </Reader>
       )}
     </div>

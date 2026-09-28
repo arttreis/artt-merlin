@@ -15,6 +15,15 @@ import { MAP_TEMPLATES, mapGroups, mapBranches, mapShape, mapSize, buildMap } fr
 import { parseMermaid, toMermaid } from "./shared/mermaid.js";
 /* o layout e o desenho moram no map-draw: a pagina publica pinta o mesmo mapa */
 import { computeLayout, colorVar, svgNode, svgEdgesOf, svgSiblingIndicator, svgGhost, svgGrid, countNodes, collectIds } from "./shared/map-draw.jsx";
+/* o quadro livre em volta da arvore: o modelo e a geometria no board.js, o
+   desenho no board-draw, e as pecas de tela (barra, menus, campos) ao lado */
+import {
+  normalizeItems, normalizeItem, bboxOf, unionBox, moveItem, resizeBox, dragBox, simplify, penHit, marqueeHits,
+  frameChildren, DEFAULT_SIZE, TEXT_SIZES, FILL_THEME, detachFrom, cloneItems, stickyGrid, buildFormat, placeAt,
+  resizeTable, cellAt, tableSize, itemTexts, paintOrder, localBoxOf
+} from "./shared/board.js";
+import { svgBoardLayers, svgSelection, textItemHeight } from "./shared/board-draw.jsx";
+import { BoardToolbar, ItemBar, ItemEditor, DocPanel, TemplatesDialog, BulkDialog } from "./maps-board.jsx";
 
 initPage("maps");
 
@@ -39,6 +48,7 @@ function normalize(d) {
     id: d.id,
     name: String(d.name || "").slice(0, 120) || "mapa sem nome",
     root: normalizeNode(d.root && (d.root.title || d.root.children || d.root.id) ? d.root : { title: d.name || "ideia central" }),
+    items: normalizeItems(d.items, newId),
     client: d.client || "",
     idea: d.idea || "",
     funnel: d.funnel || "",
@@ -135,7 +145,47 @@ function createMapEngine(mapId, handlers) {
   let mode = null, pendingId = null, pointerOrigin = null, panOriginView = null, movedEnough = false;
   let initialTarget = null, lastPointer = null, autoPanRaf = 0, lastDownId = null;
   let pinchDist = null, pinchStartView = null;
+  /* o quadro livre: os itens como estao no documento, a copia viva durante
+     um gesto (arrastar, redimensionar, desenhar — so vira documento no
+     soltar, num passo so do desfazer), a selecao, a ferramenta armada e o
+     gesto em curso. */
+  let items = [], live = null, itemSel = new Set(), ghostItems = [], tool = { name: "select" }, editingItem = null;
+  let op = null, itemIndex = new Map(), spaceHeld = false, spacePanned = false, pendingBox = null;
+  let pendingItem = null, lastDownItem = null, lastDownPoint = null;
+  const viewListeners = new Set();
   const call = (name, ...args) => handlers.current[name](...args);
+
+  /* a caixa de qualquer coisa em que uma seta pode se prender: item do
+     quadro ou no da arvore. linha e traco nao recebem ponta (e isso que
+     impede uma seta presa em outra seta de dar volta infinita aqui). */
+  function boxOf(id) {
+    const it = itemIndex.get(id);
+    if (it) {
+      if (it.type === "line" || it.type === "pen") return null;
+      const b = bboxOf(it, boxOf);
+      return it.type === "shape" ? { ...b, shape: it.shape } : b;
+    }
+    const info = layout.get(id);
+    return info ? { x: info.x - info.w / 2, y: info.y - info.h / 2, w: info.w, h: info.h } : null;
+  }
+  function indexItems() { itemIndex = new Map(); (live || items).forEach((it) => itemIndex.set(it.id, it)); }
+  function setLive(next) { live = next; indexItems(); }
+  /* quanto vale um pixel da tela em unidades do mundo, no zoom de agora */
+  function unitNow() { const r = svgEl ? svgEl.getBoundingClientRect() : null; return view.w / ((r && r.width) || 1); }
+  /* onde uma ponta de seta se prenderia: o item mais de cima sob o ponto
+     (moldura nao conta — desenhar uma seta dentro dela nao pode grudar
+     nela), senao um no da arvore */
+  function attachAt(p, exclude) {
+    const list = paintOrder(live || items);
+    for (let i = list.length - 1; i >= 0; i--) {
+      const it = list[i];
+      if (it.id === exclude || it.type === "line" || it.type === "pen" || it.type === "frame" || String(it.id).indexOf("draft") === 0) continue;
+      const b = bboxOf(it, boxOf);
+      if (p.x >= b.x && p.x <= b.x + b.w && p.y >= b.y && p.y <= b.y + b.h) return it.id;
+    }
+    const n = nodeAt(p.x, p.y);
+    return n && n !== exclude ? n : "";
+  }
 
   /* ---- viewBox ---- */
   function saveView() { try { localStorage.setItem(viewKey(mapId), JSON.stringify(view)); } catch (e) {} }
@@ -145,6 +195,10 @@ function createMapEngine(mapId, handlers) {
     if (!svgEl) return;
     svgEl.setAttribute("viewBox", view.x + " " + view.y + " " + view.w + " " + view.h);
     applyGrid(); saveView();
+    /* a barra da selecao e o campo de escrever seguem o quadro; as alcas
+       tem tamanho de tela, entao mudam com o zoom */
+    viewListeners.forEach((f) => f());
+    if (itemSel.size) scheduleDraw();
   }
   /* usada tanto pelo Ctrl+0 (enquadra tudo) quanto por frameNode (enquadra
      so um ramo, depois que o merlin acrescenta sugestoes nele). */
@@ -175,8 +229,16 @@ function createMapEngine(mapId, handlers) {
       minX = Math.min(minX, info.x - info.w / 2); maxX = Math.max(maxX, info.x + info.w / 2);
       minY = Math.min(minY, info.y - info.h / 2); maxY = Math.max(maxY, info.y + info.h / 2);
     });
+    if (!filter) items.forEach((it) => {
+      const b = bboxOf(it, boxOf);
+      any = true;
+      minX = Math.min(minX, b.x); maxX = Math.max(maxX, b.x + b.w);
+      minY = Math.min(minY, b.y); maxY = Math.max(maxY, b.y + b.h);
+    });
     return any ? [minX, minY, maxX, maxY] : null;
   }
+  /* enquadra uma caixa do mundo — o que um modelo acabou de largar */
+  function frameBox(b) { if (svgEl && b) fit(b.x, b.y, b.x + b.w, b.y + b.h); }
   function frame() {
     if (!svgEl || !layout.size) return;
     fit.apply(null, bounds());
@@ -231,6 +293,12 @@ function createMapEngine(mapId, handlers) {
     const w = info.w * scale, h = info.h * scale;
     return { left: cx - w / 2, top: cy - h / 2, width: w, height: h, scale };
   }
+  /* o mesmo para uma caixa com canto (x,y) — e como os itens guardam */
+  function screenRectOfBox(b) {
+    const rect = svgEl.getBoundingClientRect();
+    const scale = rect.width / view.w;
+    return { left: rect.left + (b.x - view.x) * scale, top: rect.top + (b.y - view.y) * scale, width: b.w * scale, height: b.h * scale, scale };
+  }
 
   /* ---- desenho ----
      quem muda de lugar desliza ate a posicao nova (220ms) em vez de saltar:
@@ -275,8 +343,15 @@ function createMapEngine(mapId, handlers) {
       }
       nodes.push(svgNode(info, node, node.id === rootId, posOf(info), selectedId, drag));
     });
+    /* o quadro em volta: molduras atras da arvore, o resto na frente, e a
+       selecao (com alcas do tamanho do dedo, em qualquer zoom) por cima de tudo */
+    const cur = live || items;
+    const board = svgBoardLayers(cur, boxOf, { editing: editingItem, ghosts: ghostItems });
+    const overlay = itemSel.size || (op && (op.marquee || op.snap))
+      ? svgSelection(cur, itemSel, boxOf, unitNow(), { snap: op && op.snap, marquee: op && op.marquee }) : null;
     const tree = (
-      <>{svgGrid(view.w > 2400 ? "0" : "1")}<g>{edges}</g><g>{nodes}</g>
+      <>{svgGrid(view.w > 2400 ? "0" : "1")}<g className="bd-back">{board.back}</g><g>{edges}</g><g>{nodes}</g>
+        <g className="bd-front">{board.front}</g><g>{overlay}</g>
         {svgSiblingIndicator(layout, posOf, drag)}{svgGhost(layout, drag)}</>
     );
     /* fora do commit do React (ponteiro, roda, animacao) o desenho tem que
@@ -354,16 +429,139 @@ function createMapEngine(mapId, handlers) {
     if (hintEl) hintEl.hidden = true;
   }
 
+  /* ---- o quadro: gestos ----
+     cada ferramenta e um gesto: a caneta risca, a borracha apaga traco, as
+     de criar desenham ou clicam, a mao arrasta a tela. com a de selecionar,
+     o que esta debaixo do dedo decide: alca redimensiona, item anda, no da
+     arvore segue o arraste dela, e o vazio abre um retangulo de selecao (no
+     toque, o vazio arrasta a tela — dedo nao faz retangulo). botao do meio,
+     botao direito e Espaco seguro sempre arrastam a tela. */
+  const CREATE_TOOLS = ["sticky", "text", "shape", "frame", "line", "sticker"];
+  const penDraft = (raw) => ({ id: "draft-pen", type: "pen", points: raw, color: tool.color || 0, width: tool.width || 3, alpha: tool.alpha || 1 });
+  function erase(p) {
+    const tol = 6 * unitNow();
+    const next = live.filter((it) => !(it.type === "pen" && penHit(it, p.x, p.y, tol)));
+    if (next.length !== live.length) { setLive(next); scheduleDraw(); }
+  }
+  /* o gesto acabou e mudou o quadro: o motor ja pinta o resultado (sem
+     esperar o React voltar — senao o quadro piscaria o estado de antes por
+     um quadro) e o editor grava */
+  function commit(next, opts) {
+    items = next; live = null; indexItems();
+    if (opts && opts.select) itemSel = new Set(opts.select);
+    call("commitItems", next, opts || {});
+  }
+  function startMove() {
+    const id = pendingItem;
+    if (!itemSel.has(id)) itemSel = new Set([id]); // arrastar o que nao estava selecionado pega so ele
+    const ids = new Set(itemSel);
+    /* moldura leva junto o que mora dentro dela */
+    items.forEach((it) => { if (ids.has(it.id) && it.type === "frame") frameChildren(items, it, boxOf).forEach((c) => ids.add(c)); });
+    op = { kind: "move", ids, p0: pointSvg(pointerOrigin.x, pointerOrigin.y) };
+    svgEl.classList.add("is-dragging");
+  }
+  function resizeLive(p, shift) {
+    const base = items.find((it) => it.id === op.id);
+    if (!base) return;
+    let next;
+    if (base.type === "line") {
+      const end = op.handle === "p1" ? "1" : "2";
+      const target = attachAt(p, base.id);
+      op.snap = target ? boxOf(target) : null;
+      next = { ...base, ["x" + end]: Math.round(p.x), ["y" + end]: Math.round(p.y), [end === "1" ? "from" : "to"]: target };
+    } else if (base.type === "pen") return;
+    else {
+      /* post-it, adesivo e texto nao deformam; texto crescendo e letra crescendo */
+      const ratio = shift || base.type === "sticky" || base.type === "sticker" || base.type === "text";
+      const b = resizeBox(base, op.handle, p, ratio);
+      next = { ...base, ...b };
+      if (base.type === "text") { next.size = clamp(Math.round(base.size * b.w / base.w), 8, 200); next.h = textItemHeight(next); }
+    }
+    setLive(items.map((it) => (it.id === op.id ? next : it)));
+    scheduleDraw();
+  }
+  function createLive(p, shift) {
+    const t = tool.name;
+    if (t === "shape" || t === "frame") {
+      const b = dragBox(op.p0, p, shift);
+      op.draft = t === "frame"
+        ? { id: "draft", type: "frame", ...b, title: "" }
+        : { id: "draft", type: "shape", shape: tool.shape || "rect", fill: tool.fill == null ? FILL_THEME : tool.fill, color: 0, text: "", ...b };
+    } else if (t === "line") {
+      const target = attachAt(p, op.from);
+      op.snap = target ? boxOf(target) : null;
+      op.draft = { id: "draft", type: "line", kind: tool.kind || "arrow", x1: Math.round(op.p0.x), y1: Math.round(op.p0.y), x2: Math.round(p.x), y2: Math.round(p.y), from: op.from, to: target, color: 0, width: 2, dash: false, text: "" };
+    } else return;
+    setLive(items.concat([op.draft]));
+    scheduleDraw();
+  }
+  function finishCreate(p) {
+    const t = tool.name, p0 = op.p0;
+    let it = null, edit = false;
+    if (t === "shape" || t === "frame") {
+      if (movedEnough && op.draft && op.draft.w >= 12 && op.draft.h >= 12) it = { ...op.draft, id: newId() };
+      else {
+        const [w, h] = DEFAULT_SIZE[t];
+        it = t === "frame"
+          ? { id: newId(), type: "frame", x: Math.round(p0.x - w / 2), y: Math.round(p0.y - h / 2), w, h, title: "" }
+          : { id: newId(), type: "shape", shape: tool.shape || "rect", fill: tool.fill == null ? FILL_THEME : tool.fill, color: 0, text: "", x: Math.round(p0.x - w / 2), y: Math.round(p0.y - h / 2), w, h };
+      }
+      edit = t === "shape";
+    } else if (t === "line") {
+      it = movedEnough && op.draft
+        ? { ...op.draft, id: newId() }
+        : { id: newId(), type: "line", kind: tool.kind || "arrow", x1: Math.round(p0.x), y1: Math.round(p0.y), x2: Math.round(p0.x + 160), y2: Math.round(p0.y), from: op.from, to: "", color: 0, width: 2, dash: false, text: "" };
+    } else if (t === "sticky") {
+      const s = DEFAULT_SIZE.sticky[0];
+      it = { id: newId(), type: "sticky", color: tool.color || 0, x: Math.round(p.x - s / 2), y: Math.round(p.y - s / 2), w: s, h: s, text: "" };
+      edit = true;
+    } else if (t === "text") {
+      it = { id: newId(), type: "text", x: Math.round(p.x), y: Math.round(p.y - 14), w: DEFAULT_SIZE.text[0], h: 28, size: tool.size || 18, bold: false, color: 0, text: "" };
+      it.h = textItemHeight(it);
+      edit = true;
+    } else if (t === "sticker") {
+      const s = DEFAULT_SIZE.sticker[0];
+      it = { id: newId(), type: "sticker", emoji: tool.emoji || "👍", x: Math.round(p.x - s / 2), y: Math.round(p.y - s / 2), w: s, h: s };
+    }
+    if (!it) return;
+    it = normalizeItem(it, newId);
+    commit(items.concat([it]), { select: [it.id], edit: edit ? it.id : null, toolDone: true });
+  }
+
   function onPointerDown(e) {
-    if (editing || e.button != null && e.button !== 0) return;
+    if (editing) return;
     if (mode) return; // segundo dedo: o pinch cuida
-    const target = e.target.closest("[data-id]");
-    initialTarget = e.target;
-    lastDownId = target ? target.dataset.id : null;
+    const button = e.button == null ? 0 : e.button;
+    if (button > 2) return;
+    const t = e.target;
+    const itemEl = t.closest("[data-item]"), nodeEl = t.closest("[data-id]");
+    const p = pointSvg(e.clientX, e.clientY);
+    initialTarget = t;
+    lastDownId = nodeEl ? nodeEl.dataset.id : null;
+    lastDownItem = itemEl ? itemEl.dataset.item : null;
+    lastDownPoint = p;
     pointerOrigin = { x: e.clientX, y: e.clientY };
     movedEnough = false;
-    if (target) { mode = "node-pending"; pendingId = target.dataset.id; }
-    else { mode = "pan-pending"; panOriginView = { x: view.x, y: view.y }; }
+    const panNow = () => { mode = "pan-pending"; panOriginView = { x: view.x, y: view.y }; };
+    if (button !== 0 || spaceHeld || tool.name === "hand") panNow();
+    else if (tool.name === "pen") {
+      mode = "pen"; op = { kind: "pen", raw: [p.x, p.y] };
+      setLive(items.concat([penDraft(op.raw)]));
+      scheduleDraw();
+    } else if (tool.name === "eraser") {
+      mode = "erase"; op = { kind: "erase" };
+      setLive(items.slice()); erase(p);
+    } else if (CREATE_TOOLS.indexOf(tool.name) >= 0) {
+      mode = "create"; op = { kind: "create", p0: p, from: tool.name === "line" ? attachAt(p, null) : "" };
+    } else {
+      const handle = t.closest("[data-handle]"), ghostEl = t.closest("[data-ghost-item]");
+      if (handle && itemSel.size === 1) { mode = "handle"; op = { kind: "handle", handle: handle.dataset.handle, id: [...itemSel][0] }; }
+      else if (ghostEl) { mode = "ghost-item"; pendingItem = ghostEl.dataset.ghostItem; }
+      else if (itemEl) { mode = "item-pending"; pendingItem = itemEl.dataset.item; }
+      else if (nodeEl) { mode = "node-pending"; pendingId = nodeEl.dataset.id; }
+      else if (e.pointerType === "touch") panNow();
+      else { mode = "marquee-pending"; op = { kind: "marquee", p0: p, base: e.shiftKey ? new Set(itemSel) : new Set() }; }
+    }
     /* o navegador comeca a propria selecao junto com o arrasto. como o svg e
        user-select:none, ela nao pega texto nenhum e sobe para o container,
        que aparece contornado de branco enquanto o dedo esta apertado. o pan e
@@ -379,6 +577,18 @@ function createMapEngine(mapId, handlers) {
   function onPointerMove(e) {
     const dx = e.clientX - pointerOrigin.x, dy = e.clientY - pointerOrigin.y;
     if (!movedEnough && Math.hypot(dx, dy) > 4) movedEnough = true;
+    const p = pointSvg(e.clientX, e.clientY);
+    /* caneta e borracha respondem desde o primeiro pixel */
+    if (mode === "pen") {
+      const r = op.raw;
+      if (Math.hypot(p.x - r[r.length - 2], p.y - r[r.length - 1]) >= unitNow() * 1.5 && r.length < 8000) {
+        r.push(p.x, p.y);
+        live[live.length - 1] = penDraft(r);
+        scheduleDraw();
+      }
+      return;
+    }
+    if (mode === "erase") { erase(p); return; }
     if (!movedEnough) return;
     const rect = svgEl.getBoundingClientRect();
     const scale = view.w / rect.width;
@@ -388,6 +598,20 @@ function createMapEngine(mapId, handlers) {
       view.x = panOriginView.x - dx * scale;
       view.y = panOriginView.y - dy * scale;
       applyView();
+    } else if (mode === "item-pending" || mode === "move") {
+      if (mode === "item-pending") { startMove(); mode = "move"; }
+      const mx = p.x - op.p0.x, my = p.y - op.p0.y;
+      setLive(items.map((it) => (op.ids.has(it.id) ? moveItem(it, mx, my) : it)));
+      scheduleDraw();
+    } else if (mode === "handle") {
+      resizeLive(p, e.shiftKey);
+    } else if (mode === "marquee-pending" || mode === "marquee") {
+      mode = "marquee";
+      op.marquee = dragBox(op.p0, p);
+      itemSel = new Set([...op.base, ...marqueeHits(items, op.marquee, boxOf)]);
+      scheduleDraw();
+    } else if (mode === "create") {
+      createLive(p, e.shiftKey);
     } else if (mode === "node-pending" || mode === "node") {
       if (mode === "node-pending") {
         const info = layout.get(pendingId);
@@ -411,12 +635,30 @@ function createMapEngine(mapId, handlers) {
     svgEl.removeEventListener("pointerup", onPointerUp);
     svgEl.removeEventListener("pointercancel", onPointerUp);
     try { svgEl.releasePointerCapture(e.pointerId); } catch (err) {}
-    if (mode === "pan") { svgEl.classList.remove("is-dragging"); }
+    const cancelled = e.type === "pointercancel";
+    const p = pointSvg(e.clientX, e.clientY);
+    svgEl.classList.remove("is-dragging");
+    if (mode === "pan") { if (spaceHeld) spacePanned = true; }
     else if (mode === "node") {
       const target = drag && drag.target, nodeId = drag && drag.id;
       endDrag();
-      if (target && e.type !== "pointercancel") call("drop", nodeId, target);
-    } else if (!movedEnough) {
+      if (target && !cancelled) call("drop", nodeId, target);
+    } else if (mode === "pen") {
+      /* o traco guarda so os pontos que mudam o desenho: meio pixel de tela */
+      const pts = simplify(op.raw, unitNow() * 0.6);
+      const it = normalizeItem({ id: newId(), type: "pen", points: pts, color: tool.color || 0, width: tool.width || 3, alpha: tool.alpha || 1 }, newId);
+      if (it && !cancelled) commit(items.concat([it]), {});
+    } else if (mode === "erase") {
+      if (live && live.length !== items.length && !cancelled) commit(live, {});
+    } else if (mode === "move") {
+      if (!cancelled) commit(live, { select: [...itemSel] });
+    } else if (mode === "handle") {
+      if (movedEnough && live && !cancelled) commit(live, { select: [op.id] });
+    } else if (mode === "marquee") {
+      call("selectItems", [...itemSel]);
+    } else if (mode === "create") {
+      if (!cancelled) finishCreate(p);
+    } else if (!movedEnough && !cancelled) {
       if (mode === "node-pending") {
         const noteTarget = initialTarget && initialTarget.closest("[data-note]");
         const toggle = initialTarget && initialTarget.closest("[data-toggle]");
@@ -425,20 +667,39 @@ function createMapEngine(mapId, handlers) {
         else if (noteTarget) call("openNote", pendingId);
         else if ((e.ctrlKey || e.metaKey) && info && info.node.link) window.open(info.node.link, "_blank", "noopener");
         else call("select", pendingId);
-      } else { call("closePanel"); }
+      } else if (mode === "item-pending") {
+        const id = pendingItem;
+        if (e.shiftKey) {
+          const next = new Set(itemSel);
+          if (next.has(id)) next.delete(id); else next.add(id);
+          call("selectItems", [...next]);
+        } else if (itemSel.size === 1 && itemSel.has(id)) call("editItem", id, p); // o segundo clique no mesmo escreve
+        else call("selectItems", [id]);
+      } else if (mode === "ghost-item") {
+        call("acceptGhostItem", pendingItem);
+      } else if (mode === "marquee-pending") {
+        if (!e.shiftKey) call("clearSelection");
+      } else if (mode === "pan-pending" && e.pointerType === "touch" && e.button === 0 && tool.name !== "hand") {
+        call("clearSelection");
+      }
     }
-    mode = null; pendingId = null; initialTarget = null;
+    mode = null; pendingId = null; pendingItem = null; initialTarget = null; op = null;
+    if (live) setLive(null);
     if (drag) endDrag();
     draw();
   }
   /* com o ponteiro capturado pelo svg, o chrome entrega o dblclick ao proprio
-     svg, nao ao no — por isso o no vem do ultimo pointerdown, que chegou
+     svg, nao ao no — por isso o alvo vem do ultimo pointerdown, que chegou
      antes da captura */
   function onDblClick(e) {
+    if (tool.name !== "select") return;
+    if (lastDownItem) { call("editItem", lastDownItem, lastDownPoint); return; }
     const target = e.target.closest("[data-id]");
     const id = target ? target.dataset.id : lastDownId;
     if (id) call("edit", id);
   }
+  /* o botao direito arrasta a tela; o menu do navegador so atrapalharia */
+  function onContextMenu(e) { e.preventDefault(); }
   function onWheel(e) {
     e.preventDefault();
     zoomAt(e.deltaY > 0 ? 1.12 : 1 / 1.12, e.clientX, e.clientY);
@@ -450,8 +711,10 @@ function createMapEngine(mapId, handlers) {
     if (e.touches.length === 2) {
       /* o segundo dedo cancela o que o primeiro estava fazendo (pan ou arraste) */
       svgEl.removeEventListener("pointermove", onPointerMove);
-      mode = null; pendingId = null;
-      if (drag) { endDrag(); draw(); }
+      mode = null; pendingId = null; pendingItem = null; op = null;
+      if (live) setLive(null);
+      if (drag) endDrag();
+      draw();
       svgEl.classList.remove("is-dragging");
       pinchDist = touchDistance(e.touches); pinchStartView = { x: view.x, y: view.y, w: view.w, h: view.h };
     }
@@ -478,6 +741,7 @@ function createMapEngine(mapId, handlers) {
       root = createRoot(el);
       el.addEventListener("pointerdown", onPointerDown);
       el.addEventListener("dblclick", onDblClick);
+      el.addEventListener("contextmenu", onContextMenu);
       el.addEventListener("wheel", onWheel, { passive: false });
       el.addEventListener("touchstart", onTouchStart, { passive: false });
       el.addEventListener("touchmove", onTouchMove, { passive: false });
@@ -490,6 +754,7 @@ function createMapEngine(mapId, handlers) {
       svgEl.removeEventListener("pointerdown", onPointerDown);
       svgEl.removeEventListener("pointermove", onPointerMove);
       svgEl.removeEventListener("dblclick", onDblClick);
+      svgEl.removeEventListener("contextmenu", onContextMenu);
       svgEl.removeEventListener("wheel", onWheel);
       svgEl.removeEventListener("touchstart", onTouchStart);
       svgEl.removeEventListener("touchmove", onTouchMove);
@@ -503,26 +768,43 @@ function createMapEngine(mapId, handlers) {
     /* o documento ou a selecao mudaram: redesenha (deslizando quem se moveu) */
     update(next) {
       layout = next.layout; selectedId = next.selectedId; rootId = next.rootId; editing = next.editing;
+      /* no meio de um gesto o quadro e do motor: o que vier do React agora
+         (um salvar atrasado, a nuvem) entra, mas a copia viva segue ate o soltar */
+      items = next.items || []; itemSel = new Set(next.itemSel || []); ghostItems = next.ghosts || [];
+      editingItem = next.editingItem || null;
+      tool = next.tool || { name: "select" };
+      if (svgEl) svgEl.dataset.tool = tool.name;
+      if (!live) indexItems();
       committing = true;
       try {
         draw();
         if (firstDraw) { firstDraw = false; if (savedView) applyView(); else frame(); }
         if (pendingFrame) { const id = pendingFrame; pendingFrame = null; frameNode(id); }
+        if (pendingBox) { const b = pendingBox; pendingBox = null; frameBox(b); }
       } finally { committing = false; }
     },
     frame, frameNode,
     frameNodeNext(id) { pendingFrame = id; },
-    zoomCenter, ensureVisible, screenRectOf,
+    frameBoxNext(b) { pendingBox = b; },
+    zoomCenter, ensureVisible, screenRectOf, screenRectOfBox, boxOf,
+    /* o meio da tela, no mundo: onde nasce o que nao foi clicado num lugar */
+    viewCenter: () => ({ x: view.x + view.w / 2, y: view.y + view.h / 2 }),
+    onView(fn) { viewListeners.add(fn); return () => viewListeners.delete(fn); },
+    /* Espaco segurado: arrastar move a tela. soltar sem ter arrastado devolve
+       o Espaco ao que ele sempre fez (colapsar o no selecionado) */
+    setSpace(on) {
+      if (on && !spaceHeld) spacePanned = false;
+      spaceHeld = on;
+      if (svgEl) svgEl.classList.toggle("is-panning", on);
+    },
+    spacePanned: () => spacePanned,
+    /* o editor recusou uma gravacao (grande demais): volta ao que ficou */
+    setItems(list) { items = list; live = null; indexItems(); draw(); },
     svg: () => svgEl
   };
 }
 
 /* ---------- icones que so existem aqui ---------- */
-const SparkIcon = () => (
-  <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-    <path d="M12 3l1.5 4.5L18 9l-4.5 1.5L12 15l-1.5-4.5L6 9l4.5-1.5L12 3z" /><path d="M19 14l.8 2.2L22 17l-2.2.8L19 20l-.8-2.2L16 17l2.2-.8L19 14z" />
-  </svg>
-);
 const FrameIcon = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
     <path d="M9 4H5a1 1 0 00-1 1v4M15 4h4a1 1 0 011 1v4M9 20H5a1 1 0 01-1-1v-4M15 20h4a1 1 0 001-1v-4" />
@@ -544,6 +826,19 @@ const FabIcon = () => (
   </svg>
 );
 const COLORS = [0, 1, 2, 3, 4, 5, 6];
+
+/* ---------- o quadro: o que vive fora de um mapa ----------
+   as opcoes das ferramentas (a cor do post-it, a forma, a ponta da seta, a
+   caneta) sao da pessoa, nao do mapa: valem em todos e ficam no navegador.
+   a area de copiar tambem vive fora do editor — copiar num mapa e colar
+   noutro e o jeito de levar um pedaco de quadro de um para o outro. */
+const TOOLS_KEY = "merlin:maps:tools";
+const TOOL_DEFAULTS = { sticky: 0, shape: "rect", line: "arrow", penColor: 0, penWidth: 4, marker: false, emoji: "👍" };
+function loadToolOpts() {
+  try { return { ...TOOL_DEFAULTS, ...(JSON.parse(localStorage.getItem(TOOLS_KEY)) || {}) }; } catch (e) { return { ...TOOL_DEFAULTS }; }
+}
+function saveToolOpts(o) { try { localStorage.setItem(TOOLS_KEY, JSON.stringify(o)); } catch (e) {} }
+let boardClipboard = null;
 
 /* ---------- a pagina: lista ou editor, conforme o hash ----------
    quem abre um mapa de outro modulo (maps.html#<id>) entra direto no editor;
@@ -583,7 +878,11 @@ function MapList({ maps }) {
     const m = maps.get(id);
     if (!m) return;
     const copy = cloneDoc(m);
-    (function regenerate(node) { node.id = newId(); (node.children || []).forEach(regenerate); })(copy.root);
+    /* os nos ganham id novo; seta do quadro presa num no segue presa na copia dele */
+    const ids = new Map();
+    (function regenerate(node) { const fresh = newId(); ids.set(node.id, fresh); node.id = fresh; (node.children || []).forEach(regenerate); })(copy.root);
+    copy.items = (copy.items || []).map((it) => (it.type !== "line" ? it
+      : { ...it, from: ids.get(it.from) || it.from, to: ids.get(it.to) || it.to }));
     copy.id = newId();
     copy.name = m.name + " (cópia)";
     copy.createdAt = Date.now(); copy.updatedAt = Date.now();
@@ -607,7 +906,7 @@ function MapList({ maps }) {
   return (
     <main className="page">
       <div className="header">
-        <div><h1>mapas</h1><p className="sub">mapas mentais com layout automático — teclado para escrever, arrastar para reorganizar</p></div>
+        <div><h1>mapas</h1><p className="sub">quadros livres com um mapa mental no meio — post-its, formas, setas, caneta e modelos em volta</p></div>
         <div className="actions">
           <button className="pill" type="button" id="import-map" title="colar um mapa em mermaid (i)" onClick={() => setImporting(true)}>{icon("code")}mermaid</button>
           {choosing && all.length
@@ -661,7 +960,7 @@ function MapRow({ m, notes, funnels, maps, renaming, onRename, onRenamed, onDupl
       {renaming
         ? <RenameInput map={m} maps={maps} onDone={onRenamed} />
         : <button type="button" className="mp-line-name">{m.name}</button>}
-      <span className="measure t-mono">{n + (n === 1 ? " nó" : " nós")}</span>
+      <span className="measure t-mono">{n + (n === 1 ? " nó" : " nós") + (m.items.length ? " · " + m.items.length + (m.items.length === 1 ? " item" : " itens") : "")}</span>
       <span className="measure t-mono">{"editado há " + relativeTime(m.updatedAt)}</span>
       <span className="mp-links">
         {note && <a className="pill pill--mini" href={"notes.html#" + m.idea} title="abrir a nota" onClick={stop}>{NAV_ICONS.notes}{note.title || "nota"}</a>}
@@ -818,11 +1117,28 @@ function Editor({ id, maps }) {
   useEffect(() => {
     setPageContext(() =>
       "Mapa aberto: " + doc.name + (doc.client ? " · cliente: " + clientName(doc.client) + " (id " + doc.client + ")" : "") + ". " +
-      "Nó raiz: " + doc.root.title + ". Ramos: " + (doc.root.children.length ? doc.root.children.map((n) => n.title).join("; ") : "nenhum ainda")
+      "Nó raiz: " + doc.root.title + ". Ramos: " + (doc.root.children.length ? doc.root.children.map((n) => n.title).join("; ") : "nenhum ainda") +
+      (doc.items.length ? ". No quadro em volta: " + itemTexts(doc.items).slice(0, 40).join("; ") : "")
     );
     return () => setPageContext(null);
   }, [doc.id, doc.updatedAt]);
-  const [selectedId, setSelectedId] = useState(() => doc.root.id);
+  /* nada selecionado ao abrir: com a tela limpa, as letras armam as
+     ferramentas do quadro (N post-it, T texto...). Tab e Enter continuam
+     levando para a arvore. */
+  const [selectedId, setSelectedId] = useState(null);
+  /* o quadro: selecao de itens (so um dos dois mundos tem selecao por vez),
+     a ferramenta armada, as opcoes de cada uma (cor do post-it, forma, ponta
+     da seta, caneta — lembradas entre visitas), o item sendo escrito, o menu
+     aberto da barra, os post-its que o merlin propos e as caixas */
+  const [itemSel, setItemSel] = useState([]);
+  const [tool, setTool] = useState("select");
+  const [toolOpts, setToolOpts] = useState(loadToolOpts);
+  const [editingItem, setEditingItem] = useState(null); // { id, cell?, initial? } | null
+  const [flyout, setFlyout] = useState(null);
+  const [stickyGhosts, setStickyGhosts] = useState(null); // [item] | null
+  const [docOpen, setDocOpen] = useState(null);
+  const [templatesOpen, setTemplatesOpen] = useState(false);
+  const [bulkOpen, setBulkOpen] = useState(false);
   const [editing, setEditing] = useState(null);         // { id, initial } | null
   const [panelOpen, setPanelOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
@@ -884,7 +1200,10 @@ function Editor({ id, maps }) {
     scheduleSave();
     return true;
   };
-  const keepSelection = (d) => setSelectedId((s) => (s && findNode(d.root, s)) ? s : d.root.id);
+  const keepSelection = (d) => {
+    setSelectedId((s) => (!s ? null : findNode(d.root, s) ? s : d.root.id));
+    setItemSel((sel) => { const has = new Set(d.items.map((it) => it.id)); const next = sel.filter((x) => has.has(x)); return next.length === sel.length ? sel : next; });
+  };
   const undo = () => {
     const h = historyRef.current;
     if (!h.length) return;
@@ -922,7 +1241,7 @@ function Editor({ id, maps }) {
     if (isGhostId(nid)) { acceptGhost(nid); return; } // fantasma nao se seleciona: ele se aceita
     setSuggestions(null); // trocar de nó descarta a tira: ela era daquele nó
     setSelectedId(nid);
-    if (nid) engine.ensureVisible(nid);
+    if (nid) { setItemSel([]); engine.ensureVisible(nid); }
   };
   const navigate = (dir) => {
     const d = docRef.current;
@@ -984,7 +1303,13 @@ function Editor({ id, maps }) {
     if (!found || !found.parent) return; // nunca apaga a raiz
     const parentId = found.parent.id, originalIndex = found.index;
     let removed = null;
-    mutate((d) => { const f = findNode(d.root, sel); removed = f.parent.children.splice(f.index, 1)[0]; });
+    mutate((d) => {
+      const f = findNode(d.root, sel);
+      removed = f.parent.children.splice(f.index, 1)[0];
+      /* seta do quadro presa no ramo apagado fica onde estava, solta */
+      const gone = new Set(); collectIds(removed, gone);
+      d.items = detachFrom(d.items, gone, engine.boxOf);
+    });
     setSelectedId(parentId);
     notify("nó apagado", () => {
       mutate((d) => {
@@ -1097,22 +1422,30 @@ function Editor({ id, maps }) {
       client: d.client ? (clientName(d.client) || "") : ""
     };
   };
-  const askSuggestions = async (nid) => {
-    const d = docRef.current;
-    if (!findNode(d.root, nid) || thinkingRef.current) return;
+  /* a conversa com o merlin e a mesma para ramos e para post-its: pede,
+     traduz os erros em aviso e devolve a lista (ou null) */
+  const callMerlin = async (context) => {
+    if (thinkingRef.current) return null;
     thinkingRef.current = true; setThinking(true);
     let r;
-    try { r = await api("/merlin", { method: "POST", body: JSON.stringify({ task: "branches", context: suggestionContext(d, nid) }) }); }
+    try { r = await api("/merlin", { method: "POST", body: JSON.stringify({ task: "branches", context }) }); }
     catch (e) { r = null; }
     thinkingRef.current = false; setThinking(false);
-    if (!r) { notify("não consegui falar com o Merlin agora"); return; }
-    if (r.status === 401) { notify("entre para usar o Merlin"); return; }
-    if (r.status === 503) { notify((r.body && r.body.error) || "faltou configurar a chave do Merlin"); return; }
-    if (!r.ok) { notify((r.body && r.body.error) || "o Merlin não respondeu"); return; }
-    /* seis ramos ja e o teto do que cabe em volta de um no sem virar
-       parede; a lista antiga ia ate doze porque era rolavel numa caixa */
-    const list = Array.isArray(r.body.suggestions) ? r.body.suggestions.slice(0, 6) : [];
+    if (!r) { notify("não consegui falar com o Merlin agora"); return null; }
+    if (r.status === 401) { notify("entre para usar o Merlin"); return null; }
+    if (r.status === 503) { notify((r.body && r.body.error) || "faltou configurar a chave do Merlin"); return null; }
+    if (!r.ok) { notify((r.body && r.body.error) || "o Merlin não respondeu"); return null; }
+    /* seis e o teto do que cabe em volta de um no (ou numa grade de post-its)
+       sem virar parede; a lista antiga ia ate doze porque era rolavel numa caixa */
+    return Array.isArray(r.body.suggestions) ? r.body.suggestions.slice(0, 6) : [];
+  };
+  const askSuggestions = async (nid) => {
+    const d = docRef.current;
+    if (!findNode(d.root, nid)) return;
+    const list = await callMerlin(suggestionContext(d, nid));
+    if (!list) return;
     if (!list.length) { notify("o Merlin não teve sugestões para esse nó"); return; }
+    setStickyGhosts(null);
     setSuggestions({ targetId: nid, list });
   };
   /* clicar num fantasma: aquele ramo — e so aquele — vira real, no mesmo
@@ -1139,6 +1472,337 @@ function Editor({ id, maps }) {
     setSelectedId(freshId); // fica selecionado: o S pede os ramos dele em seguida
     engine.frameNodeNext(freshId);
   };
+
+  /* ---- o quadro livre ----
+     a ferramenta que o motor recebe ja vem com as opcoes dela resolvidas */
+  const toolObj = useMemo(() => {
+    const o = toolOpts;
+    if (tool === "sticky") return { name: tool, color: o.sticky };
+    if (tool === "shape") return { name: tool, shape: o.shape, fill: FILL_THEME };
+    if (tool === "line") return { name: tool, kind: o.line };
+    if (tool === "pen") return { name: tool, color: o.penColor, width: o.marker ? 16 : o.penWidth, alpha: o.marker ? 0.35 : 1 };
+    if (tool === "sticker") return { name: tool, emoji: o.emoji };
+    if (tool === "text") return { name: tool, size: 18 };
+    return { name: tool };
+  }, [tool, toolOpts]);
+  const patchOpts = (patch) => setToolOpts((o) => { const n = { ...o, ...patch }; saveToolOpts(n); return n; });
+  /* armar uma ferramenta de criar solta a selecao: o proximo clique e dela */
+  const armTool = (name) => {
+    setTool(name);
+    if (name !== "select" && name !== "hand") { setItemSel([]); setSelectedId(null); setPanelOpen(false); }
+  };
+  const itemById = (iid) => docRef.current.items.find((it) => it.id === iid) || null;
+  const selectedItems = useMemo(() => {
+    const set = new Set(itemSel);
+    return doc.items.filter((it) => set.has(it.id));
+  }, [doc.items, itemSel]);
+
+  /* grava a lista inteira do quadro. o teto e o do servidor (1MB por
+     documento): passar dele e recusar aqui, com aviso, e nao perder na nuvem */
+  const setItems = (next) => {
+    if (JSON.stringify(next).length + JSON.stringify(docRef.current.root).length > 950000) {
+      notify("o quadro ficou grande demais para gravar — apague rabiscos ou leve uma parte para outro mapa");
+      engine.setItems(docRef.current.items);
+      return false;
+    }
+    return mutate((d) => { d.items = next; });
+  };
+  const commitItems = (next, opts) => {
+    if (!setItems(next)) return;
+    if (opts.select) { setItemSel(opts.select); setSelectedId(null); setPanelOpen(false); }
+    if (opts.toolDone) setTool("select");
+    if (opts.edit) setEditingItem({ id: opts.edit });
+  };
+  const selectItems = (ids) => {
+    setItemSel(ids);
+    if (ids.length) { setSelectedId(null); setPanelOpen(false); setSuggestions(null); }
+  };
+  const clearSelection = () => { setItemSel([]); setSelectedId(null); setPanelOpen(false); };
+  /* o que a pessoa esta arrastando, copiando ou duplicando: moldura leva o
+     que mora dentro dela */
+  const withFrameContent = (ids) => {
+    const d = docRef.current, out = new Set(ids);
+    d.items.forEach((it) => { if (out.has(it.id) && it.type === "frame") frameChildren(d.items, it, engine.boxOf).forEach((c) => out.add(c)); });
+    return out;
+  };
+
+  const removeItems = (ids, silent) => {
+    const gone = new Set(ids);
+    const before = docRef.current.items;
+    const removed = before.filter((it) => gone.has(it.id));
+    if (!removed.length) return;
+    const loosened = before.filter((it) => it.type === "line" && !gone.has(it.id) && ((it.from && gone.has(it.from)) || (it.to && gone.has(it.to))));
+    mutate((d) => { d.items = detachFrom(d.items.filter((it) => !gone.has(it.id)), gone, engine.boxOf); });
+    setItemSel((sel) => sel.filter((x) => !gone.has(x)));
+    if (silent) return;
+    /* desfazer pelo aviso devolve o que saiu no lugar da ordem em que estava,
+       e as setas que tinham se soltado voltam a se prender */
+    notify(removed.length === 1 ? "item apagado" : removed.length + " itens apagados", () => mutate((d) => {
+      const back = new Map(loosened.map((it) => [it.id, it]));
+      const list = d.items.map((it) => (back.has(it.id) ? { ...it, from: back.get(it.id).from, to: back.get(it.id).to } : it));
+      const has = new Set(list.map((it) => it.id));
+      removed.forEach((it) => { if (!has.has(it.id)) list.splice(Math.min(before.indexOf(it), list.length), 0, it); });
+      d.items = list;
+    }));
+  };
+  /* mexe nos itens selecionados; texto livre recalcula a altura, porque a
+     letra e a largura mudam quantas linhas ele ocupa */
+  const patchItems = (fn, ids) => {
+    const set = new Set(ids || itemSel);
+    mutate((d) => {
+      let any = false;
+      d.items = d.items.map((it) => {
+        if (!set.has(it.id)) return it;
+        const n = normalizeItem(fn(it), newId);
+        if (!n) return it;
+        if (n.type === "text") n.h = textItemHeight(n);
+        any = true;
+        return n;
+      });
+      if (!any) return false;
+    });
+  };
+  const reorder = (toFront) => mutate((d) => {
+    const set = new Set(itemSel);
+    const a = d.items.filter((it) => set.has(it.id)), b = d.items.filter((it) => !set.has(it.id));
+    if (!a.length) return false;
+    d.items = toFront ? b.concat(a) : a.concat(b);
+  });
+  const duplicateItems = (ids) => {
+    const set = withFrameContent(ids);
+    const list = docRef.current.items.filter((it) => set.has(it.id));
+    if (!list.length) return;
+    const copies = cloneItems(list, newId, 24, 24, engine.boxOf);
+    if (setItems(docRef.current.items.concat(copies))) setItemSel(copies.filter((c, i) => ids.indexOf(list[i].id) >= 0).map((c) => c.id));
+  };
+  /* copiar leva os itens soltos do que ficou para tras: a seta presa num no
+     que nao foi junto vira seta solta, no lugar exato onde estava */
+  const copyItems = (ids) => {
+    const set = withFrameContent(ids);
+    const list = docRef.current.items.filter((it) => set.has(it.id));
+    if (!list.length) return false;
+    const outside = new Set();
+    list.forEach((it) => { if (it.type === "line") { if (it.from && !set.has(it.from)) outside.add(it.from); if (it.to && !set.has(it.to)) outside.add(it.to); } });
+    boardClipboard = { items: cloneDoc(detachFrom(list, outside, engine.boxOf)), pasted: 0 };
+    return true;
+  };
+  const pasteItems = () => {
+    if (!boardClipboard) return;
+    boardClipboard.pasted++;
+    const k = boardClipboard.pasted * 24;
+    const copies = cloneItems(boardClipboard.items, newId, k, k, localBoxOf(boardClipboard.items, engine.boxOf));
+    if (setItems(docRef.current.items.concat(copies))) { setItemSel(copies.map((c) => c.id)); setSelectedId(null); }
+  };
+  const nudge = (dx, dy) => {
+    const set = new Set(itemSel);
+    mutate((d) => { d.items = d.items.map((it) => (set.has(it.id) ? moveItem(it, dx, dy) : it)); });
+  };
+  const textSize = (dir) => patchItems((it) => {
+    const i = TEXT_SIZES.findIndex((s) => s >= it.size);
+    const at = i < 0 ? TEXT_SIZES.length - 1 : TEXT_SIZES[i] === it.size ? i + dir : dir > 0 ? i : i - 1;
+    return { ...it, size: TEXT_SIZES[clamp(at, 0, TEXT_SIZES.length - 1)] };
+  });
+  const tableShape = (dRows, dCols) => {
+    const it = selectedItems.length === 1 && selectedItems[0].type === "table" ? selectedItems[0] : null;
+    if (!it) return;
+    const next = resizeTable(it, dRows, dCols);
+    if (next !== it) mutate((d) => { d.items = d.items.map((x) => (x.id === it.id ? next : x)); });
+  };
+
+  /* escrever: cada tipo tem o seu jeito — documento abre o painel, tabela
+     escreve na celula clicada, o resto escreve por cima do proprio item */
+  const editItem = (iid, point, initial) => {
+    const it = itemById(iid);
+    if (!it) return;
+    setItemSel([iid]); setSelectedId(null); setPanelOpen(false);
+    if (it.type === "doc") { setDocOpen(iid); return; }
+    if (it.type === "table") {
+      const cell = (point && cellAt(it, point.x, point.y)) || [0, 0];
+      setEditingItem({ id: iid, cell, initial });
+      return;
+    }
+    if (["sticky", "text", "shape", "frame", "line"].indexOf(it.type) >= 0) {
+      setEditingItem((cur) => (cur && cur.id === iid ? cur : { id: iid, initial }));
+    }
+  };
+  const confirmItemEdit = (value, how) => {
+    const e = editingItem;
+    setEditingItem(null);
+    if (!e) return;
+    const it = itemById(e.id);
+    if (!it) return;
+    let next = { ...it };
+    if (it.type === "frame") next.title = value.trim();
+    else if (it.type === "table") { next.cells = it.cells.map((r) => r.slice()); next.cells[e.cell[0]][e.cell[1]] = value.trim(); }
+    else if (it.type === "text") {
+      /* texto livre que ficou vazio nao tem o que mostrar: some */
+      if (!value.trim()) { removeItems([it.id], true); return; }
+      next.text = value.replace(/\s+$/, "");
+      next.h = textItemHeight(next);
+    } else next.text = value.replace(/\s+$/, "");
+    next = normalizeItem(next, newId);
+    if (JSON.stringify(next) !== JSON.stringify(it)) mutate((d) => { d.items = d.items.map((x) => (x.id === it.id ? next : x)); });
+    /* Tab anda pela tabela como numa planilha */
+    if (it.type === "table" && (how === "next" || how === "prev")) {
+      const { rows, cols } = tableSize(it);
+      const flat = e.cell[0] * cols + e.cell[1] + (how === "next" ? 1 : -1);
+      if (flat >= 0 && flat < rows * cols) setEditingItem({ id: it.id, cell: [Math.floor(flat / cols), flat % cols] });
+    }
+  };
+
+  /* ---- merlin: post-its de ideias ----
+     o mesmo pacto dos ramos: o que ele propoe aparece tracejado, ao lado do
+     que estava selecionado (ou no meio da tela), e so vira do quadro o que
+     for clicado. Enter fica com todos. */
+  const generateStickies = async () => {
+    const d = docRef.current;
+    const sel = d.items.filter((it) => itemSel.indexOf(it.id) >= 0);
+    const found = selectedId ? findNode(d.root, selectedId) : null;
+    const focus = found ? found.node.title : itemTexts(sel).join(" / ") || d.root.title || d.name;
+    const list = await callMerlin({
+      map: d.name, path: [], note: "",
+      node: "quadro de post-its — ideias sobre: " + String(focus).slice(0, 160),
+      children: itemTexts(d.items).slice(0, 40), siblings: [],
+      client: d.client ? (clientName(d.client) || "") : ""
+    });
+    if (!list) return;
+    if (!list.length) { notify("o Merlin não teve ideias para isso"); return; }
+    let k = 0;
+    const grid = stickyGrid(list.map((s) => s.title), { x: 0, y: 0 }, toolOpts.sticky, () => "ghost-s:" + (k++));
+    const anchor = sel.length ? unionBox(sel.map((it) => bboxOf(it, engine.boxOf))) : null;
+    const gb = unionBox(grid.map((it) => bboxOf(it)));
+    const at = anchor ? { x: anchor.x + anchor.w + 48 + gb.w / 2, y: anchor.y + anchor.h / 2 } : engine.viewCenter();
+    setSuggestions(null);
+    setStickyGhosts(placeAt(grid, at));
+  };
+  const acceptGhostItem = (gid) => {
+    const list = stickyGhosts || [];
+    const g = list.find((x) => x.id === gid);
+    if (!g) return;
+    const real = { ...g, id: newId() };
+    if (!setItems(docRef.current.items.concat([real]))) return;
+    const rest = list.filter((x) => x.id !== gid);
+    setStickyGhosts(rest.length ? rest : null);
+    setItemSel([real.id]); setSelectedId(null);
+  };
+  const acceptAllGhosts = () => {
+    const list = stickyGhosts || [];
+    if (!list.length) return;
+    const real = list.map((g) => ({ ...g, id: newId() }));
+    if (!setItems(docRef.current.items.concat(real))) return;
+    setStickyGhosts(null);
+    setItemSel(real.map((it) => it.id)); setSelectedId(null);
+  };
+
+  /* ---- modelos, formatos e bloco ----
+     o que nao nasce de um clique nasce no meio da tela, ja selecionado. o
+     que e grande (um modelo inteiro) ainda ganha enquadramento. */
+  /* o meio da tela, se estiver livre; senao o primeiro lugar vago andando
+     para a direita — um modelo largado em cima de post-its escondia os dois */
+  const freeSpot = (list) => {
+    const lb = localBoxOf(list, engine.boxOf);
+    const size = unionBox(list.map((it) => bboxOf(it, lb)));
+    const taken = docRef.current.items.map((it) => bboxOf(it, engine.boxOf));
+    layout.forEach((info) => taken.push({ x: info.x - info.w / 2, y: info.y - info.h / 2, w: info.w, h: info.h }));
+    const c = engine.viewCenter(), gap = 60;
+    for (let i = 0; i < 40; i++) {
+      const at = { x: c.x + i * (size.w / 2 + gap), y: c.y };
+      const box = { x: at.x - size.w / 2 - gap / 2, y: at.y - size.h / 2 - gap / 2, w: size.w + gap, h: size.h + gap };
+      if (!taken.some((t) => t.x < box.x + box.w && box.x < t.x + t.w && t.y < box.y + box.h && box.y < t.y + t.h)) return { at, moved: i > 0 };
+    }
+    return { at: c, moved: false };
+  };
+  const insertItems = (list, frameIt) => {
+    const fresh = normalizeItems(list, newId);
+    if (!fresh.length) return;
+    const spot = freeSpot(fresh);
+    const placed = placeAt(fresh, spot.at, engine.boxOf);
+    if (!setItems(docRef.current.items.concat(placed))) return;
+    setItemSel(placed.map((it) => it.id)); setSelectedId(null); setPanelOpen(false); setTool("select");
+    if (frameIt || spot.moved) engine.frameBoxNext(unionBox(placed.map((it) => bboxOf(it, localBoxOf(placed, engine.boxOf)))));
+    const doc1 = placed.length === 1 && placed[0].type === "doc" ? placed[0].id : null;
+    if (doc1) setDocOpen(doc1);
+  };
+  const insertFormat = (kind) => insertItems(buildFormat(kind, newId), kind !== "table" && kind !== "doc");
+  const insertDivider = () => insertItems([{ type: "line", kind: "line", x1: -200, y1: 0, x2: 200, y2: 0, color: 7, width: 2 }], false);
+  const insertBulk = (texts, color) => {
+    patchOpts({ sticky: color });
+    insertItems(stickyGrid(texts, { x: 0, y: 0 }, color, newId), texts.length > 8);
+  };
+  /* os galhos de um modelo de mapa pendurados no no selecionado (ou na
+     raiz). fora da raiz o ramo herda a cor de onde foi pendurado, como no
+     colar mermaid */
+  const graftTemplate = (tplId) => {
+    const tpl = MAP_TEMPLATES.find((t) => t.id === tplId);
+    if (!tpl) return;
+    const d0 = docRef.current;
+    const target = selectedId && findNode(d0.root, selectedId) ? selectedId : d0.root.id;
+    const built = buildMap(tpl, tpl.name);
+    mutate((d) => {
+      const f = findNode(d.root, target);
+      if (!f) return false;
+      if (f.parent) built.children.forEach((c) => { c.color = 0; });
+      f.node.children = (f.node.children || []).concat(built.children);
+      f.node.collapsed = false;
+    });
+    setItemSel([]); setSelectedId(target);
+    engine.frameNodeNext(target);
+    notify("ramos do modelo pendurados");
+  };
+  const pickTemplate = (p) => {
+    setTemplatesOpen(false);
+    if (p.board) insertFormat(p.board);
+    else if (p.map) graftTemplate(p.map);
+  };
+  const itemToDay = (iid) => {
+    const it = itemById(iid);
+    if (!it) return;
+    const title = (it.type === "doc" ? it.title : it.text || "").trim().split("\n")[0].slice(0, 200);
+    sendToDay({ title: title || doc.name, client: doc.client, origin: { type: "map", id: doc.id } });
+  };
+  /* o que a barra da esquerda e a barra da selecao pedem */
+  const act = (what, a, b) => {
+    switch (what) {
+      case "undo": undo(); break;
+      case "redo": redo(); break;
+      case "branches": askSuggestions(selectedId || doc.root.id); break;
+      case "generate": generateStickies(); break;
+      case "templates": setTemplatesOpen(true); break;
+      case "format": insertFormat(a); break;
+      case "divider": insertDivider(); break;
+      case "bulk": setBulkOpen(true); break;
+      case "branch": createChild(selectedId || doc.root.id); break;
+      case "mermaid": setImporting(true); break;
+      case "help": setHelpOpen(true); break;
+      case "patch": patchItems(a); break;
+      case "textSize": textSize(a); break;
+      case "table": tableShape(a, b); break;
+      case "edit": editItem(a); break;
+      case "toDay": itemToDay(a); break;
+      case "front": reorder(true); break;
+      case "back": reorder(false); break;
+      case "duplicate": duplicateItems(itemSel); break;
+      case "remove": removeItems(itemSel); break;
+    }
+  };
+  const docItem = docOpen ? doc.items.find((it) => it.id === docOpen) : null;
+  useEffect(() => { if (docOpen && !docItem) setDocOpen(null); }, [docOpen, !!docItem]);
+  const editingTarget = editingItem ? doc.items.find((it) => it.id === editingItem.id) : null;
+  useEffect(() => { if (editingItem && !editingTarget) setEditingItem(null); }, [editingItem, !!editingTarget]);
+  /* Espaco segurado arrasta a tela; solto sem arrastar, colapsa o no como sempre */
+  const selectedIdRef = useRef(selectedId); selectedIdRef.current = selectedId;
+  const toggleRef = useRef(null); toggleRef.current = toggleCollapse;
+  useEffect(() => {
+    const up = (e) => {
+      if (e.key !== " ") return;
+      engine.setSpace(false);
+      if (!engine.spacePanned() && !isTyping() && selectedIdRef.current) toggleRef.current(selectedIdRef.current);
+    };
+    const blur = () => engine.setSpace(false);
+    document.addEventListener("keyup", up);
+    window.addEventListener("blur", blur);
+    return () => { document.removeEventListener("keyup", up); window.removeEventListener("blur", blur); };
+  }, [engine]);
 
   /* ---- exportacao ---- */
   const resolveSvgVars = (root) => {
@@ -1248,36 +1912,88 @@ function Editor({ id, maps }) {
   /* o motor le daqui, sempre a versao deste render */
   handlers.current = {
     select, edit, drop, closePanel,
-    toggle: (nid) => { setSelectedId(nid); toggleCollapse(nid); },
-    openNote: openNotePanel
+    toggle: (nid) => { setSelectedId(nid); setItemSel([]); toggleCollapse(nid); },
+    openNote: openNotePanel,
+    commitItems, selectItems, clearSelection, editItem, acceptGhostItem
   };
 
-  /* ---- teclado ---- */
+  /* ---- teclado ----
+     com um no da arvore selecionado, o teclado e o de sempre (Enter irmao,
+     Tab filho, letras escrevem). com itens do quadro selecionados, apaga,
+     duplica, copia, empurra e escreve. sem nada selecionado, cada letra arma
+     uma ferramenta — como numa lousa. */
+  const TOOL_KEYS = { v: "select", h: "hand", n: "sticky", t: "text", r: "shape", o: "shape", l: "line", a: "line", p: "pen", e: "eraser", f: "frame" };
   useKeydown((e) => {
     if (isTyping()) { if (e.key === "Escape") document.activeElement.blur(); return; }
-    /* com a caixa de colar aberta, uma letra solta (foco num botao dela) nao
-       pode comecar a editar um no escondido atras */
-    if (importing) return;
-    /* a tira de fantasmas está no palco, não numa caixa por cima: Esc é o
-       jeito de dispensá-la sem aceitar nenhum, e vem antes de tudo */
+    /* com uma caixa aberta, uma letra solta (foco num botao dela) nao pode
+       comecar a editar nem armar nada escondido atras */
+    if (importing || templatesOpen || bulkOpen || document.querySelector(".dialog")) return;
+    if (e.key === " " && !e.ctrlKey && !e.metaKey) { e.preventDefault(); engine.setSpace(true); return; }
+    if (flyout && e.key === "Escape") { e.preventDefault(); setFlyout(null); return; }
+    /* as propostas estão no palco, não numa caixa por cima: Esc é o jeito de
+       dispensá-las sem aceitar nenhuma, e vem antes de tudo */
+    if (stickyGhosts && e.key === "Escape") { e.preventDefault(); setStickyGhosts(null); return; }
+    if (stickyGhosts && e.key === "Enter") { e.preventDefault(); acceptAllGhosts(); return; }
     if (suggestions && e.key === "Escape") { e.preventDefault(); setSuggestions(null); return; }
-    if (editing) return; // o proprio overlay trata suas teclas
+    if (editing || editingItem) return; // o proprio campo trata suas teclas
 
     const mod = e.ctrlKey || e.metaKey;
+    const key = e.key.length === 1 ? e.key.toLowerCase() : e.key;
     if (mod && e.key === "0") { e.preventDefault(); engine.frame(); return; }
     if (mod && (e.key === "=" || e.key === "+")) { e.preventDefault(); engine.zoomCenter(0.85); return; }
     if (mod && e.key === "-") { e.preventDefault(); engine.zoomCenter(1 / 0.85); return; }
-    if (mod && e.shiftKey && (e.key === "z" || e.key === "Z")) { e.preventDefault(); redo(); return; }
-    if (mod && (e.key === "z" || e.key === "Z")) { e.preventDefault(); undo(); return; }
+    if (mod && e.shiftKey && key === "z") { e.preventDefault(); redo(); return; }
+    if (mod && key === "z") { e.preventDefault(); undo(); return; }
+    if (mod && key === "y") { e.preventDefault(); redo(); return; }
+    if (mod && key === "a" && !selectedId) { e.preventDefault(); selectItems(doc.items.map((it) => it.id)); return; }
+    if (mod && key === "v" && boardClipboard && !selectedId) { e.preventDefault(); pasteItems(); return; }
+    if (itemSel.length) {
+      if (mod && key === "d") { e.preventDefault(); duplicateItems(itemSel); return; }
+      if (mod && key === "c") { if (copyItems(itemSel)) e.preventDefault(); return; }
+      if (mod && key === "x") { if (copyItems(itemSel)) { e.preventDefault(); removeItems(itemSel, true); } return; }
+    }
     if (mod && e.key === "ArrowUp") { e.preventDefault(); if (selectedId) moveAmongSiblings(selectedId, -1); return; }
     if (mod && e.key === "ArrowDown") { e.preventDefault(); if (selectedId) moveAmongSiblings(selectedId, 1); return; }
     if (mod) return; // outros atalhos com modificador nao sao nossos
 
+    if (e.key === "Escape" && tool !== "select") { setTool("select"); return; }
+
+    if (itemSel.length) {
+      const step = e.shiftKey ? 10 : 1;
+      const one = selectedItems.length === 1 ? selectedItems[0] : null;
+      switch (e.key) {
+        case "Delete": case "Backspace": e.preventDefault(); removeItems(itemSel); return;
+        case "Escape": clearSelection(); return;
+        case "ArrowUp": e.preventDefault(); nudge(0, -step); return;
+        case "ArrowDown": e.preventDefault(); nudge(0, step); return;
+        case "ArrowLeft": e.preventDefault(); nudge(-step, 0); return;
+        case "ArrowRight": e.preventDefault(); nudge(step, 0); return;
+        case "Enter": case "F2": if (one) { e.preventDefault(); editItem(one.id); } return;
+        default:
+          /* uma letra com um post-it, forma ou texto selecionado ja escreve nele */
+          if (one && e.key.length === 1 && !e.altKey && ["sticky", "shape", "text"].indexOf(one.type) >= 0) { e.preventDefault(); editItem(one.id, null, e.key); }
+          else if (e.key === "s" || e.key === "S") { e.preventDefault(); generateStickies(); }
+          return;
+      }
+    }
+
     /* funciona mesmo sem selecao (usa a raiz) — por isso vem antes do guard abaixo */
-    if (e.key === "s" || e.key === "S") { e.preventDefault(); askSuggestions(selectedId || doc.root.id); return; }
+    if (key === "s") { e.preventDefault(); askSuggestions(selectedId || doc.root.id); return; }
 
     if (!selectedId) {
-      if (e.key === "Escape") closePanel();
+      if (e.key === "Escape") { closePanel(); return; }
+      /* Tab e Enter sem selecao voltam para a arvore: filho da raiz, ou a raiz */
+      if (e.key === "Tab" && !e.shiftKey) { e.preventDefault(); createChild(doc.root.id); return; }
+      if (e.key === "Enter") { e.preventDefault(); select(doc.root.id); return; }
+      if (e.key.startsWith("Arrow")) { e.preventDefault(); select(doc.root.id); return; }
+      if (TOOL_KEYS[key] && !e.altKey) {
+        e.preventDefault();
+        if (key === "r") patchOpts({ shape: "rect" });
+        if (key === "o") patchOpts({ shape: "oval" });
+        if (key === "l") patchOpts({ line: "line" });
+        if (key === "a") patchOpts({ line: "arrow" });
+        armTool(TOOL_KEYS[key]);
+      }
       return;
     }
     switch (e.key) {
@@ -1293,9 +2009,10 @@ function Editor({ id, maps }) {
       case "ArrowLeft": e.preventDefault(); navigate("left"); break;
       case "ArrowRight": e.preventDefault(); navigate("right"); break;
       case "F2": e.preventDefault(); edit(selectedId); break;
-      case " ": e.preventDefault(); toggleCollapse(selectedId); break;
       case "n": case "N": e.preventDefault(); openNotePanel(selectedId); break;
-      case "Escape": closePanel(); break;
+      /* Esc com um no selecionado fecha o painel; com o painel ja fechado,
+         solta o no — e as letras voltam a armar ferramentas */
+      case "Escape": if (panelOpen) closePanel(); else setSelectedId(null); break;
       default:
         if (e.key.length === 1 && !e.altKey) { e.preventDefault(); edit(selectedId, e.key); }
     }
@@ -1305,29 +2022,31 @@ function Editor({ id, maps }) {
   const editInfo = editing ? layout.get(editing.id) : null;
   useEffect(() => { if (editing && !editInfo) setEditing(null); }, [editing, editInfo]);
 
-
   return (
     <>
       <main className="page page--full mp-editor">
-        {/* a barra de cima e so o indispensavel: voltar, o nome, o merlin e o
-            enquadrar. exportar e atalhos moram no "mais" — sao coisas de uma
-            vez na vida, e nao merecem ocupar tela em cima do mapa. */}
+        {/* a barra de cima e so o indispensavel: voltar, o nome, enquadrar e
+            compartilhar. as ferramentas do quadro (e o merlin) moram na
+            coluna da esquerda, como numa lousa; exportar e atalhos, no "mais". */}
         <div className="mp-bar">
           <a className="action" href="maps.html" id="mp-back" title="voltar para os mapas" aria-label="Voltar"><BackIcon /></a>
           <input className="mp-name" id="mp-name" maxLength="120" aria-label="Nome do mapa" value={doc.name}
             onChange={(e) => { const v = e.currentTarget.value; mutate((d) => { d.name = v; }, { history: false }); }} />
-          <button className="pill pill--green pill--icon" type="button" id="mp-suggest" disabled={thinking} aria-busy={thinking}
-            title={thinking ? "pensando…" : "sugerir ramos para o nó selecionado (S)"} aria-label="Sugerir ramos"
-            onClick={() => askSuggestions(selectedId || doc.root.id)}><SparkIcon /></button>
           <button className="action" type="button" id="mp-frame" title="enquadrar (Ctrl+0)" aria-label="Enquadrar" onClick={() => engine.frame()}><FrameIcon /></button>
           <button className="action" type="button" id="mp-share" title="compartilhar um link só de leitura" aria-label="Compartilhar" onClick={() => setSharing(true)}>{icon("link")}</button>
           <button className="action" type="button" id="mp-more" title="mais" aria-label="Mais" onClick={() => setMenuOpen(true)}><MoreIcon /></button>
         </div>
-        <MapCanvas engine={engine} layout={layout} selectedId={selectedId} rootId={doc.root.id} editing={!!editing}
-          onAddChild={() => createChild(selectedId || doc.root.id)} />
+        <MapCanvas engine={engine} layout={layout} selectedId={selectedId} rootId={doc.root.id} editing={!!editing || !!editingItem}
+          items={doc.items} itemSel={itemSel} ghosts={stickyGhosts} tool={toolObj} editingItem={editingItem}
+          onAddChild={() => createChild(selectedId || doc.root.id)}>
+          <BoardToolbar tool={tool} opts={toolOpts} flyout={flyout} setFlyout={setFlyout} onTool={armTool} onOpts={patchOpts} thinking={thinking} act={act} />
+          {selectedItems.length > 0 && !editingItem && <ItemBar engine={engine} items={selectedItems} act={act} />}
+        </MapCanvas>
       </main>
       {editInfo && <EditOverlay key={editing.id} engine={engine} info={editInfo} initial={editing.initial}
         onConfirm={(v) => confirmEdit(editing.id, v)} onCancel={() => cancelEdit(editing.id)} />}
+      {editingTarget && <ItemEditor key={editingItem.id + ":" + (editingItem.cell || "")} engine={engine} item={editingTarget}
+        cell={editingItem.cell} initial={editingItem.initial} onConfirm={confirmItemEdit} />}
       {panelOpen && selectedNode && <NodePanel key={selectedNode.node.id} node={selectedNode.node} onClose={closePanel}
         onFieldFocus={captureField} onFieldBlur={releaseField}
         onTitle={(v) => { captureField(); withSelected((n) => { n.title = v; }, { history: false }); }}
@@ -1335,6 +2054,15 @@ function Editor({ id, maps }) {
         onLink={(v) => withSelected((n) => { n.link = v.trim(); })}
         onColor={(c) => withSelected((n) => { n.color = c; })}
         onPull={pullToDay} onIdea={toIdea} />}
+      {docItem && <DocPanel key={docItem.id} item={docItem} onClose={() => setDocOpen(null)}
+        onFieldFocus={captureField} onFieldBlur={releaseField}
+        onTitle={(v) => { captureField(); patchItems((it) => ({ ...it, title: v }), [docItem.id]); }}
+        onText={(v) => { captureField(); patchItems((it) => ({ ...it, text: v }), [docItem.id]); }}
+        onIdea={() => {
+          const now = Date.now();
+          collection("notes").save({ id: newId(), title: docItem.title || doc.name, body: docItem.text || "", stage: "seed", client: doc.client, steps: [], outputs: [], history: [], createdAt: now, updatedAt: now });
+          notify("virou nota");
+        }} />}
       {menuOpen && (
         <Dialog title="mais" onClose={() => setMenuOpen(false)}>
           <div className="mp-menu">
@@ -1351,23 +2079,36 @@ function Editor({ id, maps }) {
       {importing && <MermaidDialog branch onImport={graftMermaid} onClose={() => setImporting(false)} />}
       {helpOpen && <HelpDialog onClose={() => setHelpOpen(false)} />}
       {sharing && <ShareDialog type="maps" id={doc.id} name={doc.name} onClose={() => setSharing(false)} />}
+      {templatesOpen && <TemplatesDialog hasNode={!!selectedId} onPick={pickTemplate} onClose={() => setTemplatesOpen(false)} />}
+      {bulkOpen && <BulkDialog color={toolOpts.sticky} onCreate={insertBulk} onClose={() => setBulkOpen(false)} />}
       {suggestions && <p className="mp-ghost-hint" id="mp-ghost-hint">clique num ramo tracejado para ficar com ele · <kbd>Esc</kbd> dispensa</p>}
+      {stickyGhosts && (
+        <div className="mp-ghost-hint bd-ghost-bar" id="bd-ghost-hint">
+          <span>clique num post-it tracejado para ficar com ele</span>
+          <button type="button" className="pill pill--mini pill--green" onClick={acceptAllGhosts}>ficar com todos <kbd>Enter</kbd></button>
+          <button type="button" className="pill pill--mini" onClick={() => setStickyGhosts(null)}>dispensar <kbd>Esc</kbd></button>
+        </div>
+      )}
     </>
   );
 }
 
 /* ---------- a tela do mapa ----------
-   so um svg, a dica do arraste e o "+" do celular. o desenho e do motor:
+   o svg, a dica do arraste, o "+" do celular e o que flutua em cima do
+   quadro (barra de ferramentas, barra da selecao). o desenho e do motor:
    entra pelo attach() ao montar e recebe update() quando algo muda. */
-function MapCanvas({ engine, layout, selectedId, rootId, editing, onAddChild }) {
+function MapCanvas({ engine, layout, selectedId, rootId, editing, items, itemSel, ghosts, tool, editingItem, onAddChild, children }) {
   const svgRef = useRef(null), hintRef = useRef(null);
   useLayoutEffect(() => { engine.attach(svgRef.current, hintRef.current); return () => engine.detach(); }, [engine]);
-  useLayoutEffect(() => { engine.update({ layout, selectedId, rootId, editing }); }, [engine, layout, selectedId, rootId, editing]);
+  useLayoutEffect(() => {
+    engine.update({ layout, selectedId, rootId, editing, items, itemSel, ghosts, tool, editingItem });
+  }, [engine, layout, selectedId, rootId, editing, items, itemSel, ghosts, tool, editingItem]);
   return (
     <div className="mp-body">
-      <svg ref={svgRef} className="mp-svg" id="mp-svg" aria-label="Mapa mental"></svg>
+      <svg ref={svgRef} className="mp-svg" id="mp-svg" aria-label="Quadro do mapa"></svg>
       <div ref={hintRef} className="mp-hint" id="mp-hint" hidden>solte em cima de um nó = vira filho · ao lado de um irmão = reordena</div>
       <button className="mp-fab" type="button" id="mp-fab" title="Novo filho do nó selecionado" onClick={onAddChild}><FabIcon /></button>
+      {children}
     </div>
   );
 }
@@ -1471,7 +2212,18 @@ function HelpDialog({ onClose }) {
     [<><kbd>Ctrl</kbd> <kbd>+</kbd> / <kbd>−</kbd></>, "zoom"],
     [<kbd>N</kbd>, "abre a nota do nó selecionado"],
     [<kbd>S</kbd>, "merlin desenha ramos tracejados no nó selecionado; clique num deles para ficar com ele"],
-    [<kbd>Esc</kbd>, "cancela a edição / fecha o painel"]
+    [<kbd>Esc</kbd>, "cancela a edição / fecha o painel / solta a seleção"],
+    ["quadro", "com nada selecionado, uma letra arma a ferramenta:"],
+    [<><kbd>V</kbd> <kbd>H</kbd></>, "selecionar · mover a tela (ou segure Espaço, ou arraste com o botão direito)"],
+    [<><kbd>N</kbd> <kbd>T</kbd></>, "post-it · texto — clique no quadro para colocar"],
+    [<><kbd>R</kbd> <kbd>O</kbd> <kbd>F</kbd></>, "retângulo · oval · moldura — clique, ou arraste para dar o tamanho"],
+    [<><kbd>L</kbd> <kbd>A</kbd></>, "linha · seta — solte a ponta em cima de algo e ela fica presa"],
+    [<><kbd>P</kbd> <kbd>E</kbd></>, "caneta · borracha"],
+    ["arrastar no vazio", "seleciona em retângulo (Shift soma à seleção)"],
+    [<><kbd>Ctrl</kbd> <kbd>C</kbd> / <kbd>V</kbd> / <kbd>D</kbd></>, "copia · cola (também em outro mapa) · duplica"],
+    [<><kbd>Ctrl</kbd> <kbd>A</kbd></>, "seleciona tudo do quadro"],
+    ["setas", "com itens selecionados, empurram 1 (Shift: 10)"],
+    [<kbd>Enter</kbd>, "com um item selecionado, escreve nele (ou comece a digitar)"]
   ];
   return (
     <Dialog title="atalhos do mapa" sub="teclado para escrever rápido, mouse para reorganizar" label="Atalhos do mapa" onClose={onClose}>

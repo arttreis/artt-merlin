@@ -14,12 +14,15 @@
   --mp-canvas:#111111; --mp-pill:#292929; --mp-pill-hover:#343434; --mp-pill-ink:#f2f2f2;
   --mp-pill-border:rgba(255,255,255,.05);
   --mp-dot:rgba(242,242,242,.075); --mp-edge:rgba(242,242,242,.3);
+  /* o quadro livre: a moldura e um tom acima da tela, a tabela tem cabeca */
+  --mp-frame:rgba(242,242,242,.035); --mp-frame-line:rgba(242,242,242,.14); --mp-table-head:rgba(242,242,242,.07);
 }
 html.light{
   --mc1:#1c6fc4; --mc2:#b8600a; --mc3:#c4234f; --mc4:#7a3bd8; --mc6:#127f79;
   --mp-canvas:#ececea; --mp-pill:#ffffff; --mp-pill-hover:#f7f7f5; --mp-pill-ink:#0d0d0d;
   --mp-pill-border:rgba(13,13,13,.09);
   --mp-dot:rgba(13,13,13,.11); --mp-edge:rgba(13,13,13,.32);
+  --mp-frame:rgba(255,255,255,.7); --mp-frame-line:rgba(13,13,13,.14); --mp-table-head:rgba(13,13,13,.05);
 }
 
 /* ---------- lista ---------- */
@@ -164,4 +167,179 @@ html.light{
      seguintes — senao as acoes saem da tela e a pagina rola na horizontal */
   .mp-list .line{flex-wrap:wrap}
   .mp-list .mp-line-name{flex-basis:100%}
+}
+
+/* ---------- o quadro livre ----------
+   a coluna de ferramentas flutua presa a esquerda da tela, como numa lousa;
+   os menus abrem ao lado dela. tudo em superficie com sombra, sem cor: o
+   verde e so do que esta armado. */
+.bd-toolbar{
+  position:absolute;left:12px;top:12px;z-index:4;
+  display:flex;flex-direction:column;align-items:center;gap:8px;
+  max-height:calc(100% - 24px);
+}
+.bd-ai{
+  width:44px;height:44px;border-radius:50%;flex:0 0 auto;
+  display:grid;place-items:center;
+  background:var(--green);color:var(--on-green);box-shadow:var(--sombra-2);
+  transition:transform var(--t),box-shadow var(--t);
+}
+.bd-ai svg{width:21px;height:21px}
+.bd-ai:hover,.bd-ai.is-open{transform:scale(1.06);box-shadow:0 0 0 4px var(--green-glow),var(--sombra-2)}
+.bd-ai:disabled{opacity:.6;cursor:progress}
+.bd-ai[aria-busy="true"] svg{animation:bd-spin 1.2s linear infinite}
+@keyframes bd-spin{to{transform:rotate(360deg)}}
+.bd-tools{
+  display:flex;flex-direction:column;gap:2px;padding:4px;
+  background:var(--surface);border:1px solid var(--line-soft);border-radius:var(--br3);box-shadow:var(--sombra-2);
+  overflow-y:auto;scrollbar-width:none;
+}
+.bd-tools::-webkit-scrollbar{display:none}
+.bd-tool{
+  width:38px;height:38px;flex:0 0 auto;border-radius:var(--br2);
+  display:grid;place-items:center;color:var(--ink-70);
+  transition:background var(--t),color var(--t);
+}
+.bd-tool svg{width:20px;height:20px}
+.bd-tool:hover,.bd-tool.is-open{background:var(--fill-hover);color:var(--ink)}
+.bd-tool.is-active{background:var(--fill-hover);color:var(--green-ink)}
+.bd-emoji{font-size:19px;line-height:1}
+
+.bd-fly{
+  position:absolute;left:58px;top:56px;z-index:5;
+  min-width:220px;max-height:calc(100dvh - var(--nav-h) - 120px);overflow-y:auto;
+  display:flex;flex-direction:column;gap:2px;padding:6px;
+  background:var(--surface-2);border:1px solid var(--line);border-radius:var(--br3);box-shadow:var(--sombra-2);
+}
+.bd-fly--ai{top:0}
+.bd-fly hr{border:0;border-top:1px solid var(--line-soft);margin:4px 2px;width:auto}
+.bd-fly__note{margin:4px 6px 2px;font-size:11.5px;line-height:1.45;color:var(--ink-50);max-width:230px}
+.bd-fly__wide{justify-content:center;width:100%;margin-top:4px}
+.bd-fly__wide svg{width:14px;height:14px}
+.bd-row{
+  display:flex;align-items:center;gap:10px;width:100%;
+  padding:7px 8px;border-radius:var(--br2);text-align:left;
+  font-size:13px;color:var(--ink);
+}
+.bd-row:hover{background:var(--fill-hover)}
+.bd-row.is-on{background:var(--fill-hover);color:var(--green-ink)}
+.bd-row__ic{width:20px;height:20px;display:grid;place-items:center;color:var(--ink-70);flex:0 0 auto}
+.bd-row.is-on .bd-row__ic{color:var(--green-ink)}
+.bd-row__ic svg{width:18px;height:18px}
+.bd-row__label{flex:1 1 auto}
+.bd-row kbd{margin-left:auto}
+.bd-shape-ic{width:20px;height:18px}
+
+.bd-fly--sticky{min-width:0;width:auto}
+.bd-sticky-grid{display:grid;grid-template-columns:repeat(2,32px);gap:6px;padding:2px}
+.bd-sticky-grid--wide{grid-template-columns:repeat(6,28px)}
+.bd-sticky-sw{
+  width:32px;height:32px;border-radius:4px;border:1px solid rgba(0,0,0,.12);
+  box-shadow:0 2px 4px rgba(0,0,0,.18);transition:transform 100ms;
+}
+.bd-sticky-grid--wide .bd-sticky-sw{width:28px;height:28px}
+.bd-sticky-sw:hover{transform:scale(1.08)}
+.bd-sticky-sw.is-on{outline:2px solid var(--green-ink);outline-offset:2px}
+.bd-swatches{display:flex;flex-wrap:wrap;gap:6px;padding:4px;max-width:180px}
+.bd-ink{width:22px;height:22px;border-radius:50%;box-shadow:inset 0 0 0 1px var(--line)}
+.bd-ink.is-on{outline:2px solid var(--green-ink);outline-offset:2px}
+.bd-seg{display:flex;gap:4px;padding:4px}
+.bd-seg button{
+  flex:1 1 0;height:32px;border-radius:var(--br2);display:grid;place-items:center;
+  border:1px solid var(--line-soft);color:var(--ink);
+}
+.bd-seg button:hover{background:var(--fill-hover)}
+.bd-seg button.is-on{border-color:var(--green-ink)}
+.bd-dot{display:block;border-radius:50%;background:currentColor}
+.bd-mark{display:block;width:18px;height:10px;border-radius:3px;background:var(--mc2);opacity:.55}
+.bd-emoji-grid{display:grid;grid-template-columns:repeat(8,32px);gap:2px}
+.bd-emoji-grid button{width:32px;height:32px;border-radius:var(--br2);font-size:19px;line-height:1}
+.bd-emoji-grid button:hover{background:var(--fill-hover)}
+.bd-emoji-grid button.is-on{background:var(--fill-hover);box-shadow:inset 0 0 0 1.5px var(--green-ink)}
+
+/* a barra da selecao: flutua em cima (ou embaixo, se nao couber) do que
+   esta selecionado, e some enquanto se arrasta */
+.bd-bar{
+  position:absolute;z-index:4;transform:translate(-50%,-100%);
+  display:flex;align-items:center;gap:2px;padding:4px;
+  background:var(--surface-2);border:1px solid var(--line);border-radius:var(--br3);box-shadow:var(--sombra-2);
+  white-space:nowrap;
+}
+.bd-bar[data-side="down"]{transform:translate(-50%,0)}
+.mp-svg.is-dragging ~ .bd-bar{visibility:hidden}
+.bd-bar__btn{
+  min-width:30px;height:30px;padding:0 6px;border-radius:var(--br2);
+  display:grid;place-items:center;font-size:12px;font-weight:600;color:var(--ink-70);
+}
+.bd-bar__btn svg{width:17px;height:17px}
+.bd-bar__btn .bd-shape-ic{width:20px;height:18px}
+.bd-bar__btn:hover,.bd-bar__btn.is-open{background:var(--fill-hover);color:var(--ink)}
+.bd-bar__btn.is-on{color:var(--green-ink);background:var(--fill-hover)}
+.bd-bar__num{min-width:18px;text-align:center;color:var(--ink-50)}
+.bd-bar__sep{width:1px;height:20px;background:var(--line);margin:0 4px}
+.bd-bar__pop{position:relative}
+.bd-bar__menu{
+  position:absolute;left:50%;bottom:calc(100% + 8px);transform:translateX(-50%);
+  padding:8px;background:var(--surface-2);border:1px solid var(--line);border-radius:var(--br3);box-shadow:var(--sombra-2);
+}
+.bd-bar[data-side="down"] .bd-bar__menu{bottom:auto;top:calc(100% + 8px)}
+.bd-face{display:block;width:18px;height:18px;border-radius:4px;box-shadow:inset 0 0 0 1px rgba(0,0,0,.15)}
+.bd-face--ink{border-radius:50%}
+.bd-face--none{background:linear-gradient(135deg,transparent 45%,var(--mc3) 45%,var(--mc3) 55%,transparent 55%),var(--mp-canvas)}
+.bd-shape-grid{display:grid;grid-template-columns:repeat(5,34px);gap:2px}
+.bd-shape-grid button{height:30px;border-radius:var(--br2);display:grid;place-items:center;color:var(--ink-70)}
+.bd-shape-grid button:hover,.bd-shape-grid button.is-on{background:var(--fill-hover);color:var(--green-ink)}
+
+/* escrever num item: o campo senta em cima do texto dele, na mesma letra */
+.bd-edit{
+  position:fixed;z-index:5;box-sizing:border-box;margin:0;
+  border:0;outline:1.5px solid var(--green-ink);outline-offset:2px;border-radius:2px;
+  padding:0;font-family:var(--sans);resize:none;overflow:hidden;white-space:pre-wrap;word-break:break-word;
+}
+.bd-edit--frame,.bd-edit--table,.bd-edit--line{padding:0 4px;white-space:nowrap}
+
+/* o quadro: o cursor diz qual ferramenta esta armada */
+.mp-svg[data-tool="sticky"],.mp-svg[data-tool="text"],.mp-svg[data-tool="shape"],.mp-svg[data-tool="frame"],
+.mp-svg[data-tool="line"],.mp-svg[data-tool="sticker"],.mp-svg[data-tool="pen"]{cursor:crosshair}
+.mp-svg[data-tool="sticky"] *,.mp-svg[data-tool="text"] *,.mp-svg[data-tool="shape"] *,.mp-svg[data-tool="frame"] *,
+.mp-svg[data-tool="line"] *,.mp-svg[data-tool="sticker"] *,.mp-svg[data-tool="pen"] *{cursor:crosshair !important}
+.mp-svg[data-tool="eraser"],.mp-svg[data-tool="eraser"] *{cursor:cell !important}
+.mp-svg[data-tool="hand"],.mp-svg[data-tool="hand"] *,.mp-svg.is-panning,.mp-svg.is-panning *{cursor:grab !important}
+.mp-svg.is-panning.is-dragging,.mp-svg.is-panning.is-dragging *,.mp-svg[data-tool="hand"].is-dragging *{cursor:grabbing !important}
+.bd-item{cursor:move}
+.bd-frame{cursor:default}
+.bd-frame text{cursor:move}
+.bd-handle{cursor:nwse-resize}
+.bd-handle--ne,.bd-handle--sw{cursor:nesw-resize}
+circle.bd-handle{cursor:crosshair}
+.bd-item--ghost{cursor:pointer;opacity:.55;transition:opacity 120ms}
+.bd-item--ghost:hover{opacity:1}
+.bd-ghost-bar{display:flex;align-items:center;gap:10px;pointer-events:auto;padding:5px 6px 5px 14px}
+.bd-ghost-bar kbd{margin-left:4px}
+
+/* o documento aberto e os modelos */
+.bd-docpanel{width:min(420px,96vw)}
+.bd-docpanel__body{display:flex;flex-direction:column;flex:1 1 auto;min-height:200px}
+.bd-docpanel__body .textarea{flex:1 1 auto;min-height:260px;font-size:13px;line-height:1.55}
+.bd-docpanel__body .mp-note-render{flex:1 1 auto}
+.bd-tpl-search{margin-bottom:6px}
+.bd-tpl-group{margin:14px 0 8px;font-family:var(--mono);font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-50)}
+.bd-tpl-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px}
+.bd-tpl{
+  display:flex;flex-direction:column;gap:4px;text-align:left;padding:12px;
+  border:1px solid var(--line-soft);border-radius:var(--br3);background:var(--fill);
+  transition:border-color var(--t),background var(--t);
+}
+.bd-tpl:hover{border-color:var(--green-ink);background:var(--fill-hover)}
+.bd-tpl b{font-size:13px;font-weight:600;color:var(--ink)}
+.bd-tpl span{font-size:12px;line-height:1.45;color:var(--ink-50)}
+.bd-tpl em{font-style:normal;font-size:11px;color:var(--ink-30)}
+.bd-bulk{min-height:180px}
+
+@media (max-width:640px){
+  .bd-toolbar{left:8px;top:8px}
+  .bd-tool{width:34px;height:34px}
+  .bd-fly{left:50px;max-width:calc(100vw - 64px)}
+  .bd-emoji-grid{grid-template-columns:repeat(6,32px)}
+  .bd-bar{max-width:calc(100vw - 16px);flex-wrap:wrap;justify-content:center}
 }
