@@ -88,6 +88,22 @@
 .wk__block.is-reserved{
   background:var(--fill-hover);border:1px solid var(--line);border-left:3px solid var(--c,var(--ink-30));color:var(--ink-70);
 }
+/* no claro o bloco pinta sobre o branco da superficie, e nao sobre o
+   --surface-2: la ele e um cinza (#ececea), e qualquer cor misturada com
+   cinza vira barro — o marrom, o azul acinzentado e o lilas sujo que fizeram
+   a semana clara parecer apagada (29/09/2026). a moldura recua pelo mesmo
+   motivo: no branco a cor de fundo ja recorta o bloco, e a borda cheia so
+   escurecia a quina. a reuniao deixa o cinza chapado e vira contorno: segue
+   apagada, sem parecer suja. */
+html.light .wk__block.is-task{
+  background:color-mix(in srgb,var(--c,var(--green)) 12%,var(--surface));
+  border-color:color-mix(in srgb,var(--c,var(--green)) 22%,transparent);
+  border-left-color:var(--c,var(--green));
+}
+html.light .wk__block.is-reserved{
+  background:var(--surface);border-color:var(--line);border-left-color:var(--c,var(--ink-30));
+}
+html.light .wk__block:hover{box-shadow:var(--sombra-2)}
 .wk__client{
   font-size:10px;font-weight:500;line-height:1.3;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;
   color:color-mix(in srgb,var(--c,var(--green)) 75%,var(--ink));
