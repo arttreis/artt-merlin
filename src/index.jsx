@@ -617,12 +617,19 @@ function Home() {
    e o Merlin funciona inteiro sem conexão.
 
    `bare` na raiz tira a barra de navegação. tira a BARRA, não a casca: o
-   diálogo de entrar mora dentro dela, e é ele que a landing abre. */
+   diálogo de entrar mora dentro dela, e é ele que a landing abre.
+
+   entrar também abre a porta. sem isto, quem entrava pela landing — o
+   celular novo, sempre — acertava o código e continuava olhando a landing,
+   que parece exatamente "deslogado" (o erro de 29/09/2026). */
 function Root() {
+  const c = useCloud();
   const [bare, setBare] = useState(() => isNewHere() && !seen("landing"));
-  useLayoutEffect(() => { document.documentElement.classList.toggle("bare", bare); }, [bare]);
+  const door = bare && !c.signedIn;
+  useLayoutEffect(() => { document.documentElement.classList.toggle("bare", door); }, [door]);
+  useEffect(() => { if (bare && c.signedIn) { markSeen("landing"); setBare(false); } }, [bare, c.signedIn]);
   const enter = () => { markSeen("landing"); setBare(false); };
-  return bare ? <Landing onGuest={enter} /> : <Home />;
+  return door ? <Landing onGuest={enter} /> : <Home />;
 }
 
 mount(<Root />, "app");
