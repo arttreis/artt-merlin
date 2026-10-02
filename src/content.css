@@ -51,6 +51,14 @@
 .content-empty{max-width:540px;margin:clamp(20px,6vh,60px) auto;text-align:center;display:flex;flex-direction:column;align-items:center;gap:10px}
 .content-empty__title{margin:0;font-size:18px;font-weight:600;letter-spacing:-.02em}
 .content-empty__text{margin:0 0 6px;font-size:13px;line-height:1.5;color:var(--ink-50)}
+.content-empty__actions{display:flex;gap:var(--pd2);flex-wrap:wrap;justify-content:center}
+
+/* o que falta publicar: clicavel, mas no tom do resto do topo. falta nao e
+   erro — nada de vermelho, nem de alerta. */
+.gap{all:unset;cursor:pointer;color:inherit;border-bottom:1px dotted var(--ink-30);transition:color var(--t),border-color var(--t)}
+.gap:hover{color:var(--ink);border-bottom-color:var(--ink-50)}
+.gap:focus-visible{outline:2px solid var(--green);outline-offset:2px;border-radius:3px}
+.gap__who{color:var(--ink-70)}
 
 /* ---------- a peca aberta ---------- */
 .piece-panel{position:fixed;inset:0;z-index:60;display:flex;justify-content:flex-end}
@@ -74,6 +82,36 @@
 .piece-sheet__row .datefield{flex:0 0 170px}
 .piece-sheet__client{flex:0 1 220px;width:auto}
 
+.piece-kin{display:flex;flex-direction:column;gap:4px;margin-top:-10px;font-size:12.5px;color:var(--ink-50)}
+.piece-kin__link{all:unset;cursor:pointer;color:var(--ink-70);border-bottom:1px solid var(--line)}
+.piece-kin__link:hover{color:var(--ink)}
+.piece-kin__fmt{color:var(--ink-30)}
+
+/* ---------- a faixa do Merlin ----------
+   entre a ficha e o roteiro: as acoes da etapa na frente, as outras num
+   "outras" discreto. a proposta abre logo embaixo, com usar e descartar. */
+.merlin-strip{display:flex;flex-direction:column;gap:10px}
+.merlin-strip__row{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.merlin-strip__k{display:inline-flex;align-items:center;gap:5px;margin-right:4px;font-size:12.5px;color:var(--ink-50)}
+.merlin-strip__k svg{width:13px;height:13px;color:var(--green)}
+.pill--merlin{border-color:var(--ink-30);color:var(--ink)}
+.merlin-strip__more{all:unset;cursor:pointer;display:inline-flex;align-items:center;gap:3px;margin-left:4px;font-size:12px;color:var(--ink-30)}
+.merlin-strip__more:hover{color:var(--ink-70)}
+.merlin-strip__more svg{width:12px;height:12px}
+.merlin-strip__row--rest{padding-left:2px}
+
+.proposal{display:flex;flex-direction:column;gap:12px;padding:14px 16px;background:var(--fill);border:1px solid var(--line-soft);border-radius:var(--br3)}
+.proposal__text{max-height:420px;overflow-y:auto;cursor:auto}
+.proposal__actions{display:flex;gap:6px;flex-wrap:wrap}
+.proposal__list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:2px}
+.proposal__item{display:flex;align-items:flex-start;gap:12px;padding:8px 0;border-bottom:1px solid var(--line-soft)}
+.proposal__item:last-child{border-bottom:0}
+.proposal__body{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:3px;font-size:13.5px;line-height:1.45}
+.proposal__body b{font-weight:600;color:var(--ink)}
+.proposal__type{font-size:11px;letter-spacing:.02em;color:var(--ink-30);text-transform:lowercase}
+.proposal__note{font-size:12.5px;color:var(--ink-50)}
+.proposal__go{flex:0 0 auto;display:flex;gap:6px}
+
 .script__head{display:flex;align-items:center;gap:12px;margin:0 0 10px;font-size:12.5px;color:var(--ink-50)}
 .script__input{
   width:100%;min-height:280px;background:none;border:0;outline:none;resize:none;padding:0;
@@ -87,7 +125,27 @@
 .script__read ul,.script__read ol{margin:0 0 8px;padding-left:20px}
 .script__read li{margin:2px 0}
 
+/* ---------- as escolhas: pecas propostas e ideias para a semana ---------- */
+.suggestion-list{display:flex;flex-direction:column;gap:2px}
+.suggestion{display:flex;align-items:flex-start;gap:var(--pd2);padding:6px 4px;border-radius:var(--br2);cursor:pointer;transition:background var(--t)}
+.suggestion:hover{background:var(--fill)}
+.suggestion input[type="checkbox"]{flex:0 0 auto;width:16px;height:16px;margin-top:2px;accent-color:var(--green)}
+.suggestion__text{flex:1 1 auto;min-width:0;font-size:13px;display:flex;flex-direction:column;gap:3px}
+.suggestion__text b{font-weight:600;color:var(--ink)}
+.suggestion__text .fmt{font-size:11px;margin-right:4px}
+.suggestion__note{color:var(--ink-50);font-size:12px}
+
+/* ---------- o ritmo ---------- */
+.rhythm{display:flex;flex-direction:column;gap:10px;margin-top:var(--pd);align-items:flex-start}
+.rhythm > .select{max-width:260px}
+.rhythm__rule{display:flex;align-items:center;gap:6px;flex-wrap:wrap;width:100%;padding:8px 0;border-top:1px solid var(--line-soft)}
+.rhythm__rule .select{width:auto;flex:0 1 auto}
+.rhythm__n{width:64px;flex:0 0 64px;font-variant-numeric:tabular-nums}
+.rhythm__days{gap:3px}
+.rhythm__days .chip{min-width:26px;padding:0 6px;justify-content:center}
+
 @media (max-width:640px){
   .piece-sheet{grid-template-columns:1fr}
   .piece-sheet__k{margin-top:4px}
+  .proposal__item{flex-direction:column;gap:8px}
 }

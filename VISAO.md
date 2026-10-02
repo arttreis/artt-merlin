@@ -489,6 +489,49 @@ a cópia era reconhecida pelo título. O botão saiu, e as mães viraram blocos 
   `{id, title, days:[0-6], at, min, reserved, client, weeks:{'YYYY-MM-DD': true},
   createdAt, updatedAt}`. A regra inteira mora em `shared/routine.js`, pura e testada.
 
+### 4.12 Conteúdo (`content.html`) — 02/10/2026, EPIC-1
+
+Um kanban de seis etapas (ideia → roteiro → gravar → editar → agendado → publicado), um cartão
+por peça, e o roteiro mora dentro do cartão. Desde o EPIC-1 (`docs/prd/epic-1-conteudo-que-ajuda-a-criar.md`)
+a tela **ajuda a criar**, e não só guarda o que já foi criado.
+
+- **Molde por formato.** Reels, story, carrossel, YouTube, e-mail e outro têm cada um o seu
+  esqueleto de bullets. Com o roteiro vazio, a pílula "começar pelo molde de {formato}" aplica o
+  molde. Trocar o formato troca o molde só se ele ainda estiver intocado.
+- **O Merlin na peça.** Uma faixa entre a ficha e o roteiro mostra as ações da etapa atual. As
+  outras ficam em "outras". As ações são: ideia → 5 ângulos; roteiro → escrever roteiro e 3
+  ganchos; gravar e editar → produção; agendado → publicação; publicado → desdobrar. Produção e
+  publicação viram **seção do roteiro** (`## produção`, `## publicação`); a peça continua tendo
+  um único texto.
+- **Peças novas a partir do que existe.** "Desdobrar" transforma uma peça em até 5 derivadas, que
+  guardam a origem em `parent` e se mostram dos dois lados. "Puxar pautas" (no topo e no quadro
+  vazio) lê a ficha do cliente e propõe até 8 peças. Só as marcadas nascem, todas em ideia e
+  sem data, e um desfazer apaga todas.
+- **Ritmo: o topo diz o que falta.** O ritmo define quantas peças por dia ou por semana, por
+  dono e, se quiser, por formato e por dia da semana. O conteúdo próprio nasce com 1 por dia. O
+  topo abre com "hoje ainda sem peça · faltam 3 dias nesta semana" ou "falta 1 carrossel nesta
+  semana". Dia que passou vazio não vira cobrança, e a falta sai em tom neutro. Clicar numa
+  falta preenche a semana com ideias sem data ou, sem ideia, puxa pautas já com o cliente e o
+  formato.
+- Coleção `cadence` (`merlin:cadence`), com um documento por dono: id do cliente, ou `me` para o
+  conteúdo próprio, no formato `{id, rules:[{id, n, per:"day"|"week", format, days:[0-6]}]}`.
+  Ritmo zerado é uma lista vazia gravada, e isso é diferente de nunca ter mexido.
+- A regra inteira (moldes, `setHook`, `upsertSection`, `contentContext`, a conta do ritmo) mora
+  em `shared/content-script.js`, pura e testada em `content.test.mjs`.
+
+**Decisões do EPIC-1:**
+- **D1.** A lógica da `roteiro-viral` (parar o scroll, segurar, virar, converter) é a base de
+  toda recomendação. Em Reels e story ela é a própria estrutura; nos outros formatos entra
+  dentro do molde.
+- **D2.** O ritmo é configurável, com padrão de 1 peça por dia para o conteúdo próprio, e mora
+  numa coleção própria.
+- **D3.** As seis etapas e os seis formatos não mudam.
+- **D4.** O que vem depois do roteiro entra no próprio roteiro, como seção.
+
+O Merlin propõe e a pessoa decide: nada grava sem clique e toda troca tem desfazer. O Merlin
+não inventa número nem case, e o dado que falta sai marcado com `[conferir]`. Cada botão é uma
+chamada a `/merlin` e conta no teto de 30 por hora.
+
 ---
 
 ## 5. Ordem de construção

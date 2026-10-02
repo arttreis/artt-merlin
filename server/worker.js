@@ -723,6 +723,84 @@ const LIST_TASKS = {
   })
 };
 
+/* ---------- conteudo: o Merlin dentro da peca ----------
+   os formatos que a tela aceita. se FORMATS mudar em
+   src/shared/content-script.js, muda aqui junto: sugestao com formato que
+   nao existe do outro lado e descartada em silencio, e o Merlin parece ter
+   ficado mudo. */
+const FORMAT_IDS = "youtube, reels, carousel, story, email, other";
+
+/* a logica da roteiro-viral e a base de tudo que se recomenda aqui (D1 do
+   EPIC-1): parar o scroll, segurar, virar, converter. em reels e story ela e
+   a propria estrutura; nos outros formatos entra dentro do molde. e a regra
+   3: o Merlin nao inventa dado. */
+const CONTENT_RULES =
+  "Método da casa (roteiro-viral), base de toda recomendação, em qualquer formato: PARAR o scroll (gancho com número, contraste ou case — nunca pergunta, nunca saudação, nunca \"oi\"), SEGURAR (abre uma curiosidade que só fecha no fim), VIRAR (o insight que faz salvar e mandar para alguém) e CONVERTER (CTA amarrado na virada, não genérico). " +
+  "Em Reels e story essa é a própria estrutura do roteiro. Em YouTube, carrossel e e-mail, siga o molde do formato e aplique a lógica dentro dele: gancho que para o scroll, virada antes do fim e CTA amarrado na virada. " +
+  "Roteiro é bullet para falar, não texto para ler: tópicos curtos com \"- \", nada de parágrafo corrido. " +
+  "NUNCA invente número, resultado, preço, depoimento ou case: só use o que estiver no contexto. Quando a peça precisar de um dado que não está confirmado no contexto, escreva o lugar dele marcado com [conferir] (ex. \"- [conferir] quanto o cliente faturou no mês\"). ";
+
+function contentCtx(c) {
+  return "Peça: " + String(c.title || "").slice(0, 200) + "\n" +
+    "Formato: " + String(c.format || "").slice(0, 30) + "\n" +
+    (c.stage ? "Etapa: " + String(c.stage).slice(0, 30) + "\n" : "") +
+    (c.date ? "Vai ao ar: " + String(c.date).slice(0, 10) + "\n" : "") +
+    clientCtx(c) +
+    (c.mold ? "Molde do formato:\n" + String(c.mold).slice(0, 1500) + "\n" : "") +
+    (c.script ? "Roteiro atual:\n" + String(c.script).slice(0, 4000) + "\n" : "Roteiro atual: vazio\n");
+}
+function clientCtx(c) {
+  if (!c.client) return "Cliente: nenhum — é o conteúdo próprio da casa\n" + recentCtx(c);
+  return "Cliente: " + String(c.client).slice(0, 120) + "\n" +
+    (c.niche ? "Nicho: " + String(c.niche).slice(0, 80) + "\n" : "") +
+    (c.sells ? "O que vende: " + String(c.sells).slice(0, 120) + "\n" : "") +
+    (c.pain ? "Dor: " + String(c.pain).slice(0, 600) + "\n" : "") +
+    (Array.isArray(c.offers) && c.offers.length ? "Ofertas: " + listOf(c.offers.slice(0, 12)) + "\n" : "") +
+    (c.page ? "Página do cliente:\n" + String(c.page).slice(0, 1200) + "\n" : "") +
+    recentCtx(c);
+}
+const recentCtx = (c) => "Peças que já existem (não repita ângulo nem pauta):\n" + linesOf(Array.isArray(c.recent) ? c.recent.slice(0, 30) : [], 30) + "\n";
+
+Object.assign(LIST_TASKS, {
+  /* 5 angulos para uma ideia: cada um vira titulo e primeira frase */
+  angles: (c) => ({
+    instruction:
+      CONTENT_RULES +
+      "Proponha 5 ângulos diferentes para esta peça. Cada item: type = o tipo do ângulo em uma ou duas palavras (contraste, case, erro comum, bastidor, lista, mito, tutorial…); title = o título da peça nesse ângulo (até 10 palavras); note = a primeira frase falada, o gancho, que para o scroll (até 20 palavras, sem pergunta, sem saudação). " +
+      'Formato: {"suggestions":[{"type":"…","title":"…","note":"…"}]}',
+    context: contentCtx(c)
+  }),
+  /* 3 ganchos para o roteiro */
+  hooks: (c) => ({
+    instruction:
+      CONTENT_RULES +
+      "Proponha 3 ganchos para esta peça, diferentes entre si. Cada item: title = a frase do gancho, exatamente como seria falada ou escrita (até 20 palavras, sem pergunta, sem saudação); note = por que ela segura (até 15 palavras). " +
+      'Formato: {"suggestions":[{"title":"…","note":"…"}]}',
+    context: contentCtx(c)
+  }),
+  /* desdobrar uma peca em derivadas */
+  spinOff: (c) => ({
+    instruction:
+      CONTENT_RULES +
+      "Desdobre esta peça em até 5 peças derivadas, em outros formatos ou recortes do mesmo assunto (ex. um YouTube vira 3 reels, 1 carrossel e 1 e-mail). Cada derivada pega UM ponto do roteiro e fica de pé sozinha. " +
+      "Cada item: type = o id do formato, exatamente um de " + FORMAT_IDS + "; title = o título da derivada (até 10 palavras); note = o gancho dela ou o ponto do roteiro que ela aproveita (até 20 palavras). " +
+      'Formato: {"suggestions":[{"type":"reels","title":"…","note":"…"}]}',
+    context: contentCtx(c)
+  }),
+  /* puxar pautas de um cliente */
+  pautas: (c) => ({
+    instruction:
+      CONTENT_RULES +
+      "Proponha até 8 pautas de conteúdo para este cliente" + (c.theme ? ", em volta do tema pedido" : "") + ", que falem com a dor e com o que ele vende. Não repita as peças que já existem. Varie os ângulos. " +
+      (c.formatId ? "Todas no formato " + String(c.formatId).slice(0, 20) + ". " : "Escolha o formato que melhor serve cada pauta. ") +
+      "Cada item: type = o id do formato, exatamente um de " + FORMAT_IDS + "; title = o título da peça (até 10 palavras); note = o gancho, a primeira frase (até 20 palavras, sem pergunta, sem saudação). " +
+      'Formato: {"suggestions":[{"type":"reels","title":"…","note":"…"}]}',
+    context:
+      (c.theme ? "Tema pedido: " + String(c.theme).slice(0, 200) + "\n" : "") +
+      clientCtx(c)
+  })
+});
+
 /* tarefas que respondem com um texto, nao com uma lista: o formato e
    {"text":"…"} em markdown simples (paragrafos, listas com -, negrito). */
 const TEXT_TASKS = {
@@ -817,6 +895,44 @@ const TEXT_TASKS = {
   })
 };
 
+/* conteudo: o roteiro inteiro, a producao e a publicacao. as duas ultimas
+   viram secao do roteiro (D4), entao o texto vem SEM o "## titulo" — a tela
+   poe o dela. */
+const PUBLISH_BY_FORMAT = {
+  "Reels": "a legenda (a primeira linha precisa segurar sozinha, porque é a única que aparece), um corpo curto e o CTA",
+  "story": "a legenda de cada tela que precisar de texto, o adesivo de interação e o CTA",
+  "carrossel": "a legenda (a primeira linha precisa segurar sozinha, porque é a única que aparece), um corpo curto e o CTA",
+  "YouTube": "3 opções de título, o texto da thumb (até 4 palavras) e a descrição com os capítulos do roteiro (00:00 e o nome de cada um)",
+  "e-mail": "3 opções de assunto (até 45 caracteres) e o preheader"
+};
+Object.assign(TEXT_TASKS, {
+  scriptDraft: (c) => ({
+    instruction:
+      CONTENT_RULES +
+      "Escreva o roteiro desta peça em markdown, seguindo EXATAMENTE as seções do molde do formato (mesmos títulos \"## \", na mesma ordem), com o \"# título\" na primeira linha. Sem as linhas de dica em itálico do molde. " +
+      "Preencha cada seção com bullets curtos para falar. Se já houver roteiro, aproveite o que a pessoa escreveu e complete. " +
+      'Formato: {"text":"# …\\n## …\\n- …"}',
+    context: contentCtx(c)
+  }),
+  production: (c) => ({
+    instruction:
+      CONTENT_RULES +
+      "Monte a produção desta peça a partir do roteiro, em markdown com bullets, sem título de seção no começo: a lista de takes na ordem de gravação, o B-roll literal para cada fala (o que aparece na tela enquanto aquilo é dito), o texto que vai na tela" +
+      (/reels|story/i.test(String(c.format || "")) ? " e os pontos de corte (onde corta para segurar o ritmo)" : "") +
+      ". Use \"### \" para separar as partes. Até 220 palavras. " +
+      'Formato: {"text":"### takes\\n- …"}',
+    context: contentCtx(c)
+  }),
+  publish: (c) => ({
+    instruction:
+      CONTENT_RULES +
+      "Escreva o que esta peça precisa para ser publicada: " + (PUBLISH_BY_FORMAT[String(c.format || "")] || "a legenda, o corpo curto e o CTA") + ". " +
+      "Markdown com \"### \" separando as partes e sem título de seção no começo. Até 200 palavras. " +
+      'Formato: {"text":"### legenda\\n…"}',
+    context: contentCtx(c)
+  })
+});
+
 /* ---------- assistente: uma proposta de acao por vez, nunca executada aqui ----------
    o catalogo e fechado de proposito: nao e function-calling generico, e um
    enum pequeno com um formato de payload por tipo — cabe num prompt so, e o
@@ -846,7 +962,7 @@ LIST_TASKS.assistant = (c) => ({
     "lead-update {id (o id do cliente/prospecto do contexto — NUNCA invente um; sem id no contexto, não proponha este tipo), stage, temperature (frio, morno ou quente), note}; " +
     "onboarding-map {name, tree: {title, note, children:[{title, note, children:[...]}]} — no máximo 3 níveis, 6 filhos por nó}; " +
     "onboarding-funnel {name, stages: lista de {nodeType (um de " + NODE_TYPES + "), title}}; " +
-    "script {contentId (o id da peça de conteúdo do contexto — NUNCA invente um; sem id no contexto, não proponha este tipo), script (roteiro em markdown: # título, ## gancho, ## desenvolvimento, ## fechamento, com bullets, não texto corrido)}; " +
+    "script {contentId (o id da peça de conteúdo do contexto — NUNCA invente um; sem id no contexto, não proponha este tipo), script (roteiro em markdown: # título e depois as seções \"## \" do molde do formato que vier no contexto da tela, na mesma ordem e sem as linhas de dica em itálico — sem molde no contexto, ## gancho, ## desenvolvimento, ## fechamento —, com bullets para falar, não texto corrido; gancho com número, contraste ou case, nunca pergunta nem saudação; virada antes do fim e CTA amarrado nela; NUNCA invente número, resultado ou case — o dado que faltar entra marcado com [conferir])}; " +
     "wishlist-item {list (id da coletânea do contexto, ou vazio), name, price (centavos, número, ou 0), bucket (um de asap, longterm, online, presencial, mercado, ou vazio), qty (ex. \"2x\", \"~1\", ou vazio)}. " +
     "Se a mensagem for uma PERGUNTA (inclusive financeira — \"posso gastar X\", \"dá pra fazer Y\") em vez de um pedido de ação, devolva suggestions vazio e responda a pergunta direto em clarify, usando só o que está no contexto da tela (ex. saldo e fixos, quando a tela for o financeiro); se faltar dado pra responder com segurança, diga o que falta em vez de estimar. " +
     "Se a mensagem não corresponder a nenhuma ação nem a uma pergunta respondível, devolva suggestions vazio e clarify com UMA pergunta curta que ajudaria a decidir — nunca invente uma ação só para responder algo. " +

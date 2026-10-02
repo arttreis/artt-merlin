@@ -900,7 +900,7 @@ document.addEventListener("visibilitychange", () => {
    nao baixou espera a proxima sincronizacao, e a marca de "feito" so e
    gravada quando todas fecharam. depois disso ela nunca mais faz nada. */
 const FRONTS_PURGED = "merlin:fronts-removed";
-const PURGE_TYPES = ["notes", "clients", "tasks", "week", "maps", "funnels", "finance", "habits", "plans", "bookmarks", "content"];
+const PURGE_TYPES = ["notes", "clients", "tasks", "week", "maps", "funnels", "finance", "habits", "plans", "bookmarks", "content", "cadence"];
 function stripFront(value) {
   if (Array.isArray(value)) return value.map(stripFront).some(Boolean);
   if (!value || typeof value !== "object") return false;
