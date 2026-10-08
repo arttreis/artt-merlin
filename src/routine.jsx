@@ -129,7 +129,7 @@ function Routine() {
         </div>
         <div className="actions">
           {list.length > 0 && <button className="pill" type="button" onClick={() => setSuggesting(true)}>sugerir</button>}
-          <button className="pill pill--green" type="button" title="novo bloco (n)" onClick={() => setForm({ id: "" })}>{icon("plus")}bloco</button>
+          <button className="pill pill--accent" type="button" title="novo bloco (n)" onClick={() => setForm({ id: "" })}>{icon("plus")}bloco</button>
         </div>
       </div>
 
@@ -157,7 +157,7 @@ function Routine() {
                 label="Sugestões de rotina" onClose={closeSuggest}
                 actions={<>
                   <button className="pill" type="button" onClick={closeSuggest}>fechar</button>
-                  {!!chosen.length && <button className="pill pill--green" type="button" onClick={addChosen}>{pickedLabel}</button>}
+                  {!!chosen.length && <button className="pill pill--accent" type="button" onClick={addChosen}>{pickedLabel}</button>}
                 </>}>
           {suggestionGroups().length
             ? <EmptyStart title="" groups={suggestionGroups()} picked={(s) => chosen.includes(s.id)} onPick={toggleChosen} />

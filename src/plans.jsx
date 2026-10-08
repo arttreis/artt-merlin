@@ -288,7 +288,7 @@ function Goal({ g, kind, kids, parent, shade, focused, onFocus, onToggle, onEdit
         {(g.client || parent || kids.length > 0 || g.card) && (
           <span className="goal__meta">
             <ClientBadge id={g.client} />
-            {g.card && <span className="badge badge--green">na semana</span>}
+            {g.card && <span className="badge badge--accent">na semana</span>}
             {kids.length > 0 && (
               <span className="goal__children" title="desdobrado">
                 <i className="goal__bar"><i style={{ width: Math.round((doneKids / kids.length) * 100) + "%" }} /></i>
@@ -325,7 +325,7 @@ function ReviewDialog({ kind, doc, onSave, onAsk, onClose }) {
                   title={thinking ? "pensando…" : "revisar com o merlin"} aria-label="revisar com o merlin">
             <span className="merlin-btn__icon" aria-hidden="true">{icon("spark")}</span>
           </button>
-          <button className="pill pill--green" type="button" onClick={close}>guardar</button>
+          <button className="pill pill--accent" type="button" onClick={close}>guardar</button>
         </>}>
       <div className="review">
         <div><label className="field-label">o que foi</label><textarea className="textarea" rows="3" {...bind("went")}></textarea></div>
@@ -378,7 +378,7 @@ function MerlinDialog({ title, text, onClose }) {
     <Dialog title={title} wide onClose={onClose}
         actions={<>
           <button className="pill" type="button" onClick={copy}>copiar</button>
-          <button className="pill pill--green" type="button" onClick={onClose}>fechar</button>
+          <button className="pill pill--accent" type="button" onClick={onClose}>fechar</button>
         </>}>
       <Markdown className="merlin-body" text={text} />
     </Dialog>

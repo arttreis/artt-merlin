@@ -10,7 +10,7 @@
 .pf-who{display:flex;align-items:center;gap:12px;margin:0 0 var(--pd2);min-width:0}
 .pf-avatar{
   width:44px;height:44px;flex:none;border-radius:50%;display:grid;place-items:center;
-  background:var(--green);color:var(--on-green);font-weight:600;font-size:17px;
+  background:var(--accent);color:var(--on-accent);font-weight:600;font-size:17px;
 }
 .pf-avatar.is-out{background:var(--fill-hover);color:var(--ink-50)}
 .pf-who__text{flex:1 1 auto;min-width:0}
@@ -21,7 +21,7 @@
   display:flex;align-items:center;gap:6px;margin:0 0 var(--pd2);
   font-family:var(--mono);font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-30);
 }
-.pf-cloud[data-status="synced"]{color:var(--green-ink)}
+.pf-cloud[data-status="synced"]{color:var(--accent-ink)}
 .pf-cloud[data-status="error"]{color:var(--ink-70)}
 .pf-cloud .dot{width:6px;height:6px;border-radius:50%;background:currentColor;flex:none}
 

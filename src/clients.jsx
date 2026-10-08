@@ -456,7 +456,7 @@ function Clients() {
           <ClientsSummary list={list} />
         </div>
         <div className="actions">
-          <button className="pill pill--green" type="button" id="new-client-btn" onClick={() => openNew()}>{icon("plus")}cliente</button>
+          <button className="pill pill--accent" type="button" id="new-client-btn" onClick={() => openNew()}>{icon("plus")}cliente</button>
         </div>
       </div>
 
@@ -505,7 +505,7 @@ function Clients() {
       {confirming && doc && (
         <Dialog title="apagar cliente?" label="Confirmar" onClose={() => setConfirming(false)}
             sub={'isso apaga "' + doc.name + '" e tudo que está nele — dá para desfazer logo em seguida.'}
-            actions={<><button className="pill" type="button" onClick={() => setConfirming(false)}>cancelar</button><button className="pill pill--green" type="button" id="confirm-delete-btn" onClick={deleteClient}>apagar</button></>} />
+            actions={<><button className="pill" type="button" onClick={() => setConfirming(false)}>cancelar</button><button className="pill pill--accent" type="button" id="confirm-delete-btn" onClick={deleteClient}>apagar</button></>} />
       )}
       {meeting != null && <MeetingDialog text={meeting} onClose={() => setMeeting(null)} onKeep={keepMeeting} />}
       {vaultDialog && <VaultPasswordForm isNew={!vaultStore.get("config")} error={vaultDialog.error} onUnlock={unlockVault} onClose={() => setVaultDialog(null)} />}
@@ -656,7 +656,7 @@ function Properties({ doc, ctx }) {
       <Prop label="status">
         <div className="chips">
           {CLIENT_STATUSES.map((st) => (
-            <button key={st} type="button" className={"chip" + (st === "active" ? " chip--green" : "")} aria-pressed={doc.status === st} onClick={() => setStatus(st)}>{STATUS_LABEL[st]}</button>
+            <button key={st} type="button" className={"chip" + (st === "active" ? " chip--accent" : "")} aria-pressed={doc.status === st} onClick={() => setStatus(st)}>{STATUS_LABEL[st]}</button>
           ))}
         </div>
       </Prop>
@@ -1316,7 +1316,7 @@ function Vault({ doc, ctx, masterKey, openDialog, lock }) {
   if (!masterKey) return (
     <div className="block" id="vault-locked">
       <p className="empty">cofre trancado — entre com a senha-mestra para ver os acessos deste cliente.</p>
-      <button className="pill pill--green" type="button" id="unlock-vault-btn" onClick={() => openDialog()}>destrancar</button>
+      <button className="pill pill--accent" type="button" id="unlock-vault-btn" onClick={() => openDialog()}>destrancar</button>
     </div>
   );
   if (!plain) return null;
@@ -1365,7 +1365,7 @@ function VaultForm({ item, plain, onSave, onCancel }) {
       </div>
       <textarea className="textarea mt2" id="vault-note" placeholder="nota (opcional)" {...bind("note")} />
       <div className="row mt2">
-        <button className="pill pill--green" type="button" id="save-vault-btn" onClick={() => onSave(v)}>{item ? "salvar" : "adicionar"}</button>
+        <button className="pill pill--accent" type="button" id="save-vault-btn" onClick={() => onSave(v)}>{item ? "salvar" : "adicionar"}</button>
         {item && <button className="pill" type="button" id="cancel-vault-btn" onClick={onCancel}>cancelar</button>}
       </div>
     </div>
@@ -1420,7 +1420,7 @@ function VaultPasswordForm({ isNew, error, onUnlock, onClose }) {
 function MeetingDialog({ text, onClose, onKeep }) {
   return (
     <Dialog title="pauta da reunião" label="Preparar reunião" wide onClose={onClose}
-        actions={<><button className="pill" type="button" onClick={onClose}>fechar</button><button className="pill pill--green" type="button" id="keep-meeting-btn" onClick={onKeep}>guardar no histórico</button></>}>
+        actions={<><button className="pill" type="button" onClick={onClose}>fechar</button><button className="pill pill--accent" type="button" id="keep-meeting-btn" onClick={onKeep}>guardar no histórico</button></>}>
       <Markdown className="meeting-text" text={text} />
     </Dialog>
   );

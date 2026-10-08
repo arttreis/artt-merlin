@@ -36,7 +36,7 @@
    recortado. fica atras do conteudo, que sobe pro z-index 1. */
 .device::before{
   content:"";position:absolute;inset:0;pointer-events:none;z-index:0;
-  background:radial-gradient(128% 56% at -4% 16%,var(--green-glow),transparent 58%);
+  background:radial-gradient(128% 56% at -4% 16%,var(--accent-glow),transparent 58%);
   opacity:.3;
 }
 .top,.scroll,.composer{position:relative;z-index:1}
@@ -68,7 +68,7 @@
   background:var(--fill);border:1px solid var(--line);
   display:grid;place-items:center;margin-bottom:calc(var(--pd) * 1.5);
 }
-.logo-tile svg{width:23px;height:23px;color:var(--green)}
+.logo-tile svg{width:23px;height:23px;color:var(--accent)}
 /* o cliente na linha da tarefa: o selo vem da casca, aqui so encolhe.
    fica na mesma linha da duracao, e nao numa terceira — o cliente e parte
    da leitura rapida da tarefa, nao um rodape. */
@@ -87,7 +87,7 @@
 /* se e medida, e mono — o .n do sistema */
 .headline .measure{
   font-family:var(--mono);font-weight:500;letter-spacing:-.03em;
-  color:var(--green);
+  color:var(--accent);
 }
 /* nao ha vermelho neste sistema: quando nao cabe, o verde simplesmente some */
 .headline[data-tone="overflow"] .measure{color:var(--ink)}
@@ -109,7 +109,7 @@
 .slot.guess{
   background:repeating-linear-gradient(45deg,var(--fill-hover) 0 4px,transparent 4px 8px);
 }
-.free{background:var(--green);flex:1 1 auto}
+.free{background:var(--accent);flex:1 1 auto}
 .free.receipt{background:var(--ink)}
 .overflow{
   /* com estouro pequeno a barra vira um respingo de 3px e parece sujeira */
@@ -130,7 +130,7 @@
   background:var(--fill);border:1px solid var(--line);border-radius:var(--br2);
   padding:5px 8px;font-family:var(--mono);font-size:11px;color:var(--ink);
 }
-.window-editor .action{color:var(--green)}
+.window-editor .action{color:var(--accent)}
 
 .section-label{
   margin:calc(var(--pd) * 1.25) 0 var(--pd2);color:var(--ink-50);
@@ -206,7 +206,7 @@
 /* editar duracao na propria linha, no lugar exato onde ela e lida */
 .task__time-input{
   align-self:flex-start;width:104px;
-  background:var(--fill);border:1px solid var(--green-glow);border-radius:var(--br2);
+  background:var(--fill);border:1px solid var(--accent-glow);border-radius:var(--br2);
   padding:2px 7px;font-family:var(--mono);font-size:10.5px;letter-spacing:.06em;
   color:var(--ink);
 }
@@ -252,7 +252,7 @@
 .examples .examples__body{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:2px}
 .examples .examples__name{font-size:14.5px;font-weight:500;color:var(--ink-50)}
 .examples .examples__sub{font-family:var(--mono);font-size:10.5px;letter-spacing:.06em}
-.examples .examples__sub b{font-weight:400;color:var(--green)}
+.examples .examples__sub b{font-weight:400;color:var(--accent)}
 .empty__foot{margin:var(--pd) 0 0;font-size:12.5px;color:var(--ink-30)}
 
 /* ---------- concluidas ---------- */
@@ -264,7 +264,7 @@
   color:var(--ink-30);transition:background var(--t);
 }
 .done-item:hover{background:var(--fill)}
-.done-item .mark{width:30px;height:30px;border-radius:var(--br2);color:var(--green);background:var(--fill)}
+.done-item .mark{width:30px;height:30px;border-radius:var(--br2);color:var(--accent);background:var(--fill)}
 .done-item .mark svg{width:13px;height:13px;opacity:1}
 .done-item .done-item__name{
   flex:1 1 auto;min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;
@@ -296,14 +296,14 @@
 /* finalizar a reuniao (14/09/2026): o relogio e o botao. no hover ele vira o
    check; finalizada, fica o check e a linha risca e apaga */
 .reserve .reserve__mark{border-radius:50%;transition:color var(--t),background var(--t)}
-.reserve .reserve__mark:hover{color:var(--green-ink);background:var(--fill-hover)}
+.reserve .reserve__mark:hover{color:var(--accent-ink);background:var(--fill-hover)}
 .reserve__check{display:none}
 .reserve__mark:hover .reserve__clock,.reserve.is-done .reserve__clock{display:none}
 .reserve__mark:hover .reserve__check,.reserve.is-done .reserve__check{display:grid}
 .reserve__clock,.reserve__check{place-items:center}
 .reserve__clock{display:grid}
 .reserve.is-done{opacity:.6}
-.reserve.is-done .reserve__mark{color:var(--green-ink)}
+.reserve.is-done .reserve__mark{color:var(--accent-ink)}
 .reserve.is-done .reserve__name{text-decoration:line-through;text-decoration-color:var(--line)}
 
 /* ---------- pilula do composer ---------- */
@@ -346,7 +346,7 @@
   background:var(--fill);border:1px solid var(--line);
   border-radius:var(--br-pill);transition:border-color var(--t),background var(--t);
 }
-.entry:focus-within{border-color:var(--green-glow);background:var(--fill-hover)}
+.entry:focus-within{border-color:var(--accent-glow);background:var(--fill-hover)}
 .entry__plus{
   flex:0 0 auto;width:38px;height:38px;border-radius:50%;
   background:var(--fill-hover);border:1px solid var(--line);
@@ -354,10 +354,10 @@
   transition:background var(--t),color var(--t),border-color var(--t);
 }
 .entry__plus svg{width:16px;height:16px}
-.entry:focus-within .entry__plus{background:var(--green);border-color:var(--green);color:var(--on-green)}
+.entry:focus-within .entry__plus{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
 .entry input{
   flex:1 1 auto;min-width:0;background:none;border:0;outline:0;
-  font-size:14.5px;caret-color:var(--green);
+  font-size:14.5px;caret-color:var(--accent);
 }
 .entry input::placeholder{color:var(--ink-30)}
 .entry__send{
@@ -381,7 +381,7 @@
 .toast span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .toast button{
   flex:0 0 auto;width:30px;height:30px;display:grid;place-items:center;border-radius:50%;
-  color:var(--green);background:var(--fill);transition:background var(--t);
+  color:var(--accent);background:var(--fill);transition:background var(--t);
 }
 .toast button:hover{background:var(--fill-hover)}
 .toast button svg{width:15px;height:15px}
@@ -467,8 +467,8 @@
 .matrix-card__deleg li small{flex:none;font-size:11px;color:var(--ink-30);font-variant-numeric:tabular-nums}
 
 /* a marca de delegavel, na fila e na previa */
-.badge--delegable{border-style:dashed;border-color:color-mix(in srgb,var(--green) 55%,transparent);color:var(--green-ink)}
-.task__badges .badge--delegable{color:var(--green-ink)}
+.badge--delegable{border-style:dashed;border-color:color-mix(in srgb,var(--accent) 55%,transparent);color:var(--accent-ink)}
+.task__badges .badge--delegable{color:var(--accent-ink)}
 
 /* a caixa */
 .mx{display:grid;grid-template-columns:minmax(0,1fr) 220px;gap:var(--pd)}
@@ -482,11 +482,11 @@
   border-radius:var(--br2);background:var(--fill);border:1px solid var(--line-soft);
   transition:border-color var(--t),background var(--t);
 }
-.mx-zone[data-target="yes"]{border-color:var(--green);background:color-mix(in srgb,var(--green) 8%,transparent)}
+.mx-zone[data-target="yes"]{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 8%,transparent)}
 .mx-zone--pool{min-height:0;background:transparent;border-style:dashed;border-color:var(--line)}
 .mx-zone--pool .zone__chips{flex-direction:row;flex-wrap:wrap}
 .mx-zone--pool .matrix-chip{max-width:100%}
-.mx-zone--q1{border-color:color-mix(in srgb,var(--green) 30%,transparent)}
+.mx-zone--q1{border-color:color-mix(in srgb,var(--accent) 30%,transparent)}
 .mx-zone__head{display:flex;align-items:baseline;gap:6px;margin:0;min-width:0}
 .mx-zone__head b{font-size:12.5px;font-weight:600;color:var(--ink)}
 .mx-zone__head small{flex:1 1 auto;min-width:0;font-size:11px;color:var(--ink-30);overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
@@ -500,7 +500,7 @@
   transition:border-color var(--t);
 }
 .matrix-chip:hover{border-color:var(--line)}
-.matrix-chip:focus-visible{outline:none;border-color:var(--green);box-shadow:0 0 0 1px var(--green)}
+.matrix-chip:focus-visible{outline:none;border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
 .matrix-chip .matrix-chip__name{flex:1 1 auto;min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
 .matrix-chip .matrix-chip__min{flex:0 0 auto;font-size:11px;color:var(--ink-30);font-variant-numeric:tabular-nums}
 .matrix-chip.is-dragging{opacity:.45;cursor:grabbing;pointer-events:none}
@@ -655,7 +655,7 @@
 
 .agendas ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:1px}
 .agenda{
-  --c:var(--green);
+  --c:var(--accent);
   display:flex;align-items:center;gap:4px;min-width:0;padding:0 6px 0 4px;border-radius:8px;
   transition:background var(--t);
 }

@@ -57,7 +57,7 @@
 }
 .year__head:hover{background:var(--fill)}
 .year__head b{font-size:12.5px;font-weight:600;letter-spacing:-.01em}
-.year__month.is-current .year__head b{color:var(--green-ink)}
+.year__month.is-current .year__head b{color:var(--accent-ink)}
 .year__head span{font-family:var(--mono);font-size:10.5px;color:var(--ink-50);white-space:nowrap}
 .year__day{
   display:flex;justify-content:space-between;gap:4px;padding:1px 8px;
@@ -84,14 +84,14 @@
    do aportado, verde quando ficou acima — fora do grid do saldo, entao sem
    o fundo do balance-cell, so a cor do texto */
 .table td.is-negative{color:#f87171}
-.table td.is-green{color:var(--green-ink)}
+.table td.is-green{color:var(--accent-ink)}
 
 /* ---------- simular: o "e se" que nao grava ---------- */
 .sim-panel .heading .total{font-family:var(--mono);font-size:12.5px}
 .sim-panel__hint{margin:0 0 var(--pd2);font-size:12px}
 .sim-panel__add{flex-wrap:wrap}
 .sim-panel__add > input.input{flex:1 1 160px;min-width:120px}
-.year__day.is-today{box-shadow:inset 0 0 0 1px var(--green)}
+.year__day.is-today{box-shadow:inset 0 0 0 1px var(--accent)}
 .year__day.is-empty{visibility:hidden}
 
 /* categorias dentro da config: chips com o x, e um campo para a nova */
@@ -137,12 +137,12 @@
 .legend-line{display:flex;align-items:center;gap:6px;margin:4px 0 0;font-size:11px;color:var(--ink-30)}
 .lg{display:inline-block;width:14px;height:6px;border-radius:100px}
 .lg + .lg,.legend-line .lg:not(:first-child){margin-left:8px}
-.lg--real{background:var(--green)}
+.lg--real{background:var(--accent)}
 .lg--forecast{border:1px dashed var(--ink-30)}
 
 /* a barra de dois tempos (SplitBar): cheio + tracejado */
 .split{display:flex;height:6px;border-radius:100px;background:var(--fill-hover);overflow:hidden;min-width:20px}
-.split i{display:block;height:100%;background:var(--green)}
+.split i{display:block;height:100%;background:var(--accent)}
 .split b{display:block;height:100%;background:repeating-linear-gradient(135deg,var(--ink-30) 0 2px,transparent 2px 5px)}
 
 /* os itens do dia */
@@ -157,7 +157,7 @@
 .fin-item.is-suggestion .name,.fin-item.is-suggestion .measure{color:var(--ink-30)}
 .fin-item.is-suggestion .fin-item__acts .pill{opacity:.8}
 .fin-item.is-suggestion:hover .fin-item__acts .pill{opacity:1}
-.measure.positive{color:var(--green-ink)}
+.measure.positive{color:var(--accent-ink)}
 .soon--pending{margin-bottom:var(--pd);padding-bottom:var(--pd2);border-bottom:1px solid var(--line-soft)}
 .soon--suggest{margin-top:var(--pd);padding-top:var(--pd2);border-top:1px solid var(--line-soft)}
 .soon__day{margin:0 0 6px;font-size:11px;color:var(--ink-30)}

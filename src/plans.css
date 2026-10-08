@@ -22,14 +22,14 @@
 }
 /* o periodo de agora nao precisa da palavra "atual" ao lado do nome dele:
    um ponto verde diz o mesmo e nao rouba a linha */
-.horizon__now{width:6px;height:6px;border-radius:50%;background:var(--green);flex:none}
+.horizon__now{width:6px;height:6px;border-radius:50%;background:var(--accent);flex:none}
 .horizon__open{margin:3px 0 0;font-size:12px;color:var(--ink-30)}
 .horizon__nav{display:flex;align-items:center;gap:2px;flex:none}
 .horizon__nav .action{width:24px;height:24px}
 .horizon__nav .action svg{width:13px;height:13px}
 .horizon__body{flex:1 1 auto;display:flex;flex-direction:column;gap:var(--pd2)}
 .horizon__sep{width:1px;height:14px;background:var(--line-soft);margin:0 4px}
-.horizon__nav .action.is-on{color:var(--green-ink)}
+.horizon__nav .action.is-on{color:var(--accent-ink)}
 .horizon__empty{
   display:flex;align-items:center;gap:8px;width:100%;padding:10px 12px;text-align:left;
   border:1px dashed var(--line);border-radius:var(--br2);background:none;
@@ -40,7 +40,7 @@
 
 /* ---------- o objetivo ---------- */
 .goal{padding:6px 6px 6px 10px;gap:8px;align-items:flex-start;transition:opacity var(--t),border-color var(--t),background var(--t)}
-.goal__check{flex:0 0 auto;width:14px;height:14px;margin-top:3px;accent-color:var(--green);cursor:pointer}
+.goal__check{flex:0 0 auto;width:14px;height:14px;margin-top:3px;accent-color:var(--accent);cursor:pointer}
 /* o corpo do objetivo e um botao: clicar acende o parentesco. por isso ele
    reseta o que um <button> traz de fabrica e volta a parecer texto. */
 .goal__main{
@@ -57,7 +57,7 @@
    cumprida em outro horizonte. */
 .goal__children{display:flex;align-items:center;gap:6px;font-size:11px;font-variant-numeric:tabular-nums;color:var(--ink-50)}
 .goal__bar{display:block;width:34px;height:3px;border-radius:100px;background:var(--fill-hover);overflow:hidden;flex:none}
-.goal__bar i{display:block;height:100%;background:var(--green);border-radius:100px;transition:width .35s var(--ease)}
+.goal__bar i{display:block;height:100%;background:var(--accent);border-radius:100px;transition:width .35s var(--ease)}
 .goal .row-actions{align-self:center}
 @media (hover:none){.goal .row-actions{opacity:1}}
 
@@ -65,8 +65,8 @@
    com um objetivo escolhido, as tres colunas param de ser tres listas: o
    escolhido ganha a borda, quem tem sangue dele fica em tinta cheia e todo o
    resto apaga. e a unica coisa que esta tela faz e uma lista nao faria. */
-.goal.is-focus{border-color:var(--green);background:color-mix(in srgb,var(--green) 9%,transparent)}
-.goal.is-kin{border-color:color-mix(in srgb,var(--green) 34%,transparent)}
+.goal.is-focus{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 9%,transparent)}
+.goal.is-kin{border-color:color-mix(in srgb,var(--accent) 34%,transparent)}
 .goal.is-dim{opacity:.3}
 .goal.is-dim:hover{opacity:.65}
 

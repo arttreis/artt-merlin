@@ -150,7 +150,7 @@ function Prospecting() {
           <Summary all={all} pipeline={pipeline} lostList={lostList} />
         </div>
         <div className="actions">
-          <button className="pill pill--green" type="button" onClick={() => setNewIn("lead")}>{icon("plus")}prospecto</button>
+          <button className="pill pill--accent" type="button" onClick={() => setNewIn("lead")}>{icon("plus")}prospecto</button>
         </div>
       </div>
 
@@ -158,7 +158,7 @@ function Prospecting() {
         <div className="prospect-empty block">
           <p className="prospect-empty__title">ninguém no funil ainda</p>
           <p className="prospect-empty__text">Quem você está conversando e ainda não fechou entra aqui. Cada um passa de lead a negociação, e "fechou" leva tudo que se soube para a página de cliente.</p>
-          <button className="pill pill--green" type="button" onClick={() => setNewIn("lead")}>{icon("plus")}primeiro prospecto</button>
+          <button className="pill pill--accent" type="button" onClick={() => setNewIn("lead")}>{icon("plus")}primeiro prospecto</button>
         </div>
       ) : (
         <div className="pipeline">
@@ -283,7 +283,7 @@ function Drawer({ c, update, onClose, onStage, onWon, onLost, onTask, onRemove }
         <div className="drawer__bar">
           <span className="t-mono drawer__where">{stageLabel(c.stage)} · {days ? days + " dias aqui" : "entrou hoje"}</span>
           <span className="spacer" />
-          <button className="pill pill--green pill--mini" type="button" onClick={onWon}>fechou</button>
+          <button className="pill pill--accent pill--mini" type="button" onClick={onWon}>fechou</button>
           <button className="pill pill--mini" type="button" onClick={onLost}>perdeu</button>
           <button className="pill pill--mini" type="button" onClick={onTask}>{icon("plus")}tarefa</button>
           <button className="action" type="button" title="apagar" aria-label="Apagar prospecto" onClick={onRemove}>{icon("trash")}</button>

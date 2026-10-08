@@ -20,7 +20,7 @@
 }
 .fl-thumb svg{position:absolute;inset:0;width:100%;height:100%}
 .fl-thumb rect{fill:var(--fill-hover);stroke:var(--line)}
-.fl-thumb rect.is-conversion{fill:color-mix(in srgb,var(--green) 22%,transparent);stroke:color-mix(in srgb,var(--green) 45%,transparent)}
+.fl-thumb rect.is-conversion{fill:color-mix(in srgb,var(--accent) 22%,transparent);stroke:color-mix(in srgb,var(--accent) 45%,transparent)}
 .fl-thumb path{fill:none;stroke:var(--ink-30);stroke-width:1.4}
 .fl-thumb .empty{position:absolute;inset:0;display:grid;place-items:center;padding:0;font-size:12px}
 .fl-name{margin:0;font-size:14px;font-weight:600;letter-spacing:-.02em;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -42,7 +42,7 @@
 .fe-stage svg{display:block;width:100%;height:100%;cursor:grab;touch-action:none;user-select:none;-webkit-user-select:none}
 .fe-top,.fe-dock{user-select:none;-webkit-user-select:none}
 .fe-stage svg.is-panning{cursor:grabbing}
-.fe-stage.is-dropping::after{content:"";position:absolute;inset:6px;border:1.5px dashed var(--green);border-radius:var(--br);pointer-events:none}
+.fe-stage.is-dropping::after{content:"";position:absolute;inset:6px;border:1.5px dashed var(--accent);border-radius:var(--br);pointer-events:none}
 
 /* o minimapa: só existe quando alguma etapa está fora da tela (o palco
    decide e liga o .is-shown); no celular não cabe e não aparece */
@@ -54,7 +54,7 @@
 .fe-minimap.is-shown{opacity:1;visibility:visible;transform:none;transition:opacity .18s,transform .18s}
 .fe-minimap svg{display:block;border-radius:calc(var(--br3) - 3px);background:var(--bg)}
 .fe-minimap rect{fill:var(--ink-30);fill-opacity:.35}
-.fe-minimap rect.is-conversion{fill:var(--green);fill-opacity:.45}
+.fe-minimap rect.is-conversion{fill:var(--accent);fill-opacity:.45}
 .fe-minimap .fe-minimap__view{fill:var(--ink);fill-opacity:.05;stroke:var(--ink-50);stroke-width:1.2}
 @media (max-width:899px){.fe-minimap{display:none}}
 
@@ -111,7 +111,7 @@
 .fe-type.is-active{background:var(--fill-hover);color:var(--ink)}
 .fe-type:active{cursor:grabbing}
 .fe-type svg{width:15px;height:15px;flex:none}
-.fe-type.is-conversion svg{color:var(--green-ink)}
+.fe-type.is-conversion svg{color:var(--accent-ink)}
 .fe-type span{font-size:12.5px;color:var(--ink);line-height:1.2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .fe-library .empty{margin:6px 8px;font-size:12px}
 .fe-panel__top .ico{
@@ -120,7 +120,7 @@
 }
 .fe-panel__top .ico svg{width:15px;height:15px}
 .fe-panel__top .ico.is-conversion{
-  color:var(--green-ink);background:color-mix(in srgb,var(--green) 12%,transparent);border-color:color-mix(in srgb,var(--green) 32%,transparent);
+  color:var(--accent-ink);background:color-mix(in srgb,var(--accent) 12%,transparent);border-color:color-mix(in srgb,var(--accent) 32%,transparent);
 }
 
 /* painel da direita: o funil (nada selecionado), o nó, ou a aresta */
@@ -138,7 +138,7 @@
 .pn-section{margin-top:12px;padding-top:10px;border-top:1px solid var(--line-soft)}
 .pn-section h4{margin:0 0 6px;font-family:var(--sans);font-size:11.5px;font-weight:500;color:var(--ink-30)}
 .pn-item{display:flex;align-items:center;gap:6px;padding:4px 0;font-size:12.5px;color:var(--ink-70)}
-.pn-add{font-size:12px;color:var(--green-ink);margin-top:4px}
+.pn-add{font-size:12px;color:var(--accent-ink);margin-top:4px}
 .pn-add:hover{filter:brightness(1.15)}
 .pn-rate{display:flex;align-items:center;gap:6px;margin-bottom:6px}
 .pn-rate-target{flex:1 1 auto;min-width:0;font-size:12px;color:var(--ink-70);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -188,7 +188,7 @@
    ponteiro em cima. as sugestões da etapa ficam tracejadas, embaixo. */
 .fb{display:flex;gap:10px;align-items:flex-start;min-height:100%;overflow-x:auto;padding-bottom:4px;scrollbar-width:thin}
 .fb__col{flex:0 0 264px;display:flex;flex-direction:column;gap:6px;padding:8px;border-radius:var(--br3);background:var(--fill);border:1px solid transparent;transition:border-color var(--t),background var(--t)}
-.fb__col.is-over{border-color:var(--green);background:color-mix(in srgb,var(--green) 6%,var(--fill))}
+.fb__col.is-over{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 6%,var(--fill))}
 .fb__head{display:flex;align-items:center;gap:8px;padding:2px 2px 4px}
 .fb__head .ico{width:26px;height:26px;flex:none}
 .fb__name{display:flex;flex-direction:column;min-width:0;flex:1 1 auto;line-height:1.25}
@@ -218,7 +218,7 @@
 .fb__idea{display:flex;align-items:center;gap:6px;width:100%;padding:6px 8px;border-radius:var(--br2);border:1px dashed var(--line);font-size:11.5px;color:var(--ink-50);text-align:left;transition:color var(--t),border-color var(--t),background var(--t)}
 .fb__idea svg{width:11px;height:11px;flex:none}
 .fb__idea span{min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
-.fb__idea:hover{color:var(--ink);border-color:var(--green);background:var(--surface)}
+.fb__idea:hover{color:var(--ink);border-color:var(--accent);background:var(--surface)}
 .fb__add{align-self:flex-start;padding:4px 6px;font-size:11.5px;color:var(--ink-30);border-radius:var(--br2)}
 .fb__add:hover{color:var(--ink);background:var(--fill-hover)}
 /* ofertas: o quadro e, do lado, a escada */
@@ -239,17 +239,17 @@
 .node{cursor:grab}
 .node-box{fill:var(--surface);stroke:var(--line);stroke-width:1;transition:stroke .15s}
 .node:hover .node-box{stroke:var(--ink-30)}
-.node.is-selected .node-box{stroke:var(--green);stroke-width:1.5;filter:drop-shadow(0 0 14px var(--green-glow))}
+.node.is-selected .node-box{stroke:var(--accent);stroke-width:1.5;filter:drop-shadow(0 0 14px var(--accent-glow))}
 .node-icon-bg{fill:var(--fill-hover);stroke:var(--line-soft)}
-.node-icon-bg.is-conversion{fill:color-mix(in srgb,var(--green) 14%,transparent);stroke:color-mix(in srgb,var(--green) 34%,transparent)}
+.node-icon-bg.is-conversion{fill:color-mix(in srgb,var(--accent) 14%,transparent);stroke:color-mix(in srgb,var(--accent) 34%,transparent)}
 .node-icon{color:var(--ink-70);fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
-.node-icon.is-conversion{color:var(--green-ink)}
+.node-icon.is-conversion{color:var(--accent-ink)}
 .node-type{fill:var(--ink-30);font-family:var(--sans);font-size:10.5px;font-weight:500}
 .node-title{fill:var(--ink);font-family:var(--sans);font-size:12.5px;font-weight:500}
 .node-body{fill:var(--bg);fill-opacity:.55;stroke:var(--line-soft)}
 html.light .node-body{fill-opacity:.35}
 .node-dot{fill:var(--ink-30)}
-.node-dot.has-number{fill:var(--green)}
+.node-dot.has-number{fill:var(--accent)}
 .node-number{fill:var(--ink);font-family:var(--mono);font-size:19px;font-weight:500;letter-spacing:-.02em}
 /* sem número e sem projeção o desenho escreve "—": melhor não escrever nada */
 .node-number.is-empty{display:none}
@@ -261,14 +261,14 @@ html.light .node-body{fill-opacity:.35}
 .node-port{fill:var(--surface-2);stroke:var(--line)}
 .node-handle circle.vis{fill:var(--surface-2);stroke:var(--line);stroke-width:1.2;transition:fill .15s,stroke .15s}
 .node-handle circle.hit{fill:transparent;stroke:none;cursor:crosshair}
-.node-handle:hover circle.vis{fill:var(--green);stroke:var(--green)}
+.node-handle:hover circle.vis{fill:var(--accent);stroke:var(--accent)}
 /* a marca no lugar do ícone: a cor vem do próprio desenho, aqui só a letra */
 .node-brand-mono{font-family:var(--sans);font-size:10.5px;font-weight:700;letter-spacing:-.02em}
 /* "próxima etapa": aparece ao passar no cartão, some quando ele está
    selecionado (ali a tira de fantasmas já diz o que vem depois) */
 .node-next{fill:var(--ink-30);font-family:var(--sans);font-size:10px;opacity:0;pointer-events:none;transition:opacity .15s}
 .node:hover:not(.is-selected) .node-next{opacity:1}
-.node:has(.node-handle:hover) .node-next{fill:var(--green-ink)}
+.node:has(.node-handle:hover) .node-next{fill:var(--accent-ink)}
 .fe.is-locked .node-next,.fe.is-locked .node-handle{display:none}
 .fe.is-locked .node{cursor:pointer}
 .edge-hit{fill:none;stroke:transparent;stroke-width:16;cursor:pointer}
@@ -276,13 +276,13 @@ html.light .node-body{fill-opacity:.35}
 .edge-line.is-estimate{stroke-dasharray:5 5}
 .edge-line.is-weak{stroke-opacity:.7}
 .edge:hover .edge-line{stroke:var(--ink-70)}
-.edge.is-selected .edge-line{stroke:var(--green)}
+.edge.is-selected .edge-line{stroke:var(--accent)}
 .edge-label{fill:var(--ink-70);font-family:var(--mono);font-size:10.5px}
 .edge-label.is-weak{fill:var(--ink-50)}
 .edge-label.is-avg{fill:var(--ink-30)}
 .edge-label-bg{fill:var(--surface-2);stroke:var(--line)}
-.edge.is-selected .edge-label-bg{stroke:var(--green)}
-.temp-link{fill:none;stroke:var(--green);stroke-width:1.6;stroke-dasharray:4 4;pointer-events:none}
+.edge.is-selected .edge-label-bg{stroke:var(--accent)}
+.temp-link{fill:none;stroke:var(--accent);stroke-width:1.6;stroke-dasharray:4 4;pointer-events:none}
 
 /* ---------- o fantasma: a etapa que ainda não existe ----------
    tracejado e apagado porque ele não é dado, é convite: tem que dar pra ler
@@ -293,28 +293,28 @@ html.light .node-body{fill-opacity:.35}
 .ghost-link{fill:none;stroke:var(--ink-30);stroke-width:1.4;stroke-dasharray:4 4;opacity:.45;pointer-events:none;transition:opacity .15s,stroke .15s}
 .ghost-card{opacity:.55;transition:opacity .15s}
 .ghost:hover .ghost-card{opacity:1}
-.ghost:hover .ghost-link{opacity:.9;stroke:var(--green)}
+.ghost:hover .ghost-link{opacity:.9;stroke:var(--accent)}
 .ghost-box{fill:var(--surface);fill-opacity:.5;stroke:var(--ink-30);stroke-width:1.2;stroke-dasharray:5 4;transition:stroke .15s}
-.ghost:hover .ghost-box{fill-opacity:.96;stroke:var(--green);stroke-dasharray:none}
+.ghost:hover .ghost-box{fill-opacity:.96;stroke:var(--accent);stroke-dasharray:none}
 .ghost-icon{color:var(--ink-50);fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
-.ghost-icon.is-conversion{color:var(--green-ink)}
+.ghost-icon.is-conversion{color:var(--accent-ink)}
 .ghost-type{fill:var(--ink-50);font-family:var(--sans);font-size:10.5px;font-weight:500}
 .ghost-why{fill:var(--ink-30);font-family:var(--sans);font-size:11px}
 .ghost:hover .ghost-type{fill:var(--ink-70)}
 .ghost:hover .ghost-why{fill:var(--ink-50)}
 .ghost-plus circle{fill:none;stroke:var(--ink-30);stroke-width:1.2;stroke-dasharray:3 2.6}
 .ghost-plus path{fill:none;stroke:var(--ink-30);stroke-width:1.6;stroke-linecap:round}
-.ghost:hover .ghost-plus circle{fill:var(--green);stroke:var(--green);stroke-dasharray:none}
-.ghost:hover .ghost-plus path{stroke:var(--on-green)}
+.ghost:hover .ghost-plus circle{fill:var(--accent);stroke:var(--accent);stroke-dasharray:none}
+.ghost:hover .ghost-plus path{stroke:var(--on-accent)}
 /* a única porta da tira para a rede — discreta, porque a gramática já
    respondeu e o Merlin aqui é refinamento, não pré-requisito */
 .ghost-ask{cursor:pointer;opacity:.5;transition:opacity .15s}
 .ghost-ask:hover{opacity:1}
 .ghost-ask.is-thinking{cursor:default;opacity:.85}
 .ghost-ask-box{fill:var(--fill);stroke:var(--line-soft);stroke-width:1;transition:stroke .15s}
-.ghost-ask:hover .ghost-ask-box{stroke:var(--green)}
+.ghost-ask:hover .ghost-ask-box{stroke:var(--accent)}
 .ghost-ask-text{fill:var(--ink-50);font-family:var(--mono);font-size:10px}
-.ghost-ask:hover .ghost-ask-text{fill:var(--green-ink)}
+.ghost-ask:hover .ghost-ask-text{fill:var(--accent-ink)}
 .fe-empty{
   position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);z-index:2;
   text-align:center;max-width:300px;pointer-events:none;
@@ -330,7 +330,7 @@ html.light .node-body{fill-opacity:.35}
 .sug-group{margin-bottom:var(--pd)}
 .sug-group h4{margin:0 0 6px;font-family:var(--sans);font-size:11.5px;font-weight:500;color:var(--ink-30)}
 .sug-item{display:flex;align-items:flex-start;gap:8px;padding:7px 4px;border-bottom:1px solid var(--line-soft)}
-.sug-item input[type="checkbox"]{margin-top:3px;flex:0 0 auto;accent-color:var(--green)}
+.sug-item input[type="checkbox"]{margin-top:3px;flex:0 0 auto;accent-color:var(--accent)}
 .sug-title{font-weight:600;font-size:13px}
 .sug-note{display:block;color:var(--ink-50);font-size:12px;margin-top:2px}
 .dlg-md{min-height:120px;background:var(--fill);border:1px solid var(--line);border-radius:var(--br2);padding:8px 12px;font-size:13px;color:var(--ink);overflow:auto}

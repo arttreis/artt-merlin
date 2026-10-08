@@ -202,7 +202,7 @@ function Habits() {
                   title={thinking ? "pensando…" : "ler o mês com o merlin"} aria-label="ler o mês com o merlin">
             <span className="merlin-btn__icon" aria-hidden="true">{icon("spark")}</span>
           </button>}
-          <button className="pill pill--green" type="button" title="novo hábito (n)" onClick={() => setForm({ id: "" })}>{icon("plus")}hábito</button>
+          <button className="pill pill--accent" type="button" title="novo hábito (n)" onClick={() => setForm({ id: "" })}>{icon("plus")}hábito</button>
         </div>
       </div>
 
@@ -246,7 +246,7 @@ function Habits() {
                 label="Sugestões de hábito" onClose={() => { setSuggesting(false); setChosen([]); }}
                 actions={<>
                   <button className="pill" type="button" onClick={() => { setSuggesting(false); setChosen([]); }}>fechar</button>
-                  {!!chosen.length && <button className="pill pill--green" type="button" onClick={addChosen}>
+                  {!!chosen.length && <button className="pill pill--accent" type="button" onClick={addChosen}>
                     {chosen.length === 1 ? "criar o escolhido" : "criar os " + chosen.length + " escolhidos"}
                   </button>}
                 </>}>
@@ -357,7 +357,7 @@ function MerlinDialog({ text, onClose }) {
     <Dialog title="o merlin lê o mês" wide onClose={onClose}
         actions={<>
           <button className="pill" type="button" onClick={copy}>copiar</button>
-          <button className="pill pill--green" type="button" onClick={onClose}>fechar</button>
+          <button className="pill pill--accent" type="button" onClick={onClose}>fechar</button>
         </>}>
       <Markdown className="merlin-body" text={text} />
     </Dialog>

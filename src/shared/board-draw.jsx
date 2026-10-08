@@ -211,7 +211,7 @@ function drawDoc(it) {
   return [
     <rect key="sh" x="1.5" y="3.5" width={it.w} height={it.h} rx="10" fill="#000" opacity=".14" pointerEvents="none" />,
     <rect key="bg" width={it.w} height={it.h} rx="10" fill="var(--mp-pill)" stroke="var(--mp-pill-border)" strokeWidth="1" />,
-    <path key="ic" transform="translate(16 16)" d="M2 0h9l5 5v13a2 2 0 01-2 2H2a2 2 0 01-2-2V2a2 2 0 012-2zM11 0v5h5M4 10h8M4 14h6" fill="none" stroke="var(--green-ink)" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" pointerEvents="none" />,
+    <path key="ic" transform="translate(16 16)" d="M2 0h9l5 5v13a2 2 0 01-2 2H2a2 2 0 01-2-2V2a2 2 0 012-2zM11 0v5h5M4 10h8M4 14h6" fill="none" stroke="var(--accent-ink)" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" pointerEvents="none" />,
     ...lines({ ...t, lines: titleLines }, 16, 44, "start", "var(--mp-pill-ink)", 700, "tt"),
     ...lines({ ...body, lines: bodyLines }, 16, top, "start", it.text ? "var(--ink-50)" : "var(--ink-30)", 500, "bd")
   ];
@@ -246,7 +246,7 @@ export function svgItem(it, boxOf, opts) {
   return (
     <g key={it.id} className={cls} {...dataset} transform={"translate(" + it.x + "," + it.y + ")"}>
       {body}
-      {o.ghost && <rect width={it.w} height={it.h} rx="3" fill="none" stroke="var(--green-ink)" strokeWidth="1.5" strokeDasharray="6 5" vectorEffect="non-scaling-stroke" pointerEvents="none" />}
+      {o.ghost && <rect width={it.w} height={it.h} rx="3" fill="none" stroke="var(--accent-ink)" strokeWidth="1.5" strokeDasharray="6 5" vectorEffect="non-scaling-stroke" pointerEvents="none" />}
     </g>
   );
 }
@@ -276,21 +276,21 @@ export function svgSelection(items, selected, boxOf, unit, extra) {
     if (it.type === "line") return;
     const b = bboxOf(it, boxOf);
     out.push(<rect key={"s" + it.id} x={b.x - pad} y={b.y - pad} width={b.w + pad * 2} height={b.h + pad * 2} rx={2 * unit} fill="none"
-      stroke="var(--green-ink)" strokeWidth="1.5" vectorEffect="non-scaling-stroke" pointerEvents="none" />);
+      stroke="var(--accent-ink)" strokeWidth="1.5" vectorEffect="non-scaling-stroke" pointerEvents="none" />);
   });
   if (single && single.type === "line") {
     const pts = linePoints(single, boxOf), n = pts.length;
     const d = "M" + pts.slice(0, 2).join(" ") + pts.slice(2).reduce((s, v, i) => s + (i % 2 ? " " : "L") + v, "");
-    out.push(<path key="ls" d={d} fill="none" stroke="var(--green-ink)" strokeWidth="1" strokeDasharray="4 4" vectorEffect="non-scaling-stroke" pointerEvents="none" />);
+    out.push(<path key="ls" d={d} fill="none" stroke="var(--accent-ink)" strokeWidth="1" strokeDasharray="4 4" vectorEffect="non-scaling-stroke" pointerEvents="none" />);
     [["p1", pts[0], pts[1], single.from], ["p2", pts[n - 2], pts[n - 1], single.to]].forEach(([h, x, y, attached]) => {
-      out.push(<circle key={h} data-handle={h} cx={x} cy={y} r={6 * unit} fill={attached ? "var(--green)" : "var(--surface)"} stroke="var(--green-ink)" strokeWidth="1.5" vectorEffect="non-scaling-stroke" className="bd-handle" />);
+      out.push(<circle key={h} data-handle={h} cx={x} cy={y} r={6 * unit} fill={attached ? "var(--accent)" : "var(--surface)"} stroke="var(--accent-ink)" strokeWidth="1.5" vectorEffect="non-scaling-stroke" className="bd-handle" />);
     });
   } else if (single && single.type !== "pen") {
     const b = bboxOf(single, boxOf);
     HANDLES.forEach((h) => {
       const x = h.indexOf("w") >= 0 ? b.x - pad : b.x + b.w + pad, y = h.indexOf("n") >= 0 ? b.y - pad : b.y + b.h + pad;
       out.push(<rect key={h} data-handle={h} className={"bd-handle bd-handle--" + h} x={x - hs / 2} y={y - hs / 2} width={hs} height={hs} rx={2 * unit}
-        fill="var(--surface)" stroke="var(--green-ink)" strokeWidth="1.5" vectorEffect="non-scaling-stroke" />);
+        fill="var(--surface)" stroke="var(--accent-ink)" strokeWidth="1.5" vectorEffect="non-scaling-stroke" />);
     });
   } else if (list.length > 1) {
     let bb = null;
@@ -299,17 +299,17 @@ export function svgSelection(items, selected, boxOf, unit, extra) {
       bb = bb ? { x: Math.min(bb.x, b.x), y: Math.min(bb.y, b.y), x2: Math.max(bb.x2, b.x + b.w), y2: Math.max(bb.y2, b.y + b.h) } : { x: b.x, y: b.y, x2: b.x + b.w, y2: b.y + b.h };
     });
     out.push(<rect key="grp" x={bb.x - pad * 2} y={bb.y - pad * 2} width={bb.x2 - bb.x + pad * 4} height={bb.y2 - bb.y + pad * 4} fill="none"
-      stroke="var(--green-ink)" strokeWidth="1" strokeDasharray="5 4" vectorEffect="non-scaling-stroke" pointerEvents="none" />);
+      stroke="var(--accent-ink)" strokeWidth="1" strokeDasharray="5 4" vectorEffect="non-scaling-stroke" pointerEvents="none" />);
   }
   const e = extra || {};
   if (e.snap) {
     const b = e.snap;
     out.push(<rect key="snap" x={b.x - 6 * unit} y={b.y - 6 * unit} width={b.w + 12 * unit} height={b.h + 12 * unit} rx={6 * unit} fill="none"
-      stroke="var(--green)" strokeWidth="2" strokeDasharray="5 4" vectorEffect="non-scaling-stroke" pointerEvents="none" />);
+      stroke="var(--accent)" strokeWidth="2" strokeDasharray="5 4" vectorEffect="non-scaling-stroke" pointerEvents="none" />);
   }
   if (e.marquee) {
     const m = e.marquee;
-    out.push(<rect key="mq" x={m.x} y={m.y} width={m.w} height={m.h} fill="var(--green)" fillOpacity=".08" stroke="var(--green-ink)" strokeWidth="1" vectorEffect="non-scaling-stroke" pointerEvents="none" />);
+    out.push(<rect key="mq" x={m.x} y={m.y} width={m.w} height={m.h} fill="var(--accent)" fillOpacity=".08" stroke="var(--accent-ink)" strokeWidth="1" vectorEffect="non-scaling-stroke" pointerEvents="none" />);
   }
   return out;
 }

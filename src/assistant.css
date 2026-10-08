@@ -35,7 +35,7 @@
   font-size:13.5px;line-height:1.55;max-width:76%;
 }
 .chat__msg.is-me{justify-content:flex-end}
-.chat__msg.is-me > p{background:var(--green);border-color:var(--green);color:var(--on-green)}
+.chat__msg.is-me > p{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
 
 /* o markdown do Merlin: lista, titulo, negrito e codigo do jeito que ele
    escreve. as mesmas regras do corpo da nota (.body-md), com as margens de
@@ -51,10 +51,10 @@
 .chat__body code{font-family:var(--mono);font-size:12px;background:var(--fill);padding:1px 5px;border-radius:4px}
 /* endereco no meio do texto continua sendo endereco: aqui sublinhado e
    informacao, nao um botao disfarcado */
-.chat__body a{color:var(--green-ink);text-decoration:underline;text-underline-offset:2px}
+.chat__body a{color:var(--accent-ink);text-decoration:underline;text-underline-offset:2px}
 .chat__body li.chk{list-style:none;margin-left:-20px}
 .chat__body li.chk::before{content:"☐ ";color:var(--ink-30)}
-.chat__body li.chk.is-done::before{content:"☑ ";color:var(--green-ink)}
+.chat__body li.chk.is-done::before{content:"☑ ";color:var(--accent-ink)}
 .chat__body li.chk.is-done{color:var(--ink-30);text-decoration:line-through}
 
 /* ---------- a chegada ----------
@@ -62,7 +62,7 @@
 .chat__welcome{margin:auto 0;display:flex;flex-direction:column;align-items:center;text-align:center}
 .chat__mark{
   width:56px;height:56px;display:grid;place-items:center;border-radius:50%;
-  color:var(--green-ink);background:radial-gradient(circle at 50% 42%,var(--green-glow),transparent 70%);
+  color:var(--accent-ink);background:radial-gradient(circle at 50% 42%,var(--accent-glow),transparent 70%);
 }
 .chat__mark svg{width:28px;height:28px}
 .chat__welcome h1{margin:var(--pd2) 0 0;font-size:clamp(22px,3vw,30px);font-weight:600;letter-spacing:-.03em;line-height:1.1}
@@ -75,10 +75,10 @@
   transition:background var(--t),border-color var(--t);
 }
 .chat__start:hover{background:var(--fill-hover);border-color:var(--ink-30)}
-.chat__start[aria-pressed="true"]{border-color:var(--green);background:var(--fill-hover)}
+.chat__start[aria-pressed="true"]{border-color:var(--accent);background:var(--fill-hover)}
 .chat__start i{
   width:28px;height:28px;display:grid;place-items:center;margin-bottom:2px;
-  border-radius:var(--br2);color:var(--green-ink);background:var(--green-glow);
+  border-radius:var(--br2);color:var(--accent-ink);background:var(--accent-glow);
 }
 .chat__start i svg{width:16px;height:16px}
 .chat__start b{font-size:12.5px;font-weight:600;letter-spacing:-.01em}
@@ -99,7 +99,7 @@
 .chat__field:focus{outline:none}
 .chat__field::placeholder{color:var(--ink-30)}
 /* qual dos comecos esta ligado, e o botao que o tira */
-.chat__mode{display:flex;align-items:center;gap:6px;margin:0 0 6px;padding:0 8px;font-size:11.5px;color:var(--green-ink)}
+.chat__mode{display:flex;align-items:center;gap:6px;margin:0 0 6px;padding:0 8px;font-size:11.5px;color:var(--accent-ink)}
 .chat__mode svg{width:13px;height:13px}
 .chat__mode button{display:grid;place-items:center;width:16px;height:16px;border-radius:4px;color:var(--ink-30)}
 .chat__mode button:hover{color:var(--ink);background:var(--fill-hover)}

@@ -14,7 +14,7 @@
   background:var(--fill);border:1px solid var(--line-soft);border-radius:var(--br);
   transition:border-color var(--t),background var(--t);
 }
-.col-c.is-over{border-color:var(--green);background:color-mix(in srgb,var(--green) 6%,var(--fill))}
+.col-c.is-over{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 6%,var(--fill))}
 .col-c__head{display:flex;align-items:center;gap:6px;padding:2px 2px 4px 6px;min-height:28px}
 .col-c__name{font-size:13px;font-weight:600;letter-spacing:-.01em;color:var(--ink)}
 .col-c__count{font-size:11.5px;color:var(--ink-30);font-variant-numeric:tabular-nums}
@@ -31,7 +31,7 @@
 .piece:hover{border-color:var(--line)}
 .piece.is-active{border-color:var(--ink-30)}
 .piece.is-dragging{opacity:.4}
-.piece:focus-visible{outline:none;box-shadow:0 0 0 2px var(--green)}
+.piece:focus-visible{outline:none;box-shadow:0 0 0 2px var(--accent)}
 .piece__title{margin:0;font-size:13px;font-weight:600;line-height:1.35;color:var(--ink)}
 .piece__meta{display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:11.5px;color:var(--ink-50)}
 .piece__date{font-variant-numeric:tabular-nums}
@@ -43,7 +43,7 @@
    cor fica na bolinha, e so o video (o formato longo) leva o verde */
 .fmt{display:inline-flex;align-items:center;gap:5px;padding:2px 8px 2px 7px;border-radius:var(--br-pill);background:var(--fill-hover);color:var(--ink-70);white-space:nowrap}
 .fmt::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--ink-30)}
-.fmt--youtube::before{background:var(--green)}
+.fmt--youtube::before{background:var(--accent)}
 .fmt--reels::before,.fmt--story::before{background:var(--ink-70)}
 .fmt--carousel::before{background:transparent;box-shadow:inset 0 0 0 1.5px var(--ink-50)}
 .fmt--email::before{background:var(--ink-50)}
@@ -57,7 +57,7 @@
    erro — nada de vermelho, nem de alerta. */
 .gap{all:unset;cursor:pointer;color:inherit;border-bottom:1px dotted var(--ink-30);transition:color var(--t),border-color var(--t)}
 .gap:hover{color:var(--ink);border-bottom-color:var(--ink-50)}
-.gap:focus-visible{outline:2px solid var(--green);outline-offset:2px;border-radius:3px}
+.gap:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:3px}
 .gap__who{color:var(--ink-70)}
 
 /* ---------- a peca aberta ---------- */
@@ -93,7 +93,7 @@
 .merlin-strip{display:flex;flex-direction:column;gap:10px}
 .merlin-strip__row{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
 .merlin-strip__k{display:inline-flex;align-items:center;gap:5px;margin-right:4px;font-size:12.5px;color:var(--ink-50)}
-.merlin-strip__k svg{width:13px;height:13px;color:var(--green)}
+.merlin-strip__k svg{width:13px;height:13px;color:var(--accent)}
 .pill--merlin{border-color:var(--ink-30);color:var(--ink)}
 .merlin-strip__more{all:unset;cursor:pointer;display:inline-flex;align-items:center;gap:3px;margin-left:4px;font-size:12px;color:var(--ink-30)}
 .merlin-strip__more:hover{color:var(--ink-70)}
@@ -129,7 +129,7 @@
 .suggestion-list{display:flex;flex-direction:column;gap:2px}
 .suggestion{display:flex;align-items:flex-start;gap:var(--pd2);padding:6px 4px;border-radius:var(--br2);cursor:pointer;transition:background var(--t)}
 .suggestion:hover{background:var(--fill)}
-.suggestion input[type="checkbox"]{flex:0 0 auto;width:16px;height:16px;margin-top:2px;accent-color:var(--green)}
+.suggestion input[type="checkbox"]{flex:0 0 auto;width:16px;height:16px;margin-top:2px;accent-color:var(--accent)}
 .suggestion__text{flex:1 1 auto;min-width:0;font-size:13px;display:flex;flex-direction:column;gap:3px}
 .suggestion__text b{font-weight:600;color:var(--ink)}
 .suggestion__text .fmt{font-size:11px;margin-right:4px}

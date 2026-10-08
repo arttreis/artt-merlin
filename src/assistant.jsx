@@ -213,7 +213,7 @@ function Assistant() {
               : messages.map((m, i) => (
                   <div key={i} className={"chat__msg" + (m.from === "me" ? " is-me" : "")}>
                     {m.proposal
-                      ? <button className="pill pill--green" type="button" onClick={() => setProposal(m.proposal)}>{icon("spark")}{m.proposal.title}</button>
+                      ? <button className="pill pill--accent" type="button" onClick={() => setProposal(m.proposal)}>{icon("spark")}{m.proposal.title}</button>
                       : m.from === "me"
                         /* o que a pessoa escreveu sai como ela escreveu; o que o
                            Merlin responde vem em markdown e é lido como markdown —
@@ -237,7 +237,7 @@ function Assistant() {
                      placeholder={start ? start.placeholder : "escreva para o Merlin…"}
                      aria-label="Escreva para o Merlin"
                      value={input} onChange={(e) => setInput(e.currentTarget.value)} />
-              <button className="pill pill--green pill--icon" type="submit" aria-label="Enviar"
+              <button className="pill pill--accent pill--icon" type="submit" aria-label="Enviar"
                       disabled={thinking || !input.trim()}>{icon("arrow")}</button>
             </div>
           </form>

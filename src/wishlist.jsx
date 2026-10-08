@@ -173,7 +173,7 @@ function ShoppingView({ store, onNewItem, onEditItem, onBuy, onUnbuy, onPaste })
         </div>
         <div className="actions">
           <button className="pill pill--icon" type="button" title="colar uma lista" aria-label="colar uma lista" onClick={onPaste}>{icon("copy")}</button>
-          <button className="pill pill--green" type="button" title="novo item (n)" onClick={onNewItem}>{icon("plus")}item</button>
+          <button className="pill pill--accent" type="button" title="novo item (n)" onClick={onNewItem}>{icon("plus")}item</button>
         </div>
       </div>
 
@@ -215,7 +215,7 @@ function Shelf({ store, lists, onOpen, onNewList }) {
           {wanted.length > 0 && <p className="sub">{wanted.length + (wanted.length === 1 ? " item" : " itens") + " · faltam " + brl(sum(wanted, (it) => it.price))}</p>}
         </div>
         <div className="actions">
-          <button className="pill pill--green" type="button" title="nova coletânea (n)" onClick={onNewList}>{icon("plus")}coletânea</button>
+          <button className="pill pill--accent" type="button" title="nova coletânea (n)" onClick={onNewList}>{icon("plus")}coletânea</button>
         </div>
       </div>
 
@@ -272,7 +272,7 @@ function ListView({ store, list, onBack, onEditList, onNewItem, onEditItem, onBu
         </div>
         <div className="actions">
           <button className="pill pill--icon" type="button" title="editar coletânea" aria-label="editar coletânea" onClick={onEditList}>{icon("pencil")}</button>
-          <button className="pill pill--green" type="button" title="novo item (n)" onClick={onNewItem}>{icon("plus")}item</button>
+          <button className="pill pill--accent" type="button" title="novo item (n)" onClick={onNewItem}>{icon("plus")}item</button>
         </div>
       </div>
 

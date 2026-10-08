@@ -26,7 +26,7 @@
   position:absolute;top:12px;left:12px;z-index:8;max-width:calc(100vw - 24px);
   display:flex;align-items:center;gap:10px;padding:7px 14px 7px 10px;border-radius:var(--br3);
 }
-.shv-mark{display:grid;place-items:center;width:26px;height:26px;flex:none;color:var(--green)}
+.shv-mark{display:grid;place-items:center;width:26px;height:26px;flex:none;color:var(--accent)}
 .shv-mark svg{width:17px;height:17px}
 .shv-top .sep{width:1px;height:22px;background:var(--line-soft);flex:none}
 .shv-title{min-width:0;display:flex;flex-direction:column}
@@ -78,7 +78,7 @@
 /* ---------- abrindo, e o link que não existe mais ---------- */
 .sh{max-width:760px;margin:0 auto;padding:clamp(28px,7vh,72px) clamp(18px,5vw,32px)}
 .sh__mark{display:inline-flex;align-items:center;gap:8px;font-weight:600;font-size:13px;color:var(--ink-30)}
-.sh__mark svg{width:16px;height:16px;color:var(--green)}
+.sh__mark svg{width:16px;height:16px;color:var(--accent)}
 .sh--gone{text-align:center;display:flex;flex-direction:column;align-items:center;gap:var(--pd2);padding-top:clamp(60px,18vh,160px)}
 .sh--gone h1{margin:var(--pd2) 0 0;font-size:clamp(22px,4vw,30px);font-weight:600;letter-spacing:-.03em;color:var(--ink)}
 .sh--gone p{margin:0;max-width:44ch;font-size:13.5px;line-height:1.55;color:var(--ink-30)}

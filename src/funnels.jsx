@@ -1295,7 +1295,7 @@ function Editor({ id, funnels }) {
             title={thinking ? "pensando…" : "pedir sugestões ao Merlin para este funil"} aria-label="Sugerir" aria-busy={thinking} onClick={suggest}><SparkIcon /></button>
           <button className="action" id="share-btn" type="button" title="compartilhar um link só de leitura" aria-label="Compartilhar" onClick={() => setSharing(true)}>{icon("link")}</button>
           <button className="action" id="more-btn" type="button" title="mais" aria-label="Mais" onClick={() => setMenuOpen(true)}><MoreIcon /></button>
-          <button className="pill pill--mini pill--green pill--icon" id="library-toggle" type="button" title="nova etapa — biblioteca de tipos" aria-label="Nova etapa" aria-haspopup="dialog" aria-expanded={String(libraryOpen)} onClick={() => showLibrary(!libraryOpen)}>{icon("plus")}</button>
+          <button className="pill pill--mini pill--accent pill--icon" id="library-toggle" type="button" title="nova etapa — biblioteca de tipos" aria-label="Nova etapa" aria-haspopup="dialog" aria-expanded={String(libraryOpen)} onClick={() => showLibrary(!libraryOpen)}>{icon("plus")}</button>
         </div>
       </div>
 
@@ -1620,7 +1620,7 @@ function NodePanel({ node, doc, comparing, pendingFocus, onPatch, onType, onNumb
 function StatusChips({ options, green, value, onPick }) {
   return (
     <div className="chips">
-      {options.map(([v, label]) => <button key={v} type="button" className={"chip" + (v === green ? " chip--green" : "")} aria-pressed={String(v === value)} onClick={() => onPick(v)}>{label}</button>)}
+      {options.map(([v, label]) => <button key={v} type="button" className={"chip" + (v === green ? " chip--accent" : "")} aria-pressed={String(v === value)} onClick={() => onPick(v)}>{label}</button>)}
     </div>
   );
 }
@@ -1944,7 +1944,7 @@ function SuggestionsDialog({ list, onAdd, onClose }) {
     <Dialog title="o Merlin sugere" sub="olhou o funil como está e achou isto — desmarque o que não serve" wide onClose={onClose}
         actions={<>
           <button className="pill" type="button" onClick={onClose}>descartar</button>
-          <button className="pill pill--green" type="button" id="add-suggestions" disabled={!n} onClick={() => onAdd(list.filter((s, i) => checked[i]))}>adicionar {n}</button></>}>
+          <button className="pill pill--accent" type="button" id="add-suggestions" disabled={!n} onClick={() => onAdd(list.filter((s, i) => checked[i]))}>adicionar {n}</button></>}>
       {groups.length ? groups.map((g) => (
         <div key={g.type} className="sug-group"><h4>{g.label}</h4>
           {g.items.map(([s, i]) => (
@@ -2116,7 +2116,7 @@ function FunnelList({ funnels }) {
         <div><h1>funis</h1>{list.length > 0 && <p className="sub">{list.length === 1 ? "1 funil" : list.length + " funis"}</p>}</div>
         <div className="actions">{choosing && list.length
           ? <button className="pill pill--icon" type="button" id="new-funnel-back" title="voltar para a lista (esc)" aria-label="Voltar" onClick={() => setChoosing(false)}>{icon("chevronLeft")}</button>
-          : <button className="pill pill--green" type="button" id="new-funnel" title="novo funil (n)" onClick={() => setChoosing(true)}>{icon("plus")}funil</button>}</div>
+          : <button className="pill pill--accent" type="button" id="new-funnel" title="novo funil (n)" onClick={() => setChoosing(true)}>{icon("plus")}funil</button>}</div>
       </div>
       {!picking && <div className="fl-grid">{list.map((f) => <FunnelCard key={f.id} f={f} onDuplicate={() => duplicate(f.id)} onRemove={() => remove(f.id)} />)}</div>}
       {/* eram trinta e nove modelos prontos, com as taxas médias já

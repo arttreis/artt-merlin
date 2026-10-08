@@ -35,7 +35,7 @@
 /* marca de feito reaproveitada em canal, objetivo, passo e backlog: o mesmo
    gesto do resto do sistema — apagado quando falta, verde quando feito. */
 .action[data-done="false"]{opacity:.3}
-.action[data-done="true"]{color:var(--green-ink)}
+.action[data-done="true"]{color:var(--accent-ink)}
 
 .is-finished{opacity:.6}
 .channel-funnels{margin-top:var(--pd);padding-top:var(--pd2);border-top:1px solid var(--line-soft)}
@@ -75,14 +75,14 @@
   background:var(--fill-hover);border:1px solid var(--line-soft);
   font-size:12.5px;font-weight:600;color:var(--ink-70);
 }
-.client-row.is-active .avatar{background:var(--green);border-color:var(--green);color:var(--on-green)}
+.client-row.is-active .avatar{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
 .sub--numbers b{color:var(--ink);font-weight:500}
 
 /* ---------- a pagina do cliente ---------- */
 .client-page{padding:var(--pd) calc(var(--pd) * 1.5) calc(var(--pd) * 1.5)}
 .client-page .panel-head{margin-bottom:var(--pd2)}
 .client-hero{display:flex;align-items:center;gap:12px;margin:0 0 var(--pd2)}
-.avatar--big{width:44px;height:44px;border-radius:13px;font-size:18px;background:var(--green);border-color:var(--green);color:var(--on-green)}
+.avatar--big{width:44px;height:44px;border-radius:13px;font-size:18px;background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
 .client-hero__names{flex:1 1 auto;min-width:0;display:flex;flex-direction:column}
 .client-hero__name,.client-hero__brand{width:100%;background:none;border:0;outline:none;padding:0;color:var(--ink)}
 .client-hero__name{font-size:clamp(20px,2.2vw,26px);font-weight:600;letter-spacing:-.03em;line-height:1.15}
@@ -159,12 +159,12 @@
 }
 .drop b{color:var(--ink);font-weight:500;font-size:13px}
 .drop:hover{background:var(--fill)}
-.drop.is-over{border-color:var(--green);background:color-mix(in srgb,var(--green) 8%,transparent);color:var(--green-ink)}
+.drop.is-over{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 8%,transparent);color:var(--accent-ink)}
 .file-line{gap:10px}
 .file-line .name{text-decoration:none}
-.file-line .name:hover{color:var(--green-ink)}
+.file-line .name:hover{color:var(--accent-ink)}
 .file-line__ext{flex:0 0 38px;height:28px;display:grid;place-items:center;border-radius:var(--br2);background:var(--fill-hover);color:var(--ink-50);font-size:11px}
-.file-line.is-contract .file-line__ext{background:var(--green);color:var(--on-green)}
+.file-line.is-contract .file-line__ext{background:var(--accent);color:var(--on-accent)}
 .file-line__kind{flex:0 0 auto;background:none;border:1px solid var(--line-soft);border-radius:var(--br-pill);padding:3px 8px;font-size:11.5px;color:var(--ink-50)}
 .file-line__kind option{background:var(--surface);color:var(--ink)}
 
@@ -178,7 +178,7 @@
 .timeline__item{position:relative}
 .timeline__item::before{
   content:"";position:absolute;left:-23px;top:4px;width:9px;height:9px;border-radius:50%;
-  background:var(--surface);border:2px solid var(--green);
+  background:var(--surface);border:2px solid var(--accent);
 }
 .timeline__item.is-event::before{border-color:var(--ink-30)}
 .timeline__head{display:flex;align-items:center;gap:8px;margin:0 0 4px;color:var(--ink-30)}

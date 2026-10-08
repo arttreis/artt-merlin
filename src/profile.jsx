@@ -91,7 +91,7 @@ function Profile() {
           <div className="pf-actions">
             {c.signedIn
               ? <button className="pill" type="button" onClick={() => c.signOut()}>sair</button>
-              : <button className="pill pill--green" type="button" onClick={() => signIn.show()}>entrar</button>}
+              : <button className="pill pill--accent" type="button" onClick={() => signIn.show()}>entrar</button>}
             {c.status === "error" && <button className="pill" type="button" onClick={() => c.syncAll()}>tentar de novo</button>}
           </div>
           {currentBrand() === "gl" && (

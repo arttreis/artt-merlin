@@ -226,7 +226,7 @@ export function Form({ title, sub, wide, submit, remove, removeIcon, aside, onSu
             <span className="spacer" />
           </>}
           <button className="pill" type="button" onClick={onClose}>cancelar</button>
-          <button className="pill pill--green" type="submit">{submit || "salvar"}</button>
+          <button className="pill pill--accent" type="submit">{submit || "salvar"}</button>
         </div>
       </form>
     </div>
@@ -463,7 +463,7 @@ export function ShareDialog({ type, id, name, onClose }) {
           <p className="note">Cria um endereço público que abre este {what} do jeito que ele está
           desenhado: sem conta, sem entrar e sem poder mexer. Dá para fechar depois.</p>
           <div className="share__actions">
-            <button className="pill pill--green" type="button" id="share-create" disabled={busy} onClick={create}>
+            <button className="pill pill--accent" type="button" id="share-create" disabled={busy} onClick={create}>
               {icon("link")}<span>{busy ? "criando…" : "criar o link"}</span>
             </button>
           </div>
@@ -886,7 +886,7 @@ export function DelegateDialog({ answer, onClose, onBuild }) {
         sub="o Merlin leu esta demanda e diz se dá para fazer com o Claude, com o quê, e o que continua sendo seu. ele só responde — nada aqui muda a tarefa nem a duração."
         actions={<>
           <button className="pill" type="button" onClick={onClose}>fechar</button>
-          {!!answer.setup && <button className="pill pill--green" type="button" id="build-btn" onClick={build}>montar no dia</button>}
+          {!!answer.setup && <button className="pill pill--accent" type="button" id="build-btn" onClick={build}>montar no dia</button>}
         </>}>
       <Markdown className="merlin-body" text={answer.text} />
       {!!answer.setup && <p className="delegate__setup"><span className="t-mono">montar</span>{answer.setup}</p>}
@@ -1030,7 +1030,7 @@ function CloudCard({ page }) {
         <div className="cloud" id="cloud" data-status={c.status}><i className="dot" /><span id="cloud-status">{info.line}</span></div>
         <p id="cloud-text">{info.text}</p>
         {info.action && (
-          <button className="pill pill--green" type="button" id="cloud-action"
+          <button className="pill pill--accent" type="button" id="cloud-action"
                   onClick={() => (c.status === "error" ? c.syncAll() : signIn.show())}>{info.action}</button>
         )}
       </div>

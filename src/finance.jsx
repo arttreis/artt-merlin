@@ -566,7 +566,7 @@ function MonthView({ ctx, month, openDay, onToggleDay, onShift, onNewEntry, onEd
         <button className={"pill" + (sim.length || simOpen ? " is-on" : "")} type="button" aria-pressed={String(simOpen)} onClick={() => setSimOpen((v) => !v)}>
           {icon("spark")}simular{sim.length > 0 ? " · " + sim.length : ""}
         </button>
-        <button className="pill pill--green" type="button" onClick={() => onNewEntry()}>{icon("plus")}lançamento</button>
+        <button className="pill pill--accent" type="button" onClick={() => onNewEntry()}>{icon("plus")}lançamento</button>
       </div>
 
       {simOpen && <SimPanel month={month} entries={sim} onAdd={addSim} onRemove={removeSim} onClear={clearSim} onClose={() => setSimOpen(false)} />}
@@ -812,7 +812,7 @@ function DebtRow({ d, onEdit, onPay }) {
       <td className="weak">{d.creditor}</td>
       <td className="num">{brl(d.total)}</td>
       <td className="num">{settled
-        ? <span className="badge badge--green">pago</span>
+        ? <span className="badge badge--accent">pago</span>
         : <span className="bar" title={brl(d.paid) + " de " + brl(d.total)}><i style={{ width: pct + "%" }}></i></span>}</td>
       <td className="num">{!settled && <span className="row-actions"><button className="pill pill--mini" type="button" title={"abate " + brl(Math.min(d.installment || (d.total - d.paid), d.total - d.paid)) + " do que falta"} onClick={(e) => { e.stopPropagation(); onPay(d.id); }}>abater</button></span>}</td>
     </tr>

@@ -360,7 +360,7 @@ function Notes() {
       <div className="top">
         <h1>notas</h1>
         <span className="count">{live + (live === 1 ? " nota" : " notas")}</span>
-        <button className="pill pill--green pill--mini top__new" type="button" title="nova nota (n)" onClick={() => setForm(true)}>{icon("plus")}nota</button>
+        <button className="pill pill--accent pill--mini top__new" type="button" title="nova nota (n)" onClick={() => setForm(true)}>{icon("plus")}nota</button>
         <div className="views" role="tablist" aria-label="Visão">
           <button className="action" type="button" role="tab" aria-selected={String(view === "list")} title="lista" onClick={() => changeView("list")}><ListIcon /></button>
           <button className="action" type="button" role="tab" aria-selected={String(view === "board")} title="quadro por estágio" onClick={() => changeView("board")}><BoardIcon /></button>
@@ -984,7 +984,7 @@ function SuggestionsDialog({ items, onToggle, onAdd, onClose }) {
         actions={<>
           <button className="dialog__remove" type="button" title="descartar as sugestões" aria-label="Descartar as sugestões" onClick={onClose}>{icon("trash")}</button>
           <span className="spacer" />
-          <button className="pill pill--green" type="button" id="suggestions-add" disabled={n === 0} onClick={onAdd}>{"adicionar" + (n ? " " + n : "")}</button>
+          <button className="pill pill--accent" type="button" id="suggestions-add" disabled={n === 0} onClick={onAdd}>{"adicionar" + (n ? " " + n : "")}</button>
         </>}>
       {groups.length ? groups.map((g) => (
         <div key={g.type} className="mt">

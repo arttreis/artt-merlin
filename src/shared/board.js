@@ -30,7 +30,7 @@ export const STICKY_COLORS = [
 ];
 /* o ultimo post-it e preto: a letra dele e clara */
 export const stickyInk = (color) => (color === STICKY_COLORS.length - 1 ? "#f2f2f2" : "#1a1a1a");
-export const INKS = ["var(--ink)", "var(--mc1)", "var(--mc2)", "var(--mc3)", "var(--mc4)", "var(--green-ink)", "var(--mc6)", "var(--ink-50)"];
+export const INKS = ["var(--ink)", "var(--mc1)", "var(--mc2)", "var(--mc3)", "var(--mc4)", "var(--accent-ink)", "var(--mc6)", "var(--ink-50)"];
 export const inkOf = (i) => INKS[i] || INKS[0];
 /* preenchimento de forma: -1 vazio, 0..15 as cores de papel, 16 a pilula do tema */
 export const FILL_NONE = -1, FILL_THEME = 16;

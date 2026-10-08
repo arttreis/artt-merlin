@@ -26,25 +26,25 @@
 /* o cabecalho de cada dia: a letra do dia da semana em cima e o numero */
 .habit-day{line-height:1.15;min-width:22px}
 .habit-day__weekday{display:block;font-size:9px;color:var(--ink-30)}
-.habit-day.is-today{color:var(--green-ink)}
-.habit-day.is-today .habit-day__weekday{color:var(--green-ink)}
+.habit-day.is-today{color:var(--accent-ink)}
+.habit-day.is-today .habit-day__weekday{color:var(--accent-ink)}
 .habit-day.is-future{opacity:.45}
 
 /* a marca: quadrado que se acende. o esperado tem borda mais viva, para a
    grade mostrar o padrao sem precisar de legenda; o futuro fica apagado. */
 .mark{
   width:20px;height:20px;border-radius:5px;display:inline-grid;place-items:center;
-  border:1px solid var(--line-soft);background:var(--fill);color:var(--on-green);
+  border:1px solid var(--line-soft);background:var(--fill);color:var(--on-accent);
   transition:background var(--t),border-color var(--t),transform var(--t);
 }
 .mark.is-expected{border-color:var(--line)}
 .mark:hover:not(:disabled){border-color:var(--ink-30);transform:scale(1.08)}
-.mark.is-done{background:var(--green);border-color:var(--green)}
+.mark.is-done{background:var(--accent);border-color:var(--accent)}
 .mark:disabled{opacity:.3;cursor:default}
 .mark svg{width:11px;height:11px}
 
 .habit-table td.num{font-variant-numeric:tabular-nums;font-size:12px;color:var(--ink-50);white-space:nowrap;padding:0 8px}
-.habit-table td.num.is-green{color:var(--green-ink)}
+.habit-table td.num.is-green{color:var(--accent-ink)}
 .habit-frac{display:block;font-size:10.5px;color:var(--ink-30);line-height:1.1}
 .habit-table td.habit-actions{white-space:nowrap;padding-right:6px}
 .habit-actions .row-actions{justify-content:flex-end}
@@ -58,4 +58,4 @@
   transition:background var(--t),color var(--t),border-color var(--t);
 }
 .weekday-picker input{position:absolute;opacity:0;width:1px;height:1px}
-.weekday-picker label.is-on{background:var(--green);color:var(--on-green);border-color:var(--green)}
+.weekday-picker label.is-on{background:var(--accent);color:var(--on-accent);border-color:var(--accent)}

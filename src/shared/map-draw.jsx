@@ -140,7 +140,7 @@ export function propagateColors(node, inherited, layout) {
 
 export function colorVar(color) {
   if (!color) return "var(--ink-30)";
-  if (color === 5) return "var(--green-ink)";
+  if (color === 5) return "var(--accent-ink)";
   return "var(--mc" + color + ")";
 }
 
@@ -163,8 +163,8 @@ export function edgeColor(color) { return color ? colorVar(color) : "var(--mp-ed
 export function svgPill(info, node, isRoot, state) {
   const w = info.w, h = info.h, lines = info.lines, rx = h / 2;
   const selected = state === "selected", ghost = state === "ghost";
-  const fill = ghost ? "var(--mp-canvas)" : selected ? "var(--green)" : isRoot ? "var(--ink)" : "var(--mp-pill)";
-  const ink = ghost ? "var(--ink-50)" : selected ? "var(--on-green)" : isRoot ? "var(--bg)" : "var(--mp-pill-ink)";
+  const fill = ghost ? "var(--mp-canvas)" : selected ? "var(--accent)" : isRoot ? "var(--ink)" : "var(--mp-pill)";
+  const ink = ghost ? "var(--ink-50)" : selected ? "var(--on-accent)" : isRoot ? "var(--bg)" : "var(--mp-pill-ink)";
   const stroke = ghost ? "var(--ink-30)" : selected || isRoot ? "none" : "var(--mp-pill-border)";
   const firstY = -(lines.length * LINE_H) / 2 + LINE_H * 0.72;
   return [
@@ -182,9 +182,9 @@ export function svgNode(info, node, isRoot, pos, selectedId, drag) {
   const childTarget = drag && drag.target && drag.target.type === "child" && drag.target.id === node.id;
   const extras = [];
   if (childTarget) {
-    extras.push(<rect key="alvo" x={-w / 2 - 5} y={-h / 2 - 5} width={w + 10} height={h + 10} rx={rx + 5} fill="none" stroke="var(--green-ink)" strokeWidth="2" strokeDasharray="4 4" pointerEvents="none" />);
+    extras.push(<rect key="alvo" x={-w / 2 - 5} y={-h / 2 - 5} width={w + 10} height={h + 10} rx={rx + 5} fill="none" stroke="var(--accent-ink)" strokeWidth="2" strokeDasharray="4 4" pointerEvents="none" />);
   } else if (state === "selected" && isRoot) {
-    extras.push(<rect key="alvo" x={-w / 2 - 4} y={-h / 2 - 4} width={w + 8} height={h + 8} rx={rx + 4} fill="none" stroke="var(--green-ink)" strokeWidth="1.5" pointerEvents="none" />);
+    extras.push(<rect key="alvo" x={-w / 2 - 4} y={-h / 2 - 4} width={w + 8} height={h + 8} rx={rx + 4} fill="none" stroke="var(--accent-ink)" strokeWidth="1.5" pointerEvents="none" />);
   }
   const decorations = [];
   /* o fantasma nao tem nota nem filhos para decorar: ele ganha um "+", que
@@ -196,7 +196,7 @@ export function svgNode(info, node, isRoot, pos, selectedId, drag) {
         <circle r="7" fill="var(--mp-canvas)" stroke="var(--ink-30)" strokeWidth="1" strokeDasharray="2.6 2.2" />
         <path d="M-3.2 0h6.4M0 -3.2v6.4" stroke="var(--ink-30)" strokeWidth="1.4" strokeLinecap="round" fill="none" /></g>
     );
-  } else if (node.note) decorations.push(<circle key="nota" data-note="1" cx={w / 2 - 4} cy={-h / 2 + 4} r="3.5" fill="var(--green-ink)" stroke="var(--mp-canvas)" strokeWidth="1.5"><title>abrir a nota</title></circle>);
+  } else if (node.note) decorations.push(<circle key="nota" data-note="1" cx={w / 2 - 4} cy={-h / 2 + 4} r="3.5" fill="var(--accent-ink)" stroke="var(--mp-canvas)" strokeWidth="1.5"><title>abrir a nota</title></circle>);
   const children = node.children || [];
   const badge = (label, fill, tx) => {
     const lw = 14 + label.length * 6.5;
@@ -279,8 +279,8 @@ export function svgSiblingIndicator(layout, posOf, drag) {
   const y = target.before ? p.y - info.h / 2 - SPACING_V / 2 : p.y + info.h / 2 + SPACING_V / 2;
   const sx = info.side === "left" ? -1 : 1;
   return (
-    <g pointerEvents="none"><rect x={p.x - info.w / 2} y={y - 1.5} width={info.w} height="3" rx="1.5" fill="var(--green)" />
-      <circle cx={p.x - sx * info.w / 2} cy={y} r="4" fill="var(--green)" /></g>
+    <g pointerEvents="none"><rect x={p.x - info.w / 2} y={y - 1.5} width={info.w} height="3" rx="1.5" fill="var(--accent)" />
+      <circle cx={p.x - sx * info.w / 2} cy={y} r="4" fill="var(--accent)" /></g>
   );
 }
 

@@ -912,7 +912,7 @@ function Calendar() {
           </button>
         )}
         {view !== "day" && (
-          <button className="pill pill--green pill--icon" type="button" title="nova tarefa (n)" aria-label="Nova tarefa"
+          <button className="pill pill--accent pill--icon" type="button" title="nova tarefa (n)" aria-label="Nova tarefa"
                   onClick={() => setForm({ id: "", date: anchor })}>{icon("plus")}</button>
         )}
       </div>
@@ -1677,7 +1677,7 @@ function AgendaColor({ agenda }) {
       {open && (
         <span className="swatches" role="dialog" aria-label={"Cor de " + agenda.name}>
           <label className="hexfield">
-            <i style={{ "--s": preview || "var(--green)" }} aria-hidden="true" />
+            <i style={{ "--s": preview || "var(--accent)" }} aria-hidden="true" />
             <span aria-hidden="true">#</span>
             <input autoFocus spellCheck="false" autoComplete="off" maxLength="7" aria-label="cor em hex" placeholder="3B82F6"
                    value={hex} onChange={(e) => typeHex(e.currentTarget.value)}
@@ -1981,7 +1981,7 @@ function Matrix({ doc, open, onApply }) {
                 sub="arraste cada tarefa para um quadrante, ou use as teclas 1 a 4. o que cair em “delega” fica marcado."
                 actions={<>
                   <button className="pill" type="button" id="matrix-discard" onClick={close}>descartar</button>
-                  <button className="pill pill--green" type="button" id="matrix-apply" onClick={apply}>aplicar a ordem</button>
+                  <button className="pill pill--accent" type="button" id="matrix-apply" onClick={apply}>aplicar a ordem</button>
                 </>}>
           <div className="mx" ref={fieldRef}>
             <div className="mx__main">

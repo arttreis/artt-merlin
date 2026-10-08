@@ -126,7 +126,7 @@ function Ideas() {
       <div className="header">
         <div><h1>notas</h1><p className="sub">o que ainda não é tarefa</p></div>
         <div className="actions">
-          <button className="pill pill--green" type="button" onClick={() => setForm({})}>{icon("plus")}ideia</button>
+          <button className="pill pill--accent" type="button" onClick={() => setForm({})}>{icon("plus")}ideia</button>
         </div>
       </div>
       {ideas.all().length

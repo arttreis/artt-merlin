@@ -6,7 +6,7 @@
 
 /* tintas dos ramos: os mesmos tons da paleta --color-N (shell.css), replicados em variavel
    porque dentro do svg inline so custom property resolve nos dois temas —
-   a cor 5 nao tem entrada aqui porque usa --green-ink direto (ja e tema-aware). */
+   a cor 5 nao tem entrada aqui porque usa --accent-ink direto (ja e tema-aware). */
 :root{
   --mc1:#6bb8ff; --mc2:#ffb35c; --mc3:#ff7a9a; --mc4:#c58bff; --mc6:#5ce0d8;
   /* a tela do mapa: fundo um tom abaixo da superficie, pilulas cheias por
@@ -31,7 +31,7 @@ html.light{
   flex:1 1 auto;min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;
   font-size:13px;color:var(--ink);
 }
-.mp-line-name:hover{color:var(--green-ink)}
+.mp-line-name:hover{color:var(--accent-ink)}
 .mp-links{display:flex;gap:6px;flex:0 0 auto}
 .mp-import-hint{max-width:900px;margin:0 auto;font-size:12.5px;color:var(--ink-50);display:flex;align-items:center;gap:4px}
 
@@ -94,7 +94,7 @@ html.light{
    ganha corpo, a borda fecha e o cursor vira mão. */
 .mp-node--ghost{cursor:pointer;opacity:.6;transition:opacity 120ms}
 .mp-node--ghost:hover{opacity:1}
-.mp-node--ghost:hover .mp-pill{fill:var(--mp-pill);stroke:var(--green-ink);stroke-dasharray:none}
+.mp-node--ghost:hover .mp-pill{fill:var(--mp-pill);stroke:var(--accent-ink);stroke-dasharray:none}
 .mp-ghost-hint{
   position:fixed;left:50%;bottom:16px;transform:translateX(-50%);z-index:6;margin:0;
   padding:6px 13px;border-radius:var(--br-pill);
@@ -114,7 +114,7 @@ html.light{
 .mp-fab{
   position:absolute;right:18px;bottom:22px;z-index:3;
   width:48px;height:48px;border-radius:50%;
-  background:var(--green);color:var(--on-green);
+  background:var(--accent);color:var(--on-accent);
   display:grid;place-items:center;box-shadow:var(--sombra-2);
 }
 .mp-fab svg{width:20px;height:20px}
@@ -123,7 +123,7 @@ html.light{
 /* no em edicao: input flutuante sobre o proprio no, no mesmo lugar que o texto ocupava */
 .mp-edit{
   position:fixed;z-index:5;box-sizing:border-box;
-  background:var(--surface);border:1.5px solid var(--green-ink);border-radius:18px;
+  background:var(--surface);border:1.5px solid var(--accent-ink);border-radius:18px;
   padding:6px 12px;font-family:var(--sans);color:var(--ink);text-align:center;
   line-height:1.3;resize:none;overflow:hidden;
 }
@@ -181,11 +181,11 @@ html.light{
 .bd-ai{
   width:44px;height:44px;border-radius:50%;flex:0 0 auto;
   display:grid;place-items:center;
-  background:var(--green);color:var(--on-green);box-shadow:var(--sombra-2);
+  background:var(--accent);color:var(--on-accent);box-shadow:var(--sombra-2);
   transition:transform var(--t),box-shadow var(--t);
 }
 .bd-ai svg{width:21px;height:21px}
-.bd-ai:hover,.bd-ai.is-open{transform:scale(1.06);box-shadow:0 0 0 4px var(--green-glow),var(--sombra-2)}
+.bd-ai:hover,.bd-ai.is-open{transform:scale(1.06);box-shadow:0 0 0 4px var(--accent-glow),var(--sombra-2)}
 .bd-ai:disabled{opacity:.6;cursor:progress}
 .bd-ai[aria-busy="true"] svg{animation:bd-spin 1.2s linear infinite}
 @keyframes bd-spin{to{transform:rotate(360deg)}}
@@ -202,7 +202,7 @@ html.light{
 }
 .bd-tool svg{width:20px;height:20px}
 .bd-tool:hover,.bd-tool.is-open{background:var(--fill-hover);color:var(--ink)}
-.bd-tool.is-active{background:var(--fill-hover);color:var(--green-ink)}
+.bd-tool.is-active{background:var(--fill-hover);color:var(--accent-ink)}
 .bd-emoji{font-size:19px;line-height:1}
 
 .bd-fly{
@@ -222,9 +222,9 @@ html.light{
   font-size:13px;color:var(--ink);
 }
 .bd-row:hover{background:var(--fill-hover)}
-.bd-row.is-on{background:var(--fill-hover);color:var(--green-ink)}
+.bd-row.is-on{background:var(--fill-hover);color:var(--accent-ink)}
 .bd-row__ic{width:20px;height:20px;display:grid;place-items:center;color:var(--ink-70);flex:0 0 auto}
-.bd-row.is-on .bd-row__ic{color:var(--green-ink)}
+.bd-row.is-on .bd-row__ic{color:var(--accent-ink)}
 .bd-row__ic svg{width:18px;height:18px}
 .bd-row__label{flex:1 1 auto}
 .bd-row kbd{margin-left:auto}
@@ -239,23 +239,23 @@ html.light{
 }
 .bd-sticky-grid--wide .bd-sticky-sw{width:28px;height:28px}
 .bd-sticky-sw:hover{transform:scale(1.08)}
-.bd-sticky-sw.is-on{outline:2px solid var(--green-ink);outline-offset:2px}
+.bd-sticky-sw.is-on{outline:2px solid var(--accent-ink);outline-offset:2px}
 .bd-swatches{display:flex;flex-wrap:wrap;gap:6px;padding:4px;max-width:180px}
 .bd-ink{width:22px;height:22px;border-radius:50%;box-shadow:inset 0 0 0 1px var(--line)}
-.bd-ink.is-on{outline:2px solid var(--green-ink);outline-offset:2px}
+.bd-ink.is-on{outline:2px solid var(--accent-ink);outline-offset:2px}
 .bd-seg{display:flex;gap:4px;padding:4px}
 .bd-seg button{
   flex:1 1 0;height:32px;border-radius:var(--br2);display:grid;place-items:center;
   border:1px solid var(--line-soft);color:var(--ink);
 }
 .bd-seg button:hover{background:var(--fill-hover)}
-.bd-seg button.is-on{border-color:var(--green-ink)}
+.bd-seg button.is-on{border-color:var(--accent-ink)}
 .bd-dot{display:block;border-radius:50%;background:currentColor}
 .bd-mark{display:block;width:18px;height:10px;border-radius:3px;background:var(--mc2);opacity:.55}
 .bd-emoji-grid{display:grid;grid-template-columns:repeat(8,32px);gap:2px}
 .bd-emoji-grid button{width:32px;height:32px;border-radius:var(--br2);font-size:19px;line-height:1}
 .bd-emoji-grid button:hover{background:var(--fill-hover)}
-.bd-emoji-grid button.is-on{background:var(--fill-hover);box-shadow:inset 0 0 0 1.5px var(--green-ink)}
+.bd-emoji-grid button.is-on{background:var(--fill-hover);box-shadow:inset 0 0 0 1.5px var(--accent-ink)}
 
 /* a barra da selecao: flutua em cima (ou embaixo, se nao couber) do que
    esta selecionado, e some enquanto se arrasta */
@@ -274,7 +274,7 @@ html.light{
 .bd-bar__btn svg{width:17px;height:17px}
 .bd-bar__btn .bd-shape-ic{width:20px;height:18px}
 .bd-bar__btn:hover,.bd-bar__btn.is-open{background:var(--fill-hover);color:var(--ink)}
-.bd-bar__btn.is-on{color:var(--green-ink);background:var(--fill-hover)}
+.bd-bar__btn.is-on{color:var(--accent-ink);background:var(--fill-hover)}
 .bd-bar__num{min-width:18px;text-align:center;color:var(--ink-50)}
 .bd-bar__sep{width:1px;height:20px;background:var(--line);margin:0 4px}
 .bd-bar__pop{position:relative}
@@ -288,12 +288,12 @@ html.light{
 .bd-face--none{background:linear-gradient(135deg,transparent 45%,var(--mc3) 45%,var(--mc3) 55%,transparent 55%),var(--mp-canvas)}
 .bd-shape-grid{display:grid;grid-template-columns:repeat(5,34px);gap:2px}
 .bd-shape-grid button{height:30px;border-radius:var(--br2);display:grid;place-items:center;color:var(--ink-70)}
-.bd-shape-grid button:hover,.bd-shape-grid button.is-on{background:var(--fill-hover);color:var(--green-ink)}
+.bd-shape-grid button:hover,.bd-shape-grid button.is-on{background:var(--fill-hover);color:var(--accent-ink)}
 
 /* escrever num item: o campo senta em cima do texto dele, na mesma letra */
 .bd-edit{
   position:fixed;z-index:5;box-sizing:border-box;margin:0;
-  border:0;outline:1.5px solid var(--green-ink);outline-offset:2px;border-radius:2px;
+  border:0;outline:1.5px solid var(--accent-ink);outline-offset:2px;border-radius:2px;
   padding:0;font-family:var(--sans);resize:none;overflow:hidden;white-space:pre-wrap;word-break:break-word;
 }
 .bd-edit--frame,.bd-edit--table,.bd-edit--line{padding:0 4px;white-space:nowrap}
@@ -330,7 +330,7 @@ circle.bd-handle{cursor:crosshair}
   border:1px solid var(--line-soft);border-radius:var(--br3);background:var(--fill);
   transition:border-color var(--t),background var(--t);
 }
-.bd-tpl:hover{border-color:var(--green-ink);background:var(--fill-hover)}
+.bd-tpl:hover{border-color:var(--accent-ink);background:var(--fill-hover)}
 .bd-tpl b{font-size:13px;font-weight:600;color:var(--ink)}
 .bd-tpl span{font-size:12px;line-height:1.45;color:var(--ink-50)}
 .bd-tpl em{font-style:normal;font-size:11px;color:var(--ink-30)}

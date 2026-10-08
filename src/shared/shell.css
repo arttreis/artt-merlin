@@ -42,11 +42,11 @@ body{
 }
 /* a tinta sobre o destaque é token porque muda com a marca: escura sobre o
    verde do Merlin, branca sobre o azul da casa. */
-::selection{background:var(--green);color:var(--on-green)}
+::selection{background:var(--accent);color:var(--on-accent)}
 a{color:inherit;text-decoration:none}
 button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer}
 input,select,textarea{font:inherit;color:inherit}
-:focus-visible{outline:2px solid var(--green);outline-offset:2px;border-radius:var(--br2)}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:var(--br2)}
 
 :root{
   --pd:16px; --pd2:8px; --pd3:4px;
@@ -67,10 +67,10 @@ input,select,textarea{font:inherit;color:inherit}
   --fill-hover:rgba(242,242,242,.1);
   --scrim:rgba(13,13,13,.62);
 
-  --green:#2EE86B;
-  --green-ink:#2EE86B;
-  --green-glow:rgba(46,232,107,.3);
-  --on-green:#0d0d0d;
+  --accent:#2EE86B;
+  --accent-ink:#2EE86B;
+  --accent-glow:rgba(46,232,107,.3);
+  --on-accent:#0d0d0d;
 
   /* sombras em token porque no claro elas precisam recuar */
   --sombra:inset 0 1px 0 rgba(242,242,242,.05),0 40px 110px -44px rgba(0,0,0,.95);
@@ -103,8 +103,8 @@ html.light{
   --fill:rgba(13,13,13,.04);
   --fill-hover:rgba(13,13,13,.08);
   --scrim:rgba(242,242,240,.7);
-  --green-ink:#0d8038;
-  --green-glow:rgba(46,232,107,.5);
+  --accent-ink:#0d8038;
+  --accent-glow:rgba(46,232,107,.5);
   --sombra:inset 0 1px 0 rgba(255,255,255,.6),0 30px 80px -40px rgba(13,13,13,.25);
   --sombra-2:0 10px 30px rgba(13,13,13,.14);
   --glow-op:.12;
@@ -124,10 +124,9 @@ html.light{
    troca não desmonta nada — e o azul #368DFF no destaque. O #0014FF que
    aparece por aí não é a marca: o próprio CSS da casa anota isso.
 
-   O token de destaque ainda se chama `--green`. Ele nasceu quando havia uma
-   marca só e o destaque era, de fato, verde; aqui ele carrega o azul. São 174
-   ocorrências em 22 arquivos, e renomear para `--accent` merece um commit
-   próprio — está anotado na VISAO. */
+   O token de destaque é `--accent` (até 08/10/2026 era `--accent`, de quando
+   havia uma marca só e o destaque era, de fato, verde); aqui ele carrega o
+   azul. */
 html.gl{
   --bg:#0A0A0A;
   --surface:#121212;
@@ -144,11 +143,11 @@ html.gl{
   --fill-hover:rgba(255,255,255,.08);
   --scrim:rgba(10,10,10,.72);
 
-  --green:#368DFF;
-  --green-ink:#368DFF;
-  --green-glow:rgba(54,141,255,.22);
+  --accent:#368DFF;
+  --accent-ink:#368DFF;
+  --accent-glow:rgba(54,141,255,.22);
   /* branco no azul, como o .btn--accent da casa — no verde era o inverso */
-  --on-green:#ffffff;
+  --on-accent:#ffffff;
 
   --sans:"Manrope",system-ui,-apple-system,sans-serif;
   --display:"DM Sans",var(--sans);
@@ -173,8 +172,8 @@ html.gl.light{
   --scrim:rgba(247,247,245,.72);
   /* o azul da casa em texto sobre branco fica em 3,5:1 — abaixo do mínimo de
      leitura. o destaque de fundo continua #368DFF; só a tinta escurece. */
-  --green-ink:#1257C4;
-  --green-glow:rgba(54,141,255,.34);
+  --accent-ink:#1257C4;
+  --accent-glow:rgba(54,141,255,.34);
   --glow-op:.14;
 }
 /* o display da casa é DM Sans; o corpo, Manrope. no Merlin os dois são Sora,
@@ -208,7 +207,7 @@ html.merlin.sidebar-closed{--sidebar-w:var(--sidebar-min)}
 .sb a{text-decoration:none}
 .sb__top{display:flex;align-items:center;justify-content:space-between;gap:var(--pd2);padding:2px 4px 10px;border-bottom:1px solid var(--line-soft);min-height:44px}
 .sb__logo{display:flex;align-items:center;gap:10px;color:var(--ink);min-width:0}
-.sb__logo svg{width:22px;height:22px;flex:none;color:var(--green-ink)}
+.sb__logo svg{width:22px;height:22px;flex:none;color:var(--accent-ink)}
 .sb__logo b{font-weight:600;font-size:17px;letter-spacing:-.02em;white-space:nowrap}
 
 /* o lockup da casa: logotipo + "merlin" de sub-rótulo, do jeito que a
@@ -257,12 +256,12 @@ html.sidebar-closed .sb__logo--gl .gl-mark{display:block}
 .sb__results p{margin:0;padding:8px;font-size:12px;color:var(--ink-30)}
 .sb__ask{display:flex;align-items:center;gap:8px;width:100%;padding:7px 8px;margin-top:2px;border-top:1px solid var(--line-soft);border-radius:var(--br2);font-size:12.5px;color:var(--ink-50)}
 .sb__ask:hover{background:var(--fill-hover);color:var(--ink)}
-.sb__ask svg{width:14px;height:14px;color:var(--green-ink)}
+.sb__ask svg{width:14px;height:14px;color:var(--accent-ink)}
 
 /* o botao de faisca dentro do campo de busca, que leva pro assistente com o
    que ja foi digitado */
 .sb__assistant{flex:none;width:22px;height:22px;display:grid;place-items:center;border-radius:var(--br2);color:var(--ink-30);transition:color var(--t),background var(--t)}
-.sb__assistant:hover{color:var(--green-ink);background:var(--fill-hover)}
+.sb__assistant:hover{color:var(--accent-ink);background:var(--fill-hover)}
 .sb__assistant svg{width:14px;height:14px}
 
 /* itens */
@@ -276,11 +275,11 @@ html.sidebar-closed .sb__logo--gl .gl-mark{display:block}
 .sb__item:hover{color:var(--ink);background:var(--fill)}
 .sb__item:hover svg{color:var(--ink-70)}
 .sb__item[aria-current="page"]{color:var(--ink);background:var(--fill-hover)}
-.sb__item[aria-current="page"] svg{color:var(--green-ink)}
+.sb__item[aria-current="page"] svg{color:var(--accent-ink)}
 /* a luz do sistema, escorrendo pela borda do item ativo */
 .sb__item[aria-current="page"]::after{
   content:"";position:absolute;right:0;top:6px;bottom:6px;width:3px;border-radius:2px;
-  background:var(--green);box-shadow:0 0 12px var(--green-glow);
+  background:var(--accent);box-shadow:0 0 12px var(--accent-glow);
 }
 /* os grupos: um titulo pequeno em cima de cada um, e ar entre eles. a lista
    rola por dentro se a tela for baixa, pro cartao da nuvem nunca sair de vista */
@@ -302,7 +301,7 @@ html.sidebar-closed .sb__group + .sb__group{border-top:1px solid var(--line-soft
   background:var(--fill);border:1px solid var(--line-soft);
 }
 .sb__card .cloud{display:flex;align-items:center;gap:6px;margin-bottom:6px;font-size:11.5px;color:var(--ink-30)}
-.sb__card .cloud[data-status="synced"]{color:var(--green-ink)}
+.sb__card .cloud[data-status="synced"]{color:var(--accent-ink)}
 .sb__card .cloud[data-status="error"]{color:var(--ink-70)}
 .sb__card .cloud .dot{width:6px;height:6px;border-radius:50%;background:currentColor;flex:none}
 .sb__card p{margin:0 0 8px;font-size:12px;color:var(--ink-50);line-height:1.4}
@@ -316,7 +315,7 @@ html.sidebar-closed .sb__group + .sb__group{border-top:1px solid var(--line-soft
 }
 .sb__who .avatar{
   width:32px;height:32px;flex:none;border-radius:50%;display:grid;place-items:center;
-  background:var(--green);color:var(--on-green);font-weight:600;font-size:13px;
+  background:var(--accent);color:var(--on-accent);font-weight:600;font-size:13px;
 }
 .sb__who .avatar.is-out{background:var(--fill-hover);color:var(--ink-50)}
 .sb__who .who{flex:1 1 auto;min-width:0}
@@ -438,7 +437,7 @@ html.light .knob__sun{opacity:1;transform:none}
 .delegate__setup .t-mono{color:var(--ink-30);flex:none}
 /* o botao da pergunta enquanto ela esta no ar, em qualquer lista */
 .action:disabled{opacity:.45;cursor:default}
-.action[data-thinking="yes"]{color:var(--green-ink);opacity:1}
+.action[data-thinking="yes"]{color:var(--accent-ink);opacity:1}
 
 /* ---------- entrar (login) ---------- */
 .signin{width:min(100%,420px)}
@@ -446,7 +445,7 @@ html.light .knob__sun{opacity:1;transform:none}
 .signin-email{font-weight:600;color:var(--ink);overflow-wrap:anywhere}
 .signin-input{height:42px;font-size:14px}
 .signin-button{
-  width:100%;height:40px;margin-top:var(--pd2);border-radius:var(--br-pill);background:var(--green);color:var(--on-green);
+  width:100%;height:40px;margin-top:var(--pd2);border-radius:var(--br-pill);background:var(--accent);color:var(--on-accent);
   font-weight:500;font-size:13.5px;transition:filter var(--t),opacity var(--t);
 }
 .signin-button:hover:not(:disabled){filter:brightness(1.08)}
@@ -480,7 +479,7 @@ html.light .knob__sun{opacity:1;transform:none}
   transition:border-color var(--t),box-shadow var(--t),background var(--t);
 }
 .otp__cell.is-filled{background:var(--fill-hover)}
-.otp:focus-within .otp__cell.is-at{border-color:var(--green);box-shadow:0 0 0 1px var(--green)}
+.otp:focus-within .otp__cell.is-at{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
 .otp:focus-within .otp__cell.is-at:not(.is-filled)::after{content:"";width:1.5px;height:22px;background:var(--ink);animation:otp-caret 1s steps(1) infinite}
 @keyframes otp-caret{50%{opacity:0}}
 .otp.is-error .otp__cell{border-color:var(--ink-50)}
@@ -495,11 +494,11 @@ html.light .knob__sun{opacity:1;transform:none}
   font-size:11px;font-weight:500;
   color:var(--ink-50);white-space:nowrap;flex:0 0 auto;
 }
-.badge--green{color:var(--green-ink);border-color:color-mix(in srgb,var(--green) 40%,transparent)}
-.badge--solid{background:var(--green);color:var(--on-green);border-color:var(--green)}
+.badge--accent{color:var(--accent-ink);border-color:color-mix(in srgb,var(--accent) 40%,transparent)}
+.badge--solid{background:var(--accent);color:var(--on-accent);border-color:var(--accent)}
 /* a paleta: qualquer elemento com data-color recebe --color, e quem quiser
    pintar le so a variavel. hoje o unico consumidor e o ponto do habito. */
-:root{--color-1:#6bb8ff;--color-2:#ffb35c;--color-3:#ff7a9a;--color-4:#c58bff;--color-5:var(--green-ink);--color-6:#5ce0d8}
+:root{--color-1:#6bb8ff;--color-2:#ffb35c;--color-3:#ff7a9a;--color-4:#c58bff;--color-5:var(--accent-ink);--color-6:#5ce0d8}
 html.light{--color-1:#1c6fc4;--color-2:#b8600a;--color-3:#c4234f;--color-4:#7a3bd8;--color-6:#127f79}
 [data-color="1"]{--color:var(--color-1)}[data-color="2"]{--color:var(--color-2)}[data-color="3"]{--color:var(--color-3)}
 [data-color="4"]{--color:var(--color-4)}[data-color="5"]{--color:var(--color-5)}[data-color="6"]{--color:var(--color-6)}
@@ -511,7 +510,7 @@ html.light{--color-1:#1c6fc4;--color-2:#b8600a;--color-3:#c4234f;--color-4:#7a3b
 .sb__who{transition:background var(--t),border-color var(--t)}
 .sb__who:has(.sb__me:hover){background:var(--fill);border-color:var(--line)}
 .sb__me:hover .who b{color:var(--ink)}
-.sb__me[aria-current="page"] .who b{color:var(--green-ink)}
+.sb__me[aria-current="page"] .who b{color:var(--accent-ink)}
 
 
 /* ---------- a caixa de marcar ----------
@@ -530,10 +529,10 @@ html.light{--color-1:#1c6fc4;--color-2:#b8600a;--color-3:#c4234f;--color-4:#7a3b
   transition:background var(--t),color var(--t),border-color var(--t);
 }
 .mark svg{width:12px;height:12px;opacity:.18;transition:opacity var(--t)}
-.mark:hover{background:var(--green);border-color:var(--green);color:var(--on-green)}
+.mark:hover{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
 .mark:hover svg{opacity:1}
 /* marcada: o verde fica, e o ✓ para de ser fantasma */
-.is-done > .mark,.mark[aria-checked="true"]{background:var(--green);border-color:var(--green);color:var(--on-green)}
+.is-done > .mark,.mark[aria-checked="true"]{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
 .is-done > .mark svg,.mark[aria-checked="true"] svg{opacity:1}
 
 

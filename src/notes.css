@@ -64,11 +64,11 @@
 .item__when{flex:0 0 auto;font-size:11.5px;color:var(--ink-30);white-space:nowrap;font-variant-numeric:tabular-nums}
 .item__preview{font-size:12.5px;color:var(--ink-50);overflow:hidden;white-space:nowrap;text-overflow:ellipsis;display:flex;align-items:center;gap:6px}
 .item__preview .stage{flex:0 0 auto;color:var(--ink-50);font-size:11.5px;font-weight:500;font-variant-numeric:tabular-nums}
-.item__preview .stage.is-green{color:var(--green-ink)}
+.item__preview .stage.is-green{color:var(--accent-ink)}
 .item__preview .phrase{min-width:0;overflow:hidden;text-overflow:ellipsis}
 /* a bolinha verde: nota que ainda e semente sem corpo nem passo — chegou e
    ninguem mexeu, como uma mensagem nao lida */
-.item__new{width:7px;height:7px;border-radius:50%;background:var(--green);flex:0 0 auto;align-self:center;box-shadow:0 0 8px var(--green-glow)}
+.item__new{width:7px;height:7px;border-radius:50%;background:var(--accent);flex:0 0 auto;align-self:center;box-shadow:0 0 8px var(--accent-glow)}
 .item__actions{
   position:absolute;right:8px;top:8px;display:flex;gap:2px;opacity:0;
   background:var(--surface-2);border:1px solid var(--line-soft);border-radius:var(--br2);padding:1px;
@@ -77,7 +77,7 @@
 .item:hover .item__actions,.item:focus-within .item__actions{opacity:1}
 .item:hover .item__when{visibility:hidden}
 .item__actions .action{width:26px;height:26px}
-.item__actions .action[aria-pressed="true"]{color:var(--green)}
+.item__actions .action[aria-pressed="true"]{color:var(--accent)}
 @media (hover:none){.item__actions{display:none}}
 
 .list-empty{padding:40px 20px;text-align:center;color:var(--ink-30);font-size:13px}
@@ -94,10 +94,10 @@
   border-bottom:1px solid var(--line-soft);
 }
 .panel__bar .sep{width:1px;height:18px;background:var(--line-soft);margin:0 6px}
-.panel__bar .action[aria-pressed="true"]{color:var(--green)}
+.panel__bar .action[aria-pressed="true"]{color:var(--accent)}
 .panel__bar .action:disabled{cursor:default}
 /* ramificando: a faísca pulsa enquanto o Merlin pensa */
-.panel__bar .action.is-thinking{color:var(--green-ink);animation:print-wait .9s ease-in-out infinite alternate}
+.panel__bar .action.is-thinking{color:var(--accent-ink);animation:print-wait .9s ease-in-out infinite alternate}
 .back-btn{display:none}
 .panel__scroll{flex:1 1 auto;min-height:0;overflow-y:auto;padding:clamp(16px,2.5vw,28px) clamp(16px,3vw,36px) 60px}
 .panel__body{max-width:760px}
@@ -121,7 +121,7 @@
 .body-md h3,.body-md h4,.body-md h5{margin:0 0 6px;font-size:13.5px;font-weight:600;color:var(--ink)}
 .body-md li.chk{list-style:none;margin-left:-20px}
 .body-md li.chk::before{content:"☐ ";color:var(--ink-30)}
-.body-md li.chk.is-done::before{content:"☑ ";color:var(--green-ink)}
+.body-md li.chk.is-done::before{content:"☑ ";color:var(--accent-ink)}
 .body-md li.chk.is-done{color:var(--ink-30);text-decoration:line-through}
 .saved{font-size:11.5px;color:var(--ink-30);opacity:0;transition:opacity .3s var(--ease);margin-right:8px}
 .saved.is-visible{opacity:1}
@@ -149,7 +149,7 @@
 .v--stage[data-stage="seed"] .stage-dot{border-color:var(--ink-30)}
 .v--stage[data-stage="exploring"] .stage-dot{background:linear-gradient(90deg,var(--ink-50) 50%,transparent 50%)}
 .v--stage[data-stage="defined"] .stage-dot{background:var(--ink-50)}
-.v--stage[data-stage="executing"] .stage-dot{border-color:var(--green);background:var(--green);box-shadow:0 0 8px var(--green-glow)}
+.v--stage[data-stage="executing"] .stage-dot{border-color:var(--accent);background:var(--accent);box-shadow:0 0 8px var(--accent-glow)}
 .v--stage[data-stage="archived"] .stage-dot{border-style:dashed;border-color:var(--ink-30)}
 .sheet .v .weak{font-size:12.5px}
 
@@ -208,7 +208,7 @@
 .suggestion-list{display:flex;flex-direction:column;gap:2px}
 .suggestion{display:flex;align-items:flex-start;gap:var(--pd2);padding:6px 4px;border-radius:var(--br2);cursor:pointer;transition:background var(--t)}
 .suggestion:hover{background:var(--fill)}
-.suggestion input[type="checkbox"]{flex:0 0 auto;width:16px;height:16px;margin-top:2px;accent-color:var(--green)}
+.suggestion input[type="checkbox"]{flex:0 0 auto;width:16px;height:16px;margin-top:2px;accent-color:var(--accent)}
 .suggestion__text{flex:1 1 auto;min-width:0;font-size:13px;display:flex;flex-direction:column;gap:2px}
 .suggestion__text b{font-weight:600;color:var(--ink)}
 .suggestion__note{color:var(--ink-50);font-size:12px}
@@ -245,11 +245,11 @@
 /* o proximo da fila: o unico passo que a nota esta realmente pedindo */
 .step__now{
   flex:none;height:16px;padding:0 6px;border-radius:var(--br-pill);
-  background:color-mix(in srgb,var(--green) 15%,transparent);
-  color:var(--green-ink);font-size:11px;font-weight:500;letter-spacing:0;
+  background:color-mix(in srgb,var(--accent) 15%,transparent);
+  color:var(--accent-ink);font-size:11px;font-weight:500;letter-spacing:0;
   display:inline-flex;align-items:center;
 }
-.step.is-now{background:color-mix(in srgb,var(--green) 5%,transparent)}
+.step.is-now{background:color-mix(in srgb,var(--accent) 5%,transparent)}
 .step__actions .action{width:24px;height:24px}
 .step__actions .action svg{width:13px;height:13px}
 .step__actions .action:disabled{opacity:.25;cursor:default}
@@ -269,7 +269,7 @@
   background:var(--fill-hover);border:1px solid var(--line);
 }
 .activity li[data-kind="born"]::before{background:var(--ink-30);border-color:var(--ink-30)}
-.activity li[data-kind="step"]::before{background:var(--green);border-color:var(--green)}
+.activity li[data-kind="step"]::before{background:var(--accent);border-color:var(--accent)}
 .activity li[data-kind="out"]::before{background:var(--ink-50);border-color:var(--ink-50)}
 
 /* ---------- os prints ----------
@@ -279,7 +279,7 @@
 .prints{border-radius:var(--br2);transition:background var(--t),box-shadow var(--t)}
 /* arrastando por cima: o painel inteiro vira alvo, nao um retangulo pontilhado
    escondido no meio da pagina */
-.prints.is-over{box-shadow:inset 0 0 0 2px var(--green);background:color-mix(in srgb,var(--green) 6%,transparent)}
+.prints.is-over{box-shadow:inset 0 0 0 2px var(--accent);background:color-mix(in srgb,var(--accent) 6%,transparent)}
 .prints__grid{display:grid;gap:8px;grid-template-columns:repeat(auto-fill,minmax(104px,1fr));margin-bottom:10px}
 .print{position:relative;margin:0;aspect-ratio:1;border-radius:var(--br2);overflow:hidden;background:var(--fill);border:1px solid var(--line-soft)}
 .print__open{display:block;width:100%;height:100%;padding:0;border:0;background:none;cursor:zoom-in}

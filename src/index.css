@@ -26,7 +26,7 @@
 .hm-me:hover{border-color:var(--ink-30);color:var(--ink-70)}
 .hm-me__av{
   width:24px;height:24px;border-radius:50%;display:grid;place-items:center;flex:none;
-  background:var(--green);color:var(--on-green);font-weight:600;font-size:11px;
+  background:var(--accent);color:var(--on-accent);font-weight:600;font-size:11px;
 }
 .hm-me__av.is-out{background:var(--fill-hover);color:var(--ink-50)}
 
@@ -54,7 +54,7 @@
   transition:border-color var(--t),box-shadow var(--t);
 }
 .hm-capture__field:focus-within{border-color:var(--ink-30);box-shadow:var(--sombra-2)}
-.hm-capture__field > svg{width:16px;height:16px;flex:none;color:var(--green-ink)}
+.hm-capture__field > svg{width:16px;height:16px;flex:none;color:var(--accent-ink)}
 .hm-capture__field input{
   flex:1 1 auto;min-width:0;background:none;border:0;outline:none;
   font-size:15px;color:var(--ink);
@@ -108,7 +108,7 @@ a.bx__aside:hover{color:var(--ink-70)}
 .bx--day{grid-column:span 2;grid-row:span 2}
 .bx__big{
   margin:0 0 14px;font-family:var(--mono);font-weight:500;
-  font-size:clamp(30px,4vw,44px);line-height:1;letter-spacing:-.04em;color:var(--green-ink);
+  font-size:clamp(30px,4vw,44px);line-height:1;letter-spacing:-.04em;color:var(--accent-ink);
 }
 .bx__big.is-over{color:var(--ink)}
 .bx__big small{
@@ -118,12 +118,12 @@ a.bx__aside:hover{color:var(--ink-70)}
 /* a barra do dia em miniatura: o que ja passou, o que esta prometido, a sobra */
 .bx__track{height:7px;border-radius:100px;background:var(--fill-hover);overflow:hidden;display:flex;margin-bottom:14px}
 .bx__used{background:repeating-linear-gradient(135deg,var(--line) 0 3px,transparent 3px 6px)}
-.bx__busy{background:var(--green)}
+.bx__busy{background:var(--accent)}
 .bx__queue{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:1px;flex:1 1 auto}
 .bx__queue li{display:flex;align-items:center;gap:9px;padding:6px 0;min-width:0}
 .bx__queue b{flex:1 1 auto;min-width:0;font-size:13px;font-weight:400;color:var(--ink-70);overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
 .bx__queue .t-mono{flex:none;font-size:10.5px;color:var(--ink-30)}
-.bx__dot{width:5px;height:5px;border-radius:50%;background:var(--green);flex:none;opacity:.65}
+.bx__dot{width:5px;height:5px;border-radius:50%;background:var(--accent);flex:none;opacity:.65}
 .bx__none{color:var(--ink-30);font-size:12.5px}
 .bx__more{margin:8px 0 0;font-size:10px;color:var(--ink-30)}
 a.bx--day{transition:border-color var(--t)}
@@ -140,7 +140,7 @@ a.bx--day:hover{border-color:var(--ink-30)}
 }
 .today-habits__check:hover{border-color:var(--ink-30)}
 .today-habits__check svg{width:12px;height:12px}
-.today-habits__check.is-done{background:var(--green);border-color:var(--green);color:var(--on-green)}
+.today-habits__check.is-done{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
 .today-habits__name{font-size:13px;color:var(--ink-70);overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
 .today-journal{display:flex;flex-direction:column;gap:6px;flex:1 1 auto}
 .today-journal__label{color:var(--ink-30)}
@@ -192,7 +192,7 @@ a.bx--day:hover{border-color:var(--ink-30)}
 }
 .quote__mark{
   font-family:"Instrument Serif",Georgia,serif;font-size:44px;line-height:.6;
-  color:var(--green-ink);opacity:.5;
+  color:var(--accent-ink);opacity:.5;
 }
 .quote__text{
   margin:6px 0 0;font-family:"Instrument Serif",Georgia,serif;
@@ -234,7 +234,7 @@ a.bx--day:hover{border-color:var(--ink-30)}
 .tour__art{
   height:230px;display:grid;place-items:center;padding:24px;
   background:
-    radial-gradient(90% 70% at 50% 0%,color-mix(in srgb,var(--green) 14%,transparent),transparent 70%),
+    radial-gradient(90% 70% at 50% 0%,color-mix(in srgb,var(--accent) 14%,transparent),transparent 70%),
     var(--surface-2);
   border-bottom:1px solid var(--line-soft);
 }
@@ -247,7 +247,7 @@ a.bx--day:hover{border-color:var(--ink-30)}
 .tour__dots button{display:grid;place-items:center;height:20px;padding:0 2px;background:none;border:0;cursor:pointer}
 .tour__dots i{display:block;width:6px;height:6px;border-radius:50%;background:var(--line);transition:background var(--t),width var(--t)}
 .tour__dots button:hover i{background:var(--ink-30)}
-.tour__dots button.is-on i{width:18px;border-radius:100px;background:var(--green)}
+.tour__dots button.is-on i{width:18px;border-radius:100px;background:var(--accent)}
 .tour__nav{display:flex;align-items:center;gap:6px}
 .tour__back{height:40px;padding:0 14px;border-radius:var(--br-pill);font-size:13px;color:var(--ink-50);transition:color var(--t)}
 .tour__back:hover{color:var(--ink)}
@@ -262,8 +262,8 @@ a.bx--day:hover{border-color:var(--ink-30)}
 .ta{width:100%;max-width:290px;font-size:11px;color:var(--ink-70)}
 .ta small{font-size:10px;color:var(--ink-30)}
 .ta__bar{display:block;height:5px;border-radius:100px;background:var(--fill-hover);overflow:hidden}
-.ta__bar i{display:block;height:100%;background:var(--green);border-radius:100px}
-.ta__arrow{display:grid;place-items:center;width:26px;height:26px;border-radius:50%;background:var(--green);color:var(--on-green);flex:none}
+.ta__bar i{display:block;height:100%;background:var(--accent);border-radius:100px}
+.ta__arrow{display:grid;place-items:center;width:26px;height:26px;border-radius:50%;background:var(--accent);color:var(--on-accent);flex:none}
 .ta__arrow svg{width:13px;height:13px}
 
 /* 1 · o calendario: as tres visoes, uma semana e a barra do dia */
@@ -273,11 +273,11 @@ a.bx--day:hover{border-color:var(--ink-30)}
 .ta__week{display:grid;grid-template-columns:repeat(5,1fr);gap:4px;height:92px}
 .ta__col{display:flex;flex-direction:column;gap:3px;padding:4px;border-radius:7px;background:var(--fill)}
 .ta__col small{font-size:9px;text-align:center}
-.ta__blk{display:block;border-radius:4px;background:color-mix(in srgb,var(--green) 55%,transparent)}
+.ta__blk{display:block;border-radius:4px;background:color-mix(in srgb,var(--accent) 55%,transparent)}
 .ta__blk--soft{background:transparent;border:1px dashed var(--ink-30)}
 .ta__blk--meet{background:var(--ink-30)}
 .ta__daybar{display:grid;grid-template-columns:auto 1fr;align-items:center;gap:4px 10px;margin-top:10px}
-.ta__daybar b{font-family:var(--mono);font-size:16px;font-weight:500;color:var(--green-ink)}
+.ta__daybar b{font-family:var(--mono);font-size:16px;font-weight:500;color:var(--accent-ink)}
 .ta__daybar small{grid-column:1 / -1}
 
 /* 2 · a rotina: um bloco vira cinco dias */
@@ -286,7 +286,7 @@ a.bx--day:hover{border-color:var(--ink-30)}
 .ta__rblock b{display:block;font-size:12px;color:var(--ink);font-weight:600}
 .ta__rdays{display:grid;grid-template-columns:repeat(5,1fr);gap:5px;width:100%}
 .ta__rdays span{display:flex;flex-direction:column;align-items:center;gap:4px;padding:6px 0;border-radius:7px;background:var(--fill)}
-.ta__rdays i{display:block;width:70%;height:16px;border-radius:4px;background:color-mix(in srgb,var(--green) 55%,transparent)}
+.ta__rdays i{display:block;width:70%;height:16px;border-radius:4px;background:color-mix(in srgb,var(--accent) 55%,transparent)}
 .ta--routine .ta__arrow svg{transform:rotate(90deg)}
 
 /* 3 · nota com checklist vira tarefa */
@@ -297,8 +297,8 @@ a.bx--day:hover{border-color:var(--ink-30)}
 .ta__check{display:flex;align-items:center;gap:7px;margin-top:4px;font-size:10.5px;color:var(--ink-70)}
 .ta__check::before{content:"";width:11px;height:11px;border-radius:3px;border:1px solid var(--line);flex:none}
 .ta__check.is-done{color:var(--ink-30);text-decoration:line-through}
-.ta__check.is-done::before{background:var(--green);border-color:var(--green)}
-.ta__card--task{border-color:color-mix(in srgb,var(--green) 45%,transparent)}
+.ta__check.is-done::before{background:var(--accent);border-color:var(--accent)}
+.ta__card--task{border-color:color-mix(in srgb,var(--accent) 45%,transparent)}
 .ta__card--task b{margin:0}
 
 /* 4 · o quadro da prospeccao e o que atrai */
@@ -306,8 +306,8 @@ a.bx--day:hover{border-color:var(--ink-30)}
 .ta__stages div{display:flex;flex-direction:column;gap:5px;min-height:92px;padding:6px;border-radius:8px;background:var(--fill)}
 .ta__stages i{display:block;height:20px;border-radius:5px;background:var(--surface);border:1px solid var(--line-soft)}
 .ta__stages i.is-hot{border-color:var(--ink-30)}
-.ta__stages .is-won{background:color-mix(in srgb,var(--green) 12%,transparent)}
-.ta__stages .is-won i{border-color:color-mix(in srgb,var(--green) 55%,transparent)}
+.ta__stages .is-won{background:color-mix(in srgb,var(--accent) 12%,transparent)}
+.ta__stages .is-won i{border-color:color-mix(in srgb,var(--accent) 55%,transparent)}
 .ta__chips{display:flex;justify-content:center;gap:6px;margin-top:10px}
 .ta__chips span{display:inline-flex;align-items:center;gap:5px;padding:3px 9px 3px 7px;border-radius:100px;border:1px solid var(--line-soft);font-size:10px;color:var(--ink-50)}
 .ta__chips svg{width:11px;height:11px}
@@ -316,29 +316,29 @@ a.bx--day:hover{border-color:var(--ink-30)}
 .ta__money{margin:0 0 8px;display:flex;align-items:baseline;justify-content:space-between}
 .ta__money b{font-family:var(--mono);font-size:20px;font-weight:500;color:var(--ink)}
 .ta__split{display:flex;height:7px;border-radius:100px;background:var(--fill-hover);overflow:hidden}
-.ta__split i{display:block;background:var(--green)}
+.ta__split i{display:block;background:var(--accent)}
 .ta__split em{display:block;background:repeating-linear-gradient(135deg,var(--ink-30) 0 2px,transparent 2px 5px)}
 .ta__legend{display:flex;align-items:center;gap:5px;margin:7px 0 14px;font-size:10px;color:var(--ink-30)}
 .ta__legend i{display:inline-block;width:12px;height:5px;border-radius:100px}
 .ta__legend i + i,.ta__legend i:not(:first-child){margin-left:6px}
-.ta__legend .is-real{background:var(--green)}
+.ta__legend .is-real{background:var(--accent)}
 .ta__legend .is-forecast{border:1px dashed var(--ink-30)}
 .ta__habits{display:grid;grid-template-columns:repeat(12,1fr);gap:4px}
 .ta__habits i{display:block;aspect-ratio:1;border-radius:4px;border:1px solid var(--line)}
-.ta__habits i.is-on{background:var(--green);border-color:var(--green)}
+.ta__habits i.is-on{background:var(--accent);border-color:var(--accent)}
 
 /* 6 · os gestos e os aparelhos */
 .ta--keys{display:flex;flex-direction:column;align-items:center;gap:22px}
 .ta__keyrow{display:flex;align-items:center;gap:10px}
 .ta__key{display:inline-flex;align-items:center;gap:4px;height:38px;min-width:38px;padding:0 10px;justify-content:center;border-radius:11px;background:var(--surface);border:1px solid var(--line);color:var(--ink-70)}
 .ta__key svg{width:15px;height:15px}
-.ta__key--plus{background:var(--green);border-color:var(--green);color:var(--on-green)}
-.ta__key--spark{color:var(--green-ink)}
+.ta__key--plus{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
+.ta__key--spark{color:var(--accent-ink)}
 .ta__key kbd{font-size:10px}
 .ta__sync{display:flex;align-items:center;gap:12px}
 .ta__device{display:grid;place-items:center;width:42px;height:42px;border-radius:12px;background:var(--surface);border:1px solid var(--line);color:var(--ink-50)}
 .ta__device svg{width:18px;height:18px}
-.ta__link{width:34px;height:1px;background:repeating-linear-gradient(90deg,var(--green) 0 4px,transparent 4px 8px)}
+.ta__link{width:34px;height:1px;background:repeating-linear-gradient(90deg,var(--accent) 0 4px,transparent 4px 8px)}
 
 /* ================================================================
    a landing
@@ -369,19 +369,19 @@ html.bare body::before,html.bare body::after{opacity:0}
 .lg__grade{
   position:absolute;inset:0;z-index:-1;
   background:
-    radial-gradient(120% 80% at 12% 0%,color-mix(in srgb,var(--green) 30%,transparent),transparent 60%),
-    repeating-linear-gradient(90deg,color-mix(in srgb,var(--green) 9%,transparent) 0 2px,transparent 2px 9px);
+    radial-gradient(120% 80% at 12% 0%,color-mix(in srgb,var(--accent) 30%,transparent),transparent 60%),
+    repeating-linear-gradient(90deg,color-mix(in srgb,var(--accent) 9%,transparent) 0 2px,transparent 2px 9px);
   -webkit-mask-image:linear-gradient(180deg,#000,transparent 78%);
   mask-image:linear-gradient(180deg,#000,transparent 78%);
 }
 .lg__logo{display:inline-flex;align-items:center;gap:9px;font-weight:600;font-size:15px;color:var(--ink)}
-.lg__logo svg{width:19px;height:19px;color:var(--green)}
+.lg__logo svg{width:19px;height:19px;color:var(--accent)}
 .lg__words{margin-top:auto}
 .lg__badge{
   display:flex;align-items:center;gap:7px;margin:0 0 14px;
   font-family:var(--mono);font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-50);
 }
-.lg__badge i{width:6px;height:6px;border-radius:50%;background:var(--green);flex:none}
+.lg__badge i{width:6px;height:6px;border-radius:50%;background:var(--accent);flex:none}
 .lg__art h1{
   margin:0;font-size:clamp(30px,4.4vw,52px);font-weight:600;
   letter-spacing:-.04em;line-height:1.04;color:var(--ink);
@@ -394,7 +394,7 @@ html.bare body::before,html.bare body::after{opacity:0}
 .lg__lead{margin:12px 0 22px;font-size:14px;line-height:1.55;color:var(--ink-50)}
 .lg__cta{
   width:100%;height:48px;border-radius:var(--br-pill);
-  background:var(--green);color:var(--on-green);font-size:14.5px;font-weight:500;
+  background:var(--accent);color:var(--on-accent);font-size:14.5px;font-weight:500;
   transition:filter var(--t);
 }
 .lg__cta:hover{filter:brightness(1.08)}

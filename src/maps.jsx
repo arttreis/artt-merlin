@@ -911,7 +911,7 @@ function MapList({ maps }) {
           <button className="pill" type="button" id="import-map" title="colar um mapa em mermaid (i)" onClick={() => setImporting(true)}>{icon("code")}mermaid</button>
           {choosing && all.length
             ? <button className="pill" type="button" id="new-map-back" onClick={() => setChoosing(false)}>{icon("chevronLeft")}voltar</button>
-            : <button className="pill pill--green" type="button" id="new-map" title="novo mapa (n)" onClick={() => setChoosing(true)}>{icon("plus")}mapa</button>}
+            : <button className="pill pill--accent" type="button" id="new-map" title="novo mapa (n)" onClick={() => setChoosing(true)}>{icon("plus")}mapa</button>}
         </div>
       </div>
       {!picking && <ul className="list mp-list" id="map-list">
@@ -2085,7 +2085,7 @@ function Editor({ id, maps }) {
       {stickyGhosts && (
         <div className="mp-ghost-hint bd-ghost-bar" id="bd-ghost-hint">
           <span>clique num post-it tracejado para ficar com ele</span>
-          <button type="button" className="pill pill--mini pill--green" onClick={acceptAllGhosts}>ficar com todos <kbd>Enter</kbd></button>
+          <button type="button" className="pill pill--mini pill--accent" onClick={acceptAllGhosts}>ficar com todos <kbd>Enter</kbd></button>
           <button type="button" className="pill pill--mini" onClick={() => setStickyGhosts(null)}>dispensar <kbd>Esc</kbd></button>
         </div>
       )}

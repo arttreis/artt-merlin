@@ -53,7 +53,7 @@
 .jr__day li{display:flex;align-items:center;gap:10px;min-height:30px;font-size:13px;color:var(--ink-70)}
 .jr__day li.is-done .jr__day-name{text-decoration:line-through;text-decoration-color:var(--line)}
 .jr__day-icon{flex:none;width:18px;height:18px;display:grid;place-items:center;color:var(--ink-30)}
-.jr__day-icon.is-check{color:var(--green-ink)}
+.jr__day-icon.is-check{color:var(--accent-ink)}
 .jr__day-icon svg{width:13px;height:13px}
 .jr__day-name{flex:1 1 auto;min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
 .jr__day-min{flex:none;font-size:10.5px;color:var(--ink-30)}

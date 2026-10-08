@@ -230,7 +230,7 @@ function Content() {
         <div className="actions">
           <button className="pill" type="button" onClick={() => setRhythm(true)} title="quantas peças por dia ou por semana, por cliente">{icon("calendar")}ritmo</button>
           <button className="pill" type="button" disabled={pulling} onClick={() => setPautasAsk({ client: "", format: "" })} title="o Merlin propõe pautas a partir do cliente">{icon("spark")}{pulling ? "pensando…" : "puxar pautas"}</button>
-          <button className="pill pill--green" type="button" onClick={() => setNewIn("idea")}>{icon("plus")}conteúdo</button>
+          <button className="pill pill--accent" type="button" onClick={() => setNewIn("idea")}>{icon("plus")}conteúdo</button>
         </div>
       </div>
 
@@ -240,7 +240,7 @@ function Content() {
           <p className="content-empty__text">Cada peça passa de ideia a publicada. O roteiro mora dentro dela, e a data de publicação aparece no calendário. Sem saber sobre o que falar, o Merlin puxa pautas do cliente.</p>
           <div className="content-empty__actions">
             <button className="pill" type="button" disabled={pulling} onClick={() => setPautasAsk({ client: "", format: "" })}>{icon("spark")}{pulling ? "pensando…" : "puxar pautas"}</button>
-            <button className="pill pill--green" type="button" onClick={() => setNewIn("idea")}>{icon("plus")}primeira ideia</button>
+            <button className="pill pill--accent" type="button" onClick={() => setNewIn("idea")}>{icon("plus")}primeira ideia</button>
           </div>
         </div>
       ) : (
@@ -492,7 +492,7 @@ function Piece({ c, all, update, onClose, onStage, onTask, onRemove, onOpen, onS
               <div className="proposal">
                 <Markdown className="proposal__text script__read" text={section ? "## " + section + "\n" + proposal.text : proposal.text} />
                 <div className="proposal__actions">
-                  <button type="button" className="pill pill--mini pill--green" onClick={() => section
+                  <button type="button" className="pill pill--mini pill--accent" onClick={() => section
                     ? apply(upsertSection(draftRef.current, section, proposal.text), "seção de " + section + " no roteiro")
                     : apply(proposal.text, "roteiro do Merlin no lugar")}>usar</button>
                   <button type="button" className="pill pill--mini" onClick={() => copy(section ? "## " + section + "\n" + proposal.text : proposal.text)}>{icon("copy")}copiar</button>
@@ -585,7 +585,7 @@ function PickDialog({ pick, onToggle, onCreate, onClose }) {
         actions={<>
           <button className="dialog__remove" type="button" title="descartar" aria-label="Descartar as propostas" onClick={onClose}>{icon("trash")}</button>
           <span className="spacer" />
-          <button className="pill pill--green" type="button" disabled={n === 0} onClick={onCreate}>{"criar" + (n ? " " + n : "")}</button>
+          <button className="pill pill--accent" type="button" disabled={n === 0} onClick={onCreate}>{"criar" + (n ? " " + n : "")}</button>
         </>}>
       {pick.items.length ? (
         <div className="suggestion-list mt">
@@ -631,7 +631,7 @@ function RhythmDialog({ cadence, onClose }) {
           <button className="pill" type="button" onClick={() => setRules([])} title="sem ritmo: o topo volta a só contar o que existe">zerar</button>
           <span className="spacer" />
           <button className="pill" type="button" onClick={onClose}>cancelar</button>
-          <button className="pill pill--green" type="button" onClick={save}>salvar</button>
+          <button className="pill pill--accent" type="button" onClick={save}>salvar</button>
         </>}>
       <div className="rhythm">
         <label className="field-label" htmlFor="rhythm-owner">de quem</label>
@@ -679,7 +679,7 @@ function FillDialog({ fill, all, onSchedule, onPautas, onClose }) {
         actions={<>
           <button className="pill" type="button" onClick={onPautas}>{icon("spark")}puxar pautas</button>
           <span className="spacer" />
-          <button className="pill pill--green" type="button" disabled={!chosen.length} onClick={() => onSchedule(chosen, gap)}>{"pôr na semana" + (chosen.length ? " " + chosen.length : "")}</button>
+          <button className="pill pill--accent" type="button" disabled={!chosen.length} onClick={() => onSchedule(chosen, gap)}>{"pôr na semana" + (chosen.length ? " " + chosen.length : "")}</button>
         </>}>
       {ideas.length ? (
         <div className="suggestion-list mt">
