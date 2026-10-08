@@ -19,6 +19,8 @@ npm run dev      # servidor de desenvolvimento, com recarga na hora
 npm run build    # gera server/site/
 ```
 
+O mapa do código para quem vai continuar o desenvolvimento está em [PROJETO.md](PROJETO.md).
+
 A história de como o sistema chegou aqui (de HTML por string a Preact, e de Preact a React)
 está em [MIGRATION.md](MIGRATION.md).
 
@@ -27,14 +29,19 @@ está em [MIGRATION.md](MIGRATION.md).
 | `index.html` | o início: um campo no meio, as notas e os favoritos numa faixa, e os atalhos embaixo dizendo o número que faria você abrir cada um. Para quem nunca esteve aqui, é a porta — com o gesto de começar sem conta. |
 | `calendar.html` | o calendário: **uma** coleção de tarefas com data, e três jeitos de olhar para ela. O **dia** é a fila de hoje, com a barra que se gasta e a sobra — o único lugar com minutos. A **semana** são sete colunas. O **mês** é a grade. `day.html` e `week.html` continuam existindo e encaminham para cá. |
 | `assistant.html` | a conversa com o Merlin: os três começos (mapa mental, funil, simulação financeira), a conversa no meio e o histórico à direita. O campo da home e a busca da sidebar desaguam aqui. Cada resposta é no máximo uma **proposta** — ela só vira documento quando você confirma numa caixa com os campos. |
+| `routine.html` | a rotina: a semana de sempre, sem datas. Cada bloco tem dias, hora e duração, e vira tarefa quando o calendário abre a semana. |
 | `notes.html` | o que ainda não é tarefa, numa caixa de entrada: lista por dia à esquerda, a nota aberta à direita com corpo, estágio, checklist e histórico. |
+| `journal.html` | o diário: uma página por dia, o registro do que o dia foi. Não vira tarefa nem nada. |
+| `prospecting.html` | quem ainda não fechou: um quadro por etapa (lead → negociação). O prospecto é o mesmo documento do cliente — "fechou" só muda o status. |
 | `clients.html` | clientes com canais (Mercado Livre, Shopee, TikTok Shop…), backlog, diário, objetivos, ficha e cofre. Um cliente novo abre com os primeiros passos. |
+| `content.html` | o que vai ao ar: um quadro por etapa (ideia → publicado), um cartão por peça, com o roteiro dentro do cartão. |
 | `funnels.html` | funil como grafo com tipos de nó, vazão por etapa, criativos, automações, ofertas e gatilhos. |
 | `maps.html` | mapa mental com teclado e layout automático. Sai como texto (copiar mermaid ou outline), como arquivo (png, .md, .mmd) ou como link só de leitura; e volta colando o mermaid, num mapa novo ou como ramo de um que já existe. |
 | `finance.html` | do jeito da planilha: o mês dia a dia com saldo previsto, o ano em doze colunas, e o painel com saídas fixas, entradas fixas, compras no cartão e dívidas, mais a divisão 50/30/20. |
 | `wishlist.html` | a vitrine: o que se quer comprar, em coletâneas, com preço, link e foto. "comprei" lança a saída no financeiro; desfazer a compra tira o lançamento. |
 | `habits.html` | a grade do mês: hábitos nas linhas, dias nas colunas, uma marca por dia. Sequência e taxa do mês. |
 | `plans.html` | trimestre, mês e semana lado a lado: desdobrar de um horizonte para o outro. Acender um objetivo apaga tudo que não tem parentesco com ele nas outras colunas. |
+| `share.html` | a leitura de um mapa ou funil por link público (`share.html#<token>`), sem conta. |
 | `profile.html` | o perfil: a sessão, a aparência (o tema mora aqui), a apresentação e o inventário do que está guardado. |
 
 Em toda tela, criar é o mesmo gesto: um botão "+" abre uma caixa (pop-up) com os campos. Nenhuma

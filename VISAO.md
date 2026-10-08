@@ -95,8 +95,10 @@ Duas coisas ficaram de fora, de propósito:
 - **O endereço continua `merlin.arttreis.com.br`.** Um `merlin.guessless.com.br` apontando para
   o mesmo Worker resolve (a Cloudflare aceita mais de um `custom_domain`), mas depende de um
   registro de DNS no domínio da casa — decisão de quem tem a zona, não do código.
-- **O token de destaque ainda se chama `--green`** e carrega o azul. São 174 ocorrências em 22
-  arquivos: renomear para `--accent` é mecânico e merece um commit só dele, longe deste.
+- **O token de destaque se chamava `--green`** e carregava o azul. Ficou de fora deste passo
+  por ser mecânico, e foi feito em 08/10/2026 num commit só dele: `--green`, `--green-ink`,
+  `--green-glow` e `--on-green` viraram `--accent`, `--accent-ink`, `--accent-glow` e `--on-accent`,
+  e os modificadores `pill--green`, `chip--green` e `badge--green` viraram `--accent` junto.
 
 ### Só o dia tem minutos
 
@@ -357,7 +359,7 @@ A sugestão em lote abre num diálogo com caixas de marcar; a sugestão de um it
 tracejada no próprio palco, onde ela nasceria, e um clique é que a torna real.
 
 - **Feito**: rota `/api/merlin` no worker (chave `ANTHROPIC_API_KEY` como segredo, modelo
-  `claude-opus-5`) com dez tarefas: **ramos** (mapa mental, nó selecionado), **funil** (o que
+  `claude-opus-5-5`) com dez tarefas: **ramos** (mapa mental, nó selecionado), **funil** (o que
   falta: etapas, automações, criativos, ofertas, gatilhos), **próxima etapa** (o que vem depois
   de uma etapa só, para refinar a tira de fantasmas do funil), **ramificar** (perguntas, caminhos
   e passos para uma ideia), **semana** (resumo do que fechou e ficou), **reunião**

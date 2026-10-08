@@ -617,7 +617,7 @@ async function deleteFile(env, person, id) {
    sem ela a rota responde 503 e a tela diz que falta configurar. nada aqui e
    gravado: quem decide o que entra no mapa ou no funil e quem esta na tela. */
 
-const MODEL = "claude-opus-5";
+const MODEL = "claude-opus-5-5";
 const MAX_SUGGESTIONS = 12;
 /* conselhos por pessoa por hora. e folgado para quem trabalha e apertado
    para quem esqueceu o dedo no botao: ninguem pede trinta conselhos numa

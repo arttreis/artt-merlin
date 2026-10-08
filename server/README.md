@@ -67,7 +67,7 @@ npx wrangler secret put ANTHROPIC_API_KEY
 O `ANTHROPIC_API_KEY` é do Merlin conselheiro (a rota `/api/merlin`, que sugere
 ramos no mapa mental e o que falta num funil). É opcional: sem ele a rota
 responde 503 e as telas dizem que falta a chave. A chave sai de
-console.anthropic.com; o modelo é o `claude-opus-5` e cada pedido custa centavos.
+console.anthropic.com; o modelo é o `claude-opus-5-5` e cada pedido custa centavos.
 
 Essa chave é **uma só para o time**, e por isso a rota tem teto: 30 conselhos
 por pessoa por hora, contados na tabela `advice`. Quem estourar espera; quem
@@ -106,7 +106,7 @@ de um CNAME existente, e o deploy falha.
 npm run deploy
 ```
 
-Isso roda os testes, copia as páginas e `shared/` da raiz para `site/` e publica. Se
+Isso roda os testes, faz o `vite build` (que escreve as páginas prontas em `site/`) e publica. Se
 algum teste falhar, nada sobe.
 
 ## Mexer sem quebrar nada
@@ -140,6 +140,10 @@ SESSION_SECRET=qualquer-coisa-longa-em-desenvolvimento
 | `POST /api/days` | grava um dia; recusa se o servidor estiver na frente |
 | `GET /api/docs?type=T&since=V` | os documentos do tipo `T` com carimbo maior que `V` |
 | `POST /api/docs` | grava um documento `{type, id, v, doc}`; 409 com `server` se estiver na frente |
+| `POST /api/quick-note` | guarda uma nota vinda da extensão do Chrome (`extension/`) |
+| `GET/POST/DELETE /api/share` | lista, cria e revoga links públicos de mapa ou funil |
+| `GET /api/shared/:token` | a leitura pública de um link — a única rota sem sessão |
+| `POST /api/files`, `GET/DELETE /api/files/:id` | anexos no R2; sem o binding `FILES`, 503 |
 | `POST /api/merlin` | `{task, context}`; tarefas `branches, funnel, nextStage, expand, assistant, week, meeting, habits, review, numbers, delegate`. Só `assistant` aceita `context.history` (array `{role, content}`) — as outras nunca mandam esse campo, e continuam um turno só. |
 
 ## Decisões que valem saber

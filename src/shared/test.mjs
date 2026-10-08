@@ -595,7 +595,9 @@ const dataLeft = () => globalThis.localStorage.keys().filter((k) => k in DATA);
      lugar só, e esse lugar é o shell.css. */
   const fs = await import("node:fs");
   const path = await import("node:path");
-  const here = path.dirname(new URL(import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, "$1"));
+  /* fileURLToPath, e nao .pathname: numa pasta com espaco o pathname vem com %20 */
+  const { fileURLToPath } = await import("node:url");
+  const here = path.dirname(fileURLToPath(import.meta.url));
   const src = path.join(here, "..");
 
   const tokensOf = (text) => new Set([...text.matchAll(/(--[a-z0-9-]+)\s*:/g)].map((m) => m[1]));

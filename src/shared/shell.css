@@ -124,7 +124,7 @@ html.light{
    troca não desmonta nada — e o azul #368DFF no destaque. O #0014FF que
    aparece por aí não é a marca: o próprio CSS da casa anota isso.
 
-   O token de destaque é `--accent` (até 08/10/2026 era `--accent`, de quando
+   O token de destaque é `--accent` (até 08/10/2026 era `--green`, de quando
    havia uma marca só e o destaque era, de fato, verde); aqui ele carrega o
    azul. */
 html.gl{
