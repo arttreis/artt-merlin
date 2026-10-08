@@ -38,6 +38,11 @@ Vite; o build sai em `server/site/`. O que é comum vive aqui:
 - `funnel-layout.js` — onde cada etapa do funil fica no palco (camadas da esquerda para a
   direita). Mora fora da página porque duas telas criam funil: a lista de funis e o canal do
   cliente.
+- `app-spec.js` — o **projeto de app** (`apps.html`): a forma do documento (`normalizeApp`), o que
+  falta antes de construir (`problemsOf`), o arranjo no palco (`layoutEntities`, `layoutScreens`),
+  o rascunho do Merlin (`fromBlueprint` resolve nome em id; `mergeDraft` junta sem trocar o que a
+  pessoa escreveu) e as saídas: `toSQL` (Postgres, na ordem das relações), `toMermaidER`,
+  `toMermaidFlow`, `toMarkdown` e `toPrompt`. Puro, testado no `app-spec.test.mjs`.
 - `mermaid.js` — o **mapa mental em mermaid**: `parseMermaid(text)` lê o que uma IA devolve
   (`mindmap`, ou `graph`/`flowchart` como plano B, com cerca e conversa em volta) e devolve
   `{name, root, kind, count, dropped}` — nós sem id, que o `normalizeNode` do `maps.jsx` completa;
@@ -147,7 +152,7 @@ vezes numa montagem (esvaziar a caixa de entrada, gerar a recorrência da semana
 
 | o quê | para quê |
 | --- | --- |
-| `initPage(id)` | sidebar, clientes, preferências, sessão. `id` é `home, calendar, routine, notes, prospecting, clients, content, funnels, maps, finance, wishlist, habits, plans, profile` |
+| `initPage(id)` | sidebar, clientes, preferências, sessão. `id` é `home, calendar, routine, notes, prospecting, clients, content, funnels, maps, apps, finance, wishlist, habits, plans, profile` |
 | `collection(type, {normalize})` | fora de componente; dentro use `useCollection` |
 | `newId()`, `today()`, `dayOf(date)`, `isDay(v)`, `dateOf(day)`, `addDays(day, n)`, `mondayOf(day)` | datas como `YYYY-MM-DD` |
 | `dateLabel(day, withYear?)`, `weekdayOf(day)`, `monthLabel("YYYY-MM")` | rótulos |

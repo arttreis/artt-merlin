@@ -37,6 +37,7 @@ está em [MIGRATION.md](MIGRATION.md).
 | `content.html` | o que vai ao ar: um quadro por etapa (ideia → publicado), um cartão por peça, com o roteiro dentro do cartão. |
 | `funnels.html` | funil como grafo com tipos de nó, vazão por etapa, criativos, automações, ofertas e gatilhos. |
 | `maps.html` | mapa mental com teclado e layout automático. Sai como texto (copiar mermaid ou outline), como arquivo (png, .md, .mmd) ou como link só de leitura; e volta colando o mermaid, num mapa novo ou como ramo de um que já existe. |
+| `apps.html` | o projeto de app: conceito e funcionalidades com fase (primeira versão, depois, talvez), o banco (entidades, campos e relações num diagrama), as telas e as ações entre elas, e a saída pronta para construir — SQL do Postgres, mermaid do banco e dos fluxos, a especificação em markdown e o prompt para o Claude Code. O Merlin rascunha o projeto a partir de duas frases e revisa o que está desenhado; o app se liga ao funil de lançamento e às peças de conteúdo. |
 | `finance.html` | do jeito da planilha: o mês dia a dia com saldo previsto, o ano em doze colunas, e o painel com saídas fixas, entradas fixas, compras no cartão e dívidas, mais a divisão 50/30/20. |
 | `wishlist.html` | a vitrine: o que se quer comprar, em coletâneas, com preço, link e foto. "comprei" lança a saída no financeiro; desfazer a compra tira o lançamento. |
 | `habits.html` | a grade do mês: hábitos nas linhas, dias nas colunas, uma marca por dia. Sequência e taxa do mês. |

@@ -1004,6 +1004,72 @@ function buildMessages(name, ctx, instruction, context) {
 }
 
 /* tira o objeto JSON de uma resposta que pode vir com texto em volta */
+/* ---------- o projeto de app ----------
+   `app` rascunha o projeto inteiro a partir de uma descricao curta; a tela
+   mostra o rascunho e so grava o que a pessoa confirmar. a IA fala em NOMES
+   (o campo aponta para "Cliente"): a tela resolve nome em id, e o que nao
+   fechar cai la. aqui so se corta tamanho e se descarta o que nao e lista.
+   se FIELD_TYPES mudar em shared/app-spec.js, muda aqui junto. */
+const APP_FIELD_TYPES = "uuid, text, int, decimal, money, bool, date, timestamp, email, enum, json, file, ref";
+const APP_RULES =
+  "Você é arquiteto de produto e de software. Pense como quem vai construir de verdade, em Postgres. " +
+  "Seja concreto e enxuto: o mínimo que faz o app funcionar na primeira versão, e o resto marcado como depois. ";
+const BLUEPRINT_TASKS = {
+  app: (c) => ({
+    instruction:
+      APP_RULES +
+      "Desenhe o projeto do app descrito: conceito, funcionalidades, banco e telas. " +
+      "Funcionalidades: até 14, cada uma com phase mvp, later ou maybe — a primeira versão tem só o que prova o valor. " +
+      "Entidades: até 12, nomes no singular em português, cada uma com os campos (name em snake_case, type em " + APP_FIELD_TYPES + ", required, unique, e options separadas por vírgula quando o type for enum). " +
+      "Não escreva o campo id: toda entidade já ganha um. Relação é um campo de type ref com ref igual ao NOME exato de outra entidade (ex.: {\"name\":\"cliente\",\"type\":\"ref\",\"ref\":\"Cliente\"}). Inclua created_at quando fizer sentido. " +
+      "Telas: até 14, cada uma com name, goal (uma frase), parts (lista curta do que tem na tela), entities (NOMES das entidades que ela lê ou grava) e start true só na tela de entrada. " +
+      "Flows: as ações que levam de uma tela a outra, com from e to iguais aos NOMES das telas e action curto (\"clicou em pagar\"). " +
+      "Se a descrição citar uma stack, respeite; senão, sugira uma em stack, em uma ou duas linhas. " +
+      'Formato: {"pitch":"…","problem":"…","audience":"…","value":"…","stack":"…","features":[{"title":"…","note":"…","phase":"mvp"}],' +
+      '"entities":[{"name":"…","note":"…","fields":[{"name":"…","type":"text","required":true,"unique":false,"ref":"","options":""}]}],' +
+      '"screens":[{"name":"…","goal":"…","parts":["…"],"entities":["…"],"start":true}],"flows":[{"from":"…","to":"…","action":"…"}]}',
+    context:
+      "Nome do app: " + String(c.name || "").slice(0, 120) + "\n" +
+      "Descrição: " + String(c.description || "").slice(0, 3000) + "\n" +
+      (c.spec ? "O que já está desenhado (complete, sem repetir nem contradizer):\n" + String(c.spec).slice(0, 6000) + "\n" : "")
+  })
+};
+const cut = (v, n) => String(v == null ? "" : v).slice(0, n);
+const arr = (v, n) => (Array.isArray(v) ? v.slice(0, n) : []);
+function cleanBlueprint(d) {
+  return {
+    pitch: cut(d.pitch, 300), problem: cut(d.problem, 3000), audience: cut(d.audience, 3000),
+    value: cut(d.value, 3000), stack: cut(d.stack, 3000),
+    features: arr(d.features, 40).filter((f) => f && f.title).map((f) => ({ title: cut(f.title, 200), note: cut(f.note, 600), phase: cut(f.phase, 10) })),
+    entities: arr(d.entities, 30).filter((e) => e && e.name).map((e) => ({
+      name: cut(e.name, 60), note: cut(e.note, 600),
+      fields: arr(e.fields, 60).filter((f) => f && f.name).map((f) => ({
+        name: cut(f.name, 60), type: cut(f.type, 12), required: !!f.required, unique: !!f.unique,
+        ref: cut(f.ref, 60), options: cut(f.options, 300), note: cut(f.note, 200)
+      }))
+    })),
+    screens: arr(d.screens, 40).filter((s) => s && s.name).map((s) => ({
+      name: cut(s.name, 60), goal: cut(s.goal, 300), start: !!s.start,
+      parts: arr(s.parts, 20).map((x) => cut(x, 120)), entities: arr(s.entities, 20).map((x) => cut(x, 60))
+    })),
+    flows: arr(d.flows, 120).filter((f) => f && f.from && f.to).map((f) => ({ from: cut(f.from, 60), to: cut(f.to, 60), action: cut(f.action, 120) }))
+  };
+}
+Object.assign(TEXT_TASKS, {
+  /* a revisao: o que esta faltando ou vai doer na obra, sem reescrever o projeto */
+  appReview: (c) => ({
+    instruction:
+      APP_RULES +
+      "Revise este projeto de app antes de ele ir para a construção. Em markdown simples, no máximo 260 palavras, com \"## \" em cada parte: " +
+      "## banco (relação faltando, campo que vai fazer falta, tipo errado, o que deveria ser tabela própria); " +
+      "## fluxos (tela sem saída, caminho que falta, como o usuário volta); " +
+      "## primeira versão (o que está sobrando ou faltando para provar o valor). " +
+      "Só o que for concreto deste projeto, citando os nomes dele; parte sem problema é uma linha dizendo isso. " +
+      'Formato: {"text":"…"}',
+    context: "Projeto:\n" + String(c.spec || "").slice(0, 9000) + "\n"
+  })
+});
+
 function extractJson(text) {
   const a = text.indexOf("{"), b = text.lastIndexOf("}");
   if (a < 0 || b <= a) return null;
@@ -1014,7 +1080,7 @@ async function advise(req, env, person) {
   if (!env.ANTHROPIC_API_KEY) return fail("o Merlin ainda não tem chave: npx wrangler secret put ANTHROPIC_API_KEY", 503);
   const body = await req.json().catch(() => null);
   const name = String((body && body.task) || "");
-  const task = body && (LIST_TASKS[name] || TEXT_TASKS[name]);
+  const task = body && (LIST_TASKS[name] || TEXT_TASKS[name] || BLUEPRINT_TASKS[name]);
   if (!task || !body.context || typeof body.context !== "object") return fail("tarefa inválida");
   const isText = !!TEXT_TASKS[name];
   const { instruction, context } = task(body.context);
@@ -1045,7 +1111,9 @@ async function advise(req, env, person) {
     },
     body: JSON.stringify({
       model: MODEL,
-      max_tokens: 4000,
+      /* o projeto de app inteiro nao cabe em 4000: banco, telas e fluxos de
+         uma vez so */
+      max_tokens: BLUEPRINT_TASKS[name] ? 12000 : 4000,
       /* sugestao curta nao precisa do maximo de raciocinio: medio segura o custo */
       output_config: { effort: "medium" },
       system: SYSTEM,
@@ -1060,6 +1128,10 @@ async function advise(req, env, person) {
   if (answer.stop_reason === "refusal") return fail("o Merlin preferiu não responder a isso", 422);
   const text = (answer.content || []).filter((b) => b.type === "text").map((b) => b.text).join("\n");
   const data = extractJson(text);
+  if (BLUEPRINT_TASKS[name]) {
+    if (!data || typeof data !== "object") return fail("o Merlin respondeu fora do formato", 502);
+    return json({ blueprint: cleanBlueprint(data) });
+  }
   if (isText) {
     if (!data || typeof data.text !== "string" || !data.text.trim()) return fail("o Merlin respondeu fora do formato", 502);
     return json({ text: data.text.slice(0, 4000) });

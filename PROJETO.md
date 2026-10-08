@@ -63,6 +63,7 @@ os pares sozinho; não há lista de rotas. Nunca escreva no `localStorage` diret
 | conteúdo | `content.jsx` | quadro de peças com roteiro |
 | funis | `funnels.jsx` | grafo de etapas |
 | mapas | `maps.jsx` + `maps-board.jsx` | mapa mental + quadro livre (estilo Miro, `board.js`) |
+| apps | `apps.jsx` | projeto de app: conceito, banco, telas e fluxos → SQL, mermaid, spec e prompt (`app-spec.js`) |
 | financeiro | `finance.jsx` | mês, ano, painel 50/30/20 |
 | wishlist | `wishlist.jsx` | "comprei" lança no financeiro |
 | hábitos | `habits.jsx` | grade do mês |

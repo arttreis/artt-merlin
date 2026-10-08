@@ -144,7 +144,7 @@ SESSION_SECRET=qualquer-coisa-longa-em-desenvolvimento
 | `GET/POST/DELETE /api/share` | lista, cria e revoga links públicos de mapa ou funil |
 | `GET /api/shared/:token` | a leitura pública de um link — a única rota sem sessão |
 | `POST /api/files`, `GET/DELETE /api/files/:id` | anexos no R2; sem o binding `FILES`, 503 |
-| `POST /api/merlin` | `{task, context}`; tarefas `branches, funnel, nextStage, expand, assistant, week, meeting, habits, review, numbers, delegate`. Só `assistant` aceita `context.history` (array `{role, content}`) — as outras nunca mandam esse campo, e continuam um turno só. |
+| `POST /api/merlin` | `{task, context}`; tarefas `branches, funnel, nextStage, expand, assistant, week, meeting, habits, review, numbers, delegate`, as do conteúdo, e as do projeto de app: `app` (devolve `{blueprint}` — o projeto inteiro em nomes, que a tela resolve em ids; 12000 tokens de saída em vez de 4000) e `appReview` (texto). Só `assistant` aceita `context.history` (array `{role, content}`) — as outras nunca mandam esse campo, e continuam um turno só. |
 
 ## Decisões que valem saber
 

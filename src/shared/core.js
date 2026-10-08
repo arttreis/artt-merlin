@@ -273,7 +273,10 @@ export const PAGE_GROUPS = [
     { id: "clients", label: "clientes", href: "clients.html" },
     { id: "content", label: "conteúdo", href: "content.html" },
     { id: "funnels", label: "funis", href: "funnels.html" },
-    { id: "maps", label: "mapas", href: "maps.html" }
+    { id: "maps", label: "mapas", href: "maps.html" },
+    /* o projeto de app (08/10/2026): o mapa e para pensar solto; aqui a ideia
+       ganha forma de produto — banco, telas e fluxos — e sai pronta para construir */
+    { id: "apps", label: "apps", href: "apps.html" }
   ] },
   { id: "money", label: "dinheiro", pages: [
     { id: "finance", label: "financeiro", href: "finance.html" },
@@ -314,6 +317,7 @@ const SEARCH_SOURCES = [
   { type: "tasks", label: "tarefa", field: "title", href: (d) => "calendar.html#" + encodeURIComponent(d.date || ""), filter: (d) => !d.done },
   { type: "maps", label: "mapa", field: "name", href: (d) => "maps.html#" + encodeURIComponent(d.id) },
   { type: "funnels", label: "funil", field: "name", href: (d) => "funnels.html#" + encodeURIComponent(d.id) },
+  { type: "apps", label: "app", field: "name", href: (d) => "apps.html#" + encodeURIComponent(d.id) },
   { type: "finance", label: "R$", field: "name", href: () => "finance.html", filter: (d) => d.type === "entry" || d.type === "fixed" || d.type === "debt" || d.type === "card" },
   { type: "wishlist", label: "coletânea", field: "name", href: (d) => "wishlist.html#" + encodeURIComponent(d.id), filter: (d) => d.type === "list" },
   { type: "wishlist", label: "vitrine", field: "name", href: (d) => "wishlist.html#" + encodeURIComponent(d.list || ""), filter: (d) => d.type === "item" && !d.bought },
@@ -900,7 +904,7 @@ document.addEventListener("visibilitychange", () => {
    nao baixou espera a proxima sincronizacao, e a marca de "feito" so e
    gravada quando todas fecharam. depois disso ela nunca mais faz nada. */
 const FRONTS_PURGED = "merlin:fronts-removed";
-const PURGE_TYPES = ["notes", "clients", "tasks", "week", "maps", "funnels", "finance", "habits", "plans", "bookmarks", "content", "cadence"];
+const PURGE_TYPES = ["notes", "clients", "tasks", "week", "maps", "funnels", "apps", "finance", "habits", "plans", "bookmarks", "content", "cadence"];
 function stripFront(value) {
   if (Array.isArray(value)) return value.map(stripFront).some(Boolean);
   if (!value || typeof value !== "object") return false;

@@ -534,6 +534,33 @@ O Merlin propõe e a pessoa decide: nada grava sem clique e toda troca tem desfa
 não inventa número nem case, e o dado que falta sai marcado com `[conferir]`. Cada botão é uma
 chamada a `/merlin` e conta no teto de 30 por hora.
 
+### 4.13 Projetos de app (`apps.html`) — 08/10/2026
+
+O mapa mental servia para pensar solto, mas desenhar um app nele dava num monte de caixa que não
+sabia o que era: uma tela e uma tabela eram o mesmo retângulo, e nada saía dali pronto para
+construir. O projeto de app é o mesmo desenho **com forma**.
+
+> O mapa é para pensar. O projeto é para construir.
+
+- **Conceito**: a frase, o problema, para quem, a proposta, a stack e as notas; funcionalidades
+  com fase — **primeira versão**, **depois**, **talvez**. Funcionalidade vira tarefa pelo mesmo
+  `TaskDialog` de sempre: nada entra no dia sem duração.
+- **Dados**: entidades com campos, tipo, chave, obrigatório, único e **relação** (o campo aponta
+  para outra entidade). Num palco: a seta sai do campo e chega na tabela apontada.
+- **Fluxos**: telas (o que é, o que tem, que dados usa, qual é a entrada) e as **ações** que levam
+  de uma à outra. Puxar a bolinha de uma tela até outra cria a ação.
+- **Exportar**: o que falta antes de construir (relação sem alvo, tela que nenhum caminho
+  alcança…) e cinco saídas — o prompt para o Claude Code, a especificação em markdown, o SQL do
+  Postgres, o mermaid do banco e o dos fluxos.
+- **Lançamento**: o app se liga a um funil (ou cria o de "SaaS com teste grátis") e às peças de
+  conteúdo — que continuam morando nas telas delas, com o campo `app` apontando para cá.
+- **Merlin**: rascunha o projeto a partir de duas frases (tarefa `app`) e revisa o que está
+  desenhado (`appReview`). O rascunho é **proposta**, como no assistente: aparece inteiro e só
+  entra quando a pessoa junta — e juntar nunca troca o que ela escreveu.
+
+É também a aposta do produto: desenhar o app e o funil dele no mesmo lugar, e sair com tudo
+pronto para construir e lançar. Ninguém junta produto, marketing e execução assim.
+
 ---
 
 ## 5. Ordem de construção

@@ -391,6 +391,18 @@ claudeAnswer = { stop_reason: "end_turn", content: [{ type: "text", text: '{"sug
 r = await call("POST", "/merlin", { task: "expand", context: { title: "app", steps: [] } }, cookie);
 body = await r.json();
 check("merlin ramifica ideia", r.status === 200 && body.suggestions[0].type === "step");
+/* o projeto de app: o rascunho volta limpo, e a revisao e texto */
+claudeAnswer = { stop_reason: "end_turn", content: [{ type: "text", text: JSON.stringify({ pitch: "agenda de salão", features: [{ title: "agendar", phase: "mvp" }, { note: "sem título" }], entities: [{ name: "Cliente", fields: [{ name: "nome", type: "text", required: true }, { type: "text" }] }, { fields: [] }], screens: [{ name: "Agenda", parts: ["calendário"], entities: ["Cliente"], start: true }], flows: [{ from: "Agenda", to: "" }, { from: "Agenda", to: "Agenda", action: "voltou" }] }) }] };
+r = await call("POST", "/merlin", { task: "app", context: { name: "salão", description: "agenda para salão de beleza" } }, cookie);
+body = await r.json();
+check("merlin rascunha o app", r.status === 200 && body.blueprint && body.blueprint.pitch === "agenda de salão", JSON.stringify(body).slice(0, 200));
+check("rascunho do app larga o que não tem nome", body.blueprint.features.length === 1 && body.blueprint.entities.length === 1 && body.blueprint.entities[0].fields.length === 1);
+check("rascunho do app larga ação sem ponta", body.blueprint.flows.length === 1);
+check("merlin recebe a descrição do app", /salão de beleza/.test(claudeAsked));
+claudeAnswer = { stop_reason: "end_turn", content: [{ type: "text", text: '{"text":"## banco\\n- falta a relação"}' }] };
+r = await call("POST", "/merlin", { task: "appReview", context: { spec: "# salão" } }, cookie);
+body = await r.json();
+check("merlin revisa o app", r.status === 200 && /## banco/.test(body.text), JSON.stringify(body));
 /* "da pra fazer com Claude?": a estimativa tem que subir junto, senao o
    veredicto nao teria como falar em minutos */
 claudeAnswer = { stop_reason: "end_turn", content: [{ type: "text", text: '{"text":"**dá** — o Claude lê a planilha e escreve as descrições.\\n\\nMontar: escrever a skill de conferência"}' }] };
