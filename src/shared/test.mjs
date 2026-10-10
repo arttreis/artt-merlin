@@ -619,6 +619,19 @@ const dataLeft = () => globalThis.localStorage.keys().filter((k) => k in DATA);
     };
     check("a medição carrega para quem está na porta", !!beacon && measures(true));
     check("a medição não carrega para quem já usa o Merlin", !!beacon && !measures(false));
+
+    /* e a Cloudflare não injeta o beacon dela nas páginas: no-transform nas
+       da raiz, e só nelas — em /assets/* ele tiraria a compressão do JS */
+    const headers = fs.readFileSync(path.join(root, "public", "_headers"), "utf8");
+    const rules = {};
+    let at = null;
+    headers.split("\n").forEach((line) => {
+      if (!line.trim() || line.trim().startsWith("#")) return;
+      if (!/^\s/.test(line)) { at = line.trim(); rules[at] = rules[at] || []; } else if (at) rules[at].push(line.trim());
+    });
+    const blocks = (p) => (rules[p] || []).some((h) => /^cache-control:.*no-transform/i.test(h));
+    check("as páginas pedem para a Cloudflare não injetar nada", blocks("/") && blocks("/:page"), Object.keys(rules).join(" "));
+    check("o JS e o CSS continuam comprimidos", Object.keys(rules).every((p) => !(p === "/*" || p.startsWith("/assets")) || !blocks(p)), Object.keys(rules).join(" "));
   }
 
   /* ---- o endereço de um favorito ----

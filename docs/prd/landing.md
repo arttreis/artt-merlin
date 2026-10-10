@@ -1,7 +1,7 @@
 # Landing · a página de quem nunca ouviu falar do Merlin
 
-**Status:** ✅ No ar desde 2026-10-10. A versão do worker é a `ef29d274`, com a privacidade e a
-medição; a primeira da landing foi a `2f70532a`, e a de antes dela, para voltar, é a `d0c507b1`. O Arthur pediu para desenvolver direto, sem `/plan-project`, e as recomendações
+**Status:** ✅ No ar desde 2026-10-10. A versão do worker é a `f4725072`, com a privacidade, a
+medição e o `_headers`; a primeira da landing foi a `2f70532a`, e a de antes dela, para voltar, é a `d0c507b1`. O Arthur pediu para desenvolver direto, sem `/plan-project`, e as recomendações
 abaixo viraram as decisões.
 **Owner:** Arthur Reis
 **Criado em:** 2026-10-10
@@ -64,14 +64,19 @@ Duas coisas desta máquina que travavam o deploy:
   quem já usa abre o início no mesmo endereço, e contar essas aberturas misturaria a casa com a
   vitrine. O `test.mjs` confere os dois lados. Conferido em produção: o visitante novo manda o
   beacon, e quem já usa não manda o nosso.
-- ⚠️ **A Cloudflare também injeta um beacon sozinha.** É outro token (`de4be3af…`), entra pela
-  borda em toda resposta HTML pedida por navegador e vale para todas as páginas do
-  merlin.arttreis.com.br, inclusive as do app (`/calendar`, `/finance`, `/share`). É a
-  instalação automática de algum site do Web Analytics na zona arttreis.com.br. Por isso a
-  privacidade diz "o site conta as visitas", e não "só a landing". Para medir só a vitrine,
-  basta desligar a instalação automática desse site no painel (Web Analytics → o site do
-  token `de4be3af…` → desligar o *automatic setup* ou excluir o hostname). Feito isso, a
-  privacidade pode voltar a dizer que nenhuma tela do sistema é medida.
+- ✅ **A injeção automática da Cloudflare foi barrada pelo código.** A Cloudflare injetava
+  sozinha, pela borda, um segundo beacon (token `de4be3af…`, a instalação automática de algum
+  site do Web Analytics na zona) em todas as páginas do merlin.arttreis.com.br, inclusive as
+  do app. O `public/_headers` manda `Cache-Control: ... no-transform` nas páginas da raiz (`/`
+  e `/:page`), que é o que a Cloudflare documenta para não mexer na resposta. Conferido em
+  produção: nenhuma página traz mais o `de4be3af…`, e a inicial só traz o nosso beacon.
+  - **O preço:** com `no-transform` a borda também não comprime, então as páginas HTML chegam
+    sem Brotli. A inicial passou de 7,4 KB para 23,8 KB; as outras têm cerca de 2,6 KB. O JS e
+    o CSS de `/assets/*` não entram na regra e continuam comprimidos, e o `test.mjs` impede
+    que a regra vire `/*`.
+  - **Para tirar o preço:** desligar no painel o *automatic setup* do site do token
+    `de4be3af…` (ou excluir o hostname dele) e apagar o `_headers`.
+  - A privacidade voltou a dizer que só a página de apresentação é medida.
 - O endereço (D4) continua `merlin.arttreis.com.br`. Quando a fila vira conta segue em aberto
   (VISAO 8.6).
 
