@@ -750,5 +750,33 @@ const dataLeft = () => globalThis.localStorage.keys().filter((k) => k in DATA);
 }
 
 
+/* ---- sessões de foco, meta e teto (VISAO, 11) ---- */
+{
+  const F = await import("./focus.js?n=" + (++n));
+  const base = new Date(2026, 9, 7, 10, 0).getTime();   /* quarta, 07/10/2026 */
+  const s1 = { id: "a", start: base, end: base + 50 * 60000, planned: 45 };
+  const s2 = { id: "b", start: base + 3 * 3600000, end: null, planned: 30 };
+  check("foco: só uma rodando", F.runningOf([s1, s2]).id === "b");
+  check("foco: a que roda conta até agora", F.minutesOf(s2, base + 3 * 3600000 + 20 * 60000) === 20);
+  check("foco: soma da semana", F.focusMinutes([s1, s2], "2026-10-07", base + 3 * 3600000 + 20 * 60000) === 70);
+  check("foco: sessão de outra semana não conta", F.focusMinutes([{ start: new Date(2026, 9, 1).getTime(), end: new Date(2026, 9, 1).getTime() + 3600000 }], "2026-10-07") === 0);
+  check("recibo: 50 de 45 está na estimativa", F.receipt(s1).verdict === "na estimativa", F.receipt(s1).verdict);
+  check("recibo: 80 de 45 passou", F.receipt({ start: base, end: base + 80 * 60000, planned: 45 }).verdict === "passou da estimativa");
+  const tasks = [
+    { title: "reunião com cliente", reserved: true, min: 60, date: "2026-10-05" },
+    { title: "daily", reserved: true, min: 15, date: "2026-10-08" },
+    { title: "almoço", reserved: true, min: 60, date: "2026-10-07" },
+    { title: "call de vendas", reserved: true, min: 30, date: "2026-10-12" }
+  ];
+  check("teto: soma só reunião da semana", F.meetingMinutes(tasks, "2026-10-07") === 75, String(F.meetingMinutes(tasks, "2026-10-07")));
+  const gh = F.githubDay([
+    { type: "PushEvent", created_at: new Date(2026, 9, 7, 11).toISOString(), repo: { name: "arttreis/merlin" }, payload: { commits: [{ message: "o rastreador ganha a sessão\n\ncorpo" }] } },
+    { type: "PullRequestEvent", created_at: new Date(2026, 9, 7, 15).toISOString(), repo: { name: "arttreis/merlin" }, payload: { action: "closed", pull_request: { merged: true, title: "sessão de foco" } } },
+    { type: "PushEvent", created_at: new Date(2026, 9, 6, 11).toISOString(), repo: { name: "x/y" }, payload: { commits: [{ message: "ontem" }] } }
+  ], "2026-10-07");
+  check("github: commits do dia", gh.commits.length === 1 && gh.commits[0].message === "o rastreador ganha a sessão" && gh.commits[0].repo === "merlin", JSON.stringify(gh.commits));
+  check("github: PR mergeado", gh.prs.length === 1 && gh.prs[0].action === "merged");
+}
+
 console.log("\n" + passed + " passaram, " + failures.length + " falharam");
 if (failures.length) { console.log("\nFALHAS:"); failures.forEach((f) => console.log("  - " + f)); process.exit(1); }
