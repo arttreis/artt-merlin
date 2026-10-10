@@ -738,6 +738,12 @@ const dataLeft = () => globalThis.localStorage.keys().filter((k) => k in DATA);
   check("regra: o nome do Merlin sai da pergunta", T.routeLine("merlin, vale lançar sexta").text === "vale lançar sexta", JSON.stringify(T.routeLine("merlin, vale lançar sexta")));
   check("regra: duração vence a palavra de pergunta", T.routeLine("como fazer o deck 45m").kind === "task");
   check("regra: sem pergunta e sem duração continua ideia", T.routeLine("comprar domínio do app").kind === "note");
+  const reads = (s) => T.needsReading(s, T.routeLine(s));
+  check("leitura: o que viraria ideia passa pelo Merlin", reads("comprar domínio do app"));
+  check("leitura: tarefa com duração e sem data segue direto", !reads("revisar proposta 45m") && !reads("almoço 1h"));
+  check("leitura: data por extenso passa pelo Merlin", reads("ligar pro João amanhã 30m") && reads("call com a Ana às 15h 1h") && reads("entregar o deck sexta 2h"));
+  check("leitura: duas durações na mesma linha passam pelo Merlin", reads("revisar landing 45m, responder e-mails 30m"));
+  check("leitura: pergunta não passa pela leitura", !reads("como precifico o plano anual"));
 
   /* a janela anda com o relógio de verdade: começa uma hora atrás e acaba em
      quatro, então a conta é a mesma a qualquer hora em que o teste rodar */

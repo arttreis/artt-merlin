@@ -1092,6 +1092,53 @@ Object.assign(TEXT_TASKS, {
   })
 });
 
+/* ---------- a captura do inicio ----------
+   o campo da home le a linha pela regra (routeLine, no tasks.js) e, quando a
+   regra nao basta — o que cairia em ideia, uma data por extenso, duas tarefas
+   na mesma linha —, pede aqui a leitura. e trabalho de leitura, nao de
+   conselho: vai no Haiku, com pouco esforco, e numa cota propria, para que
+   anotar tarefa nao gaste a vez de pedir conselho. nada e gravado: a tela
+   mostra o que entendeu e a pessoa confirma. */
+const CAPTURE_MODEL = "claude-haiku-5-5";
+const CAPTURE_PER_HOUR = 60;
+const MAX_CAPTURE_ITEMS = 8;
+const CAPTURE_TASKS = {
+  capture: (c) => ({
+    instruction:
+      "Leia a linha que a pessoa escreveu no campo do início e diga o que ela vira. Pode ser mais de uma coisa: \"revisar a landing, responder os e-mails e call com a Ana\" são três tarefas. " +
+      "Cada item: kind = task (uma ação concreta que a pessoa vai fazer — verbo de fazer, data, hora ou duração) ou note (uma ideia, possibilidade ou pensamento para explorar depois); " +
+      "title = o que fazer, curto e na grafia da pessoa, SEM a data, a hora, a duração e o cliente (até 80 caracteres); " +
+      "min = a duração em minutos — a que foi escrita, ou, se não houver, uma estimativa realista (múltiplos de 15) com guess true; para note, 0; " +
+      "date = AAAA-MM-DD contada a partir de hoje (\"amanhã\", \"sexta\", \"dia 14\"; \"semana que vem\" é a próxima segunda); sem data, hoje; para note, vazio; " +
+      "at = HH:MM quando houver hora (\"às 15h\", \"15:30\"), senão vazio; " +
+      "client = o nome exato de um dos clientes listados quando a linha citar um deles, senão vazio. " +
+      "Nunca invente item que a linha não diz. Se a linha inteira for uma pergunta, devolva items vazio. " +
+      'Formato: {"items":[{"kind":"task","title":"…","min":45,"guess":false,"date":"AAAA-MM-DD","at":"","client":""}]}',
+    context:
+      "Linha: " + String(c.text || "").slice(0, 600) + "\n" +
+      "Hoje: " + String(c.today || "").slice(0, 40) + " · agora " + String(c.hour || "").slice(0, 5) + "\n" +
+      (c.window ? "Janela do dia: " + String(c.window).slice(0, 20) + "\n" : "") +
+      (Array.isArray(c.clients) && c.clients.length ? "Clientes: " + listOf(c.clients.slice(0, 40)) + "\n" : "")
+  })
+};
+function cleanCapture(d) {
+  return arr(d && d.items, MAX_CAPTURE_ITEMS)
+    .filter((x) => x && (x.kind === "task" || x.kind === "note") && String(x.title || "").trim())
+    .map((x) => {
+      const task = x.kind === "task";
+      const min = Math.round(+x.min || 0);
+      return {
+        kind: x.kind,
+        title: cut(x.title, 120).trim(),
+        min: task ? Math.max(0, Math.min(720, min)) : 0,
+        guess: task && !!x.guess,
+        date: task && /^\d{4}-\d{2}-\d{2}$/.test(String(x.date || "")) ? String(x.date) : "",
+        at: task && /^\d{1,2}:\d{2}$/.test(String(x.at || "")) ? String(x.at) : "",
+        client: cut(x.client, 60)
+      };
+    });
+}
+
 function extractJson(text) {
   const a = text.indexOf("{"), b = text.lastIndexOf("}");
   if (a < 0 || b <= a) return null;
@@ -1125,22 +1172,25 @@ async function advise(req, env, person) {
   if (!env.ANTHROPIC_API_KEY) return fail("o Merlin ainda não tem chave: npx wrangler secret put ANTHROPIC_API_KEY", 503);
   const body = await req.json().catch(() => null);
   const name = String((body && body.task) || "");
-  const task = body && (LIST_TASKS[name] || TEXT_TASKS[name] || BLUEPRINT_TASKS[name]);
+  const task = body && (LIST_TASKS[name] || TEXT_TASKS[name] || BLUEPRINT_TASKS[name] || CAPTURE_TASKS[name]);
   if (!task || !body.context || typeof body.context !== "object") return fail("tarefa inválida");
   const isText = !!TEXT_TASKS[name];
+  const isCapture = !!CAPTURE_TASKS[name];
   const { instruction, context } = task(body.context);
 
   /* o teto por pessoa. a chave e uma so para o time, e um botao que chama
      Opus nao pode virar a fatura de todo mundo porque alguem deixou o dedo
      preso. contamos ANTES de perguntar: um pedido que falha la fora tambem
      gastou a nossa vez, e contar depois deixaria a porta aberta em cima do
-     erro. o limite e por hora e por pessoa, entao esperar resolve. */
-  const hour = Math.floor(Date.now() / 3600e3);
+     erro. o limite e por hora e por pessoa, entao esperar resolve.
+     a captura conta na mesma tabela, com a hora negativa: e outra cota sem
+     precisar de outra tabela. */
+  const hour = Math.floor(Date.now() / 3600e3) * (isCapture ? -1 : 1);
   const used = await env.DB.prepare(
     "SELECT n FROM advice WHERE person = ? AND hour = ?"
   ).bind(person, hour).first();
-  if (used && used.n >= ADVICE_PER_HOUR) {
-    return fail("você já pediu bastante conselho nesta hora; volte daqui a pouco", 429);
+  if (used && used.n >= (isCapture ? CAPTURE_PER_HOUR : ADVICE_PER_HOUR)) {
+    return fail(isCapture ? "o Merlin já leu bastante nesta hora; o texto segue pela regra" : "você já pediu bastante conselho nesta hora; volte daqui a pouco", 429);
   }
   await env.DB.prepare(
     "INSERT INTO advice (person, hour, n) VALUES (?, ?, 1) " +
@@ -1155,12 +1205,13 @@ async function advise(req, env, person) {
       "content-type": "application/json"
     },
     body: JSON.stringify({
-      model: MODEL,
+      model: isCapture ? CAPTURE_MODEL : MODEL,
       /* o projeto de app inteiro nao cabe em 4000: banco, telas e fluxos de
          uma vez so */
-      max_tokens: BLUEPRINT_TASKS[name] ? 12000 : 4000,
-      /* sugestao curta nao precisa do maximo de raciocinio: medio segura o custo */
-      output_config: { effort: "medium" },
+      max_tokens: BLUEPRINT_TASKS[name] ? 12000 : isCapture ? 2000 : 4000,
+      /* sugestao curta nao precisa do maximo de raciocinio: medio segura o
+         custo. ler uma linha precisa de menos ainda */
+      output_config: { effort: isCapture ? "low" : "medium" },
       system: SYSTEM + (await profileOf(env, person)),
       messages: buildMessages(name, body.context, instruction, context)
     })
@@ -1176,6 +1227,10 @@ async function advise(req, env, person) {
   if (BLUEPRINT_TASKS[name]) {
     if (!data || typeof data !== "object") return fail("o Merlin respondeu fora do formato", 502);
     return json({ blueprint: cleanBlueprint(data) });
+  }
+  if (isCapture) {
+    if (!data || !Array.isArray(data.items)) return fail("o Merlin respondeu fora do formato", 502);
+    return json({ items: cleanCapture(data) });
   }
   if (isText) {
     if (!data || typeof data.text !== "string" || !data.text.trim()) return fail("o Merlin respondeu fora do formato", 502);

@@ -192,6 +192,39 @@ html:has(.hm) body{overflow-x:clip}
 .hm-hero__merlin{display:flex;align-items:flex-start;gap:8px;max-width:620px;margin:14px auto 0;padding:10px 14px;border-radius:14px;text-align:left;font-size:13.5px;line-height:1.5;color:#fff;background:rgba(10,12,20,.42);border:1px solid rgba(255,255,255,.12);backdrop-filter:blur(8px)}
 .hm-hero__merlin svg{flex:none;width:14px;height:14px;margin-top:3px;color:var(--accent)}
 
+/* a pergunta respondida no balão: o que foi perguntado em cima, apagado, e a
+   resposta embaixo, em markdown */
+.hm-talk__body{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:6px}
+.hm-talk__q{margin:0;font-size:12.5px;color:rgba(255,255,255,.6)}
+.hm-talk__wait{margin:0;color:rgba(255,255,255,.7);animation:hm-pulse 1.6s ease-in-out infinite}
+.hm-talk__a > :first-child{margin-top:0}
+.hm-talk__a > :last-child{margin-bottom:0}
+.hm-talk__a h2{margin:10px 0 4px;font-size:13.5px;font-weight:600}
+.hm-talk__a ul,.hm-talk__a ol{margin:4px 0;padding-left:18px}
+.hm-talk__a p{margin:0 0 6px}
+.hm-talk__do{align-self:flex-start;height:28px}
+.hm-talk__do svg{color:inherit;margin-top:0}
+.hm-talk__foot{display:flex;gap:14px;margin:2px 0 0;font-size:11.5px}
+.hm-talk__foot a,.hm-talk__foot button{color:rgba(255,255,255,.65);text-decoration:underline;text-decoration-color:rgba(255,255,255,.3)}
+.hm-talk__foot a:hover,.hm-talk__foot button:hover{color:#fff}
+@media (prefers-reduced-motion:reduce){.hm-talk__wait{animation:none}}
+
+/* o que o Merlin entendeu da linha, antes de virar tarefa ou ideia */
+.hm-field[aria-busy="true"] .hm-field__hint{animation:hm-pulse 1.6s ease-in-out infinite}
+.hm-field__hint[data-kind="read"] svg{color:var(--accent)}
+.hm-draft{border-top:1px solid var(--line-soft);padding:10px 12px 12px 16px}
+.hm-draft__head{display:flex;align-items:center;gap:6px;margin:0 0 6px;font-size:11.5px;color:var(--ink-50)}
+.hm-draft__head svg{width:12px;height:12px;color:var(--accent)}
+.hm-draft__list{list-style:none;margin:0;padding:0}
+.hm-draft__list li{display:flex;align-items:center;gap:8px;min-height:32px;font-size:13.5px}
+.hm-draft__list li > svg{flex:none;width:13px;height:13px;color:var(--ink-30)}
+.hm-draft__title{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--ink)}
+.hm-draft__meta{flex:none;font-size:11.5px;color:var(--ink-50)}
+.hm-draft__drop{flex:none;width:24px;height:24px;border-radius:50%;display:grid;place-items:center;color:var(--ink-30)}
+.hm-draft__drop:hover{background:var(--fill-hover);color:var(--ink)}
+.hm-draft__drop svg{width:12px;height:12px}
+.hm-draft__actions{display:flex;justify-content:flex-end;flex-wrap:wrap;gap:6px;margin-top:8px}
+
 /* ---------- a sessão de foco, a semana e o GitHub (VISAO, 11) ---------- */
 .hm-play{flex:none;width:22px;height:22px;border-radius:50%;display:grid;place-items:center;color:var(--ink-30);opacity:0;transition:opacity var(--t),background var(--t),color var(--t)}
 .hm-list li:hover .hm-play,.hm-play:focus-visible{opacity:1}
