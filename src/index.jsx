@@ -21,7 +21,7 @@ import {
   initPage, signIn, seen, markSeen, isNewHere, today, addDays, dateOf, notify, newId,
   newNote, askMerlin, readPrefs, savePrefs, formatMin, collection, api
 } from "./shared/core.js";
-import { useState, useEffect, useLayoutEffect, useRef } from "react";
+import { Children, useState, useEffect, useLayoutEffect, useRef } from "react";
 import { mount, useCloud, useCollection, icon } from "./shared/ui.jsx";
 import { LOGO, NAV_ICONS } from "./shared/icons.jsx";
 import { normalize as normalizeTask, dayDoc, overdue, topOrder, newTask, routeLine, readClock } from "./shared/tasks.js";
@@ -485,6 +485,16 @@ function habitStreak(h, day) {
   return n;
 }
 
+// Distribui os cards em colunas independentes, na ordem de leitura (1ª, 2ª, 3ª, 1ª…),
+// para um card alto não abrir buraco na linha de baixo. No celular as colunas
+// se desfazem e o `order` devolve a sequência original.
+function Columns({ n, children }) {
+  const items = Children.toArray(children).filter(Boolean);
+  const cols = Array.from({ length: n }, () => []);
+  items.forEach((el, i) => cols[i % n].push(<div key={el.key} className="hm-cell" style={{ order: i }}>{el}</div>));
+  return <div className="hm-grid">{cols.map((c, i) => <div key={i} className="hm-col">{c}</div>)}</div>;
+}
+
 function HabitsCard({ habits, date }) {
   const list = habits.all().filter((h) => !h.archived && isExpected(h, date)).sort((a, b) => a.order - b.order || a.createdAt - b.createdAt);
   const marked = list.filter((h) => h.marks[date]).length;
@@ -674,14 +684,14 @@ function Today({ c, tasks, habits, journal, closes, reviews, apps, sessions, me,
       </div>
 
       <p className="hm-label t-mono">hoje</p>
-      <div className="hm-grid">
-        <DayCard tasks={tasks} doc={doc} b={b} slots={slots} cut={cut} sessions={sessions} />
-        <HabitsCard habits={habits} date={date} />
-        <AgendaCard doc={doc} />
-        <WeekCard me={me} sessions={sessions} tasks={tasks} date={date} />
-        {me.github && <ShippedCard gh={gh} login={me.github} />}
+      <Columns n={3}>
+        <DayCard key="day" tasks={tasks} doc={doc} b={b} slots={slots} cut={cut} sessions={sessions} />
+        <HabitsCard key="habits" habits={habits} date={date} />
+        <AgendaCard key="agenda" doc={doc} />
+        <WeekCard key="week" me={me} sessions={sessions} tasks={tasks} date={date} />
+        {me.github && <ShippedCard key="shipped" gh={gh} login={me.github} />}
         {due.map((d) => <Review key={d.id} reviews={reviews} due={d} />)}
-      </div>
+      </Columns>
 
       {closing && <Closing tasks={tasks} journal={journal} closes={closes} date={date} gh={gh} onClose={() => setClosing(false)} />}
     </div>
