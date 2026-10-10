@@ -35,7 +35,7 @@
   font-size:13.5px;line-height:1.55;max-width:76%;
 }
 .chat__msg.is-me{justify-content:flex-end}
-.chat__msg.is-me > p{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
+.chat__msg.is-me > p{background:var(--accent);border-color:var(--accent);color:var(--on-accent);white-space:pre-line}
 
 /* o markdown do Merlin: lista, titulo, negrito e codigo do jeito que ele
    escreve. as mesmas regras do corpo da nota (.body-md), com as margens de
@@ -68,7 +68,7 @@
 .chat__welcome h1{margin:var(--pd2) 0 0;font-size:clamp(22px,3vw,30px);font-weight:600;letter-spacing:-.03em;line-height:1.1}
 .chat__welcome > p{margin:8px 0 0;font-size:13px;color:var(--ink-50)}
 
-.chat__starts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:var(--pd2);width:100%;margin-top:calc(var(--pd) * 1.75)}
+.chat__starts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--pd2);width:100%;margin-top:calc(var(--pd) * 1.75)}
 .chat__start{
   display:flex;flex-direction:column;align-items:flex-start;gap:4px;text-align:left;
   padding:var(--pd);border:1px solid var(--line);border-radius:var(--br3);background:var(--surface);
@@ -83,6 +83,36 @@
 .chat__start i svg{width:16px;height:16px}
 .chat__start b{font-size:12.5px;font-weight:600;letter-spacing:-.01em}
 .chat__start span{font-size:11.5px;line-height:1.4;color:var(--ink-50)}
+
+/* ---------- montar com o Merlin ----------
+   as perguntas antes de montar e o rascunho: cartões largos, porque são para
+   ler e clicar, não bolhas de conversa */
+.build{
+  width:min(100%,600px);padding:14px 16px;border-radius:var(--br3);
+  background:var(--surface);border:1px solid var(--line);font-size:13.5px;line-height:1.5;
+}
+.build.is-draft{border-color:var(--accent)}
+.build__eyebrow{display:flex;align-items:center;gap:6px;margin:0 0 10px;font-size:11px;color:var(--ink-50)}
+.build__eyebrow svg{width:12px;height:12px;color:var(--accent-ink)}
+.build__q{display:flex;flex-direction:column;gap:6px;padding:8px 0;border-top:1px solid var(--line-soft)}
+.build__q:first-of-type{border-top:0;padding-top:0}
+.build__q b{font-weight:600;color:var(--ink)}
+.build__options{display:flex;flex-wrap:wrap;gap:6px}
+.build__option{height:28px;padding:0 11px;border-radius:var(--br-pill);border:1px solid var(--line);font-size:12.5px;color:var(--ink-70);transition:background var(--t),border-color var(--t)}
+.build__option:hover{background:var(--fill-hover)}
+.build__option[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
+.build__own{height:32px;font-size:12.5px}
+.build__actions{display:flex;align-items:center;justify-content:flex-end;flex-wrap:wrap;gap:8px;margin-top:12px}
+.build__hint{margin-right:auto;font-size:11.5px;color:var(--ink-50)}
+.build__title{margin:0;font-size:16px;font-weight:600;letter-spacing:-.01em;color:var(--ink)}
+.build__sub{margin:2px 0 0;font-size:12.5px;color:var(--ink-50)}
+.build__lines{margin:12px 0 0;display:flex;flex-direction:column;gap:8px}
+.build__lines div{display:grid;grid-template-columns:120px 1fr;gap:10px}
+.build__lines dt{font-size:11.5px;color:var(--ink-50)}
+.build__lines dd{margin:0;font-size:12.5px;color:var(--ink-70)}
+.build__summary{margin:12px 0 0;padding-top:10px;border-top:1px solid var(--line-soft);font-size:12.5px;font-style:italic;color:var(--ink-50)}
+.chat__msg > p.build__old{margin:0;padding:0 2px;background:none;border:0;font-size:12px;color:var(--ink-30)}
+@media (max-width:560px){.build__lines div{grid-template-columns:1fr;gap:2px}}
 
 /* ---------- o campo ---------- */
 .chat__composer{

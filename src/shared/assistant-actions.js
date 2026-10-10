@@ -150,8 +150,40 @@ function normalizeProposal(p) {
   };
 }
 
+/* as falas de montar com o Merlin (shared/build.js): as perguntas antes de
+   montar, o rascunho e o "criei". o rascunho pode ser um app inteiro, e so o
+   ultimo vale — os anteriores chegam aqui sem `data` (quem grava a conversa
+   tira), e ficam so com o titulo e o resumo do que mudou */
+const BUILD_KINDS = ["funnel", "app", "map"];
+const str = (v, n) => String(v == null ? "" : v).slice(0, n);
+function normalizeBuildMsg(m) {
+  if (m.brief && BUILD_KINDS.includes(m.brief.kind)) {
+    const b = m.brief;
+    return { from: "merlin", brief: {
+      kind: b.kind, request: str(b.request, 1500), answered: !!b.answered,
+      questions: (Array.isArray(b.questions) ? b.questions : []).slice(0, 6).map((q) => ({
+        q: str(q && q.q, 200), options: (Array.isArray(q && q.options) ? q.options : []).slice(0, 4).map((o) => str(o, 60))
+      }))
+    } };
+  }
+  if (m.draft && BUILD_KINDS.includes(m.draft.kind)) {
+    const d = m.draft;
+    return { from: "merlin", draft: {
+      kind: d.kind, request: str(d.request, 1500), answers: str(d.answers, 1500),
+      title: str(d.title, 120), summary: str(d.summary, 400),
+      data: d.data && typeof d.data === "object" ? d.data : null
+    } };
+  }
+  if (m.built && BUILD_KINDS.includes(m.built.kind)) {
+    return { from: "merlin", built: { kind: m.built.kind, id: str(m.built.id, 60), name: str(m.built.name, 120) } };
+  }
+  return null;
+}
+
 export function normalizeChat(d) {
   const messages = (Array.isArray(d.messages) ? d.messages : []).slice(-MAX_TURNS).map((m) => {
+    const built = m && normalizeBuildMsg(m);
+    if (built) return built;
     const proposal = normalizeProposal(m && m.proposal);
     return proposal
       ? { from: "merlin", proposal }
@@ -184,6 +216,9 @@ export function turnsOf(list) {
     role: m.from === "me" ? "user" : "assistant",
     content: m.proposal
       ? "[propôs " + m.proposal.actionType + ": '" + m.proposal.title + "']"
+      : m.brief ? "[perguntou antes de montar: " + m.brief.questions.map((q) => q.q).join(" ") + "]"
+      : m.draft ? "[mostrou o rascunho: " + m.draft.title + "]"
+      : m.built ? "[criou: " + m.built.name + "]"
       : String(m.text || "")
   })).filter((t) => t.content);
 }

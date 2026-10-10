@@ -30,6 +30,7 @@ import { LOGO, GL_LOGO, GL_MARK, ICONS, NAV_ICONS, icon } from "./icons.jsx";
 import { ACTION_COLLECTIONS, ACTION_LABELS, ACTION_FIELDS, buildDoc, previewOf } from "./assistant-actions.js";
 /* o Ctrl+K cria tarefa de hoje com a mesma regra e a mesma forma do dia */
 import { tasks, newTask, topOrder, routeLine } from "./tasks.js";
+import { BUILD, buildIntent } from "./build-intent.js";
 
 /* o CSS entra pela pagina, nao por aqui: base.css ja puxa o shell.css na
    ordem certa, e o dia carrega so o shell. */
@@ -987,6 +988,10 @@ function CommandPalette({ onClose }) {
 
   const route = routeLine(term);
   const rows = [];
+  /* o pedido de montar vai para a conversa do assistente, que pergunta o que
+     falta e mostra o rascunho. a duracao continua mandando: e tarefa */
+  const build = route && route.kind !== "task" ? buildIntent(term) : null;
+  if (build) rows.push({ key: "build", kind: "ask", label: "montar com o Merlin", text: "o " + BUILD[build].label + ": " + term.trim(), run: () => askMerlin(term.trim()) });
   if (route) {
     rows.push({ key: "do", kind: route.kind, label: ROUTE_LABEL[route.kind](route), text: route.kind === "ask" ? route.text : route.title, run: () => runRoute(route) });
     /* perguntar e sempre possivel: e o atalho de quem queria conversar sobre

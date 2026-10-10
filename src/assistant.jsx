@@ -7,36 +7,48 @@
    rola sozinha.
 
    quem pergunta de outra tela (a busca da barra, o campo da home) chega
-   aqui pelo askMerlin(), que traz a pergunta e o que aquela tela sabia. */
+   aqui pelo askMerlin(), que traz a pergunta e o que aquela tela sabia.
+
+   desde 10/10/2026 é aqui também que se monta com o Merlin um funil, um app
+   ou um mapa (shared/build.js): o pedido de montar vira uma conversa curta —
+   as perguntas que mudam o desenho, o rascunho, o ajuste em palavras — e só
+   vira documento quando a pessoa cria. */
 import "./shared/base.css";
 import "./assistant.css";
-import { initPage, newId, notify, api, takeAsk, getCurrentPage } from "./shared/core.js";
+import { initPage, newId, notify, api, takeAsk, getCurrentPage, collection } from "./shared/core.js";
 import { useState, useEffect, useRef } from "react";
 import { mount, useCollection, useHash, setHash, Markdown, ProposalDialog, icon } from "./shared/ui.jsx";
 import { NAV_ICONS } from "./shared/icons.jsx";
 import { MAX_TURNS, normalizeChat, chatTitle, turnsOf } from "./shared/assistant-actions.js";
+import { BUILD, buildIntent, answersText, draftView, docFromDraft } from "./shared/build.js";
 /* o resumo do financeiro, pra esta tela responder "posso gastar x?" sem
    obrigar a pessoa a abrir o financeiro antes */
 import { financeBrief } from "./shared/finance-data.js";
 
 initPage("assistant");
 
-/* os três começos da tela. nenhum deles executa nada: cada um só prefixa a
-   mensagem da pessoa, e é esse prefixo que faz a proposta sair do tipo certo.
-   quem grava continua sendo o ProposalDialog, com ela confirmando campo a
-   campo — a IA nunca escreve no sistema sozinha. */
+/* os quatro começos da tela. nenhum deles executa nada. os três de montar
+   (funil, app, mapa) abrem a conversa de montagem com o pedido da pessoa; o
+   do financeiro só prefixa a mensagem, e é esse prefixo que faz a resposta
+   sair pelos números. quem grava é sempre a pessoa, no botão de criar. */
 const STARTS = [
+  {
+    key: "funnel", icon: NAV_ICONS.funnels, title: "montar um funil",
+    hint: "etapas, ofertas, criativos e automações",
+    placeholder: "funil de quê? ex.: consultoria vendida por anúncio",
+    build: "funnel"
+  },
+  {
+    key: "app", icon: NAV_ICONS.apps, title: "desenhar um app",
+    hint: "conceito, banco, telas e fluxos",
+    placeholder: "app de quê? ex.: agenda de salão pelo WhatsApp",
+    build: "app"
+  },
   {
     key: "map", icon: NAV_ICONS.maps, title: "montar um mapa mental",
     hint: "uma árvore de ideias que já nasce mapa",
     placeholder: "mapa de quê? ex.: onboarding de um cliente novo",
-    prefix: "Monte um mapa mental sobre: "
-  },
-  {
-    key: "funnel", icon: NAV_ICONS.funnels, title: "desenhar um funil",
-    hint: "as etapas na ordem, prontas para editar",
-    placeholder: "funil de quê? ex.: consultoria vendida por anúncio",
-    prefix: "Desenhe um funil para: "
+    build: "map"
   },
   {
     key: "finance", icon: NAV_ICONS.finance, title: "simular uma situação financeira",
@@ -59,6 +71,79 @@ function agoOf(at) {
   return new Date(at).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
 }
 
+/* em que pé está a montagem: a última fala de montar decide. pergunta sem
+   resposta espera a resposta; rascunho espera ajuste ou o botão de criar;
+   depois do "criei", a conversa volta a ser conversa */
+function flowOf(messages) {
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const m = messages[i];
+    if (m.built) return null;
+    if (m.brief) return m.brief.answered ? null : { at: i, brief: m.brief };
+    if (m.draft) return m.draft.data ? { at: i, draft: m.draft } : null;
+  }
+  return null;
+}
+
+/* as perguntas antes de montar: uma resposta pronta para clicar ou a da
+   pessoa, e o "decide você" para quem não quer responder nada */
+function BriefCard({ brief, live, onAnswer }) {
+  const [answers, setAnswers] = useState({});
+  const set = (i, v) => setAnswers((a) => ({ ...a, [i]: v }));
+  return (
+    <div className="build">
+      <p className="build__eyebrow t-mono">{icon("spark")}antes de montar o {BUILD[brief.kind].label}</p>
+      {brief.questions.map((q, i) => (
+        <div key={i} className="build__q">
+          <b>{q.q}</b>
+          {live && (
+            <>
+              <div className="build__options">
+                {q.options.map((o) => (
+                  <button key={o} type="button" className="build__option" aria-pressed={answers[i] === o} onClick={() => set(i, answers[i] === o ? "" : o)}>{o}</button>
+                ))}
+              </div>
+              <input className="input build__own" placeholder="ou escreva" value={q.options.includes(answers[i]) ? "" : answers[i] || ""}
+                     onChange={(e) => set(i, e.currentTarget.value)} />
+            </>
+          )}
+        </div>
+      ))}
+      {live && (
+        <div className="build__actions">
+          <button type="button" className="pill" onClick={() => onAnswer(null)}>decide você</button>
+          <button type="button" className="pill pill--accent" onClick={() => onAnswer(answers)}>{icon("spark")}montar</button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* o rascunho: o bastante para conferir de relance. só o último é vivo — os
+   de antes ficam como uma linha, com o que mudou */
+function DraftCard({ draft, live, onCreate }) {
+  if (!live || !draft.data) {
+    return <p className="build__old">{BUILD[draft.kind].label} · {draft.title}{draft.summary ? " — " + draft.summary : ""}</p>;
+  }
+  const v = draftView(draft.kind, draft.data);
+  return (
+    <div className="build is-draft">
+      <p className="build__eyebrow t-mono">{icon("spark")}rascunho do {BUILD[draft.kind].label}</p>
+      <h3 className="build__title">{v.title}</h3>
+      {v.sub && <p className="build__sub">{v.sub}</p>}
+      <dl className="build__lines">
+        {v.lines.map((l, i) => (
+          <div key={i}><dt>{l.label}</dt><dd>{l.text || "—"}</dd></div>
+        ))}
+      </dl>
+      {draft.summary && <p className="build__summary">{draft.summary}</p>}
+      <div className="build__actions">
+        <span className="build__hint">ou escreva abaixo o que mudar</span>
+        <button type="button" className="pill pill--accent" onClick={onCreate}>{icon("check")}{BUILD[draft.kind].create}</button>
+      </div>
+    </div>
+  );
+}
+
 function Assistant() {
   const chats = useCollection("chats", { normalize: normalizeChat });
   const hash = useHash();
@@ -68,6 +153,8 @@ function Assistant() {
   const [thinking, setThinking] = useState(false);
   const [proposal, setProposal] = useState(null);
   const [historyOpen, setHistoryOpen] = useState(false);
+  /* o x do selo de montagem: a conversa segue normal, e o rascunho fica lá */
+  const [flowOn, setFlowOn] = useState(true);
   const listRef = useRef(null);
   const fieldRef = useRef(null);
   const idRef = useRef("");
@@ -77,10 +164,15 @@ function Assistant() {
   const started = useRef(false);
   const start = STARTS.find((s) => s.key === startKey) || null;
   const list = chats.all().sort((a, b) => b.updatedAt - a.updatedAt);
+  const flow = flowOn ? flowOf(messages) : null;
 
   /* grava a conversa a cada troca — documento como qualquer outro: sobe,
      volta no outro aparelho, e apagar é apagar */
-  const keep = (list) => {
+  const keep = (all) => {
+    /* só o último rascunho guarda o desenho inteiro: um app são dezenas de
+       KB, e a conversa é um documento que sobe para a nuvem */
+    const lastDraft = all.map((m) => !!m.draft).lastIndexOf(true);
+    const list = all.map((m, i) => (m.draft && i !== lastDraft && m.draft.data ? { ...m, draft: { ...m.draft, data: null } } : m));
     setMessages(list);
     if (!list.length) return;
     if (!idRef.current) { idRef.current = newId(); setHash(idRef.current); }
@@ -95,10 +187,75 @@ function Assistant() {
     });
   };
 
+  /* ---------- montar com o Merlin ---------- */
+  const callBuild = async (context) => {
+    try {
+      const r = await api("/merlin", { method: "POST", body: JSON.stringify({ task: "build", context }) });
+      if (r.ok) return { body: r.body };
+      return { error: r.status === 401 ? "entre para usar o Merlin" : (r.body && r.body.error) || "não consegui montar isso agora" };
+    } catch (e) { return { error: "não consegui falar com o Merlin" }; }
+  };
+  const runDraft = async (kind, request, answers, base) => {
+    setThinking("montando o rascunho…");
+    const r = await callBuild({ kind, step: "draft", request, answers });
+    setThinking(false);
+    if (r.error) { keep(base.concat([{ from: "merlin", text: r.error }])); return; }
+    const data = r.body.draft;
+    keep(base.concat([{ from: "merlin", draft: { kind, request, answers, data, title: draftView(kind, data).title, summary: r.body.summary || "" } }]));
+  };
+  const startBuild = async (kind, request) => {
+    const mine = messages.concat([{ from: "me", text: request }]);
+    keep(mine);
+    setInput("");
+    setStartKey("");
+    setThinking("vendo o que falta saber…");
+    const r = await callBuild({ kind, step: "brief", request });
+    setThinking(false);
+    if (r.error) { keep(mine.concat([{ from: "merlin", text: r.error }])); return; }
+    const questions = r.body.questions || [];
+    if (questions.length) keep(mine.concat([{ from: "merlin", brief: { kind, request, questions, answered: false } }]));
+    else runDraft(kind, request, "", mine);
+  };
+  /* a resposta às perguntas: as escolhas do cartão, o texto livre do campo,
+     ou nada ("decide você") */
+  const answerBrief = (at, answers, free) => {
+    const b = messages[at].brief;
+    const text = free != null ? free : answers ? answersText(b.questions, answers) : "";
+    const list = messages.map((m, i) => (i === at ? { ...m, brief: { ...b, answered: true } } : m))
+      .concat([{ from: "me", text: text || "decide você" }]);
+    keep(list);
+    setInput("");
+    runDraft(b.kind, b.request, text, list);
+  };
+  const revise = async (d, change) => {
+    const mine = messages.concat([{ from: "me", text: change }]);
+    keep(mine);
+    setInput("");
+    setThinking("ajustando o rascunho…");
+    const r = await callBuild({ kind: d.kind, step: "revise", request: d.request, answers: d.answers, draft: d.data, change });
+    setThinking(false);
+    if (r.error) { keep(mine.concat([{ from: "merlin", text: r.error }])); return; }
+    const data = r.body.draft;
+    keep(mine.concat([{ from: "merlin", draft: { ...d, data, title: draftView(d.kind, data).title, summary: r.body.summary || "" } }]));
+  };
+  const create = (d) => {
+    const { collection: name, doc, href } = docFromDraft(d.kind, d.data, newId);
+    collection(name).save(doc);
+    keep(messages.concat([{ from: "merlin", built: { kind: d.kind, id: doc.id, name: doc.name } }]));
+    location.href = href;
+  };
+
   const ask = async (text, mode) => {
     const message = String(text || "").trim();
     if (!message || thinking) return;
     const said = mode !== undefined ? mode : start;
+    /* o que está em montagem pega o texto antes de tudo: é a resposta às
+       perguntas ou o ajuste do rascunho. sair da montagem é o x do selo */
+    const live = flowOn ? flowOf(messages) : null;
+    if (live && live.brief) { answerBrief(live.at, null, message); return; }
+    if (live && live.draft) { revise(live.draft, message); return; }
+    const kind = (said && said.build) || buildIntent(message);
+    if (kind) { setFlowOn(true); startBuild(kind, message); return; }
     const mine = messages.concat([{ from: "me", text: message }]);
     const answer = (m) => keep(mine.concat([m]));
     keep(mine);
@@ -111,7 +268,7 @@ function Assistant() {
       const r = await api("/merlin", { method: "POST", body: JSON.stringify({
         task: "assistant",
         context: {
-          message: (said ? said.prefix : "") + message,
+          message: (said && said.prefix ? said.prefix : "") + message,
           page: (from && from.page) || getCurrentPage(),
           pageContext: (from && from.pageContext) || (said && said.key === "finance" ? financeBrief() : ""),
           history: turnsOf(messages)
@@ -132,6 +289,7 @@ function Assistant() {
   };
 
   const openChat = (doc) => {
+    setFlowOn(true);
     idRef.current = doc.id;
     setHash(doc.id);
     setMessages(doc.messages);
@@ -141,6 +299,7 @@ function Assistant() {
     fromRef.current = null;
   };
   const newChat = () => {
+    setFlowOn(true);
     idRef.current = "";
     setHash("");
     setMessages([]);
@@ -212,7 +371,13 @@ function Assistant() {
                 </div>
               : messages.map((m, i) => (
                   <div key={i} className={"chat__msg" + (m.from === "me" ? " is-me" : "")}>
-                    {m.proposal
+                    {m.brief
+                      ? <BriefCard brief={m.brief} live={!!flow && flow.at === i && !thinking} onAnswer={(a) => answerBrief(i, a)} />
+                      : m.draft
+                      ? <DraftCard draft={m.draft} live={!!flow && flow.at === i && !thinking} onCreate={() => create(m.draft)} />
+                      : m.built
+                      ? <p>criei o {BUILD[m.built.kind].label} <a href={BUILD[m.built.kind].href + m.built.id}>{m.built.name}</a></p>
+                      : m.proposal
                       ? <button className="pill pill--accent" type="button" onClick={() => setProposal(m.proposal)}>{icon("spark")}{m.proposal.title}</button>
                       : m.from === "me"
                         /* o que a pessoa escreveu sai como ela escreveu; o que o
@@ -222,19 +387,25 @@ function Assistant() {
                         : <Markdown className="chat__body" text={m.text} />}
                   </div>
                 ))}
-            {thinking && <div className="chat__msg"><p className="weak">pensando…</p></div>}
+            {thinking && <div className="chat__msg"><p className="weak">{typeof thinking === "string" ? thinking : "pensando…"}</p></div>}
           </div>
 
           <form className="chat__composer" autoComplete="off" onSubmit={(e) => { e.preventDefault(); ask(input); }}>
-            {start && (
+            {start && !flow && (
               <p className="chat__mode">
                 {start.icon}{start.title}
                 <button type="button" aria-label="Tirar" title="tirar" onClick={() => setStartKey("")}>{icon("x")}</button>
               </p>
             )}
+            {flow && (
+              <p className="chat__mode">
+                {icon("spark")}{flow.brief ? "respondendo as perguntas do " + BUILD[flow.brief.kind].label : "ajustando o rascunho: " + flow.draft.title}
+                <button type="button" aria-label="Sair da montagem" title="sair da montagem" onClick={() => setFlowOn(false)}>{icon("x")}</button>
+              </p>
+            )}
             <div className="chat__row">
               <input ref={fieldRef} className="chat__field" autoFocus maxLength="1000"
-                     placeholder={start ? start.placeholder : "escreva para o Merlin…"}
+                     placeholder={flow ? (flow.brief ? "ou responda do seu jeito" : "o que mudar? ex.: tira o webinar e põe um quiz") : start ? start.placeholder : "escreva para o Merlin…"}
                      aria-label="Escreva para o Merlin"
                      value={input} onChange={(e) => setInput(e.currentTarget.value)} />
               <button className="pill pill--accent pill--icon" type="submit" aria-label="Enviar"

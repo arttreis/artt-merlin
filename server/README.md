@@ -69,9 +69,17 @@ ramos no mapa mental e o que falta num funil). É opcional: sem ele a rota
 responde 503 e as telas dizem que falta a chave. A chave sai de
 console.anthropic.com; o modelo é o `claude-opus-5-5` e cada pedido custa centavos.
 
-Essa chave é **uma só para o time**, e por isso a rota tem teto: 30 conselhos
-por pessoa por hora, contados na tabela `advice`. Quem estourar espera; quem
-está ao lado não paga por isso. O número está em `ADVICE_PER_HOUR`, no worker.
+Essa chave é **uma só para o time**, e por isso a rota tem teto, por pessoa e
+por hora, contado na tabela `advice` em três cotas separadas (`QUOTA`, no worker):
+
+- **conselho**: 30 (`ADVICE_PER_HOUR`), no Opus. Inclui as perguntas antes de
+  montar um funil, app ou mapa: o fluxo de montagem inteiro gasta uma vez daqui.
+- **leitura do início**: 60 (`CAPTURE_PER_HOUR`), no Haiku: o campo da home
+  separando tarefa, data, hora e ideia.
+- **montagem**: 40 (`BUILD_PER_HOUR`), no Opus: o rascunho e cada ajuste de um
+  funil, app ou mapa montado na conversa.
+
+Quem estourar espera; quem está ao lado não paga por isso.
 
 O `SESSION_SECRET` assina os cookies de sessão. Gere um forte e guarde:
 
@@ -145,7 +153,7 @@ SESSION_SECRET=qualquer-coisa-longa-em-desenvolvimento
 | `GET /api/shared/:token` | a leitura pública de um link, sem sessão |
 | `POST /api/waitlist` | `{email}`: a lista de espera da landing, sem sessão. A mesma resposta para quem entra e para quem já estava; o campo escondido `site` (que só robô preenche) faz fingir que gravou; teto de `WAITLIST_PER_HOUR = 300` entradas por hora somando todo mundo. Não abre porta: quem entra continua sendo `OWNER_EMAILS`. A tabela `waitlist` precisa existir no D1 de produção antes do deploy (`schema.sql`). |
 | `POST /api/files`, `GET/DELETE /api/files/:id` | anexos no R2; sem o binding `FILES`, 503 |
-| `POST /api/merlin` | `{task, context}`; tarefas `branches, funnel, nextStage, expand, assistant, week, meeting, habits, review, numbers, delegate`, as do conteúdo, e as do projeto de app: `app` (devolve `{blueprint}` — o projeto inteiro em nomes, que a tela resolve em ids; 12000 tokens de saída em vez de 4000) e `appReview` (texto). Só `assistant` aceita `context.history` (array `{role, content}`) — as outras nunca mandam esse campo, e continuam um turno só. |
+| `POST /api/merlin` | `{task, context}`; tarefas `branches, funnel, nextStage, expand, assistant, week, meeting, habits, review, numbers, delegate`, as do conteúdo, e as do projeto de app: `app` (devolve `{blueprint}` — o projeto inteiro em nomes, que a tela resolve em ids; 12000 tokens de saída em vez de 4000) e `appReview` (texto); `capture` (a linha do início vira `{items}`, no Haiku) e `build` (`context.kind` = `funnel`, `app` ou `map`; `context.step` = `brief` devolve `{questions}`, `draft` e `revise` devolvem `{draft, summary}`). Só `assistant` aceita `context.history` (array `{role, content}`) — as outras nunca mandam esse campo, e continuam um turno só. |
 
 ## Decisões que valem saber
 
