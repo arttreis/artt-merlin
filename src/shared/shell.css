@@ -627,6 +627,19 @@ html.light{--color-1:#1c6fc4;--color-2:#b8600a;--color-3:#c4234f;--color-4:#7a3b
 .dk__plus:hover{filter:brightness(1.08)}
 @media (max-width:600px){.dk__item[aria-current="page"] span{display:none}.dk__item{padding:0 9px}}
 html.bare .tb,html.bare .dk-wrap{display:none}
+/* o onboarding e obrigatorio (core.js, guardOnboarding): enquanto ele dura o
+   dock e a busca saem — nao ha para onde ir antes de o Merlin te conhecer.
+   e a pagina que ainda esta decidindo se manda para ele nao aparece */
+html.onboarding .dk-wrap,html.onboarding .tb__search{display:none}
+html.gated #app{visibility:hidden}
+/* o aviso das outras telas: no lugar do conteudo, abaixo da barra do topo */
+.ow{position:fixed;inset:0;z-index:50;display:grid;place-items:center;padding:24px}
+.ow__card{max-width:440px;display:flex;flex-direction:column;align-items:flex-start;gap:12px;padding:28px;background:var(--surface);border:1px solid var(--line);border-radius:var(--br);box-shadow:var(--sombra-2)}
+.ow__logo{display:inline-flex;width:28px;height:28px;color:var(--accent-ink)}
+.ow__logo svg{width:100%;height:100%}
+.ow__card h2{margin:0;font-size:18px;font-weight:600;color:var(--ink)}
+.ow__card p{margin:0;font-size:14px;line-height:1.55;color:var(--ink-70)}
+.ow__go{margin-top:6px;text-decoration:none}
 /* o aviso com desfazer sobe acima do dock */
 html.merlin .notice{bottom:88px}
 

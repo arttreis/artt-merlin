@@ -19,7 +19,8 @@ import "./shared/base.css";
 import "./index.css";
 import {
   initPage, signIn, seen, markSeen, isNewHere, today, addDays, dateOf, notify, newId,
-  newNote, askMerlin, readPrefs, savePrefs, formatMin, collection, api
+  newNote, askMerlin, readPrefs, savePrefs, prefsStore, formatMin, collection, api, foldKey,
+  onboardingState, onboardingSettled
 } from "./shared/core.js";
 import { Children, useState, useEffect, useLayoutEffect, useRef } from "react";
 import { mount, useCloud, useCollection, icon } from "./shared/ui.jsx";
@@ -125,17 +126,55 @@ function parseWindow(text) {
 }
 
 const STEPS = [
-  { key: "name", ask: () => "Oi. Eu sou o Merlin. Vou te ajudar a fazer o dia caber — e, para isso, preciso te conhecer. Como posso te chamar?", placeholder: "seu nome", required: true },
-  { key: "work", ask: (a) => "Prazer, " + a.name + ". Com o que você trabalha?", placeholder: "ex.: sou dev, faço SaaS sozinho e atendo dois clientes" },
+  { key: "name", ask: (a, back) => back ? "Como posso te chamar?" : "Oi. Eu sou o Merlin. Vou te ajudar a fazer o dia caber — e, para isso, preciso te conhecer. Como posso te chamar?", placeholder: "seu nome", required: true },
+  { key: "work", ask: (a, back, saidName) => (saidName ? "Prazer, " + a.name + ". " : "") + "Com o que você trabalha?", placeholder: "ex.: sou dev, faço SaaS sozinho e atendo dois clientes" },
   { key: "building", ask: () => "E o que você está construindo agora? Me diz o nome e, se quiser, uma frase.", placeholder: "ex.: Agenda do salão — agendamento pelo WhatsApp" },
   { key: "github", ask: () => "Se você usa GitHub, qual é o seu usuário? Eu leio o que você entregar no dia — só o que é público, sem senha nem token.", placeholder: "ex.: arttreis" },
   { key: "window", ask: () => "Que horas o seu dia de trabalho começa e termina?", placeholder: "ex.: 9 às 18" },
   { key: "habit", ask: () => "Um hábito que você quer manter todo dia?", placeholder: "ex.: treinar, ler 20 páginas, dormir 7h" }
 ];
 
-function Onboarding({ profile, apps, habits, onDone }) {
-  const [answers, setAnswers] = useState({});
-  const [log, setLog] = useState([{ from: "merlin", text: STEPS[0].ask({}) }]);
+/* quem já usava o Merlin antes de o onboarding existir chega aqui obrigado
+   (core.js, guardOnboarding), com trabalho guardado e às vezes com parte do
+   perfil: o GitHub vem da tela de perfil, a janela do dia das preferências,
+   os hábitos da lista dele. a conversa reconhece isso — começa dizendo que o
+   Merlin mudou e pula o que ele já sabe. perguntar de novo o que está anotado
+   seria fingir que não conhece a pessoa. */
+function knownOf(me, habits) {
+  const p = me || {};
+  const prefs = prefsStore().get("config");
+  return {
+    name: cleanName(p.name),
+    work: p.work || "",
+    building: p.building || "",
+    github: p.github || "",
+    window: prefs && prefs.dayStart != null && prefs.dayEnd != null ? "sim" : "",
+    habit: p.habit || (habits.all().some((x) => !x.archived) ? "sim" : "")
+  };
+}
+
+/* chegou antes do onboarding: tem perfil sem a marca, ou tem trabalho guardado */
+const isVeteran = (me, lists) => !!me || lists.some((c) => c.all().length > 0);
+
+function Onboarding({ profile, apps, habits, veteran, onDone }) {
+  /* quem é, o que já se sabe e as perguntas que sobram são lidos uma vez, ao
+     abrir: cada resposta grava no perfil e cria produto e hábito, e nada
+     disso pode mudar a conversa no meio dela */
+  const [back] = useState(veteran);
+  const [known] = useState(() => (back ? knownOf(profile.get("me"), habits) : {}));
+  const [steps] = useState(() => STEPS.filter((st) => !known[st.key]));
+  const [answers, setAnswers] = useState(() => (known.name ? { name: known.name } : {}));
+  const [log, setLog] = useState(() => {
+    if (!steps.length) return [];
+    const first = { from: "merlin", text: steps[0].ask(answers, back, false) };
+    if (!back) return [first];
+    const n = steps.length;
+    return [{
+      from: "merlin",
+      text: "Oi de novo" + (known.name ? ", " + known.name : "") + ". Eu mudei desde a última vez: agora sou um assistente, e pergunto pelo seu dia sempre que você chega. " +
+        "Para isso preciso te conhecer — " + (n === 1 ? "é uma pergunta" : "são " + n + " perguntas") + ", e o que você já tem aqui continua onde está."
+    }, first];
+  });
   const [i, setI] = useState(0);
   const [text, setText] = useState("");
   const field = useRef(null);
@@ -155,9 +194,12 @@ function Onboarding({ profile, apps, habits, onDone }) {
     if (key === "work") { saveProfile({ work: value }); return "anotei no seu perfil"; }
     if (key === "building") {
       const [name, ...rest] = value.split(/\s+[—–-]\s+|:\s+/);
+      saveProfile({ building: value });
+      /* quem já usava o Merlin costuma responder com um produto que já está lá */
+      const same = apps.all().find((x) => foldKey(x.name) === foldKey(name));
+      if (same) return "o produto “" + same.name + "” já estava em Produtos — anotei que é nele que você está agora";
       const app = { id: newId(), name: name.trim().slice(0, 120), pitch: rest.join(" — ").trim().slice(0, 300), createdAt: Date.now(), updatedAt: Date.now() };
       apps.save(app);
-      saveProfile({ building: value });
       return "criei o produto “" + app.name + "” em Produtos";
     }
     if (key === "github") {
@@ -179,8 +221,11 @@ function Onboarding({ profile, apps, habits, onDone }) {
     return "";
   };
 
+  /* o perfil já tinha tudo e só faltava a marca: não há o que perguntar */
+  useEffect(() => { if (!steps.length) { saveProfile({ onboarded: true }); onDone(); } }, []);
+
   const next = (value) => {
-    const step = STEPS[i];
+    const step = steps[i];
     const out = [...log, { from: "me", text: value || "pular" }];
     if (value) {
       const note = apply(step.key, value);
@@ -194,19 +239,23 @@ function Onboarding({ profile, apps, habits, onDone }) {
     const a = { ...answers, [step.key]: step.key === "name" ? cleanName(value) || value : value };
     setAnswers(a);
     setText("");
-    if (i + 1 < STEPS.length) {
-      out.push({ from: "merlin", text: STEPS[i + 1].ask(a) });
+    if (i + 1 < steps.length) {
+      out.push({ from: "merlin", text: steps[i + 1].ask(a, back, step.key === "name") });
       setLog(out);
       setI(i + 1);
     } else {
-      out.push({ from: "merlin", text: "Pronto, " + (a.name || "") + ". A partir de agora eu pergunto pelo seu dia toda vez que você chegar. Vamos começar: o que precisa caber hoje?" });
+      out.push({ from: "merlin", text: "Pronto, " + (a.name || "") + "." + (back ? " Suas tarefas, notas e produtos continuam onde estavam." : "") +
+        " A partir de agora eu pergunto pelo seu dia toda vez que você chegar. Vamos começar: o que precisa caber hoje?" });
       setLog(out);
-      saveProfile({ onboarded: true });
-      setTimeout(onDone, 1600);
+      /* a marca espera a última fala: gravada antes, o início troca de tela na
+         hora e o "pronto" nunca aparece. se a aba fechar nessa pausa, a volta
+         encontra tudo respondido no perfil e só põe a marca */
+      setTimeout(() => { saveProfile({ onboarded: true }); onDone(); }, 1600);
     }
   };
 
-  const step = STEPS[i];
+  const step = steps[i];
+  if (!step) return null;
   return (
     <div className="ob">
       <div className="ob__log" aria-live="polite">
@@ -219,7 +268,7 @@ function Onboarding({ profile, apps, habits, onDone }) {
       </div>
       <form className="ob__form" onSubmit={(e) => { e.preventDefault(); const v = text.trim(); if (v || !step.required) next(v); }}>
         <input ref={field} className="ob__field" value={text} maxLength="200" placeholder={step.placeholder}
-               onChange={(e) => setText(e.currentTarget.value)} aria-label={step.ask(answers)} />
+               onChange={(e) => setText(e.currentTarget.value)} aria-label={step.ask(answers, back, false)} />
         {!step.required && <button type="button" className="ob__skip" onClick={() => next("")}>pular</button>}
         <button type="submit" className="ob__send" aria-label="Responder" disabled={step.required && !text.trim()}>{icon("arrow")}</button>
       </form>
@@ -620,11 +669,26 @@ function Home() {
   const phase = phaseOf(h);
   const date = today();
 
-  if (!me || !me.onboarded) {
+  /* o onboarding é um estado (core.js, onboardingState), e não só a falta do
+     perfil: com sessão, num aparelho novo, o perfil ainda está a caminho, e
+     abrir a conversa nessa hora faria quem já passou por ela responder de
+     novo — e criar o produto e o hábito outra vez. até saber, só a floresta */
+  useEffect(() => { onboardingSettled().then(() => redraw((n) => n + 1)); }, []);
+  const state = onboardingState();
+  useLayoutEffect(() => {
+    document.documentElement.classList.toggle("onboarding", state !== "done");
+    return () => document.documentElement.classList.remove("onboarding");
+  }, [state]);
+
+  if (state !== "done") {
     return (
       <div className="hm hm--onboarding">
         <div className="hm-scene"><Forest phase={phase} /></div>
-        <Onboarding profile={profile} apps={apps} habits={habits} onDone={() => redraw((n) => n + 1)} />
+        {state === "pending" && (
+          <Onboarding profile={profile} apps={apps} habits={habits}
+                      veteran={isVeteran(me, [tasks, apps, habits, collection("notes")])}
+                      onDone={() => redraw((n) => n + 1)} />
+        )}
       </div>
     );
   }
