@@ -1,0 +1,18 @@
+# merlin · cabecalhos das paginas (docs/prd/landing.md)
+#
+# a Cloudflare injeta sozinha, pela borda, o beacon do Web Analytics em toda
+# pagina HTML do merlin.arttreis.com.br, inclusive as do app. a medicao que o
+# Merlin quer e so a da vitrine: o index.html carrega o beacon proprio so
+# para quem esta na porta. "no-transform" e o que a Cloudflare documenta para
+# ela nao mexer na resposta, e com isso nao injetar nada.
+#
+# o preco: com no-transform a borda tambem nao comprime. por isso a regra
+# vale so para as paginas da raiz (/:page para no primeiro "/"), e nunca para
+# /assets/*, onde estao o JS e o CSS grandes. o resto do valor e o cache que
+# os assets ja mandavam: sempre conferir com o servidor antes de usar.
+
+/
+  Cache-Control: public, max-age=0, must-revalidate, no-transform
+
+/:page
+  Cache-Control: public, max-age=0, must-revalidate, no-transform
