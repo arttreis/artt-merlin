@@ -1,0 +1,117 @@
+/* merlin · o rastreador
+   uma janela de 380 de largura que fica por cima do trabalho, com a altura do
+   que mostra: a faixa recolhida (~48px) ou o cartao aberto. sem barra lateral,
+   sem rolagem: o que nao cabe aqui mora no calendario, a um clique. */
+
+/* a casca (sidebar, gaveta do celular) e montada pelo initPage como em toda
+   pagina; aqui ela some e fica so o que ela traz de util: a caixa de entrar e
+   o aviso com desfazer. */
+html.tracker .sb,html.tracker .sb__mobile,html.tracker .sb__scrim{display:none}
+html.tracker body,html.tracker.sidebar-closed body{margin-left:0;min-height:100vh;overflow:hidden}
+html.tracker body::before,html.tracker body::after{display:none}
+/* o aviso com desfazer sobe para cima da barra do titulo: embaixo ele cobria
+   o campo pelos 7 segundos em que o desfazer vale */
+html.tracker .notice{top:4px;bottom:auto;max-width:calc(100vw - 20px);font-size:12px;padding:7px 12px}
+
+/* a altura e a do conteudo, nunca a da janela: e o tracker.jsx que mede o
+   .tk e pede ao app a altura certa. se o .tk esticasse com a janela, a
+   medida nunca mudaria e a janela nunca encolheria. */
+.tk{
+  display:flex;flex-direction:column;
+  padding:0 14px 12px;gap:8px;
+  background:var(--bg);user-select:none;
+}
+/* nenhuma linha encolhe: com overflow:hidden o flex podia zerar a altura do
+   "depois" quando os chips abriam, e a linha sumia sem aviso */
+.tk>*{flex-shrink:0}
+
+/* ---------- recolhido: a faixa ---------- */
+.tk--strip{padding:0;gap:0}
+.tk-strip{display:flex;align-items:center;gap:8px;height:44px;padding:0 8px 0 14px}
+.tk-grip{display:grid;place-items:center;cursor:grab}
+.tk-grip svg{width:14px;height:14px;color:var(--accent);pointer-events:none}
+.tk-grip .gl-mark{width:16px;height:16px}
+.tk-peek{
+  flex:1 1 auto;min-width:0;display:flex;align-items:baseline;gap:8px;
+  height:32px;padding:0 6px;border-radius:var(--br2);text-align:left;
+  transition:background var(--t);
+}
+.tk-peek:hover{background:var(--fill)}
+.tk-peek .tk-n{font-size:17px}
+.tk-peek__text{min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-size:12px;color:var(--ink-50)}
+/* a barra vira um fio na base da faixa: sem borda e sem raio, de ponta a ponta */
+.tk-track.tk-track--thin{height:4px;border:0;border-radius:0}
+
+/* ---------- a barra de cima: e por onde se arrasta a janela ---------- */
+.tk-bar{display:flex;align-items:center;gap:6px;height:36px;flex:0 0 auto;cursor:default}
+.tk-brand{display:flex;align-items:center;gap:7px;color:var(--ink-70);font-size:12px}
+.tk-brand b{font-weight:600;letter-spacing:-.02em}
+.tk-brand svg{width:14px;height:14px;color:var(--accent);pointer-events:none}
+.tk-brand .gl-mark{width:16px;height:16px}
+.tk-win{margin-left:auto;font-size:10.5px;color:var(--ink-30)}
+.tk-btn{
+  display:grid;place-items:center;width:26px;height:26px;border-radius:var(--br2);
+  color:var(--ink-50);transition:background var(--t),color var(--t);
+}
+.tk-btn:hover{background:var(--fill-hover);color:var(--ink)}
+.tk-btn svg{width:14px;height:14px}
+
+/* ---------- o numero grande ---------- */
+.tk-big{margin:0;display:flex;align-items:baseline;gap:8px;line-height:1}
+.tk-n{font-family:var(--mono);font-weight:500;font-size:30px;letter-spacing:-.04em;color:var(--accent)}
+.tk-label{font-size:13px;color:var(--ink-50)}
+/* nao ha vermelho neste sistema: quando nao cabe, o destaque simplesmente some */
+.tk-big[data-tone="over"] .tk-n,.tk-n[data-tone="over"]{color:var(--ink)}
+
+/* ---------- a barra do dia (a mesma regra do .track do calendario) ---------- */
+.tk-track{
+  display:flex;height:10px;flex:0 0 auto;border-radius:var(--br2);overflow:hidden;
+  background:var(--bg);border:1px solid var(--line-soft);
+}
+.tk-band{min-width:0}
+.tk-band+.tk-band{box-shadow:inset 1px 0 0 var(--bg)}
+.tk-band.is-spent{background:var(--bg)}
+.tk-band.is-reserved{background:repeating-linear-gradient(90deg,var(--fill) 0 2px,var(--bg) 2px 5px)}
+.tk-band.is-slot{background:var(--fill-hover)}
+.tk-band.is-guess{background:repeating-linear-gradient(45deg,var(--fill-hover) 0 4px,transparent 4px 8px)}
+.tk-band.is-free{background:var(--accent);flex:1 1 auto}
+
+/* ---------- agora e depois ---------- */
+.tk-now{
+  display:flex;align-items:center;gap:10px;min-height:38px;padding:0 10px 0 8px;
+  background:var(--surface);border:1px solid var(--line-soft);border-radius:var(--br3);
+}
+.tk-check{
+  flex:0 0 auto;width:18px;height:18px;border-radius:50%;
+  border:1.5px solid var(--ink-30);transition:border-color var(--t),background var(--t);
+}
+.tk-check:hover{border-color:var(--accent);background:var(--accent-glow)}
+.tk-title{flex:1 1 auto;min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-size:13px}
+.tk-min{flex:0 0 auto;font-size:11px;color:var(--ink-50)}
+.tk-now.is-out .tk-title,.tk-next .is-out{color:var(--ink-30)}
+.tk-none{margin:0;font-size:12.5px;color:var(--ink-30)}
+.tk-next{
+  margin:0;font-size:11.5px;color:var(--ink-50);
+  overflow:hidden;white-space:nowrap;text-overflow:ellipsis;
+}
+.tk-next i{font-style:normal;color:var(--ink-30);font-size:10.5px}
+.tk-late{margin-left:8px;color:var(--ink-70);text-decoration:underline;text-decoration-color:var(--line)}
+
+/* ---------- o campo ---------- */
+.tk-add{margin-top:2px;position:relative;user-select:text}
+.tk-field{
+  width:100%;height:34px;padding:0 10px;border-radius:var(--br2);
+  background:var(--surface);border:1px solid var(--line);font-size:12.5px;outline:none;
+}
+.tk-field:focus{border-color:var(--ink-30)}
+.tk-field::placeholder{color:var(--ink-30)}
+.tk-hint{position:absolute;right:10px;top:0;height:34px;display:flex;align-items:center;font-size:10.5px;color:var(--ink-50);pointer-events:none}
+.tk-chips{display:flex;align-items:center;gap:5px;margin-bottom:6px;flex-wrap:wrap}
+.tk-ask{flex:1 1 100%;font-size:11.5px;color:var(--ink-50);overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.tk-ask b{color:var(--ink-70);font-weight:500}
+.tk-chip{
+  height:24px;padding:0 10px;border-radius:var(--br-pill);
+  background:var(--fill);border:1px solid var(--line);font-size:11px;color:var(--ink-70);
+}
+.tk-chip:hover{background:var(--fill-hover);color:var(--ink)}
+.tk-chip[data-fits="no"]{color:var(--ink-30)}

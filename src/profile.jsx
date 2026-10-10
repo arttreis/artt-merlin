@@ -10,23 +10,26 @@ import "./shared/base.css";
 import "./profile.css";
 import {
   initPage, cloud, signIn, collection, savedTheme, setTheme, currentTheme,
-  seen, forgetSeen, notify, currentBrand
+  seen, markSeen, forgetSeen, notify, currentBrand
 } from "./shared/core.js";
 import { useState, useEffect } from "react";
 import { mount, useCloud, icon } from "./shared/ui.jsx";
+import { Tour } from "./shared/tour.jsx";
 
 initPage("profile");
 
-/* as colecoes que a pessoa tem, na ordem da navegacao. o dia nao esta aqui
-   porque nao e colecao: e um documento so, o de hoje. */
+/* as colecoes que a pessoa tem, na ordem da barra (hoje, ideias, produtos,
+   distribuicao, clientes, dinheiro) */
 const KINDS = [
-  { type: "notes", one: "nota", many: "notas", href: "notes.html" },
-  { type: "clients", one: "cliente", many: "clientes", href: "clients.html" },
   { type: "tasks", one: "tarefa", many: "tarefas", href: "calendar.html" },
-  { type: "funnels", one: "funil", many: "funis", href: "funnels.html" },
+  { type: "habits", one: "hábito", many: "hábitos", href: "habits.html" },
+  { type: "notes", one: "nota", many: "notas", href: "notes.html" },
   { type: "maps", one: "mapa", many: "mapas", href: "maps.html" },
-  { type: "finance", one: "lançamento", many: "lançamentos", href: "finance.html" },
-  { type: "habits", one: "hábito", many: "hábitos", href: "habits.html" }
+  { type: "apps", one: "produto", many: "produtos", href: "apps.html" },
+  { type: "funnels", one: "funil", many: "funis", href: "funnels.html" },
+  { type: "content", one: "peça", many: "peças", href: "content.html" },
+  { type: "clients", one: "cliente", many: "clientes", href: "clients.html" },
+  { type: "finance", one: "lançamento", many: "lançamentos", href: "finance.html" }
 ];
 
 const THEMES = [
@@ -42,6 +45,7 @@ function Profile() {
      porque e ela que o botao precisa mostrar como ativa. */
   const [choice, setChoice] = useState(savedTheme);
   const [, redraw] = useState(0);
+  const [tour, setTour] = useState(false);
   const email = c.signedIn ? String(c.email || "") : "";
 
   /* seguir o sistema significa mudar quando ele muda, inclusive com a pagina
@@ -120,13 +124,13 @@ function Profile() {
           <p className="note">
             {seen("tour")
               ? "Você já viu como o Merlin se organiza. Dá para rever quando quiser."
-              : "Você ainda não viu a apresentação — ela abre sozinha no início."}
+              : "Você ainda não viu a apresentação — ela abre sozinha no Hoje."}
           </p>
           <div className="pf-actions">
-            <a className="pill" href="index.html#apresentacao">{icon("spark")}<span>ver a apresentação</span></a>
+            <button className="pill" type="button" onClick={() => setTour(true)}>{icon("spark")}<span>ver a apresentação</span></button>
             {seen("tour") && (
               <button className="pill" type="button"
-                      onClick={() => { forgetSeen("tour"); notify("ela volta a abrir sozinha no início"); }}>
+                      onClick={() => { forgetSeen("tour"); notify("ela volta a abrir sozinha no Hoje"); }}>
                 esquecer que eu vi
               </button>
             )}
@@ -137,7 +141,7 @@ function Profile() {
         <section className="block col-12">
           <p className="heading"><span className="t-mono">o que está guardado</span></p>
           {nothing
-            ? <p className="empty">Nada ainda. O início mostra por onde começar.</p>
+            ? <p className="empty">Nada ainda. O Ctrl K é o jeito mais curto de começar: com duração vai para hoje, sem duração vira ideia.</p>
             : (
               <ul className="pf-counts">
                 {counts.filter((k) => k.n).map((k) => (
@@ -157,6 +161,7 @@ function Profile() {
           </p>
         </section>
       </div>
+      {tour && <Tour onClose={() => { setTour(false); markSeen("tour"); }} />}
     </>
   );
 }

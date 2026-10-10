@@ -14,7 +14,7 @@ import { useState, useEffect, useRef, useLayoutEffect, Fragment } from "react";
 import {
   mount, useCollection, useHash, setHash, useKeydown, isTyping,
   useFields, Form, Field, Dialog, Markdown, TemplatePicker, EmptyStart, ChannelThumb, icon,
-  useDelegate, DelegateDialog, DateField, MoneyInput
+  useDelegate, DelegateDialog, DateField, MoneyInput, openCommand
 } from "./shared/ui.jsx";
 import { NAV_ICONS } from "./shared/icons.jsx";
 import {
@@ -439,12 +439,7 @@ function Clients() {
   useKeydown((e) => {
     if (e.key === "Escape") { if (selectedRef.current && isNarrow()) closePanel(); return; }
     if (isTyping()) return;
-    if (e.key === "/") {
-      e.preventDefault();
-      const s = document.getElementById("sb-search");
-      if (s) { s.focus(); s.select(); }
-      return;
-    }
+    if (e.key === "/") { e.preventDefault(); openCommand(); return; }
     if (e.key === "n" || e.key === "N") { e.preventDefault(); openNew(); }
   });
 

@@ -23,7 +23,7 @@
  *
  * sem React e sem pixel aqui: entra documento, sai documento.
  */
-import { collection, newId, today, isDay, api, cloud } from "./core.js";
+import { collection, newId, today, isDay, api, cloud, parseMentions, readDuration } from "./core.js";
 
 export const MINUTES = 1440;
 const CLICKUP_ID = /^[A-Za-z0-9]{1,32}$/;
@@ -209,6 +209,69 @@ export function readClock(text) {
   const h = +m[1], min = +(m[2] || m[3] || 0);
   if (h > 23 || min > 59) return undefined;
   return h * 60 + min;
+}
+
+/* ---------- a linha que vira tarefa ----------
+   a gramatica e a mesma em toda tela que cria tarefa escrevendo: o calendario
+   e o rastreador do app de desktop. morava no calendar.jsx e desceu para ca
+   quando a segunda tela apareceu — a mesma linha lida de dois jeitos seriam
+   duas tarefas diferentes para o mesmo texto. */
+
+/* link de tarefa do ClickUp colado junto do titulo. so a forma /t/<id> —
+   que e a unica que identifica uma tarefa — e a URL sai do titulo como a
+   duracao sai: o titulo fica sendo o que voce leria em voz alta. */
+const CLICKUP_URL = /(?:^|\s)https?:\/\/(?:[a-z0-9-]+\.)*clickup\.com\/t\/(?:\d+\/)?([A-Za-z0-9]{1,32})\S*(?=\s|$)/i;
+
+function readClickup(text) {
+  const m = text.match(CLICKUP_URL);
+  if (!m) return { clickup: "", title: text };
+  return { clickup: m[1], title: text.slice(0, m.index) + " " + text.slice(m.index + m[0].length) };
+}
+
+/* o composer inteiro le a linha por aqui. a previa e o submit precisam
+   entender exatamente a mesma coisa: se so o submit tirasse a URL, a previa
+   mostraria o link cru como titulo e ainda acusaria "nao entendi o tempo" por
+   causa dos digitos do id. */
+export function readLine(text) {
+  const l = readClickup(text);
+  const m = parseMentions(l.title);
+  const d = readDuration(m.title);
+  return { min: d.min, title: d.title, clickup: l.clickup, noLink: m.title, client: m.client };
+}
+
+/* o que ocupa o dia sem ser trabalho seu. escrever "almoco 1h" nao deveria
+   virar uma tarefa que voce conclui para ganhar tempo de volta que nunca
+   esteve la — entao essas viram reserva, e o prefixo "-" forca qualquer uma.
+
+   as cerimonias estao aqui por inteiro: "daily" vivia sozinha, e uma lista que
+   reconhece a reuniao de todo dia mas nao a da semana obriga voce a escrever
+   "reuniao weekly" para o Merlin entender o que "weekly" ja diz. */
+const RESERVE_RE = /^(?:-\s*|(?:almo[çc]o|caf[ée]|janta(?:r)?|reuni[ãa]o|call|daily|weekly|monthly|stand ?-?up|planning|refinement|retro(?:spectiva)?|kick ?-?off|alinhamento|mentoria|1:1|1x1|dentista|m[ée]dico|academia|deslocamento|transito|tr[âa]nsito)\b)/i;
+export const isReserve = (title) => RESERVE_RE.test(title.trim());
+export const stripPrefix = (title) => title.replace(/^-\s*/, "").trim();
+
+/* ---------- a regra unica de escrita (VISAO, 9) ----------
+   o mesmo texto cai no mesmo lugar em toda porta que aceita texto livre (o
+   Ctrl+K, por enquanto): com "?" no comeco ou no fim e pergunta ao Merlin;
+   com duracao e tarefa de hoje; sem duracao e ideia (uma nota). ate
+   09/10/2026 havia sete lugares para escrever e cada um decidia sozinho — o
+   campo da home mandava o Enter para a conversa, o da busca so buscava.
+
+   o campo do dia e o do rastreador continuam cobrando a duracao em vez de
+   mandar para as ideias: neles a pessoa ja disse "isto e para hoje". */
+export function routeLine(text) {
+  const raw = String(text || "").replace(/\s+/g, " ").trim();
+  if (!raw) return null;
+  if (/^\?|\?$/.test(raw)) {
+    const ask = raw.replace(/^\?\s*/, "").trim();
+    return ask ? { kind: "ask", text: ask } : null;
+  }
+  const l = readLine(raw);
+  const name = String(l.title || "").replace(/\s+/g, " ").trim() || raw;
+  if (l.min) return { kind: "task", title: stripPrefix(name), min: l.min, reserved: isReserve(name), clickup: l.clickup, client: l.client || "" };
+  const m = parseMentions(raw);
+  const title = String(m.title || "").replace(/\s+/g, " ").trim();
+  return title ? { kind: "note", title, client: m.client || "" } : null;
 }
 
 /* ---------- a juncao das duas colecoes antigas ----------

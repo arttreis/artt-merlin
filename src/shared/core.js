@@ -242,54 +242,56 @@ initTheme();
 
 /* ---------- navegacao ---------- */
 
-/* as paginas em grupos, cada grupo com um titulo que abre e fecha na barra
-   (14/09/2026: com treze paginas, a lista corrida ja nao se lia de relance).
-   a ordem dentro de cada grupo e a mesma de antes. */
-export const PAGE_GROUPS = [
-  { id: "day", label: "dia a dia", pages: [
-    { id: "home", label: "início", href: "index.html" },
-    /* o merlin: antes era uma caixa em cima da busca, e uma barra de navegacao
-       nao leva a caixas — foi tentado e desfeito por isso (ver VISAO.md §7.3).
-       agora e tela de verdade, com URL e historico de navegador. fica logo
-       depois do inicio porque e de la que quase toda conversa comeca: o campo
-       da home e a busca da barra desaguam nela. */
-    { id: "assistant", label: "merlin", href: "assistant.html" },
-    /* o dia e a semana eram dois itens porque eram duas paginas. viraram duas
-       visoes de uma so, e dois itens levando ao mesmo lugar seriam duas portas
-       para a mesma sala. */
+/* seis lugares, um por trabalho, e nao um por tipo de dado (VISAO, 9).
+   ate 09/10/2026 eram dezesseis paginas em quatro grupos, todas do mesmo
+   tamanho na barra: sete faziam quase todo o uso, duas (diario e planos)
+   nunca tiveram um documento, e o dia — o coracao — ficava a dois cliques,
+   atras de uma home de relogio e citacao.
+
+   cada secao e UM item na barra. as paginas dela continuam sendo paginas, com
+   o endereco de sempre; o que muda e que viram abas da secao, e as abas so
+   aparecem na secao aberta. a primeira pagina e a porta da secao.
+
+   fora das secoes: o inicio (index.html, so a porta de quem nunca entrou), a
+   conversa com o Merlin (chega-se pelo Ctrl+K), o perfil (o cartao embaixo da
+   barra), o rastreador e o link publico. */
+export const SECTIONS = [
+  /* o dia e a pagina inicial. a rotina e os habitos moram aqui porque e daqui
+     que eles vivem: a rotina so vira tarefa quando o calendario abre a semana,
+     e o habito so se marca hoje */
+  { id: "today", label: "hoje", icon: "calendar", pages: [
     { id: "calendar", label: "calendário", href: "calendar.html" },
-    /* logo abaixo do calendario porque e dele que ela vive: a rotina so vira
-       tarefa quando o calendario abre a semana */
     { id: "routine", label: "rotina", href: "routine.html" },
+    { id: "habits", label: "hábitos", href: "habits.html" }
+  ] },
+  /* o que ainda nao e tarefa: a nota solta e o mapa que pensa em galhos */
+  { id: "ideas", label: "ideias", icon: "notes", pages: [
     { id: "notes", label: "notas", href: "notes.html" },
-    /* o diario (14/09/2026): a nota e o que ainda vai virar alguma coisa; a
-       pagina do diario e o que o dia foi */
-    { id: "journal", label: "diário", href: "journal.html" }
+    { id: "maps", label: "mapas", href: "maps.html" }
   ] },
-  { id: "business", label: "negócio", pages: [
-    /* a prospeccao vem antes de clientes porque e de onde eles chegam; o
-       conteudo vem logo depois, porque e o que traz quem entra na prospeccao */
-    { id: "prospecting", label: "prospecção", href: "prospecting.html" },
-    { id: "clients", label: "clientes", href: "clients.html" },
-    { id: "content", label: "conteúdo", href: "content.html" },
+  /* o SaaS que se esta construindo: conceito, banco, telas e fluxos, e a saida
+     pronta para construir (VISAO, 4.13 e 8.1) */
+  { id: "products", label: "produtos", icon: "apps", pages: [
+    { id: "apps", label: "produtos", href: "apps.html" }
+  ] },
+  /* como gente chega ao produto: o funil e as pecas que o alimentam */
+  { id: "distribution", label: "distribuição", icon: "funnels", pages: [
     { id: "funnels", label: "funis", href: "funnels.html" },
-    { id: "maps", label: "mapas", href: "maps.html" },
-    /* o projeto de app (08/10/2026): o mapa e para pensar solto; aqui a ideia
-       ganha forma de produto — banco, telas e fluxos — e sai pronta para construir */
-    { id: "apps", label: "apps", href: "apps.html" }
+    { id: "content", label: "conteúdo", href: "content.html" }
   ] },
-  { id: "money", label: "dinheiro", pages: [
+  /* de lead a cliente: as duas paginas sao o mesmo documento (client-doc.js) */
+  { id: "clients", label: "clientes", icon: "clients", pages: [
+    { id: "prospecting", label: "leads", href: "prospecting.html" },
+    { id: "clients", label: "clientes", href: "clients.html" }
+  ] },
+  /* a vitrine desagua no financeiro: o "comprei" vira saida */
+  { id: "money", label: "dinheiro", icon: "finance", pages: [
     { id: "finance", label: "financeiro", href: "finance.html" },
-    /* logo depois do financeiro porque e para la que ela desagua: o "comprei"
-       vira saida */
     { id: "wishlist", label: "vitrine", href: "wishlist.html" }
-  ] },
-  { id: "growth", label: "evolução", pages: [
-    { id: "habits", label: "hábitos", href: "habits.html" },
-    { id: "plans", label: "planos", href: "plans.html" }
   ] }
 ];
-export const PAGES = PAGE_GROUPS.flatMap((g) => g.pages);
+export const PAGES = SECTIONS.flatMap((s) => s.pages);
+export const sectionOf = (page) => SECTIONS.find((s) => s.pages.some((p) => p.id === page)) || null;
 
 export function toggleSidebar() {
   const root = document.documentElement;
@@ -317,16 +319,15 @@ const SEARCH_SOURCES = [
   { type: "tasks", label: "tarefa", field: "title", href: (d) => "calendar.html#" + encodeURIComponent(d.date || ""), filter: (d) => !d.done },
   { type: "maps", label: "mapa", field: "name", href: (d) => "maps.html#" + encodeURIComponent(d.id) },
   { type: "funnels", label: "funil", field: "name", href: (d) => "funnels.html#" + encodeURIComponent(d.id) },
-  { type: "apps", label: "app", field: "name", href: (d) => "apps.html#" + encodeURIComponent(d.id) },
+  { type: "apps", label: "produto", field: "name", href: (d) => "apps.html#" + encodeURIComponent(d.id) },
   { type: "finance", label: "R$", field: "name", href: () => "finance.html", filter: (d) => d.type === "entry" || d.type === "fixed" || d.type === "debt" || d.type === "card" },
   { type: "wishlist", label: "coletânea", field: "name", href: (d) => "wishlist.html#" + encodeURIComponent(d.id), filter: (d) => d.type === "list" },
   { type: "wishlist", label: "vitrine", field: "name", href: (d) => "wishlist.html#" + encodeURIComponent(d.list || ""), filter: (d) => d.type === "item" && !d.bought },
   { type: "habits", label: "hábito", field: "name", href: () => "habits.html", filter: (d) => !d.archived },
   { type: "routine", label: "rotina", field: "title", href: () => "routine.html" },
-  /* a pagina do diario e texto corrido: acha no corpo, mostra a data e o trecho */
-  { type: "journal", label: "diário", href: (d) => "journal.html#" + encodeURIComponent(d.id), each: (d) => [String(d.body || "").replace(/\s+/g, " ").trim()], clip: true },
-  /* os objetivos moram dentro do documento do periodo: `each` abre o doc em varios achados */
-  { type: "plans", label: "objetivo", href: () => "plans.html", each: (d) => (d.goals || []).map((g) => g.text) }
+  /* o "como foi o dia" e texto corrido: acha no corpo, mostra o trecho. a
+     pagina do diario saiu em 09/10/2026 (VISAO, 9) e o texto mora no Hoje */
+  { type: "journal", label: "diário", href: () => "calendar.html#day", each: (d) => [String(d.body || "").replace(/\s+/g, " ").trim()], clip: true }
 ];
 export function search(term) {
   const k = foldKey(term);
@@ -904,7 +905,7 @@ document.addEventListener("visibilitychange", () => {
    nao baixou espera a proxima sincronizacao, e a marca de "feito" so e
    gravada quando todas fecharam. depois disso ela nunca mais faz nada. */
 const FRONTS_PURGED = "merlin:fronts-removed";
-const PURGE_TYPES = ["notes", "clients", "tasks", "week", "maps", "funnels", "apps", "finance", "habits", "plans", "bookmarks", "content", "cadence"];
+const PURGE_TYPES = ["notes", "clients", "tasks", "week", "maps", "funnels", "apps", "finance", "habits", "plans", "bookmarks", "content", "cadence", "profile", "closes", "reviews"];
 function stripFront(value) {
   if (Array.isArray(value)) return value.map(stripFront).some(Boolean);
   if (!value || typeof value !== "object") return false;

@@ -613,7 +613,7 @@ Decidido em 07/09/2026:
     dos dados gravados com os nomes antigos.
 15. **Hábitos e planos** (seções 4.9 e 4.10) entram depois da migração terminar.
 
-Em aberto: nada.
+Em aberto: o que a seção 8 deixou em aberto (8.6).
 
 
 ---
@@ -731,3 +731,133 @@ E as **categorias** saíram de dentro da caixa de config, onde eram uma fileira 
 clique apagava sem perguntar e sem desfazer. Agora cada uma diz quanto passou por ela no mês —
 que é a única coisa que faz uma etiqueta valer alguma coisa. Renomear arrasta junto tudo que
 estava marcado com o nome antigo; apagar avisa quantos lançamentos ficam órfãos, e volta atrás.
+
+---
+
+## 8. O Merlin sai de casa (09/10/2026)
+
+Até aqui o Merlin era da casa: do Arthur, e depois do time da Guessless, cada um no seu. A partir
+de 09/10/2026 ele vira produto para gente de fora. O que não muda: os módulos (seção 4), a
+arquitetura (seção 3), a marca que segue quem entrou, e uma pessoa por vez.
+
+### 8.1 Para quem
+
+**Pessoas sozinhas, desenvolvedores, que fazem o próprio SaaS com a IA escrevendo boa parte do
+código, e que precisam distribuí-lo.** Não é agência e não é time.
+
+O Merlin já tinha a espinha dessa pessoa sem ter sido feito para ela: o projeto de app (4.13)
+desenha o que construir e sai com o prompt para o Claude Code; o funil de lançamento e as peças
+de conteúdo ligadas a ele são a distribuição; e o dia diz quanto disso cabe hoje. Construir e
+distribuir são as duas metades do trabalho, e o dia é onde as duas disputam minuto.
+
+### 8.2 O conselheiro é o Merlin
+
+Sempre, a partir de agora. Ele deixou de se apresentar como conselheiro do time da Guessless e
+de falar do método, das ferramentas e dos clientes "da casa": o `SYSTEM` do worker diz quem ele
+é e para quem fala, e o que ele sabe do negócio de cada pessoa chega no contexto do pedido.
+
+### 8.3 Créditos a cada 5 horas
+
+O conselheiro passa a gastar **crédito por pessoa, renovado em janelas de 5 horas**. Substitui o
+teto de 30 pedidos por hora (`ADVICE_PER_HOUR`), que existia para conter acidente com uma chave
+dividida pelo time, e não para medir uso. Com gente de fora pagando, o crédito é o produto.
+
+### 8.4 Uma pessoa por vez, continua
+
+Nada muda aqui, e nada do que vem depois (8.5) pode mudar. Uma rede social cabe nessa regra se
+for **ver e publicar**: o link público de mapa e de funil já é isso. Escrever no Merlin de outra
+pessoa — mandar tarefa, ser responsável, dividir cliente — continua fora.
+
+### 8.5 App instalável
+
+O Merlin vira app que se instala: **widget no celular**, e no Windows um **rastreador** que
+fica aberto ao lado do trabalho. A barra que se gasta e o número da sobra são o que esse app
+mostra sem precisar ser aberto.
+
+Depois, e não agora: uma rede social, e um lugar onde as pessoas entram para trabalhar.
+
+### 8.6 Em aberto
+
+- Quanto crédito cada plano tem, quanto custa, e como cada pedido pesa (o projeto de app gasta
+  três vezes a saída de um conselho comum).
+- O que substitui `OWNER_EMAILS` como porta: cadastro aberto, convite ou lista de espera.
+- Os modelos de quem lança SaaS (canais, funis de lançamento, conteúdo de construir em público),
+  ao lado dos que já existem.
+- Por qual celular começar, e o endereço do produto.
+
+---
+
+## 9. Seis lugares, um por trabalho (09/10/2026)
+
+O Merlin tinha muita coisa e não estava prático. A contagem de produção em 09/10/2026 (só o
+número de documentos por tipo, desde 02/09, 3 pessoas) mostrou por quê: sete módulos faziam
+quase todo o uso (tarefas 282, financeiro 102, mapas 30, funis 23, notas 20, rotina 17,
+hábitos 15), dois nunca tiveram um documento (diário e planos), e a última tarefa gravada era
+de 29/09. O dia, que é o coração, estava a dois cliques — atrás de uma home de relógio, frase
+e favoritos — e havia sete lugares diferentes para escrever, cada um decidindo sozinho para
+onde o texto ia.
+
+### 9.1 A barra
+
+Dezesseis itens em quatro grupos viraram **seis seções**, uma por trabalho e não uma por tipo
+de dado. As páginas continuam sendo páginas, com o endereço de sempre; viraram abas da seção,
+e as abas só aparecem na seção em que você está (`SECTIONS` no `core.js`).
+
+| seção | abas |
+| --- | --- |
+| **hoje** | calendário (dia, semana, mês), rotina, hábitos |
+| **ideias** | notas, mapas |
+| **produtos** | o projeto de app |
+| **distribuição** | funis, conteúdo |
+| **clientes** | leads (a prospecção), clientes |
+| **dinheiro** | financeiro, vitrine |
+
+Fora das seções: a porta de quem nunca entrou (`index.html`), a conversa com o Merlin
+(chega-se pelo `Ctrl+K`), o perfil (o cartão embaixo da barra), o rastreador e o link público.
+
+### 9.2 O dia é a primeira tela
+
+`index.html` deixou de ser a home: quem já entrou é encaminhado para o calendário antes de ver
+qualquer coisa, e só quem nunca esteve aqui vê a porta. Do bento saíram o relógio, a citação e
+os favoritos; os **hábitos do dia** e o **"como foi o dia"** foram para o lado da fila
+(`shared/today-block.jsx`). A apresentação foi junto: aparece uma vez no Hoje e se revê pelo
+perfil (`shared/tour.jsx`), reescrita para as seis seções.
+
+### 9.3 Diário e planos saíram
+
+Nenhum dos dois teve um documento em produção. Os endereços encaminham para o Hoje, e as
+coleções não foram apagadas. Do diário ficou a pergunta do fim do dia, que grava na mesma
+coleção `journal` de antes.
+
+### 9.4 Uma regra só para escrever
+
+O `Ctrl+K` virou o campo de tudo, em qualquer tela (`routeLine` no `tasks.js`, com teste):
+
+- com **"?"** no começo ou no fim → pergunta ao Merlin;
+- com **duração** ("45m", "1h30") → tarefa de hoje;
+- **sem duração** → ideia (uma nota).
+
+A primeira linha da lista diz o que o Enter vai fazer antes de ele fazer; embaixo vem o que já
+existe com aquele nome, e com o campo vazio, as seis seções. `Ctrl+J` pergunta direto. O campo
+do dia e o do rastreador continuam cobrando a duração: neles a pessoa já disse "é para hoje".
+
+### 9.5 O produto é o centro
+
+Abrir um produto mostra primeiro a **visão geral**: construir (o que está desenhado e o que
+falta, com o prompt para o Claude Code a um clique), distribuir (o funil ligado e as peças que
+ainda não foram ao ar) e pensar (os mapas ligados a ele). O mapa ganhou o campo `app`, e o
+produto liga, desliga e cria mapa já ligado. A aba "lançamento" passou a se chamar
+"distribuição", como a seção.
+
+---
+
+## 10. O Merlin é um assistente (10/10/2026)
+
+O Arthur, depois da seção 9: ainda não era um assistente pessoal. Agora o **início é uma conversa**:
+
+- **onboarding em conversa** (nome, trabalho, o que está construindo, janela do dia, um hábito); cada resposta cria o documento na hora, e o perfil (`profile/me`) vai em todo pedido ao conselheiro (`profileOf` no worker);
+- **a pergunta segue a hora**: de manhã "o que precisa caber hoje?", à tarde "como está indo?", à noite "como fechamos o dia?";
+- **fechar o dia**: cada tarefa aberta vira feito, amanhã ou largar, mais o "como foi o dia"; os dias fechados formam a **sequência** (`closes`);
+- **revisão da semana** (sexta à noite até domingo) e **do mês** (três últimos dias), na coleção `reviews`;
+- **a floresta** (`shared/forest.jsx`), escolhida entre quatro temas, acompanha a hora;
+- **dock embaixo no lugar da barra lateral**, com o início, as seis seções e o "+".

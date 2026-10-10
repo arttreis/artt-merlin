@@ -707,6 +707,48 @@ const dataLeft = () => globalThis.localStorage.keys().filter((k) => k in DATA);
   check("próximo passo: perdido tira a tarefa do calendário", !store.all().some((t) => t.origin && t.origin.id === "p1"));
 }
 
+/* ---- a linha e a fila, que o calendário e o rastreador do desktop dividem ----
+   moraram dentro do calendar.jsx até o rastreador (tracker.jsx) passar a criar
+   tarefa e a desenhar a barra. são as mesmas funções nas duas telas; o teste
+   garante que elas continuam entendendo o que entendiam. */
+{
+  globalThis.localStorage = makeStorage({});
+  const T = await import("./tasks.js?n=" + (++n));
+  const Day = await import("./day.js?n=" + n);
+  const flat = (s) => String(s).replace(/\s+/g, " ").trim();
+
+  const l = T.readLine("revisar proposta 45m");
+  check("linha: a duração sai do título", l.min === 45 && flat(l.title) === "revisar proposta", JSON.stringify(l));
+  const c = T.readLine("ver tarefa https://app.clickup.com/t/86abc123 30m");
+  check("linha: o link do ClickUp sai do título e vira id", c.clickup === "86abc123" && c.min === 30 && flat(c.title) === "ver tarefa", JSON.stringify(c));
+  check("linha: almoço é reserva", T.isReserve("almoço"));
+  check("linha: o hífen força reserva e sai do título", T.isReserve("- buscar as crianças") && T.stripPrefix("- buscar as crianças") === "buscar as crianças");
+  check("linha: trabalho não é reserva", !T.isReserve("gravar vídeo"));
+
+  /* a regra única de escrita: o mesmo texto cai no mesmo lugar em toda porta */
+  const rt = T.routeLine("revisar proposta 45m");
+  check("regra: com duração vai para hoje", rt.kind === "task" && rt.min === 45 && rt.title === "revisar proposta", JSON.stringify(rt));
+  check("regra: almoço com duração é reserva de hoje", T.routeLine("almoço 1h").reserved === true);
+  const rn = T.routeLine("ideia de landing para o lançamento");
+  check("regra: sem duração vira ideia", rn.kind === "note" && rn.title === "ideia de landing para o lançamento", JSON.stringify(rn));
+  check("regra: ? no fim é pergunta", T.routeLine("qual funil para um SaaS de nicho?").kind === "ask");
+  check("regra: ? no começo é pergunta, sem o ?", T.routeLine("? quanto cobrar").text === "quanto cobrar");
+  check("regra: vazio não vai a lugar nenhum", T.routeLine("   ") === null && T.routeLine("?") === null);
+
+  /* a janela anda com o relógio de verdade: começa uma hora atrás e acaba em
+     quatro, então a conta é a mesma a qualquer hora em que o teste rodar */
+  const now = Day.nowMin();
+  const doc = { start: now - 60, end: now + 240, tasks: [
+    { id: "a", title: "a", min: 120, done: false, reserved: false },
+    { id: "b", title: "b", min: 90, done: false, reserved: false },
+    { id: "r", title: "almoço", min: 60, done: false, reserved: true }
+  ] };
+  const d = Day.distribute(doc);
+  check("fila: a reserva sai da frente do que resta", d.b.liveReserve === 60 && d.slots.get("a").from === 120, JSON.stringify(d.slots.get("a")));
+  check("fila: a segunda só cabe em parte e marca o corte", d.slots.get("b").partial && d.slots.get("b").min === 60 && d.cut === 1, JSON.stringify(d.slots.get("b")) + " cut=" + d.cut);
+  check("fila: não cabe meia hora", d.b.slack === -30 && d.b.overflow === 30, String(d.b.slack));
+}
+
 
 console.log("\n" + passed + " passaram, " + failures.length + " falharam");
 if (failures.length) { console.log("\nFALHAS:"); failures.forEach((f) => console.log("  - " + f)); process.exit(1); }

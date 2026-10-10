@@ -1,0 +1,13 @@
+{
+  "name": "merlin-desktop",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "icons": "tauri icon icon.svg",
+    "dev": "npm run icons && tauri dev",
+    "build": "npm run icons && tauri build"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2"
+  }
+}

@@ -18,8 +18,8 @@ import { createRoot } from "react-dom/client";
 import { createPortal } from "react-dom";
 import {
   collection, cloud, clients, listClients, clientName, md, brl, parseMoney,
-  api, notify, sendToDay, formatMin, readDuration, newId,
-  PAGE_GROUPS, CLOUD_STATUS, search, signIn, currentNotice, onNotice, closeNotice,
+  api, notify, sendToDay, formatMin, readDuration, newId, newNote, today,
+  SECTIONS, sectionOf, CLOUD_STATUS, search, signIn, currentNotice, onNotice, closeNotice,
   toggleSidebar, setShellRenderer, currentBrand, share, shareOf, unshare, shareUrl,
   currentTheme, toggleTheme, askMerlin
 } from "./core.js";
@@ -28,6 +28,8 @@ import { LOGO, GL_LOGO, GL_MARK, ICONS, NAV_ICONS, icon } from "./icons.jsx";
    Form como qualquer outro do sistema — e porque qualquer tela que um dia
    receba uma proposta usa o mesmo. */
 import { ACTION_COLLECTIONS, ACTION_LABELS, ACTION_FIELDS, buildDoc, previewOf } from "./assistant-actions.js";
+/* o Ctrl+K cria tarefa de hoje com a mesma regra e a mesma forma do dia */
+import { tasks, newTask, topOrder, routeLine } from "./tasks.js";
 
 /* o CSS entra pela pagina, nao por aqui: base.css ja puxa o shell.css na
    ordem certa, e o dia carrega so o shell. */
@@ -951,101 +953,115 @@ export function ProposalDialog({ proposal, onClose }) {
   );
 }
 
-/* ---------- busca global ---------- */
-/* a conversa com o Merlin tem tela propria (assistant.html) desde
-   22/09/2026, e nao mais uma caixa por cima desta pagina: o askMerlin()
-   leva pra la a pergunta e o que esta tela sabia. */
+/* ---------- o campo de tudo (Ctrl+K) ----------
+   ate 09/10/2026 havia sete lugares para escrever, e cada um decidia sozinho
+   para onde o texto ia: o campo da home mandava o Enter para a conversa, a
+   busca da barra so buscava, o diario e as notas tinham caixa propria. agora
+   ha um campo que vale em toda tela, e uma regra so (routeLine, no tasks.js):
 
-function SearchBox({ onNavigate }) {
+     com "?" no comeco ou no fim  → pergunta ao Merlin
+     com duracao ("45m", "1h30")  → tarefa de hoje
+     sem duracao                  → ideia (uma nota)
+
+   a primeira linha da lista diz o que o Enter vai fazer, antes de ele fazer —
+   a mesma ideia da linha fantasma da home. embaixo, o que ja existe com aquele
+   nome (a busca de sempre), e com o campo vazio, as seis secoes.
+
+   a conversa com o Merlin continua sendo uma pagina (assistant.html): o
+   askMerlin() leva para la a pergunta e o que esta tela sabia. Ctrl+J pergunta
+   direto, sem passar pela regra. */
+const ROUTE_LABEL = {
+  task: (r) => (r.reserved ? "reservar em hoje" : "pôr em hoje") + " · " + formatMin(r.min),
+  note: () => "guardar em ideias",
+  ask: () => "perguntar ao Merlin"
+};
+
+/* quem quiser abrir o campo de tudo de dentro de uma tela (o "/" dos clientes) */
+export const openCommand = () => window.dispatchEvent(new Event("merlin:command"));
+
+function CommandPalette({ onClose }) {
   const [term, setTerm] = useState("");
-  const [open, setOpen] = useState(false);
-  const [focus, setFocus] = useState(-1);
+  const [focus, setFocus] = useState(0);
   const ref = useRef(null);
-  const hits = term.trim() ? search(term) : [];
+  useEffect(() => { if (ref.current) ref.current.focus(); }, []);
 
-  /* Ctrl+K foca a busca; Ctrl+J vai pro Merlin direto, de qualquer lugar */
-  useKeydown((e) => {
-    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
-      e.preventDefault();
-      ref.current.focus(); ref.current.select();
-      setOpen(true);
-    } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "j") {
-      e.preventDefault();
-      askMerlin(term);
+  const route = routeLine(term);
+  const rows = [];
+  if (route) {
+    rows.push({ key: "do", kind: route.kind, label: ROUTE_LABEL[route.kind](route), text: route.kind === "ask" ? route.text : route.title, run: () => runRoute(route) });
+    /* perguntar e sempre possivel: e o atalho de quem queria conversar sobre
+       aquilo, e nao guardar */
+    if (route.kind !== "ask") rows.push({ key: "ask", kind: "ask", label: "perguntar ao Merlin", text: term.trim(), run: () => askMerlin(term.trim()) });
+  }
+  const hits = term.trim() ? search(term) : [];
+  hits.forEach((h, i) => rows.push({ key: "hit" + i, kind: "hit", label: h.label, text: h.text, run: () => { location.href = h.href; } }));
+  if (!term.trim()) {
+    SECTIONS.forEach((sec) => rows.push({ key: "sec" + sec.id, kind: "nav", icon: sec.icon, label: "ir para", text: sec.label, run: () => { location.href = sec.pages[0].href; } }));
+  }
+  const at = Math.min(focus, Math.max(0, rows.length - 1));
+
+  const runRoute = (r) => {
+    if (r.kind === "ask") { askMerlin(r.text); return; }
+    if (r.kind === "task") {
+      const store = tasks();
+      const date = today();
+      const t = newTask({ title: r.title, min: r.min, reserved: r.reserved, clickup: r.clickup, client: r.client, date, order: topOrder(store.all(), date) });
+      store.save(t);
+      notify((r.reserved ? "reservado em hoje · " : "entrou em hoje · ") + formatMin(r.min), () => store.remove(t.id));
+    } else {
+      const note = newNote({ title: r.title, client: r.client });
+      if (note) notify("guardado em ideias", () => collection("notes").remove(note.id));
     }
-  });
-  useEffect(() => {
-    const f = (e) => { if (!e.target.closest(".sb__search")) setOpen(false); };
-    document.addEventListener("click", f);
-    return () => document.removeEventListener("click", f);
-  }, []);
+    onClose();
+  };
+  const run = (row) => { if (row) row.run(); };
 
   const onKeyDown = (e) => {
     if (e.key === "ArrowDown" || e.key === "ArrowUp") {
       e.preventDefault();
-      if (!hits.length) return;
-      setFocus((i) => (i + (e.key === "ArrowDown" ? 1 : hits.length - 1) + (i < 0 ? 1 : 0)) % hits.length);
+      if (!rows.length) return;
+      setFocus((i) => (Math.min(i, rows.length - 1) + (e.key === "ArrowDown" ? 1 : rows.length - 1)) % rows.length);
     } else if (e.key === "Enter") {
-      const hit = hits[focus >= 0 ? focus : 0];
-      if (hit) { if (onNavigate) onNavigate(); location.href = hit.href; }
+      e.preventDefault();
+      run(rows[at]);
     } else if (e.key === "Escape") {
-      e.stopPropagation();
-      setTerm(""); setOpen(false); ref.current.blur();
+      e.preventDefault(); e.stopPropagation();
+      onClose();
     }
   };
 
-  return (
-    <div className="sb__search">
-      <label className="sb__search-field">
-        {NAV_ICONS.search}
-        <input ref={ref} id="sb-search" type="search" placeholder="buscar…" autoComplete="off" aria-label="Buscar em tudo"
-               value={term} onChange={(e) => { setTerm(e.currentTarget.value); setOpen(true); setFocus(-1); }}
-               onFocus={() => { if (term.trim()) setOpen(true); }} onKeyDown={onKeyDown} />
-        <button type="button" className="sb__assistant" title="perguntar ao Merlin (ctrl j)" aria-label="Perguntar ao Merlin" onClick={() => askMerlin(term)}>{icon("spark")}</button>
-        <kbd>ctrl k</kbd>
-      </label>
-      {open && term.trim() && (
-        <div className="sb__results" id="sb-results">
-          {hits.length
-            ? hits.map((hit, i) => (
-                <a key={hit.href + i} href={hit.href} className={i === focus ? "is-focus" : undefined} onClick={onNavigate}>
-                  <span className="t-mono">{hit.label}</span><span>{hit.text}</span>
-                </a>))
-            : <p>nada com esse nome</p>}
-          <button type="button" className="sb__ask" onClick={() => askMerlin(term)}>{icon("spark")}perguntar ao Merlin</button>
-        </div>
-      )}
-    </div>
-  );
-}
-
-/* ---------- o cartao da nuvem e quem esta aqui ---------- */
-function CloudCard({ page }) {
-  const c = useCloud();
-  const info = CLOUD_STATUS[c.status] || CLOUD_STATUS.local;
-  const email = c.signedIn ? String(c.email || "") : "";
-  return (
-    <>
-      <div className="sb__card">
-        <div className="cloud" id="cloud" data-status={c.status}><i className="dot" /><span id="cloud-status">{info.line}</span></div>
-        <p id="cloud-text">{info.text}</p>
-        {info.action && (
-          <button className="pill pill--accent" type="button" id="cloud-action"
-                  onClick={() => (c.status === "error" ? c.syncAll() : signIn.show())}>{info.action}</button>
-        )}
+  return createPortal(
+    <div className="cmd" role="dialog" aria-modal="true" aria-label="Escrever, buscar ou perguntar" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="cmd__box">
+        <label className="cmd__field">
+          {NAV_ICONS.search}
+          <input ref={ref} type="text" autoComplete="off" spellCheck="false" maxLength="300"
+                 placeholder="escreva, busque ou pergunte…" aria-label="Escrever, buscar ou perguntar"
+                 value={term} onChange={(e) => { setTerm(e.currentTarget.value); setFocus(0); }} onKeyDown={onKeyDown} />
+          <kbd>esc</kbd>
+        </label>
+        <ul className="cmd__rows" role="listbox">
+          {rows.map((row, i) => (
+            <li key={row.key} role="option" aria-selected={i === at}>
+              <button type="button" className={"cmd__row cmd__row--" + row.kind + (i === at ? " is-focus" : "")}
+                      onMouseEnter={() => setFocus(i)} onClick={() => run(row)}>
+                <span className="cmd__icon" aria-hidden="true">
+                  {row.kind === "ask" ? icon("spark") : row.kind === "task" ? icon("clock") : row.kind === "note" ? NAV_ICONS.notes : row.kind === "nav" ? NAV_ICONS[row.icon] : NAV_ICONS.search}
+                </span>
+                <span className="cmd__label t-mono">{row.label}</span>
+                <span className="cmd__text">{row.text}</span>
+                {i === at && <kbd>enter</kbd>}
+              </button>
+            </li>
+          ))}
+          {term.trim() && !hits.length && <li className="cmd__none">nada guardado com esse nome</li>}
+        </ul>
+        <p className="cmd__rule">
+          com <b>duração</b> vai para hoje · sem duração vira <b>ideia</b> · com <b>?</b> pergunta ao Merlin · <kbd>ctrl j</kbd> pergunta direto
+        </p>
       </div>
-      <div className="sb__who">
-        {/* quem está aqui É a porta do perfil: o cartão já mostrava o rosto e o
-            endereço, e uma linha "perfil" logo acima dele dizia a mesma coisa
-            duas vezes. */}
-        <a className="sb__me" href="profile.html" title="perfil" aria-current={page === "profile" ? "page" : undefined}>
-          <span className={"avatar" + (email ? "" : " is-out")} id="sb-avatar">{email ? email[0].toUpperCase() : "?"}</span>
-          <span className="who"><b id="sb-name">{email ? email.split("@")[0] : "só você"}</b><span id="sb-email">{email || "sem sessão"}</span></span>
-        </a>
-        <ThemeButton />
-        {c.signedIn && <button type="button" className="sb__mode" id="cloud-signout" title="sair" aria-label="Sair" onClick={() => c.signOut()}>{icon("logout")}</button>}
-      </div>
-    </>
+    </div>,
+    document.body
   );
 }
 
@@ -1194,82 +1210,97 @@ function Notice() {
   );
 }
 
-/* um grupo da barra: o titulo pequeno e as paginas dele. nao abre nem fecha
-   — o Arthur, em 14/09/2026: "nao pode ser collapsaveis". recolhida, a barra
-   esconde os titulos e mostra todos os icones. */
-function NavGroup({ group, page }) {
-  return (
-    <div className="sb__group">
-      <p className="sb__section">{group.label}</p>
-      <ul className="sb__list">
-        {group.pages.map((p) => (
-          <li key={p.id}>
-            <a className="sb__item" href={p.href} title={p.label} aria-current={p.id === page ? "page" : undefined}>
-              {NAV_ICONS[p.id] || null}<span>{p.label}</span>
-            </a>
-          </li>
-        ))}
-      </ul>
-    </div>
-  );
-}
-
-/* ---------- a casca inteira ---------- */
-function Shell({ page }) {
-  const [drawer, setDrawer] = useState(false);
-  const [, setClosed] = useState(() => document.documentElement.classList.contains("sidebar-closed"));
-  const [signInOpen, setSignInOpen] = useState(signIn.open);
-  useEffect(() => signIn.onChange((s) => setSignInOpen(s.open)), []);
-  useRootClass("sidebar-open", drawer);
-
-  const fold = () => { toggleSidebar(); setClosed(document.documentElement.classList.contains("sidebar-closed")); };
-  useKeydown((e) => {
-    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "b") { e.preventDefault(); fold(); }
-    if (e.key === "Escape") setDrawer(false);
-  });
-
-/* a marca na barra. o Merlin e o simbolo mais a palavra; a casa e o proprio
-   logotipo da Guessless com "merlin" de sub-rotulo, que e o lockup que ela ja
-   usa nos documentos ([GUESSLESS] docs). recolhida, o logotipo de 116px nao
-   cabe: entra o isotipo, que existe exatamente para esse tamanho. os dois vao
-   no DOM e o CSS escolhe — o mesmo jeito que a palavra "merlin" ja somia. */
+/* ---------- a casca inteira ----------
+   desde 10/10/2026 nao ha barra lateral (VISAO, 10): o Merlin e um app, e
+   app navega por um dock embaixo. no alto fica so uma faixa fina — a marca a
+   esquerda; a busca, o tema e quem esta aqui a direita. o dock tem o inicio
+   (a conversa do dia), as seis secoes e o "+", que abre o campo de tudo. as
+   abas da secao aberta sobem logo acima dele. */
 function Brand() {
   if (currentBrand() !== "gl") {
-    return <a className="sb__logo" href="index.html" aria-label="Merlin">{LOGO}<b>merlin</b></a>;
+    return <a className="tb__logo" href="index.html" aria-label="Merlin">{LOGO}<b>merlin</b></a>;
   }
   return (
-    <a className="sb__logo sb__logo--gl" href="index.html" aria-label="Merlin, da Guessless">
-      {GL_MARK}{GL_LOGO}<span className="sb__sub">merlin</span>
+    <a className="tb__logo tb__logo--gl" href="index.html" aria-label="Merlin, da Guessless">
+      {GL_MARK}<span className="tb__sub">merlin</span>
     </a>
   );
 }
 
+function TopBar({ page, onCommand }) {
+  const c = useCloud();
+  const info = CLOUD_STATUS[c.status] || CLOUD_STATUS.local;
+  const email = c.signedIn ? String(c.email || "") : "";
+  return (
+    <header className="tb">
+      <Brand />
+      <span className="tb__gap" />
+      <button type="button" className="tb__search" onClick={onCommand} title="escrever, buscar ou perguntar">
+        {NAV_ICONS.search}<span>buscar</span><kbd>ctrl k</kbd>
+      </button>
+      <ThemeButton />
+      {email
+        ? <a className="tb__me" href="profile.html" title={email + " · " + info.line} aria-current={page === "profile" ? "page" : undefined}>
+            <span className="avatar">{email[0].toUpperCase()}</span><i className="tb__dot" data-status={c.status} />
+          </a>
+        : <button type="button" className="pill pill--accent tb__in" onClick={() => signIn.show()}>entrar</button>}
+    </header>
+  );
+}
+
+function Dock({ page, onCommand }) {
+  const here = sectionOf(page);
+  return (
+    <div className="dk-wrap">
+      {here && here.pages.length > 1 && (
+        <nav className="dk-tabs" aria-label={here.label}>
+          {here.pages.map((p) => (
+            <a key={p.id} href={p.href} aria-current={p.id === page ? "page" : undefined}>{p.label}</a>
+          ))}
+        </nav>
+      )}
+      <nav className="dk" aria-label="Seções">
+        <a className="dk__item" href="index.html" aria-current={page === "home" ? "page" : undefined} title="início">
+          {NAV_ICONS.home}<span>início</span>
+        </a>
+        {SECTIONS.map((sec) => (
+          <a key={sec.id} className="dk__item" href={sec.pages[0].href} title={sec.label}
+             aria-current={here && here.id === sec.id ? "page" : undefined}>
+            {NAV_ICONS[sec.icon]}<span>{sec.label}</span>
+          </a>
+        ))}
+        <span className="dk__sep" />
+        <button type="button" className="dk__plus" onClick={onCommand} title="escrever, buscar ou perguntar (Ctrl K)" aria-label="Escrever, buscar ou perguntar">
+          {icon("plus")}
+        </button>
+      </nav>
+    </div>
+  );
+}
+
+function Shell({ page }) {
+  const [signInOpen, setSignInOpen] = useState(signIn.open);
+  useEffect(() => signIn.onChange((s) => setSignInOpen(s.open)), []);
+
+  /* o campo de tudo: Ctrl+K abre de qualquer tela; Ctrl+J pergunta ao Merlin
+     direto. o rastreador do desktop e uma janela de 380px, e ali nao cabe. */
+  const [cmd, setCmd] = useState(false);
+  useEffect(() => {
+    const open = () => { if (page !== "tracker") setCmd(true); };
+    window.addEventListener("merlin:command", open);
+    return () => window.removeEventListener("merlin:command", open);
+  }, []);
+  useKeydown((e) => {
+    if (page !== "tracker" && (e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && e.key.toLowerCase() === "k") { e.preventDefault(); setCmd(true); }
+    if (page !== "tracker" && (e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && e.key.toLowerCase() === "j") { e.preventDefault(); askMerlin(""); }
+  });
+
   return (
     <>
-      <div className="sb__mobile">
-        <button type="button" id="sb-open" aria-label="Abrir a navegação" onClick={() => setDrawer((d) => !d)}>{NAV_ICONS.menu}</button>
-        <Brand />
-      </div>
-      <div className="sb__scrim" onClick={() => setDrawer(false)} />
-      <aside className="sb" aria-label="Navegação">
-        <div className="sb__top">
-          <Brand />
-          <button className="sb__fold" type="button" id="sb-fold" title="Recolher (Ctrl+B)" aria-label="Recolher a barra" onClick={fold}>{NAV_ICONS.fold}</button>
-        </div>
-        <SearchBox onNavigate={() => setDrawer(false)} />
-        <nav className="sb__groups">
-          {PAGE_GROUPS.map((g) => <NavGroup key={g.id} group={g} page={page} />)}
-        </nav>
-        {/* aqui havia uma segunda lista, com "merlin" e "perfil". as duas
-            saíram: o perfil virou o próprio cartão de quem está aqui. o
-            merlin saiu por um motivo que não vale mais (17/09/2026): quando
-            ele só abria uma caixa em cima da tela atual, não era um lugar —
-            agora é uma conversa com URL própria, então voltou pra lista de
-            módulos de cima, como qualquer outra página. */}
-        <div className="sb__spacer" />
-        <CloudCard page={page} />
-      </aside>
+      {page !== "tracker" && <TopBar page={page} onCommand={() => setCmd(true)} />}
+      {page !== "tracker" && <Dock page={page} onCommand={() => setCmd(true)} />}
       {signInOpen && <SignInDialog />}
+      {cmd && <CommandPalette onClose={() => setCmd(false)} />}
       <Notice />
     </>
   );

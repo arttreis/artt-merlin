@@ -189,11 +189,13 @@ html.gl h1,html.gl h2,html.gl h3,html.gl .sb__logo b{font-family:var(--display);
    embaixo a nuvem e quem esta entrando. no desktop ela empurra o conteudo
    (margin-left no body); recolhida vira so icones. no celular ela some, e
    uma barra fina no topo abre a gaveta por cima do conteudo. */
-:root{--sidebar-w:248px;--sidebar-min:64px}
-html.merlin{--nav-h:0px}
-html.merlin body{margin-left:var(--sidebar-w)}
-html.merlin.sidebar-closed body{margin-left:var(--sidebar-min)}
-html.merlin.sidebar-closed{--sidebar-w:var(--sidebar-min)}
+/* desde 10/10/2026 nao ha barra lateral: --sidebar-w fica em zero para quem
+   ainda o usa nas contas, e --nav-h e a faixa fina do alto (.tb) */
+:root{--sidebar-w:0px;--sidebar-min:0px}
+html.merlin{--nav-h:52px}
+html.merlin body{margin-left:0}
+html.merlin .page{padding-bottom:calc(clamp(40px,8vh,96px) + 72px)}
+.sb,.sb__mobile,.sb__scrim{display:none !important}
 
 .sb{
   position:fixed;top:0;left:0;bottom:0;z-index:60;
@@ -243,26 +245,40 @@ html.sidebar-closed .sb__logo--gl .gl-mark{display:block}
 .sb__search-field input{flex:1 1 auto;min-width:0;background:none;border:0;outline:0;font-size:13px;color:var(--ink)}
 .sb__search-field input::placeholder{color:var(--ink-30)}
 .sb__search-field kbd{flex:none}
-.sb__results{
-  position:absolute;left:0;right:0;top:calc(100% + 6px);z-index:5;
-  max-height:60vh;overflow:auto;padding:6px;
-  background:var(--surface-2);border:1px solid var(--line);border-radius:var(--br3);
-  box-shadow:var(--sombra-2);
-}
-.sb__results a{display:flex;align-items:center;gap:8px;padding:7px 8px;border-radius:var(--br2);font-size:13px;color:var(--ink)}
-.sb__results a:hover,.sb__results a.is-focus{background:var(--fill-hover)}
-.sb__results a .t-mono{color:var(--ink-30);flex:none}
-.sb__results a span:not(.t-mono){flex:1 1 auto;min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
-.sb__results p{margin:0;padding:8px;font-size:12px;color:var(--ink-30)}
-.sb__ask{display:flex;align-items:center;gap:8px;width:100%;padding:7px 8px;margin-top:2px;border-top:1px solid var(--line-soft);border-radius:var(--br2);font-size:12.5px;color:var(--ink-50)}
-.sb__ask:hover{background:var(--fill-hover);color:var(--ink)}
-.sb__ask svg{width:14px;height:14px;color:var(--accent-ink)}
+/* o campo da barra e so a porta do Ctrl+K: um botao com a cara do campo */
+.sb__cmd{width:100%;cursor:pointer;text-align:left}
+.sb__cmd span{flex:1 1 auto;min-width:0;font-size:12.5px;color:var(--ink-30);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sb__cmd:hover{border-color:var(--line);background:var(--fill-hover)}
 
-/* o botao de faisca dentro do campo de busca, que leva pro assistente com o
-   que ja foi digitado */
-.sb__assistant{flex:none;width:22px;height:22px;display:grid;place-items:center;border-radius:var(--br2);color:var(--ink-30);transition:color var(--t),background var(--t)}
-.sb__assistant:hover{color:var(--accent-ink);background:var(--fill-hover)}
-.sb__assistant svg{width:14px;height:14px}
+/* ---------- o campo de tudo (Ctrl+K) ----------
+   no alto da tela, e nao no meio: a lista cresce para baixo enquanto se
+   escreve, e o campo nao pode pular de lugar a cada letra */
+.cmd{position:fixed;inset:0;z-index:95;display:flex;justify-content:center;align-items:flex-start;padding:min(14vh,120px) 16px 16px;background:var(--scrim)}
+.cmd__box{
+  width:min(620px,100%);max-height:calc(100dvh - 32px);display:flex;flex-direction:column;
+  background:var(--surface-2);border:1px solid var(--line);border-radius:var(--br);box-shadow:var(--sombra-2);overflow:hidden;
+}
+.cmd__field{display:flex;align-items:center;gap:10px;height:54px;padding:0 16px;border-bottom:1px solid var(--line-soft);color:var(--ink-30)}
+.cmd__field svg{width:17px;height:17px;flex:none}
+.cmd__field input{flex:1 1 auto;min-width:0;height:100%;background:none;border:0;outline:0;font-size:15px;color:var(--ink)}
+.cmd__field input::placeholder{color:var(--ink-30)}
+.cmd__rows{list-style:none;margin:0;padding:6px;overflow-y:auto;min-height:0}
+.cmd__row{
+  display:flex;align-items:center;gap:10px;width:100%;height:40px;padding:0 10px;border-radius:var(--br2);
+  text-align:left;font-size:13.5px;color:var(--ink-70);
+}
+.cmd__row.is-focus{background:var(--fill-hover);color:var(--ink)}
+.cmd__icon{display:grid;place-items:center;width:18px;flex:none;color:var(--ink-30)}
+.cmd__icon svg{width:15px;height:15px}
+.cmd__row--ask .cmd__icon,.cmd__row--task .cmd__icon{color:var(--accent-ink)}
+.cmd__label{flex:none;font-size:11px;color:var(--ink-30)}
+.cmd__row--task .cmd__label,.cmd__row--note .cmd__label,.cmd__row--ask .cmd__label{color:var(--ink-50)}
+.cmd__text{flex:1 1 auto;min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.cmd__row kbd{flex:none}
+.cmd__none{padding:8px 10px;font-size:12px;color:var(--ink-30)}
+.cmd__rule{margin:0;padding:10px 16px;border-top:1px solid var(--line-soft);font-size:11.5px;color:var(--ink-30)}
+.cmd__rule b{font-weight:500;color:var(--ink-50)}
+.cmd__rule kbd{font-size:10px}
 
 /* itens */
 .sb__list{display:flex;flex-direction:column;gap:2px;margin:0;padding:0;list-style:none}
@@ -281,13 +297,19 @@ html.sidebar-closed .sb__logo--gl .gl-mark{display:block}
   content:"";position:absolute;right:0;top:6px;bottom:6px;width:3px;border-radius:2px;
   background:var(--accent);box-shadow:0 0 12px var(--accent-glow);
 }
-/* os grupos: um titulo pequeno em cima de cada um, e ar entre eles. a lista
-   rola por dentro se a tela for baixa, pro cartao da nuvem nunca sair de vista */
-.sb__groups{flex:0 1 auto;min-height:0;overflow-y:auto;overflow-x:hidden;display:flex;flex-direction:column;gap:18px;scrollbar-width:none}
+/* as seis secoes. a lista rola por dentro se a tela for baixa, pro cartao da
+   nuvem nunca sair de vista */
+.sb__groups{flex:0 1 auto;min-height:0;overflow-y:auto;overflow-x:hidden;scrollbar-width:none}
 .sb__groups::-webkit-scrollbar{display:none}
-.sb__section{display:flex;align-items:center;height:22px;margin:0 0 2px;padding:0 10px;font-size:11.5px;font-weight:500;color:var(--ink-30)}
-html.sidebar-closed .sb__groups{gap:8px}
-html.sidebar-closed .sb__group + .sb__group{border-top:1px solid var(--line-soft);padding-top:8px}
+/* as abas da secao aberta: uma linha de pilulas logo abaixo do item, na
+   altura do texto dele. so a secao em que voce esta mostra as suas */
+.sb__tabs{display:flex;flex-wrap:wrap;gap:2px;padding:4px 0 8px 24px}
+.sb__tabs a{
+  display:inline-flex;align-items:center;height:24px;padding:0 7px;border-radius:var(--br-pill);
+  font-size:12px;color:var(--ink-50);transition:color var(--t),background var(--t);
+}
+.sb__tabs a:hover{color:var(--ink);background:var(--fill)}
+.sb__tabs a[aria-current="page"]{color:var(--ink);background:var(--fill-hover)}
 .sb__sep{height:1px;background:var(--line-soft);margin:var(--pd2) 0}
 .sb__spacer{flex:1 1 auto}
 
@@ -333,7 +355,7 @@ html.sidebar-closed .sb__group + .sb__group{border-top:1px solid var(--line-soft
 
 /* recolhida: so icones */
 html.sidebar-closed .sb{padding-left:8px;padding-right:8px}
-html.sidebar-closed .sb__logo b,html.sidebar-closed .sb__item span,html.sidebar-closed .sb__section,
+html.sidebar-closed .sb__logo b,html.sidebar-closed .sb__item span,html.sidebar-closed .sb__tabs,
 html.sidebar-closed .sb__search,html.sidebar-closed .sb__card,html.sidebar-closed .sb__who .who,
 html.sidebar-closed .sb__who button,html.sidebar-closed .sb__theme .knob{display:none}
 html.sidebar-closed .sb__top{justify-content:center;padding-bottom:10px}
@@ -356,19 +378,16 @@ html.sidebar-closed .sb__item[aria-current="page"]::after{right:-8px}
 .sb__mobile button svg{width:20px;height:20px}
 .sb__scrim{position:fixed;inset:0;z-index:58;background:var(--scrim);display:none}
 @media (max-width:899px){
-  html.merlin{--nav-h:52px}
   html.merlin body,html.merlin.sidebar-closed body{margin-left:0}
   .sb{transform:translateX(-100%);width:min(300px,84vw);box-shadow:none}
   html.sidebar-open .sb{transform:none;box-shadow:var(--sombra-2)}
   html.sidebar-open .sb__scrim{display:block}
-  html.sidebar-closed .sb__logo b,html.sidebar-closed .sb__item span,html.sidebar-closed .sb__section,
+  html.sidebar-closed .sb__logo b,html.sidebar-closed .sb__item span,html.sidebar-closed .sb__tabs,
   html.sidebar-closed .sb__search,html.sidebar-closed .sb__card,html.sidebar-closed .sb__who .who,
   html.sidebar-closed .sb__who button,html.sidebar-closed .sb__theme .knob,html.sidebar-closed .sb__logo{display:revert}
   html.sidebar-closed .sb__item{justify-content:flex-start;padding:0 10px}
   html.sidebar-closed .sb{padding:var(--pd) 12px}
-  html.sidebar-closed .sb__section{display:flex}
-  html.sidebar-closed .sb__groups{gap:18px}
-  html.sidebar-closed .sb__group + .sb__group{border-top:0;padding-top:0}
+  html.sidebar-closed .sb__tabs{display:flex}
   .sb__mobile{display:flex}
   .sb__fold{display:none}
 }
@@ -555,5 +574,60 @@ html.light{--color-1:#1c6fc4;--color-2:#b8600a;--color-3:#c4234f;--color-4:#7a3b
   font-family:var(--mono);font-size:11px;color:var(--ink);
 }
 .duration-input:focus{outline:none}
+
+/* ---------- a faixa do alto ---------- */
+.tb{
+  position:fixed;top:0;left:0;right:0;z-index:60;height:52px;display:flex;align-items:center;gap:8px;
+  padding:0 clamp(12px,2.5vw,24px);pointer-events:none;
+}
+.tb > *{pointer-events:auto}
+.tb__gap{flex:1 1 auto;pointer-events:none}
+.tb__logo{display:inline-flex;align-items:center;gap:8px;font-weight:600;font-size:14px;color:var(--ink)}
+.tb__logo svg{width:18px;height:18px;color:var(--accent)}
+.tb__logo .gl-mark{width:22px;height:22px}
+.tb__sub{font-family:var(--mono);font-size:11px;color:var(--ink-50)}
+.tb__search{
+  display:flex;align-items:center;gap:8px;height:32px;padding:0 6px 0 10px;border-radius:var(--br2);
+  background:color-mix(in srgb,var(--surface) 80%,transparent);border:1px solid var(--line-soft);
+  color:var(--ink-50);font-size:12.5px;backdrop-filter:blur(8px);
+}
+.tb__search:hover{color:var(--ink);border-color:var(--line)}
+.tb__search svg{width:14px;height:14px}
+.tb .sb__mode{width:32px;height:32px;display:grid;place-items:center;border-radius:var(--br2);color:var(--ink-50)}
+.tb .sb__mode:hover{color:var(--ink);background:var(--fill-hover)}
+.tb .sb__mode svg{width:16px;height:16px}
+.tb__me{position:relative;display:grid;place-items:center}
+.tb__me .avatar{width:30px;height:30px;border-radius:50%;display:grid;place-items:center;background:var(--accent);color:var(--on-accent);font-weight:600;font-size:12px}
+.tb__dot{position:absolute;right:-1px;bottom:-1px;width:9px;height:9px;border-radius:50%;border:2px solid var(--bg);background:var(--ink-30)}
+.tb__dot[data-status="synced"]{background:var(--accent)}
+.tb__in{height:30px}
+@media (max-width:600px){.tb__search span,.tb__search kbd{display:none}.tb__search{padding:0 8px}}
+
+/* ---------- o dock ---------- */
+.dk-wrap{position:fixed;left:50%;bottom:14px;transform:translateX(-50%);z-index:60;display:flex;flex-direction:column;align-items:center;gap:6px;max-width:calc(100vw - 16px)}
+.dk-tabs{display:flex;gap:2px;padding:3px;border-radius:var(--br-pill);background:color-mix(in srgb,var(--surface-2) 88%,transparent);border:1px solid var(--line-soft);backdrop-filter:blur(10px)}
+.dk-tabs a{height:26px;padding:0 11px;display:inline-flex;align-items:center;border-radius:var(--br-pill);font-size:12px;color:var(--ink-50)}
+.dk-tabs a:hover{color:var(--ink)}
+.dk-tabs a[aria-current="page"]{background:var(--fill-hover);color:var(--ink)}
+.dk{
+  display:flex;align-items:center;gap:2px;padding:5px;border-radius:18px;
+  background:color-mix(in srgb,var(--surface-2) 88%,transparent);border:1px solid var(--line);
+  box-shadow:var(--sombra-2);backdrop-filter:blur(12px);overflow-x:auto;scrollbar-width:none;
+}
+.dk__item{display:flex;align-items:center;gap:7px;height:38px;padding:0 10px;border-radius:13px;color:var(--ink-50);white-space:nowrap;transition:background var(--t),color var(--t)}
+.dk__item svg{width:18px;height:18px;flex:none}
+.dk__item span{display:none;font-size:12.5px}
+.dk__item:hover{color:var(--ink);background:var(--fill)}
+.dk__item[aria-current="page"]{color:var(--ink);background:var(--fill-hover)}
+.dk__item[aria-current="page"] svg{color:var(--accent-ink)}
+.dk__item[aria-current="page"] span{display:inline}
+.dk__sep{width:1px;height:22px;background:var(--line);margin:0 4px;flex:none}
+.dk__plus{width:38px;height:38px;flex:none;display:grid;place-items:center;border-radius:13px;background:var(--accent);color:var(--on-accent)}
+.dk__plus svg{width:17px;height:17px}
+.dk__plus:hover{filter:brightness(1.08)}
+@media (max-width:600px){.dk__item[aria-current="page"] span{display:none}.dk__item{padding:0 9px}}
+html.bare .tb,html.bare .dk-wrap{display:none}
+/* o aviso com desfazer sobe acima do dock */
+html.merlin .notice{bottom:88px}
 
 }

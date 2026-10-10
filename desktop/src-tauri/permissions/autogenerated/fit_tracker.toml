@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-fit-tracker"
+description = "Enables the fit_tracker command without any pre-configured scope."
+commands.allow = ["fit_tracker"]
+
+[[permission]]
+identifier = "deny-fit-tracker"
+description = "Denies the fit_tracker command without any pre-configured scope."
+commands.deny = ["fit_tracker"]

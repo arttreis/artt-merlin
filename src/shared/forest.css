@@ -1,0 +1,17 @@
+/* merlin · a floresta (forest.jsx)
+   o que se mexe e devagar e pouco: estrela que pisca, nevoa que anda,
+   vaga-lume que acende. quem pede menos movimento nao ve nada disso. */
+.forest{display:block;width:100%;height:100%}
+.forest__star{fill:#fff;opacity:.75;animation:fo-twinkle 4s ease-in-out infinite}
+.forest__mist{animation:fo-drift 38s ease-in-out infinite alternate}
+.forest__mist--b{animation-duration:46s;animation-direction:alternate-reverse}
+.forest__fly{opacity:0;animation:fo-fly 5s ease-in-out infinite}
+.forest__window{animation:fo-flicker 6s ease-in-out infinite}
+@keyframes fo-twinkle{0%,100%{opacity:.85}50%{opacity:.25}}
+@keyframes fo-drift{from{transform:translateX(-40px)}to{transform:translateX(60px)}}
+@keyframes fo-fly{0%,100%{opacity:0;transform:translate(0,0)}40%{opacity:.95}60%{opacity:.9;transform:translate(8px,-10px)}}
+@keyframes fo-flicker{0%,100%{opacity:1}48%{opacity:.82}52%{opacity:1}}
+@media (prefers-reduced-motion:reduce){
+  .forest__star,.forest__mist,.forest__fly,.forest__window{animation:none}
+  .forest__fly{opacity:.7}
+}

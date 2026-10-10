@@ -1,0 +1,20 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "remote",
+  "description": "o site do Merlin, aberto nas duas janelas, pode arrastar a janela do rastreador e falar com a bandeja. nenhum outro endereco pode.",
+  "windows": ["main", "tracker"],
+  "remote": {
+    "urls": [
+      "https://merlin.arttreis.com.br/*",
+      "http://localhost:8765/*",
+      "http://localhost:8787/*"
+    ]
+  },
+  "permissions": [
+    "core:window:allow-start-dragging",
+    "allow-set-status",
+    "allow-open-main",
+    "allow-hide-tracker",
+    "allow-fit-tracker"
+  ]
+}

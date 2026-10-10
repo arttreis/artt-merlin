@@ -203,7 +203,28 @@
   font-family:var(--mono);font-size:12px;line-height:1.55;color:var(--ink-70);white-space:pre-wrap;word-break:break-word;
 }
 
-/* ---------- lancamento ---------- */
+/* ---------- visao geral: construir, distribuir, pensar ----------
+   tres colunas iguais, cada uma com o que esta ligado e o proximo passo
+   no pe — os botoes alinham embaixo mesmo com colunas de alturas diferentes */
+.ap-hub{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:var(--pd);align-items:stretch}
+.ap-hub__col{display:flex;flex-direction:column;gap:10px;padding:var(--pd)}
+.ap-hub__head{display:flex;align-items:center;gap:8px;margin:0;font-size:13px;font-weight:600;color:var(--ink)}
+.ap-hub__head svg{width:16px;height:16px;color:var(--accent-ink)}
+.ap-hub__facts{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--ink-70)}
+.ap-hub__facts b{font-family:var(--mono);font-weight:500;color:var(--ink)}
+.ap-hub__sub{margin:4px 0 0;font-size:12px;color:var(--ink-50)}
+.ap-hub__list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px;font-size:13px;color:var(--ink-70)}
+.ap-hub__list a{color:var(--ink)}
+.ap-hub__list a:hover{color:var(--accent-ink)}
+.ap-hub__map{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.ap-hub__unlink{font-size:11.5px;color:var(--ink-30)}
+.ap-hub__unlink:hover{color:var(--ink)}
+.ap-hub__empty{margin:0;font-size:13px;line-height:1.5;color:var(--ink-50)}
+.ap-hub__ok{margin:0;font-size:12.5px;color:var(--accent-ink)}
+.ap-hub__actions{margin-top:auto;padding-top:6px;display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.ap-hub__actions .select{max-width:100%}
+
+/* ---------- distribuicao (era "lancamento") ---------- */
 .ap-launch{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--pd);align-items:start}
 .ap-launch__box{padding:var(--pd)}
 .ap-launch__text{margin:0 0 12px;font-size:13px;line-height:1.5;color:var(--ink-50)}
@@ -226,7 +247,7 @@
 
 /* ---------- celular ---------- */
 @media (max-width:900px){
-  .ap-concept,.ap-export,.ap-launch,.ap-screen-form,.ap-entity-form__top{grid-template-columns:minmax(0,1fr)}
+  .ap-concept,.ap-export,.ap-launch,.ap-hub,.ap-screen-form,.ap-entity-form__top{grid-template-columns:minmax(0,1fr)}
   .ap-draft__cols{grid-template-columns:minmax(0,1fr)}
   .ap-toolbar__hint{display:none}
   .ap-stage{height:calc(100vh - 220px)}

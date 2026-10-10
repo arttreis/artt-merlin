@@ -21,7 +21,7 @@ import "./shared/week-grid.css";
 import {
   initPage, newId, today, isDay, dateOf, dayOf, addDays, sundayOf, dateLabel, monthLabel,
   api, cloud, notify, readDuration, formatMin, parseDuration, readPrefs, savePrefs,
-  readInbox, writeInbox, parseMentions, clientName, clients
+  readInbox, writeInbox, parseMentions, clientName, clients, seen, markSeen
 } from "./shared/core.js";
 import { useState, useEffect, useLayoutEffect, useRef } from "react";
 import { createPortal } from "react-dom";
@@ -31,57 +31,30 @@ import {
   useDelegate, DelegateDialog, icon, DateField
 } from "./shared/ui.jsx";
 import {
-  normalize, onDate, inRange, overdue, dayDoc, topOrder, newTask, migrateTasks, layoutDay, readClock
+  normalize, onDate, inRange, overdue, dayDoc, topOrder, newTask, migrateTasks, layoutDay, readClock,
+  readLine, isReserve, stripPrefix
 } from "./shared/tasks.js";
 import { useHourScale } from "./shared/hour-scale.js";
 import { normalize as normalizeBlock, copyRoutine, endFrom, allCopiesOf } from "./shared/routine.js";
 import {
-  pendingOf, doneOf, reservesOf, liveReservesOf, costOf, guessMin, budget, fmt, longFmt, clock
+  pendingOf, doneOf, reservesOf, liveReservesOf, costOf, guessMin, budget, distribute, fmt, longFmt, clock
 } from "./shared/day.js";
 import { isClient } from "./shared/client-doc.js";
 import { MiniMonth, monthGrid, monthOf } from "./shared/mini-month.jsx";
+import { TodayBlock } from "./shared/today-block.jsx";
+import { Tour } from "./shared/tour.jsx";
 
 initPage("calendar");
 
 /* ================================================================
    leitura de texto: a gramatica e a mesma em toda visao
-   ================================================================ */
-
-/* link de tarefa do ClickUp colado junto do titulo. so a forma /t/<id> —
-   que e a unica que identifica uma tarefa — e a URL sai do titulo como a
-   duracao sai: o titulo fica sendo o que voce leria em voz alta. */
-const CLICKUP_URL = /(?:^|\s)https?:\/\/(?:[a-z0-9-]+\.)*clickup\.com\/t\/(?:\d+\/)?([A-Za-z0-9]{1,32})\S*(?=\s|$)/i;
-
-function readClickup(text) {
-  const m = text.match(CLICKUP_URL);
-  if (!m) return { clickup: "", title: text };
-  return { clickup: m[1], title: text.slice(0, m.index) + " " + text.slice(m.index + m[0].length) };
-}
-
-/* o composer inteiro le a linha por aqui. a previa e o submit precisam
-   entender exatamente a mesma coisa: se so o submit tirasse a URL, a previa
-   mostraria o link cru como titulo e ainda acusaria "nao entendi o tempo" por
-   causa dos digitos do id. */
-function readLine(text) {
-  const l = readClickup(text);
-  const m = parseMentions(l.title);
-  const d = readDuration(m.title);
-  return { min: d.min, title: d.title, clickup: l.clickup, noLink: m.title, client: m.client };
-}
+   ================================================================
+   readLine, isReserve e stripPrefix moram no tasks.js desde que o rastreador
+   do app de desktop (tracker.jsx) passou a criar tarefa tambem: a mesma linha
+   lida de dois jeitos seriam duas tarefas diferentes para o mesmo texto. */
 
 const looksLikeBrokenTime = (text, min) =>
   !min && /\d/.test(text) && !/^\s*\d+\s*$/.test(text);
-
-/* o que ocupa o dia sem ser trabalho seu. escrever "almoco 1h" nao deveria
-   virar uma tarefa que voce conclui para ganhar tempo de volta que nunca
-   esteve la — entao essas viram reserva, e o prefixo "-" forca qualquer uma.
-
-   as cerimonias estao aqui por inteiro: "daily" vivia sozinha, e uma lista que
-   reconhece a reuniao de todo dia mas nao a da semana obriga voce a escrever
-   "reuniao weekly" para o Merlin entender o que "weekly" ja diz. */
-const RESERVE_RE = /^(?:-\s*|(?:almo[çc]o|caf[ée]|janta(?:r)?|reuni[ãa]o|call|daily|weekly|monthly|stand ?-?up|planning|refinement|retro(?:spectiva)?|kick ?-?off|alinhamento|mentoria|1:1|1x1|dentista|m[ée]dico|academia|deslocamento|transito|tr[âa]nsito)\b)/i;
-const isReserve = (title) => RESERVE_RE.test(title.trim());
-const stripPrefix = (title) => title.replace(/^-\s*/, "").trim();
 
 const shortTitle = (s) => (s.length > 28 ? s.slice(0, 28) + "…" : s);
 const reducedMotion = () => window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -149,32 +122,6 @@ const HIDDEN_KEY = "merlin:calendar:hidden";
 const SIDE_KEY = "merlin:calendar:side";
 const readHidden = () => { try { const v = JSON.parse(localStorage.getItem(HIDDEN_KEY) || "[]"); return Array.isArray(v) ? v : []; } catch (e) { return []; } };
 const readSide = () => { try { const v = localStorage.getItem(SIDE_KEY); return v ? v === "open" : window.innerWidth >= 1000; } catch (e) { return true; } };
-
-/* ================================================================
-   onde cada tarefa cai dentro do dia
-   ================================================================
-   e a partir de qual delas nao da mais tempo. tarefa sem estimativa entra
-   pelo palpite: ela desloca o cursor e pode disparar o corte como qualquer
-   outra — so aparece marcada como palpite. */
-function distribute(doc, open) {
-  const b = budget(doc, open);
-  const slots = new Map();
-  /* a reserva ocupa a frente do que resta: o trabalho comeca depois dela.
-     nao e o horario real do almoco — e o espaco que ele tira do dia. */
-  let cursor = b.elapsed + b.liveReserve;
-  let cut = -1;
-  b.open.forEach((t, i) => {
-    const cost = costOf(t);
-    const available = b.window - cursor;
-    if (available <= 0) { if (cut < 0) cut = i; return; }
-    const use = Math.min(cost, available);
-    const partial = use < cost;
-    if (partial && cut < 0) cut = i;
-    slots.set(t.id, { from: cursor, min: use, partial, guess: !t.min });
-    cursor += use;
-  });
-  return { b, slots, cut };
-}
 
 /* ================================================================
    as notas, vistas daqui
@@ -257,6 +204,15 @@ function Calendar() {
   const [editing, setEditing] = useState(null);
   const [hidden, setHidden] = useState(readHidden);   /* as agendas desligadas: "" e a pessoal */
   const [side, setSide] = useState(readSide);
+  /* a apresentação: o Hoje é a primeira tela de quem acabou de chegar, então
+     é aqui que ela aparece uma vez. rever é pelo perfil. */
+  const [tour, setTour] = useState(() => !seen("tour"));
+  const closeTour = () => {
+    setTour(false);
+    markSeen("tour");
+    /* quem acabou de ler é devolvido ao campo do dia, com o cursor dentro */
+    requestAnimationFrame(() => { if (fieldRef.current) fieldRef.current.focus(); });
+  };
 
   const undoStack = useRef([]);
   const toastTimer = useRef(null);
@@ -981,6 +937,7 @@ function Calendar() {
         </Dialog>
       )}
 
+      {tour && <Tour onClose={closeTour} />}
       {form && <TaskForm store={store} id={form.id} presetDate={form.date || anchor} presetAt={form.at} presetClient={view === "day" ? "" : soloClient} onClose={() => setForm(null)} onRemove={remove} onDuplicate={duplicate} />}
       {summary != null && <MerlinDialog text={summary} onClose={() => setSummary(null)} />}
 
@@ -1045,6 +1002,7 @@ function DayView({
       </main>
 
       <div className="side" id="side-left">
+        <TodayBlock date={date} />
         <NotesBox notes={notes} onCreate={onCreateNote} onPull={onPullNote} onRemove={onRemoveNote} />
       </div>
       <div className="side" id="side-right">
