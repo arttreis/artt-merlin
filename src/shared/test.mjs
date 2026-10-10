@@ -603,6 +603,22 @@ const dataLeft = () => globalThis.localStorage.keys().filter((k) => k in DATA);
     const maps = [...html.matchAll(/(\d+) mapas prontos/g)].map((m) => +m[1]);
     check("a landing conta os funis que existem", funnels.length >= 2 && funnels.every((x) => x === T.FUNNEL_TEMPLATES.length), funnels.join(",") + " de " + T.FUNNEL_TEMPLATES.length);
     check("a landing conta os mapas que existem", maps.length >= 1 && maps.every((x) => x === T.MAP_TEMPLATES.length), maps.join(",") + " de " + T.MAP_TEMPLATES.length);
+
+    /* a medição (Cloudflare Web Analytics) é da vitrine: quem já usa o
+       Merlin abre o início no mesmo endereço e não pode entrar na conta */
+    const beacon = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((m) => m[1]).find((s) => s.includes("cloudflareinsights"));
+    const measures = (bare) => {
+      const added = [];
+      const doc = {
+        documentElement: { classList: { contains: (c) => bare && c === "bare" } },
+        createElement: () => ({ setAttribute() {} }),
+        head: { appendChild: (el) => added.push(el) }
+      };
+      new Function("document", beacon)(doc);
+      return added.length === 1 && /cloudflareinsights/.test(added[0].src);
+    };
+    check("a medição carrega para quem está na porta", !!beacon && measures(true));
+    check("a medição não carrega para quem já usa o Merlin", !!beacon && !measures(false));
   }
 
   /* ---- o endereço de um favorito ----

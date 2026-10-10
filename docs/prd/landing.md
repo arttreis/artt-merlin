@@ -1,7 +1,7 @@
 # Landing · a página de quem nunca ouviu falar do Merlin
 
-**Status:** ✅ No ar desde 2026-10-10. A versão do worker é a `37f1a9d1`, com a privacidade; a
-primeira da landing foi a `2f70532a`, e a de antes dela, para voltar, é a `d0c507b1`. O Arthur pediu para desenvolver direto, sem `/plan-project`, e as recomendações
+**Status:** ✅ No ar desde 2026-10-10. A versão do worker é a `ef29d274`, com a privacidade e a
+medição; a primeira da landing foi a `2f70532a`, e a de antes dela, para voltar, é a `d0c507b1`. O Arthur pediu para desenvolver direto, sem `/plan-project`, e as recomendações
 abaixo viraram as decisões.
 **Owner:** Arthur Reis
 **Criado em:** 2026-10-10
@@ -58,11 +58,20 @@ Duas coisas desta máquina que travavam o deploy:
 - ✅ **Prévia de link:** conferida em produção fazendo o pedido como os robôs do WhatsApp, do
   Facebook, do LinkedIn e do X: a página responde 200 a todos, com as 8 tags `og:`, e a
   `og.jpg` (106 KB, JPEG) também. Colar o link num chat de verdade fica com o Arthur.
-- ⏳ **Cloudflare Web Analytics:** o login do Wrangler não tem permissão para ele (a API devolve
-  403), então ligá-lo é um clique no painel: *Analytics & Logs → Web Analytics → Add a site →
-  merlin.arttreis.com.br*. Se a instalação automática não pegar no Worker, o painel dá um
-  `<script>` com um token público, que entra no `<head>` do `index.html`. Quando ligar, a
-  página de privacidade ganha uma linha: a medição é da Cloudflare, sem cookie.
+- ✅ **Cloudflare Web Analytics:** o Arthur criou o site no painel (o login do Wrangler não tem
+  permissão, a API devolve 403) e mandou o snippet, de token `6f0453a9…`. Ele entra por um
+  terceiro `<script>` no `<head>` do `index.html`, **só para quem está na porta** (`html.bare`):
+  quem já usa abre o início no mesmo endereço, e contar essas aberturas misturaria a casa com a
+  vitrine. O `test.mjs` confere os dois lados. Conferido em produção: o visitante novo manda o
+  beacon, e quem já usa não manda o nosso.
+- ⚠️ **A Cloudflare também injeta um beacon sozinha.** É outro token (`de4be3af…`), entra pela
+  borda em toda resposta HTML pedida por navegador e vale para todas as páginas do
+  merlin.arttreis.com.br, inclusive as do app (`/calendar`, `/finance`, `/share`). É a
+  instalação automática de algum site do Web Analytics na zona arttreis.com.br. Por isso a
+  privacidade diz "o site conta as visitas", e não "só a landing". Para medir só a vitrine,
+  basta desligar a instalação automática desse site no painel (Web Analytics → o site do
+  token `de4be3af…` → desligar o *automatic setup* ou excluir o hostname). Feito isso, a
+  privacidade pode voltar a dizer que nenhuma tela do sistema é medida.
 - O endereço (D4) continua `merlin.arttreis.com.br`. Quando a fila vira conta segue em aberto
   (VISAO 8.6).
 

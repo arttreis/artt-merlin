@@ -51,6 +51,12 @@ known=!!L.getItem("merlin:who")||(Array.isArray(s)&&s.indexOf("landing")>=0);
 for(var i=0;i<L.length&&!known;i++){var k=L.key(i),m=/^merlin:(notes|clients|tasks|week|maps|funnels|apps|finance|habits|plans|bookmarks|content|cadence|profile|closes|reviews|sessions|day|inbox)$/.exec(k);if(!m)continue;
 try{var v=JSON.parse(L.getItem(k));known=!!v&&(m[1]==="day"?(v.tasks||[]).length>0:m[1]==="inbox"?Array.isArray(v)&&v.length>0:!!v.items&&Object.keys(v.items).length>0)}catch(e){}}}catch(e){}
 d.classList.add(known?"in":"bare")})();</script>
+<script>/* a medicao da landing: o Cloudflare Web Analytics, sem cookie e sem nada
+   guardado no navegador. so carrega para quem esta na porta (html.bare, que
+   o script de cima acabou de decidir): quem ja usa o Merlin abre o inicio
+   neste mesmo endereco, e contar essas aberturas misturaria a casa com a
+   vitrine. o token e publico, e o snippet do painel e este, montado aqui. */
+if(document.documentElement.classList.contains("bare")){var cf=document.createElement("script");cf.type="module";cf.src="https://static.cloudflareinsights.com/beacon.min.js";cf.setAttribute("data-cf-beacon",'{"token": "6f0453a9b3fc4179abb0d0db3d62308e"}');document.head.appendChild(cf)}</script>
 </head>
 <body>
 <div class="ld" id="ld">
