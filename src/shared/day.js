@@ -47,10 +47,11 @@ export const costOf = (t) => t.min || guessMin();
 
 /* recebe a fila em vez de le-la quando alguem quer a conta de uma ordem que
    ainda nao existe — e o que a matriz usa para mostrar, ao vivo, onde o dia
-   pararia se voce aplicasse aquela arrumacao. sem argumento, e a fila real. */
-export function budget(doc, open) {
+   pararia se voce aplicasse aquela arrumacao. sem argumento, e a fila real.
+   o relogio tambem pode vir de fora: a vitrine da landing passa o dia de
+   demonstracao num relogio acelerado, e a conta tem que ser esta mesma. */
+export function budget(doc, open, now = nowMin()) {
   const window = doc.end - doc.start;
-  const now = nowMin();
   const elapsed = clamp(now - doc.start, 0, window);
   open = open || pendingOf(doc);
   const committed = open.reduce((s, t) => s + costOf(t), 0);
@@ -75,8 +76,8 @@ export function budget(doc, open) {
    pelo palpite: ela desloca o cursor e pode disparar o corte como qualquer
    outra — so aparece marcada como palpite. morava no calendar.jsx; desceu
    para ca quando o rastreador do desktop passou a desenhar a mesma barra. */
-export function distribute(doc, open) {
-  const b = budget(doc, open);
+export function distribute(doc, open, now) {
+  const b = budget(doc, open, now);
   const slots = new Map();
   /* a reserva ocupa a frente do que resta: o trabalho comeca depois dela.
      nao e o horario real do almoco — e o espaco que ele tira do dia. */

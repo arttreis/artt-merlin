@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://merlin.arttreis.com.br/sitemap.xml

@@ -142,7 +142,8 @@ SESSION_SECRET=qualquer-coisa-longa-em-desenvolvimento
 | `POST /api/docs` | grava um documento `{type, id, v, doc}`; 409 com `server` se estiver na frente |
 | `POST /api/quick-note` | guarda uma nota vinda da extensão do Chrome (`extension/`) |
 | `GET/POST/DELETE /api/share` | lista, cria e revoga links públicos de mapa ou funil |
-| `GET /api/shared/:token` | a leitura pública de um link — a única rota sem sessão |
+| `GET /api/shared/:token` | a leitura pública de um link, sem sessão |
+| `POST /api/waitlist` | `{email}`: a lista de espera da landing, sem sessão. A mesma resposta para quem entra e para quem já estava; o campo escondido `site` (que só robô preenche) faz fingir que gravou; teto de `WAITLIST_PER_HOUR = 300` entradas por hora somando todo mundo. Não abre porta: quem entra continua sendo `OWNER_EMAILS`. A tabela `waitlist` precisa existir no D1 de produção antes do deploy (`schema.sql`). |
 | `POST /api/files`, `GET/DELETE /api/files/:id` | anexos no R2; sem o binding `FILES`, 503 |
 | `POST /api/merlin` | `{task, context}`; tarefas `branches, funnel, nextStage, expand, assistant, week, meeting, habits, review, numbers, delegate`, as do conteúdo, e as do projeto de app: `app` (devolve `{blueprint}` — o projeto inteiro em nomes, que a tela resolve em ids; 12000 tokens de saída em vez de 4000) e `appReview` (texto). Só `assistant` aceita `context.history` (array `{role, content}`) — as outras nunca mandam esse campo, e continuam um turno só. |
 

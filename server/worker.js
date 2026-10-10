@@ -18,6 +18,9 @@ const SESSION_DAYS = 90;     /* quanto tempo voce fica logado */
 const CODE_MINUTES = 10;     /* validade do codigo, em minutos */
 const MAX_ATTEMPTS = 5;      /* erros de digitacao antes de queimar o codigo */
 const REQUESTS_PER_HOUR = 6; /* codigos por e-mail por hora */
+/* entradas na lista de espera por hora, somando todo mundo. e a unica escrita
+   sem sessao do servidor: o teto existe para um robo nao encher o banco */
+const WAITLIST_PER_HOUR = 300;
 
 /* ---------- utilidades ---------- */
 
@@ -278,6 +281,30 @@ async function requestCode(req, env) {
   ).bind(hash, email, now + CODE_MINUTES * 60e3).run();
 
   await sendCode(env, email, code);
+  return json({ ok: true });
+}
+
+/* a lista de espera da landing. sem sessao, porque quem chega aqui ainda nao
+   tem conta — e por isso a rota mais desconfiada depois do /code: o e-mail e
+   conferido, o campo escondido que so robo preenche faz a resposta mentir
+   que gravou, e o teto e da casa inteira. a mesma resposta para quem ja
+   estava na lista e para quem acabou de entrar: dizer "ja esta" contaria
+   quem esta. */
+async function joinWaitlist(req, env) {
+  const { email: raw, site } = await req.json().catch(() => ({}));
+  const email = normalizeEmail(raw);
+  if (!isValidEmail(email) || email.length > 200) return fail("e-mail inválido");
+  if (site) return json({ ok: true });
+
+  const now = Date.now();
+  const recent = await env.DB.prepare(
+    "SELECT COUNT(*) AS n FROM waitlist WHERE created_at > ?"
+  ).bind(now - 3600e3).first();
+  if (recent && recent.n >= WAITLIST_PER_HOUR) return fail("muita gente ao mesmo tempo; tente daqui a pouco", 429);
+
+  await env.DB.prepare(
+    "INSERT OR IGNORE INTO waitlist (email, created_at) VALUES (?, ?)"
+  ).bind(email, now).run();
   return json({ ok: true });
 }
 
@@ -1293,6 +1320,10 @@ export default {
       if (route === "/sign-in" && req.method === "POST") return await signIn(req, env);
       if (route === "/sign-out" && req.method === "POST") return signOut();
       if (route === "/me" && req.method === "GET") return await whoAmI(req, env);
+      if (route === "/waitlist") {
+        if (req.method === "POST") return await joinWaitlist(req, env);
+        return fail("método não serve aqui", 405);
+      }
 
       /* /files/<id> e a unica rota com caminho variavel: separamos o id aqui
          para o resto do roteamento continuar comparando strings inteiras */

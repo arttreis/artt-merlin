@@ -1,0 +1,385 @@
+/* merlin · a landing (a porta do index.html)
+   ================================================================
+   a página de quem nunca ouviu falar do Merlin (docs/prd/landing.md). a
+   forma vem do notion.com: curta, um bloco por ideia, o produto na primeira
+   dobra. a pele é a do Merlin: o escuro, um verde só e a floresta do início.
+
+   esta folha entra por <link> no index.html, e não por import no JS: a
+   página tem que nascer pintada para quem não roda script nenhum, que é o
+   caso do buscador. o resto do sistema vive em camada (@layer base, no
+   shell.css); o que está aqui fica fora dela e ganha todo empate.
+
+   quem decide se a porta aparece é o script do <head>: html.in esconde, e
+   html.bare tira a barra e o dock enquanto ela está na tela. */
+
+html.in .ld{display:none}
+html.bare{scroll-behavior:smooth}
+html.bare .sb,html.bare .sb__mobile,html.bare .sb__scrim{display:none}
+html.bare.merlin body{margin-left:0}
+html.bare .page{max-width:none;padding:0}
+html.bare body::before,html.bare body::after{opacity:0}
+
+.ld{overflow-x:clip;color:var(--ink)}
+.ld [id]{scroll-margin-top:84px}
+
+/* ---------- botões ---------- */
+.ld-btn{
+  display:inline-flex;align-items:center;justify-content:center;gap:8px;
+  height:38px;padding:0 16px;border-radius:var(--br-pill);
+  font-size:13.5px;font-weight:500;white-space:nowrap;
+  transition:filter var(--t),background var(--t),border-color var(--t),opacity var(--t);
+}
+.ld-btn--lg{height:48px;padding:0 24px;font-size:14.5px}
+.ld-btn--accent{background:var(--accent);color:var(--on-accent)}
+.ld-btn--accent:hover{filter:brightness(1.08)}
+.ld-btn--accent:disabled{opacity:.6;cursor:default;filter:none}
+.ld-btn--quiet{color:inherit;opacity:.85}
+.ld-btn--quiet:hover{opacity:1;background:color-mix(in srgb,currentColor 10%,transparent)}
+/* o vidro só existe sobre a floresta: lá embaixo o fundo é o do sistema */
+.ld-btn--glass{background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.24);color:#fff;-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px)}
+.ld-btn--glass:hover{background:rgba(255,255,255,.2)}
+.ld-btn--ghost{background:var(--fill);border:1px solid var(--line);color:var(--ink)}
+.ld-btn--ghost:hover{background:var(--fill-hover);border-color:var(--ink-30)}
+
+/* ---------- a barra ----------
+   branca sobre o céu; ao rolar, ganha o fundo do sistema e a tinta dele */
+.ld-nav{
+  position:fixed;inset:0 0 auto 0;z-index:20;
+  display:flex;align-items:center;gap:20px;height:62px;padding:0 clamp(16px,3vw,32px);
+  color:#fff;border-bottom:1px solid transparent;
+  transition:background var(--t),border-color var(--t),color var(--t);
+}
+.ld-nav.is-scrolled{
+  color:var(--ink);border-bottom-color:var(--line-soft);
+  background:color-mix(in srgb,var(--bg) 80%,transparent);
+  -webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);
+}
+.ld-nav__logo{display:inline-flex;align-items:center;gap:9px;font-weight:600;font-size:15.5px;color:inherit}
+.ld-nav__logo svg{width:20px;height:20px;color:var(--accent);flex:none}
+.ld-nav__links{display:flex;gap:2px;margin:0 auto}
+.ld-nav__links a{padding:8px 13px;border-radius:var(--br-pill);font-size:13.5px;opacity:.82;transition:opacity var(--t),background var(--t)}
+.ld-nav__links a:hover{opacity:1;background:color-mix(in srgb,currentColor 10%,transparent)}
+.ld-nav__act{display:flex;align-items:center;gap:6px;margin-left:auto}
+.ld-nav__links+.ld-nav__act{margin-left:0}
+
+/* ---------- o hero ---------- */
+.ld-hero{position:relative;padding:0 20px;text-align:center}
+/* o céu de reserva, na cor da hora (o <head> escreve data-phase): é o que se
+   vê antes da floresta chegar, e o que fica para quem não roda JS. as cores
+   são as do PALETTE do forest.jsx */
+.ld-hero__scene{
+  position:absolute;inset:0 0 auto 0;height:clamp(620px,88vh,800px);overflow:hidden;
+  background:linear-gradient(180deg,var(--sky-a,#05070f),var(--sky-b,#0b1430) 65%,var(--sky-c,#1b2a4a));
+}
+html[data-phase="dawn"] .ld-hero__scene{--sky-a:#2b2f55;--sky-b:#c9889a;--sky-c:#f3c59b}
+html[data-phase="day"] .ld-hero__scene{--sky-a:#5fa3d6;--sky-b:#9fcbe6;--sky-c:#d9ecf2}
+html[data-phase="dusk"] .ld-hero__scene{--sky-a:#1f2547;--sky-b:#7a4a6e;--sky-c:#e79a6a}
+.ld-hero__scene .forest{position:absolute;inset:0;opacity:0;transition:opacity .9s var(--ease)}
+.ld-hero__scene.is-on .forest{opacity:1}
+/* a cena some no fundo por máscara, e não por um degradê pintado por cima:
+   a altura em vh cai no meio de um pixel, e o degradê deixava ali um fio da
+   floresta aparecendo */
+.ld-hero__scene{
+  -webkit-mask-image:linear-gradient(180deg,#000 56%,transparent 99%);
+  mask-image:linear-gradient(180deg,#000 56%,transparent 99%);
+}
+
+.ld-hero__words{position:relative;z-index:2;padding-top:clamp(116px,17vh,168px);color:#fff}
+.ld-hero h1{
+  margin:0;font-size:clamp(40px,7.4vw,100px);font-weight:600;
+  letter-spacing:-.055em;line-height:1.02;text-wrap:balance;
+  text-shadow:0 2px 34px rgba(0,0,0,.28);
+}
+/* a palavra na pílula, como o "● Pensam" do Notion. o ponto é o verde */
+/* inline e não flex: a pílula fica na linha de base das outras palavras, e
+   a segunda linha do título não cresce por causa dela */
+.ld-pill{
+  position:relative;display:inline-block;line-height:1;
+  padding:.02em .26em .06em .56em;margin:0 .02em;border-radius:999px;
+  background:color-mix(in srgb,var(--accent) 18%,rgba(255,255,255,.1));
+  border:1px solid rgba(255,255,255,.22);
+  -webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);
+}
+.ld-pill i{
+  position:absolute;left:.2em;top:50%;width:.24em;height:.24em;margin-top:-.1em;
+  border-radius:50%;background:var(--accent);box-shadow:0 0 .5em var(--accent-glow);
+}
+/* o texto miúdo passa por cima das árvores: a sombra curta é o que o
+   separa delas de dia, quando o céu é claro */
+.ld-hero__sub{
+  margin:24px auto 0;max-width:40ch;font-size:clamp(16px,1.55vw,19px);line-height:1.5;font-weight:500;
+  color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.4),0 2px 18px rgba(0,0,0,.4);
+}
+.ld-hero__cta{display:flex;justify-content:center;flex-wrap:wrap;gap:10px;margin-top:32px}
+.ld-hero__fine{margin:14px 0 0;font-size:12.5px;color:rgba(255,255,255,.86);text-shadow:0 1px 2px rgba(0,0,0,.45),0 1px 12px rgba(0,0,0,.4)}
+
+/* ---------- a janela do início ----------
+   a mesma linguagem dos cartões do hoje (index.css, .hm-*), redesenhada em
+   classes próprias: a vitrine não pode mudar de cara quando o início mudar
+   de cara sem alguém olhar para ela. */
+.ld-win{
+  position:relative;z-index:2;max-width:1040px;margin:clamp(48px,7vw,84px) auto 0;
+  text-align:left;border-radius:18px;overflow:hidden;
+  background:color-mix(in srgb,var(--bg) 94%,transparent);
+  border:1px solid var(--line);
+  box-shadow:0 50px 120px -40px rgba(0,0,0,.75),inset 0 1px 0 rgba(255,255,255,.04);
+  -webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);
+}
+.ld-win__bar{display:flex;align-items:center;gap:6px;height:36px;padding:0 14px;border-bottom:1px solid var(--line-soft)}
+.ld-win__bar i{width:10px;height:10px;border-radius:50%;background:var(--fill-hover)}
+.ld-win__bar span{flex:1;margin-right:46px;text-align:center;font-size:11.5px;color:var(--ink-30)}
+.ld-win__body{position:relative;padding:clamp(18px,3vw,30px)}
+
+.ld-demo__hi{margin:0 0 14px;font-size:clamp(18px,2.1vw,23px);font-weight:600;letter-spacing:-.03em;color:var(--ink)}
+.ld-demo__field{
+  display:flex;flex-direction:column;gap:16px;margin-bottom:14px;padding:14px 16px;
+  border-radius:var(--br);background:var(--surface);border:1px solid var(--line);
+}
+.ld-demo__text{min-height:20px;font-size:14.5px;color:var(--ink)}
+.ld-demo__ph{color:var(--ink-30)}
+.ld-demo__caret{display:inline-block;width:1.5px;height:1.05em;margin-left:1px;vertical-align:-2px;background:var(--accent);animation:ld-blink 1s steps(1) infinite}
+.ld-demo__hint{font-size:11.5px;color:var(--ink-50);transition:color var(--t)}
+.ld-demo__hint[data-kind="task"],.ld-demo__hint[data-kind="note"]{color:var(--accent-ink)}
+.ld-demo__grid{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:12px;align-items:start}
+.ld-demo__side{display:grid;gap:12px;min-width:0}
+.ld-demo__toast{
+  position:absolute;left:50%;bottom:22px;z-index:3;margin:0;padding:9px 16px;
+  border-radius:var(--br-pill);background:var(--ink);color:var(--bg);
+  font-size:12.5px;font-weight:500;white-space:nowrap;
+  animation:ld-toast 2.2s var(--ease) both;
+}
+
+.ld-dc{background:var(--surface);border:1px solid var(--line);border-radius:var(--br);padding:14px 16px;min-width:0}
+.ld-dc__head{display:flex;align-items:center;gap:7px;margin:0 0 10px;font-size:13px;font-weight:600;color:var(--ink)}
+.ld-dc__head svg{width:15px;height:15px;color:var(--accent-ink);flex:none}
+.ld-dc__head span{font-size:11.5px;font-weight:400;color:var(--ink-30)}
+.ld-dc__n{display:flex;align-items:baseline;gap:8px;margin:0 0 10px}
+.ld-dc__n b{font-size:28px;font-weight:500;letter-spacing:-.04em;color:var(--accent-ink);font-variant-numeric:tabular-nums}
+.ld-dc__n[data-tone="over"] b{color:var(--ink)}
+.ld-dc__n span{font-size:12.5px;color:var(--ink-50)}
+.ld-dc__list{list-style:none;margin:0;padding:0;display:grid;gap:1px}
+.ld-dc__list li{
+  display:grid;grid-template-columns:18px minmax(0,1fr) auto;align-items:center;gap:9px;
+  min-height:30px;font-size:13px;color:var(--ink-70);
+}
+.ld-dc__list span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ld-dc__list small{font-size:11.5px;color:var(--ink-30);font-variant-numeric:tabular-nums}
+.ld-dc__list--log li{grid-template-columns:auto minmax(0,1fr) auto}
+.ld-dc__list li.is-done span{color:var(--ink-30);text-decoration:line-through;text-decoration-color:var(--ink-30)}
+.ld-dc__list li.is-reserve span{color:var(--ink-50)}
+.ld-dc__list li.is-new{animation:ld-in .6s var(--ease) both}
+.ld-check{display:block;width:16px;height:16px;border-radius:5px;border:1px solid var(--line);transition:background var(--t),border-color var(--t)}
+.is-reserve .ld-check{border-style:dashed}
+.is-done .ld-check{background:var(--accent);border-color:var(--accent)}
+.is-done .ld-check::after{content:"";display:block;width:4px;height:8px;margin:2px 0 0 5px;border:solid var(--on-accent);border-width:0 2px 2px 0;transform:rotate(45deg)}
+.ld-dc__foot{margin:8px 0 0;font-size:11.5px;color:var(--ink-30);font-variant-numeric:tabular-nums}
+
+/* a barra do dia: o que passou é o fundo vazio, a reserva é hachurada, cada
+   tarefa é um bloco e o que sobra é o verde. igual ao .hm-track */
+.ld-track{display:flex;height:8px;margin-bottom:10px;border-radius:var(--br2);overflow:hidden;background:var(--bg);border:1px solid var(--line-soft)}
+.ld-track i{flex:0 0 auto;min-width:0}
+.ld-track i+i{box-shadow:inset 1px 0 0 var(--bg)}
+.ld-track .is-reserved{background:repeating-linear-gradient(90deg,var(--fill-hover) 0 2px,var(--bg) 2px 5px)}
+.ld-track .is-slot{background:var(--fill-hover)}
+.ld-track .is-free{background:var(--accent);flex:1 1 auto}
+
+/* ---------- funciona com ---------- */
+.ld-works{max-width:1120px;margin:clamp(48px,6vw,72px) auto 0;padding:0 20px;text-align:center}
+.ld-works p{margin:0 0 16px;font-size:12.5px;color:var(--ink-30)}
+.ld-works ul{list-style:none;display:flex;flex-wrap:wrap;justify-content:center;gap:12px clamp(24px,4vw,52px);margin:0;padding:0}
+.ld-works li{font-size:clamp(17px,2vw,23px);font-weight:600;letter-spacing:-.035em;color:var(--ink-50)}
+
+/* ---------- seções ---------- */
+.ld-sec{max-width:1120px;margin:0 auto;padding:clamp(80px,11vw,136px) 20px 0}
+.ld-sec--tight{padding-top:clamp(56px,7vw,88px)}
+.ld-sec h2,.ld-end h2{
+  margin:0;max-width:17ch;font-size:clamp(32px,4.8vw,58px);font-weight:600;
+  letter-spacing:-.05em;line-height:1.04;color:var(--ink);text-wrap:balance;
+}
+.ld-sec .ld-h-small{max-width:none;font-size:clamp(20px,2.2vw,26px);letter-spacing:-.035em}
+.ld-sec__sub{margin:18px 0 0;max-width:52ch;font-size:clamp(15px,1.4vw,17px);line-height:1.55;color:var(--ink-50)}
+
+/* o bento: dois em cima, um largo embaixo, o print recortado no pé de cada um */
+.ld-bento{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:44px}
+.ld-card{
+  display:flex;flex-direction:column;gap:28px;min-width:0;overflow:hidden;
+  padding:30px 30px 0;border-radius:22px;
+  background:var(--surface);border:1px solid var(--line-soft);
+}
+.ld-card--wide{grid-column:1/-1;flex-direction:row;align-items:center;gap:40px;padding:30px}
+.ld-card--wide .ld-card__words{flex:0 1 380px}
+.ld-card__eyebrow{
+  display:flex;align-items:center;gap:7px;margin:0 0 12px;
+  font-family:var(--mono);font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-50);
+}
+.ld-card__eyebrow::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--accent)}
+.ld-card h3{margin:0;font-size:clamp(19px,1.9vw,23px);font-weight:600;letter-spacing:-.035em;line-height:1.2;color:var(--ink)}
+.ld-card__words>p:last-child{margin:12px 0 0;max-width:46ch;font-size:14px;line-height:1.6;color:var(--ink-50)}
+
+.ld-mock{
+  margin-top:auto;padding:16px;min-width:0;
+  border:1px solid var(--line);border-bottom:0;border-radius:14px 14px 0 0;background:var(--bg);
+}
+.ld-card--wide .ld-mock{flex:1;margin-top:0;border-bottom:1px solid var(--line);border-radius:14px}
+
+/* construir: o banco desenhado e a saída */
+.ld-build{display:grid;grid-template-columns:minmax(0,.8fr) minmax(0,1.25fr);gap:14px}
+.ld-build__er{display:grid;gap:10px;align-content:start}
+.ld-ent{
+  position:relative;display:grid;gap:3px;padding:8px 10px;border-radius:10px;
+  background:var(--surface);border:1px solid var(--line);font-size:11.5px;color:var(--ink-50);
+}
+.ld-ent b{margin-bottom:2px;font-size:12px;font-weight:600;color:var(--ink)}
+.ld-ent em{font-style:normal;color:var(--accent-ink)}
+.ld-ent--main{margin-left:20px;border-color:color-mix(in srgb,var(--accent) 45%,var(--line))}
+/* as relações: um fio de cada tabela até a do meio */
+.ld-ent--main::before,.ld-ent--main::after{content:"";position:absolute;left:-12px;width:11px;border-left:1px solid var(--line)}
+.ld-ent--main::before{top:-10px;height:22px;border-bottom:1px solid var(--line);border-bottom-left-radius:6px}
+.ld-ent--main::after{bottom:-10px;height:22px;border-top:1px solid var(--line);border-top-left-radius:6px}
+.ld-build__out{display:flex;flex-direction:column;gap:10px;min-width:0}
+.ld-tabs{display:flex;gap:2px;margin:0;font-size:11.5px;white-space:nowrap}
+.ld-tabs span{padding:4px 9px;border-radius:var(--br-pill);color:var(--ink-50)}
+.ld-tabs .is-on{background:var(--fill-hover);color:var(--ink)}
+.ld-build pre{
+  margin:0;padding:12px;overflow:hidden;border-radius:10px;
+  background:var(--surface);border:1px solid var(--line-soft);
+  font-family:var(--mono);font-size:11px;line-height:1.65;color:var(--ink-70);white-space:pre;
+}
+.ld-build pre b{font-weight:500;color:var(--accent-ink)}
+.ld-fake{
+  align-self:flex-start;display:inline-flex;align-items:center;height:30px;padding:0 13px;margin-bottom:16px;white-space:nowrap;
+  border-radius:var(--br-pill);background:var(--accent);color:var(--on-accent);font-size:12px;font-weight:500;
+}
+
+/* distribuir: o funil com a vazão e as peças da semana */
+.ld-dist{display:grid;gap:16px;padding-bottom:20px}
+.ld-flow{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px}
+.ld-flow li{position:relative;display:grid;gap:2px;padding:9px 10px;border-radius:10px;background:var(--surface);border:1px solid var(--line)}
+.ld-flow li+li::before{content:"";position:absolute;left:-17px;top:50%;width:16px;border-top:1px solid var(--ink-30)}
+.ld-flow span{font-size:11px;color:var(--ink-50);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ld-flow b{font-size:15px;font-weight:600;letter-spacing:-.02em;color:var(--ink);font-variant-numeric:tabular-nums}
+.ld-flow .is-end{border-color:color-mix(in srgb,var(--accent) 45%,var(--line))}
+.ld-flow .is-end b{color:var(--accent-ink)}
+.ld-pieces{display:grid;gap:6px}
+.ld-pieces__top{margin:0 0 2px;font-size:11.5px;color:var(--ink-50)}
+.ld-pieces span{
+  display:grid;grid-template-columns:64px minmax(0,1fr) auto;align-items:center;gap:10px;padding:8px 10px;
+  border-radius:10px;background:var(--surface);border:1px solid var(--line-soft);font-size:12px;color:var(--ink-70);
+}
+.ld-pieces i{font-style:normal;font-size:11px;color:var(--ink-30)}
+.ld-pieces em{font-style:normal;font-size:11px;padding:2px 9px;border-radius:var(--br-pill);background:var(--fill-hover);color:var(--ink-50)}
+
+/* o dia: o que cabe e o que estoura, sem vermelho */
+.ld-days{display:grid;gap:26px;padding:24px}
+.ld-dayrow>p:first-child{margin:0 0 10px;font-size:13px;color:var(--ink-50)}
+.ld-dayrow b{margin-right:6px;font-size:30px;font-weight:500;letter-spacing:-.04em;color:var(--accent-ink);font-variant-numeric:tabular-nums}
+.ld-dayrow--over b{color:var(--ink)}
+.ld-track--big{height:14px;margin-bottom:8px}
+.ld-track--over .is-slot:last-child{background:repeating-linear-gradient(45deg,var(--fill-hover) 0 4px,transparent 4px 8px)}
+.ld-scale{display:flex;justify-content:space-between;gap:12px;margin:0;font-size:11px;color:var(--ink-30)}
+
+/* o que o Merlin faz: os casos, um por cartão */
+.ld-uses{list-style:none;margin:22px 0 0;padding:0;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.ld-uses li{display:grid;align-content:start;gap:16px;padding:20px;border-radius:16px;background:var(--surface);border:1px solid var(--line-soft)}
+.ld-uses svg{width:20px;height:20px;color:var(--accent-ink)}
+.ld-uses p{margin:0;font-size:14px;line-height:1.55;color:var(--ink-70)}
+
+/* o seu dia é só seu: no lugar dos depoimentos que ainda não existem */
+.ld-trust{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;margin-top:44px}
+.ld-trust article{
+  position:relative;display:flex;flex-direction:column;justify-content:flex-end;min-height:300px;padding:30px;
+  border-radius:22px;overflow:hidden;border:1px solid var(--line-soft);
+  background:radial-gradient(120% 90% at 0% 0%,color-mix(in srgb,var(--accent) 15%,transparent),transparent 62%),var(--surface);
+}
+.ld-trust svg{position:absolute;top:30px;left:30px;width:30px;height:30px;color:var(--accent-ink)}
+.ld-trust h3{margin:0 0 10px;font-size:clamp(20px,2vw,24px);font-weight:600;letter-spacing:-.035em;color:var(--ink)}
+.ld-trust p{margin:0;font-size:14px;line-height:1.6;color:var(--ink-50)}
+
+/* a faixa de números: só fatos do produto, em loop. as contagens são
+   conferidas contra o templates.js no test.mjs */
+.ld-facts{margin-top:clamp(80px,11vw,136px);padding:20px 0;overflow:hidden;border-block:1px solid var(--line-soft)}
+.ld-facts__track{display:flex;width:max-content;animation:ld-marquee 46s linear infinite}
+.ld-facts:hover .ld-facts__track{animation-play-state:paused}
+.ld-facts ul{list-style:none;display:flex;margin:0;padding:0}
+.ld-facts li{display:flex;align-items:center;gap:44px;padding-right:44px;font-size:14.5px;color:var(--ink-50);white-space:nowrap}
+.ld-facts li::after{content:"";width:5px;height:5px;border-radius:50%;background:var(--accent)}
+
+/* ---------- o fechamento e a fila ---------- */
+.ld-end{
+  width:calc(100% - 40px);max-width:1120px;margin:clamp(80px,11vw,136px) auto 0;
+  padding:clamp(52px,8vw,100px) 24px;text-align:center;border-radius:28px;
+  border:1px solid var(--line-soft);
+  background:radial-gradient(80% 120% at 50% 0%,color-mix(in srgb,var(--accent) 13%,transparent),transparent 70%),var(--surface);
+}
+.ld-end h2{margin:0 auto}
+.ld-end>p{margin:18px auto 0;max-width:54ch;font-size:15px;line-height:1.6;color:var(--ink-50)}
+.ld-end__cta{display:flex;justify-content:center;flex-wrap:wrap;gap:10px;margin-top:30px}
+.ld-wait{max-width:460px;margin:44px auto 0;text-align:left}
+.ld-wait label{display:block;margin:0 0 8px 16px;font-size:12.5px;color:var(--ink-50)}
+.ld-wait__row{display:flex;gap:8px}
+.ld-wait input[type="email"]{
+  flex:1;min-width:0;height:44px;padding:0 18px;border-radius:var(--br-pill);
+  background:var(--bg);border:1px solid var(--line);color:var(--ink);font-size:14px;
+  transition:border-color var(--t);
+}
+.ld-wait input[type="email"]::placeholder{color:var(--ink-30)}
+.ld-wait input[type="email"]:focus{outline:none;border-color:var(--accent)}
+.ld-wait .ld-btn{height:44px}
+.ld-wait__hp{position:absolute;left:-9999px;width:1px;height:1px;opacity:0}
+.ld-wait__note{margin:10px 0 0 16px;font-size:12px;line-height:1.5;color:var(--ink-30)}
+.ld-wait.is-done .ld-wait__row,.ld-wait.is-done label{display:none}
+.ld-wait.is-done .ld-wait__note{margin-left:0;text-align:center;font-size:14px;color:var(--accent-ink)}
+
+/* ---------- o rodapé ---------- */
+.ld-foot{
+  max-width:1120px;margin:0 auto;padding:clamp(60px,8vw,100px) 20px 40px;
+  display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);gap:40px;
+}
+.ld-foot blockquote{margin:20px 0 0;max-width:30ch;font-family:"Instrument Serif",Georgia,serif;font-style:italic;font-size:21px;line-height:1.35;color:var(--ink-70)}
+.ld-foot cite{display:block;margin-top:8px;font-family:var(--sans);font-style:normal;font-size:12px;color:var(--ink-30)}
+.ld-foot__cols{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:24px}
+.ld-foot__cols div{display:grid;align-content:start;gap:10px}
+.ld-foot__cols p{margin:0 0 4px;font-size:12px;color:var(--ink-30)}
+.ld-foot__cols a,.ld-foot__cols button{justify-self:start;text-align:left;font-size:13.5px;color:var(--ink-70);transition:color var(--t)}
+.ld-foot__cols a:hover,.ld-foot__cols button:hover{color:var(--ink)}
+.ld-foot__fine{grid-column:1/-1;margin:24px 0 0;padding-top:20px;border-top:1px solid var(--line-soft);font-size:12px;color:var(--ink-30)}
+
+/* ---------- o que se mexe ---------- */
+@keyframes ld-blink{50%{opacity:0}}
+@keyframes ld-in{from{opacity:0;transform:translateY(-4px);background:var(--fill-hover)}to{opacity:1;transform:none}}
+@keyframes ld-toast{0%{opacity:0;transform:translate(-50%,6px)}12%,80%{opacity:1;transform:translate(-50%,0)}100%{opacity:0;transform:translate(-50%,0)}}
+@keyframes ld-marquee{to{transform:translateX(-50%)}}
+@media (prefers-reduced-motion:reduce){
+  html.bare{scroll-behavior:auto}
+  .ld-demo__caret{animation:none}
+  .ld-facts__track{width:auto;animation:none}
+  .ld-facts ul{flex-wrap:wrap;justify-content:center;row-gap:10px;padding:0 20px}
+  .ld-facts ul[aria-hidden]{display:none}
+}
+
+/* ---------- telas estreitas ----------
+   a mesma página medida em 390px, como o resto do sistema. a janela fica só
+   com o dia: os cartões do lado não cabem e não somam */
+@media (max-width:900px){
+  .ld-nav__links{display:none}
+  .ld-nav__links+.ld-nav__act{margin-left:auto}
+  .ld-bento,.ld-trust{grid-template-columns:1fr}
+  .ld-card--wide{flex-direction:column;align-items:stretch;gap:28px}
+  .ld-card--wide .ld-card__words{flex:none}
+  .ld-uses{grid-template-columns:1fr 1fr}
+  .ld-trust article{min-height:240px}
+  .ld-foot{grid-template-columns:1fr}
+}
+@media (max-width:640px){
+  .ld-nav__act .ld-btn--quiet{display:none}
+  .ld-demo__grid{grid-template-columns:1fr}
+  .ld-demo__side{display:none}
+  .ld-demo__hint{display:none}
+  .ld-uses{grid-template-columns:1fr}
+  .ld-build{grid-template-columns:1fr}
+  .ld-build__er{display:none}
+  .ld-flow{grid-template-columns:1fr 1fr}
+  .ld-flow li:nth-child(3)::before{display:none}
+  .ld-wait__row{flex-direction:column}
+  .ld-foot__cols{grid-template-columns:1fr 1fr}
+}
