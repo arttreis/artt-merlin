@@ -21,7 +21,7 @@ import {
   api, notify, sendToDay, formatMin, readDuration, newId, newNote, today,
   SECTIONS, sectionOf, CLOUD_STATUS, search, signIn, currentNotice, onNotice, closeNotice,
   toggleSidebar, setShellRenderer, currentBrand, share, shareOf, unshare, shareUrl,
-  currentTheme, toggleTheme, askMerlin
+  currentTheme, toggleTheme, askMerlin, onboardingBlocked
 } from "./core.js";
 import { LOGO, GL_LOGO, GL_MARK, ICONS, NAV_ICONS, icon } from "./icons.jsx";
 /* o ProposalDialog mora aqui, e nao na tela do assistente, porque ele e um
@@ -1278,6 +1278,23 @@ function Dock({ page, onCommand }) {
   );
 }
 
+/* o aviso no lugar da tela de quem ainda nao fez o onboarding (core.js,
+   guardOnboarding). a tela nao abre e nao ha outro caminho: o botao leva a
+   conversa, e o "entrar" do topo continua ali para quem ja fez noutro aparelho */
+function OnboardingWall() {
+  return (
+    <div className="ow" role="dialog" aria-modal="true" aria-labelledby="ow-title">
+      <div className="ow__card">
+        <span className="ow__logo">{LOGO}</span>
+        <h2 id="ow-title">Falta terminar a conversa com o Merlin</h2>
+        <p>Antes de usar o resto do Merlin, ele precisa te conhecer: seu nome, com o que você
+        trabalha, o horário do seu dia. São poucas perguntas, e o que você já tem aqui continua guardado.</p>
+        <a className="pill pill--accent ow__go" href="index.html">concluir agora</a>
+      </div>
+    </div>
+  );
+}
+
 function Shell({ page }) {
   const [signInOpen, setSignInOpen] = useState(signIn.open);
   useEffect(() => signIn.onChange((s) => setSignInOpen(s.open)), []);
@@ -1285,20 +1302,32 @@ function Shell({ page }) {
   /* o campo de tudo: Ctrl+K abre de qualquer tela; Ctrl+J pergunta ao Merlin
      direto. o rastreador do desktop e uma janela de 380px, e ali nao cabe. */
   const [cmd, setCmd] = useState(false);
+  /* durante o onboarding (a conversa no inicio, ou o aviso nas outras telas)
+     nao ha atalho: a busca e o "perguntar" levariam para fora dele. a classe e
+     lida na hora do atalho porque o inicio a liga e desliga sozinho */
+  const locked = () => page === "tracker" || document.documentElement.classList.contains("onboarding");
   useEffect(() => {
-    const open = () => { if (page !== "tracker") setCmd(true); };
+    const open = () => { if (!locked()) setCmd(true); };
     window.addEventListener("merlin:command", open);
     return () => window.removeEventListener("merlin:command", open);
   }, []);
   useKeydown((e) => {
-    if (page !== "tracker" && (e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && e.key.toLowerCase() === "k") { e.preventDefault(); setCmd(true); }
-    if (page !== "tracker" && (e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && e.key.toLowerCase() === "j") { e.preventDefault(); askMerlin(""); }
+    if (locked() || !(e.ctrlKey || e.metaKey) || e.shiftKey || e.altKey) return;
+    if (e.key.toLowerCase() === "k") { e.preventDefault(); setCmd(true); }
+    if (e.key.toLowerCase() === "j") { e.preventDefault(); askMerlin(""); }
   });
+  const [blocked, setBlockedView] = useState(onboardingBlocked);
+  useEffect(() => {
+    const sync = () => { setBlockedView(onboardingBlocked()); if (onboardingBlocked()) setCmd(false); };
+    window.addEventListener("merlin:onboarding", sync);
+    return () => window.removeEventListener("merlin:onboarding", sync);
+  }, []);
 
   return (
     <>
       {page !== "tracker" && <TopBar page={page} onCommand={() => setCmd(true)} />}
       {page !== "tracker" && <Dock page={page} onCommand={() => setCmd(true)} />}
+      {blocked && <OnboardingWall />}
       {signInOpen && <SignInDialog />}
       {cmd && <CommandPalette onClose={() => setCmd(false)} />}
       <Notice />

@@ -1237,11 +1237,69 @@ export function takeAsk() {
   } catch (e) { return null; }
 }
 
+/* ---------- o onboarding como estado ----------
+   quem ainda nao passou pela primeira conversa nao usa o resto do Merlin: o
+   perfil e o que faz o conselheiro falar com uma pessoa, e quem chegou antes
+   de o onboarding existir (10/10/2026) tem tarefas, notas e produtos, mas
+   nenhum perfil — e entrava direto pelo calendario sem nunca ver a conversa.
+
+   tres estados. "done": o perfil diz onboarded. "waiting": ainda nao da para
+   saber — a sessao nao respondeu ou, com sessao, o perfil ainda nao baixou; um
+   aparelho novo de quem ja fez o onboarding nao pode ser mandado refaze-lo so
+   porque o perfil ainda esta a caminho. "pending": sabido que falta.
+
+   o portao vale em toda pagina menos o inicio (que e onde a conversa mora), o
+   rastreador do desktop (uma janela sem navegacao) e o perfil (de onde se sai
+   da conta, e sair nao pode depender de responder nada). */
+let settled = null;
+let isSettled = false;
+const FREE_PAGES = new Set(["home", "tracker", "profile"]);
+export function onboardingState() {
+  const me = collection("profile").get("me");
+  if (me && me.onboarded) return "done";
+  return isSettled ? "pending" : "waiting";
+}
+export const onboardingSettled = () => settled || Promise.resolve();
+
+/* a pagina barrada nao redireciona sozinha: ela some e no lugar fica um aviso
+   (ui.jsx, OnboardingWall) dizendo o que falta e levando ao inicio. sair de
+   onde se clicou sem explicar parecia defeito. `onboarding` no <html> e a
+   mesma classe do inicio durante a conversa: tira o dock, a busca e o Ctrl+K */
+let blocked = false;
+export const onboardingBlocked = () => blocked;
+function setBlocked(on) {
+  blocked = on;
+  const root = document.documentElement.classList;
+  root.toggle("gated", on);
+  root.toggle("onboarding", on);
+  window.dispatchEvent(new Event("merlin:onboarding"));
+}
+
+function guardOnboarding() {
+  if (FREE_PAGES.has(currentPage) || onboardingState() === "done") return;
+  /* a pagina nao aparece enquanto se decide: piscar o calendario e logo depois
+     cobri-lo com o aviso parece defeito. so quem nao tem o perfil feito NESTE
+     navegador passa por isso */
+  document.documentElement.classList.add("gated");
+  settled.then(() => {
+    /* com sessao e sem ter conseguido baixar o perfil (rede caiu), nao da
+       para afirmar que falta: deixa passar em vez de tirar alguem do trabalho */
+    const unsure = cloud.signedIn && !collection("profile").hasDownloaded();
+    if (onboardingState() !== "pending" || unsure) { document.documentElement.classList.remove("gated"); return; }
+    setBlocked(true);
+    /* entrar na conta pelo topo pode trazer um perfil ja feito noutro aparelho */
+    const off = collection("profile").onChange(() => {
+      if (onboardingState() === "done") { off(); setBlocked(false); }
+    });
+  });
+}
+
 export function initPage(id) {
   currentPage = String(id || "");
   if (renderShell) renderShell(id);
   clients();
   prefsStore();   /* a janela do dia sai daqui, e o dia pinta antes da nuvem */
+  collection("profile");   /* cedo, para entrar na primeira sincronizacao e o portao saber */
   /* a mudanca de nome roda ANTES da primeira pintura. o que ja esta neste
      navegador nao depende de rede, e esperar o /me responder faz a tela nascer
      vazia e se corrigir sozinha um instante depois — pior que nascer certa. e
@@ -1252,5 +1310,7 @@ export function initPage(id) {
      nuvem tem; so entao da para apagar as frentes antigas sem apagar no
      escuro. a pagina desenha antes disso e redesenha quando os dados chegam.
      quem nao baixou nesta carga fica para a proxima — a limpeza sabe esperar. */
-  cloud.resume().finally(() => { migrateNotes(true); purgeFronts(); });
+  const resumed = cloud.resume().finally(() => { isSettled = true; migrateNotes(true); purgeFronts(); });
+  settled = resumed.then(() => {}, () => {});
+  guardOnboarding();
 }
