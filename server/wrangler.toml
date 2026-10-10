@@ -4,6 +4,10 @@
 name = "artt-planner-api"
 main = "worker.js"
 compatibility_date = "2026-09-01"
+# a conta arttreis. o login do wrangler enxerga duas (arttreis e GuessLess) e,
+# fora de um terminal interativo, para em vez de escolher. o banco, o bucket e
+# o dominio do Merlin moram nesta.
+account_id = "44b57dda1251f236beacc8a2f068f056"
 
 # o site e a api saem do mesmo worker, no mesmo dominio: e isso que permite
 # cookie SameSite=Lax. em dominios separados o cookie seria de terceiro, e

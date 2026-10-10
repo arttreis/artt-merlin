@@ -327,6 +327,8 @@ html[data-phase="dusk"] .ld-hero__scene{--sky-a:#1f2547;--sky-b:#7a4a6e;--sky-c:
 .ld-wait .ld-btn{height:44px}
 .ld-wait__hp{position:absolute;left:-9999px;width:1px;height:1px;opacity:0}
 .ld-wait__note{margin:10px 0 0 16px;font-size:12px;line-height:1.5;color:var(--ink-30)}
+.ld-wait__note a,.ld-foot__fine a{color:var(--ink-50);text-decoration:underline;text-underline-offset:3px;text-decoration-color:var(--line)}
+.ld-wait__note a:hover,.ld-foot__fine a:hover{color:var(--ink)}
 .ld-wait.is-done .ld-wait__row,.ld-wait.is-done label{display:none}
 .ld-wait.is-done .ld-wait__note{margin-left:0;text-align:center;font-size:14px;color:var(--accent-ink)}
 
