@@ -440,7 +440,9 @@ claudeAnswer = { stop_reason: "end_turn", content: [{ type: "text", text: JSON.s
   { kind: "task", title: "   " },
   { kind: "task", title: "maratona", min: 5000, date: "amanhã", at: "tarde" }
 ] }) }] };
-const adviceBefore = db.advice.filter((x) => x.hour > 0).reduce((s, x) => s + x.n, 0);
+/* a cota mora em hora × 4 + o balde: 0 conselho, 1 leitura, 2 montagem */
+const spent = (slot) => db.advice.filter((x) => x.hour % 4 === slot).reduce((s, x) => s + x.n, 0);
+const adviceBefore = spent(0);
 r = await call("POST", "/merlin", { task: "capture", context: { text: "ligar pro João amanhã às 15h e se o merlin tivesse modo offline", today: "2026-10-10 (sábado)", hour: "14:20", clients: ["Ana"] } }, cookie);
 body = await r.json();
 check("captura devolve itens", r.status === 200 && body.items.length === 3, JSON.stringify(body));
@@ -449,7 +451,54 @@ check("captura zera o que ideia não tem", body.items[1].min === 0 && body.items
 check("captura corta duração e larga data e hora inválidas", body.items[2].min === 720 && body.items[2].date === "" && body.items[2].at === "");
 check("captura vai no Haiku com pouco esforço", claudeModel === "claude-haiku-5-5/low", claudeModel);
 check("captura manda a linha e os clientes", /ligar pro João/.test(claudeAsked) && /Clientes: Ana/.test(claudeAsked));
-check("captura não gasta a cota do conselho", db.advice.filter((x) => x.hour > 0).reduce((s, x) => s + x.n, 0) === adviceBefore && db.advice.some((x) => x.hour < 0));
+check("captura não gasta a cota do conselho", spent(0) === adviceBefore && spent(1) === 1);
+/* montar com o Merlin: a pergunta no Haiku conta como um conselho; rascunho
+   e ajuste no Opus contam na cota da montagem */
+claudeAnswer = { stop_reason: "end_turn", content: [{ type: "text", text: JSON.stringify({ questions: [
+  { q: "O que você vende e por quanto?", options: ["consultoria de R$ 5 mil", "curso de R$ 497", "", "assinatura", "outro"] },
+  { q: "  " }, { q: "Por onde chega o cliente?", options: ["Meta Ads"] }, { q: "4" }, { q: "5" }
+] }) }] };
+r = await call("POST", "/merlin", { task: "build", context: { kind: "funnel", step: "brief", request: "monta um funil para minha consultoria" } }, cookie);
+body = await r.json();
+check("montagem pergunta antes", r.status === 200 && body.questions.length === 3 && body.questions[0].options.length === 3, JSON.stringify(body));
+check("a pergunta vai no Haiku e conta como conselho", claudeModel === "claude-haiku-5-5/low" && spent(0) === adviceBefore + 1, claudeModel);
+check("a pergunta leva o que importa no funil", /onde a venda fecha/.test(claudeMessages.at(-1).content) && /minha consultoria/.test(claudeAsked));
+claudeAnswer = { stop_reason: "end_turn", content: [{ type: "text", text: JSON.stringify({
+  name: "Consultoria por anúncio", channel: "Meta Ads",
+  stages: [{ nodeType: "ad", title: "anúncio de diagnóstico" }, { nodeType: "cta", title: "botão" }, { nodeType: "lp", title: "página da consultoria", after: "anúncio de diagnóstico" }, { title: "" }],
+  creatives: [{ title: "antes e depois", format: "reels", stage: "anúncio de diagnóstico" }],
+  offers: [{ name: "consultoria 3 meses", price: "5000", type: "combo" }, { price: 10 }],
+  automations: [{ name: "lembrete de call", trigger: "agendou", action: "whatsapp 1h antes" }],
+  triggers: [{ name: "escassez", usage: "5 vagas por mês" }],
+  summary: "funil curto, de anúncio a call"
+}) }] };
+const buildBefore = spent(2);
+r = await call("POST", "/merlin", { task: "build", context: { kind: "funnel", step: "draft", request: "monta um funil para minha consultoria", answers: "O que você vende? consultoria de R$ 5 mil" } }, cookie);
+body = await r.json();
+check("montagem devolve o rascunho do funil", r.status === 200 && body.draft.stages.length === 3 && body.summary === "funil curto, de anúncio a call", JSON.stringify(body).slice(0, 300));
+check("rascunho do funil troca etapa que não existe e formato que não existe", body.draft.stages[1].nodeType === "custom" && body.draft.creatives[0].format === "image");
+check("rascunho do funil limpa a oferta", body.draft.offers.length === 1 && body.draft.offers[0].price === 5000 && body.draft.offers[0].type === "main");
+check("o rascunho vai no Opus e conta na montagem", claudeModel === "claude-opus-5-5/medium" && spent(2) === buildBefore + 1 && spent(0) === adviceBefore + 1, claudeModel);
+check("o rascunho leva as respostas", /consultoria de R\$ 5 mil/.test(claudeAsked));
+r = await call("POST", "/merlin", { task: "build", context: { kind: "funnel", step: "revise", request: "monta um funil", draft: body.draft, change: "tira o botão" } }, cookie);
+body = await r.json();
+check("o ajuste manda o rascunho atual e o pedido", r.status === 200 && /Rascunho atual/.test(claudeAsked) && /anúncio de diagnóstico/.test(claudeAsked) && /Ajuste pedido: tira o botão/.test(claudeAsked) && /AJUSTE/.test(claudeMessages.at(-1).content));
+claudeAnswer = { stop_reason: "end_turn", content: [{ type: "text", text: JSON.stringify({ name: "Lançamento", tree: { title: "lançamento", children: [{ title: "oferta", children: [{ title: "a", children: [{ title: "b", children: [{ title: "fundo demais" }] }] }] }, { title: "" }] } }) }] };
+r = await call("POST", "/merlin", { task: "build", context: { kind: "map", step: "draft", request: "mapa do lançamento" } }, cookie);
+body = await r.json();
+check("rascunho do mapa corta no quarto nível", r.status === 200 && body.draft.tree.children.length === 1 && body.draft.tree.children[0].children[0].children[0].children.length === 0, JSON.stringify(body).slice(0, 300));
+claudeAnswer = { stop_reason: "end_turn", content: [{ type: "text", text: JSON.stringify({ name: "Agenda", pitch: "agenda de salão", features: [{ title: "agendar", phase: "mvp" }] }) }] };
+r = await call("POST", "/merlin", { task: "build", context: { kind: "app", step: "draft", request: "app de agenda para salão" } }, cookie);
+body = await r.json();
+check("rascunho do app sai no formato do projeto, com nome", r.status === 200 && body.draft.name === "Agenda" && body.draft.features.length === 1 && Array.isArray(body.draft.entities), JSON.stringify(body).slice(0, 200));
+check("o rascunho do app pede o nome", /"name":"…","pitch"/.test(claudeMessages.at(-1).content));
+claudeAnswer = { stop_reason: "end_turn", content: [{ type: "text", text: '{"name":"vazio","stages":[]}' }] };
+r = await call("POST", "/merlin", { task: "build", context: { kind: "funnel", step: "draft", request: "x" } }, cookie);
+check("rascunho vazio é erro, não funil vazio", r.status === 502);
+r = await call("POST", "/merlin", { task: "build", context: { kind: "planilha", step: "draft", request: "x" } }, cookie);
+check("montagem recusa o que não sabe montar", r.status === 400);
+r = await call("POST", "/merlin", { task: "build", context: { kind: "map", step: "publicar", request: "x" } }, cookie);
+check("montagem recusa passo que não existe", r.status === 400);
 globalThis.fetch = realFetch;
 /* "da pra fazer com Claude?": a estimativa tem que subir junto, senao o
    veredicto nao teria como falar em minutos */

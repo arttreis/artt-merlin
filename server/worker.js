@@ -1126,7 +1126,8 @@ Object.assign(TEXT_TASKS, {
    conselho: vai no Haiku, com pouco esforco, e numa cota propria, para que
    anotar tarefa nao gaste a vez de pedir conselho. nada e gravado: a tela
    mostra o que entendeu e a pessoa confirma. */
-const CAPTURE_MODEL = "claude-haiku-5-5";
+/* o modelo de quem so le: a linha do inicio e as perguntas antes de montar */
+const QUICK_MODEL = "claude-haiku-5-5";
 const CAPTURE_PER_HOUR = 60;
 const MAX_CAPTURE_ITEMS = 8;
 const CAPTURE_TASKS = {
@@ -1166,6 +1167,128 @@ function cleanCapture(d) {
     });
 }
 
+/* ---------- montar com o Merlin: funil, app e mapa ----------
+   ate 10/10/2026 o Merlin montava essas coisas de uma vez, a partir de uma
+   frase, e tinha que adivinhar o negocio. agora e uma conversa curta, em tres
+   passos que a tela do assistente conduz:
+     brief  → o que falta saber e muda o desenho (no maximo 4 perguntas, com
+              respostas provaveis para clicar), ou nada, quando o pedido basta;
+     draft  → o rascunho inteiro, no formato que a tela sabe gravar;
+     revise → o mesmo rascunho com o ajuste pedido em palavras.
+   nada e gravado aqui: a pessoa ve o rascunho e e ela quem cria.
+   a pergunta vai no Haiku e e o unico passo que conta na cota do conselho —
+   o fluxo inteiro custa uma vez so. rascunho e ajuste vao no Opus e contam
+   numa cota propria, para um ajuste a mais nao tirar a vez de outro conselho
+   e o fluxo ter teto do mesmo jeito. */
+const BUILD_PER_HOUR = 40;
+const MAX_QUESTIONS = 4;
+const NODE_TYPE_SET = new Set(NODE_TYPES.split(", "));
+const BUILD_KINDS = {
+  funnel: {
+    label: "funil de marketing e vendas",
+    matters: "o que é vendido e por quanto, para quem, por onde a pessoa chega (o canal de aquisição), onde a venda fecha (checkout, call, WhatsApp) e se já existe algum número",
+    draft:
+      "Desenhe o funil inteiro, pronto para usar. " +
+      "stages: de 4 a 14 etapas na ordem do fluxo, cada uma com nodeType (exatamente um de " + NODE_TYPES + "), title concreto deste negócio (até 6 palavras, com nome de ferramenta, de página ou de oferta quando der), note (o que acontece ali, até 20 palavras) e after = o title exato da etapa de onde se chega a esta (vazio = a etapa anterior da lista; use para ramos, como o downsell de quem recusou o upsell). " +
+      "Uma etapa é um lugar onde dá para contar quanta gente esteve e qual fração passou adiante — CTA, order bump e remarketing NÃO são etapas: o bump entra em offers e o remarketing em automations. " +
+      "creatives: de 3 a 8 {title, angle (o gancho ou ângulo, até 20 palavras), format (image, video, carousel ou text), stage (o title da etapa onde roda)}; " +
+      "automations: até 8 {name, trigger (quando dispara), action (o que faz), tool (a ferramenta, ou vazio), stage}; " +
+      "offers: de 1 a 5 {name, price (em reais, número; 0 se não souber), type (main, bump, upsell ou downsell), promise (até 25 palavras), guarantee (ou vazio), stage}; " +
+      "triggers: até 6 gatilhos mentais {name, usage (onde e como usar, até 20 palavras), stage}. " +
+      "name = o nome do funil (até 6 palavras); channel = o canal principal, curto. " +
+      "Use os nomes, preços e números que a pessoa deu; o que ela não deu, escolha o mais comum para este tipo de negócio, e nunca invente resultado. " +
+      'Formato: {"name":"…","channel":"…","stages":[{"nodeType":"…","title":"…","note":"…","after":""}],"creatives":[…],"automations":[…],"offers":[…],"triggers":[…],"summary":"…"}'
+  },
+  app: {
+    label: "projeto de app",
+    matters: "quem usa, o problema principal que ele resolve, o que entra na primeira versão e em que plataforma ou stack ele roda",
+    draft: null // o projeto de app usa o mesmo pedido do rascunho da tela de Apps (BLUEPRINT_TASKS.app)
+  },
+  map: {
+    label: "mapa mental",
+    matters: "para que o mapa vai servir (decidir, planejar, estudar, explicar) e o recorte do assunto",
+    draft:
+      "Monte o mapa mental: tree com title (a ideia central), note e children, até 4 níveis; de 3 a 7 ramos no primeiro nível e até 5 nos outros, no máximo 60 nós. " +
+      "Cada title com 2 a 7 palavras; note só quando acrescenta, até 20 palavras. Os ramos de um mesmo nó não se repetem entre si e vêm do mais importante para o menos. " +
+      "name = o nome do mapa (até 6 palavras). " +
+      'Formato: {"name":"…","tree":{"title":"…","note":"","children":[{"title":"…","note":"","children":[]}]},"summary":"…"}'
+  }
+};
+const BUILD_TASKS = {
+  build: (c) => {
+    const k = BUILD_KINDS[c.kind];
+    const step = String(c.step || "");
+    if (!k || !["brief", "draft", "revise"].includes(step)) return null;
+    const context =
+      "Pedido: " + String(c.request || "").slice(0, 1500) + "\n" +
+      (c.answers ? "O que a pessoa respondeu:\n" + String(c.answers).slice(0, 1500) + "\n" : "") +
+      (step === "revise" && c.draft ? "Rascunho atual (JSON):\n" + JSON.stringify(c.draft).slice(0, 24000) + "\n" : "") +
+      (step === "revise" ? "Ajuste pedido: " + String(c.change || "").slice(0, 1000) + "\n" : "");
+    if (step === "brief") {
+      return {
+        instruction:
+          "A pessoa pediu para você montar um " + k.label + ". Antes de montar, decida o que falta saber. " +
+          "Pergunte só o que muda o desenho e que não está no pedido nem no que você já sabe de quem está na tela. O que costuma importar aqui: " + k.matters + ". " +
+          "No máximo " + MAX_QUESTIONS + " perguntas curtas, cada uma com 2 a 4 respostas prováveis (até 6 palavras cada) para a pessoa clicar. " +
+          "Se o pedido já basta para um bom rascunho, devolva questions vazio. " +
+          'Formato: {"questions":[{"q":"…","options":["…","…"]}]}',
+        context
+      };
+    }
+    const draft = k.draft || (BLUEPRINT_TASKS.app({}).instruction.replace(/Formato: \{/, 'Inclua também name (o nome do app, até 4 palavras). Formato: {"name":"…",'));
+    return {
+      instruction:
+        draft + " " +
+        (step === "revise"
+          ? "Este é um AJUSTE: parta do rascunho atual, aplique só o que foi pedido e devolva o rascunho inteiro no mesmo formato; summary diz em uma frase o que mudou."
+          : "summary diz em uma frase o que você montou e por quê."),
+      context
+    };
+  }
+};
+const cleanQuestions = (d) => arr(d && d.questions, MAX_QUESTIONS)
+  .filter((q) => q && String(q.q || "").trim())
+  .map((q) => ({ q: cut(q.q, 200), options: arr(q.options, 4).map((o) => cut(o, 60)).filter(Boolean) }));
+function cleanTree(node, depth, budget) {
+  budget.n--;
+  return {
+    title: cut(node && node.title, 120) || "ideia",
+    note: cut(node && node.note, 300),
+    children: depth >= 4 ? [] : arr(node && node.children, 8)
+      .filter((x) => x && String(x.title || "").trim() && budget.n > 0)
+      .map((x) => cleanTree(x, depth + 1, budget))
+  };
+}
+const OFFER_TYPES = new Set(["main", "bump", "upsell", "downsell"]);
+const CREATIVE_FORMATS = new Set(["image", "video", "carousel", "text"]);
+function cleanDraft(kind, d) {
+  if (kind === "app") return { name: cut(d.name, 120), ...cleanBlueprint(d) };
+  if (kind === "map") return { name: cut(d.name, 120), tree: cleanTree(d.tree || {}, 1, { n: 80 }) };
+  const named = (x, k) => x && String(x[k] || "").trim();
+  return {
+    name: cut(d.name, 120), channel: cut(d.channel, 60),
+    stages: arr(d.stages, 20).filter((s) => named(s, "title")).map((s) => ({
+      nodeType: NODE_TYPE_SET.has(String(s.nodeType)) ? String(s.nodeType) : "custom",
+      title: cut(s.title, 120), note: cut(s.note, 300), after: cut(s.after, 120)
+    })),
+    creatives: arr(d.creatives, 12).filter((x) => named(x, "title")).map((x) => ({
+      title: cut(x.title, 120), angle: cut(x.angle, 300), stage: cut(x.stage, 120),
+      format: CREATIVE_FORMATS.has(String(x.format)) ? String(x.format) : "image"
+    })),
+    automations: arr(d.automations, 12).filter((x) => named(x, "name")).map((x) => ({
+      name: cut(x.name, 120), trigger: cut(x.trigger, 200), action: cut(x.action, 300), tool: cut(x.tool, 60), stage: cut(x.stage, 120)
+    })),
+    offers: arr(d.offers, 8).filter((x) => named(x, "name")).map((x) => ({
+      name: cut(x.name, 120), price: Math.max(0, Math.round((+x.price || 0) * 100) / 100),
+      type: OFFER_TYPES.has(String(x.type)) ? String(x.type) : "main",
+      promise: cut(x.promise, 300), guarantee: cut(x.guarantee, 200), stage: cut(x.stage, 120)
+    })),
+    triggers: arr(d.triggers, 8).filter((x) => named(x, "name")).map((x) => ({
+      name: cut(x.name, 120), usage: cut(x.usage, 300), stage: cut(x.stage, 120)
+    }))
+  };
+}
+
 function extractJson(text) {
   const a = text.indexOf("{"), b = text.lastIndexOf("}");
   if (a < 0 || b <= a) return null;
@@ -1195,34 +1318,46 @@ async function profileOf(env, person) {
   }
 }
 
+const QUOTA = {
+  advice: { slot: 0, limit: ADVICE_PER_HOUR, full: "você já pediu bastante conselho nesta hora; volte daqui a pouco" },
+  capture: { slot: 1, limit: CAPTURE_PER_HOUR, full: "o Merlin já leu bastante nesta hora; o texto segue pela regra" },
+  build: { slot: 2, limit: BUILD_PER_HOUR, full: "você já montou bastante nesta hora; volte daqui a pouco" }
+};
+
 async function advise(req, env, person) {
   if (!env.ANTHROPIC_API_KEY) return fail("o Merlin ainda não tem chave: npx wrangler secret put ANTHROPIC_API_KEY", 503);
   const body = await req.json().catch(() => null);
   const name = String((body && body.task) || "");
-  const task = body && (LIST_TASKS[name] || TEXT_TASKS[name] || BLUEPRINT_TASKS[name] || CAPTURE_TASKS[name]);
+  const task = body && (LIST_TASKS[name] || TEXT_TASKS[name] || BLUEPRINT_TASKS[name] || CAPTURE_TASKS[name] || BUILD_TASKS[name]);
   if (!task || !body.context || typeof body.context !== "object") return fail("tarefa inválida");
   const isText = !!TEXT_TASKS[name];
   const isCapture = !!CAPTURE_TASKS[name];
-  const { instruction, context } = task(body.context);
+  const isBuild = !!BUILD_TASKS[name];
+  const asked = task(body.context);
+  if (!asked) return fail("tarefa inválida");
+  const { instruction, context } = asked;
+  const step = isBuild ? String(body.context.step) : "";
+  const kind = isBuild ? String(body.context.kind) : "";
+  /* ler e perguntar e coisa rapida; montar e pensar */
+  const quick = isCapture || step === "brief";
+  const bucket = isCapture ? "capture" : isBuild && !quick ? "build" : "advice";
 
   /* o teto por pessoa. a chave e uma so para o time, e um botao que chama
      Opus nao pode virar a fatura de todo mundo porque alguem deixou o dedo
      preso. contamos ANTES de perguntar: um pedido que falha la fora tambem
      gastou a nossa vez, e contar depois deixaria a porta aberta em cima do
      erro. o limite e por hora e por pessoa, entao esperar resolve.
-     a captura conta na mesma tabela, com a hora negativa: e outra cota sem
-     precisar de outra tabela. */
-  const hour = Math.floor(Date.now() / 3600e3) * (isCapture ? -1 : 1);
+     sao tres cotas na mesma tabela, cada uma na sua casa da hora (hora × 4 +
+     o balde): o conselho, a leitura do inicio e a montagem. */
+  const slot = Math.floor(Date.now() / 3600e3) * 4 + QUOTA[bucket].slot;
   const used = await env.DB.prepare(
     "SELECT n FROM advice WHERE person = ? AND hour = ?"
-  ).bind(person, hour).first();
-  if (used && used.n >= (isCapture ? CAPTURE_PER_HOUR : ADVICE_PER_HOUR)) {
-    return fail(isCapture ? "o Merlin já leu bastante nesta hora; o texto segue pela regra" : "você já pediu bastante conselho nesta hora; volte daqui a pouco", 429);
-  }
+  ).bind(person, slot).first();
+  if (used && used.n >= QUOTA[bucket].limit) return fail(QUOTA[bucket].full, 429);
   await env.DB.prepare(
     "INSERT INTO advice (person, hour, n) VALUES (?, ?, 1) " +
     "ON CONFLICT(person, hour) DO UPDATE SET n = n + 1"
-  ).bind(person, hour).run();
+  ).bind(person, slot).run();
 
   const r = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
@@ -1232,13 +1367,13 @@ async function advise(req, env, person) {
       "content-type": "application/json"
     },
     body: JSON.stringify({
-      model: isCapture ? CAPTURE_MODEL : MODEL,
+      model: quick ? QUICK_MODEL : MODEL,
       /* o projeto de app inteiro nao cabe em 4000: banco, telas e fluxos de
-         uma vez so */
-      max_tokens: BLUEPRINT_TASKS[name] ? 12000 : isCapture ? 2000 : 4000,
+         uma vez so. o funil inteiro, com criativos e ofertas, tambem nao */
+      max_tokens: BLUEPRINT_TASKS[name] || (isBuild && !quick && kind === "app") ? 12000 : isBuild && !quick ? 8000 : quick ? 2000 : 4000,
       /* sugestao curta nao precisa do maximo de raciocinio: medio segura o
          custo. ler uma linha precisa de menos ainda */
-      output_config: { effort: isCapture ? "low" : "medium" },
+      output_config: { effort: quick ? "low" : "medium" },
       system: SYSTEM + (await profileOf(env, person)),
       messages: buildMessages(name, body.context, instruction, context)
     })
@@ -1254,6 +1389,14 @@ async function advise(req, env, person) {
   if (BLUEPRINT_TASKS[name]) {
     if (!data || typeof data !== "object") return fail("o Merlin respondeu fora do formato", 502);
     return json({ blueprint: cleanBlueprint(data) });
+  }
+  if (isBuild) {
+    if (!data || typeof data !== "object") return fail("o Merlin respondeu fora do formato", 502);
+    if (step === "brief") return json({ questions: Array.isArray(data.questions) ? cleanQuestions(data) : [] });
+    const draft = cleanDraft(kind, data);
+    const empty = kind === "funnel" ? !draft.stages.length : kind === "app" ? !draft.features.length && !draft.entities.length && !draft.screens.length : !draft.tree.children.length;
+    if (empty) return fail("o Merlin devolveu um rascunho vazio; tente de novo", 502);
+    return json({ draft, summary: cut(data.summary, 400) });
   }
   if (isCapture) {
     if (!data || !Array.isArray(data.items)) return fail("o Merlin respondeu fora do formato", 502);

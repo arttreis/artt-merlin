@@ -61,12 +61,14 @@ CREATE INDEX IF NOT EXISTS docs_person_type_v ON docs(person, type, v);
 -- quantos conselhos cada pessoa ja pediu na hora corrente. a chave da
 -- Anthropic e uma so para o time inteiro: sem esta conta, uma pessoa sozinha
 -- gasta o mes de todo mundo, e ninguem descobre antes da fatura.
--- a hora e epoch ms dividido por 3.600.000, entao a linha da hora que passou
+-- a coluna hour guarda a hora (epoch ms dividido por 3.600.000) vezes 4, mais
+-- a cota: 0 o conselho, 1 a leitura do inicio, 2 a montagem (QUOTA, no
+-- worker). sao tres tetos sem tres tabelas. a linha da hora que passou
 -- nunca mais e lida. ninguem apaga, e esta certo assim: sao poucas linhas por
 -- pessoa por dia, e apagar custaria uma escrita a mais em toda chamada.
 CREATE TABLE IF NOT EXISTS advice (
   person  TEXT NOT NULL,
-  hour    INTEGER NOT NULL,         -- epoch ms / 3600000
+  hour    INTEGER NOT NULL,         -- (epoch ms / 3600000) * 4 + cota
   n       INTEGER NOT NULL,
   PRIMARY KEY (person, hour),
   FOREIGN KEY (person) REFERENCES people(id) ON DELETE CASCADE

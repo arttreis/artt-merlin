@@ -31,6 +31,7 @@ import {
   needsReading, isReserve, stripPrefix
 } from "./shared/tasks.js";
 import { MAX_TURNS, normalizeChat, chatTitle, turnsOf } from "./shared/assistant-actions.js";
+import { BUILD, buildIntent } from "./shared/build-intent.js";
 import { normalize as normalizeHabit, isExpected, toggleMark } from "./shared/habits-data.js";
 import { distribute, fmt, longFmt, clock, costOf } from "./shared/day.js";
 import { Forest, phaseOf } from "./shared/forest.jsx";
@@ -260,8 +261,13 @@ function Onboarding({ profile, apps, habits, veteran, onDone }) {
    numa linha, a ação escrita sem duração. ele devolve o que entendeu num
    cartão embaixo do campo, e nada é criado antes do ok. a pergunta não sai
    mais da tela: a resposta aparece no balão do Merlin, lá em cima. sem
-   sessão, sem rede ou se a leitura falhar, vale a regra de antes. */
-const ROUTE_ICON = { task: "check", ask: "spark", note: "pencil", read: "spark" };
+   sessão, sem rede ou se a leitura falhar, vale a regra de antes.
+
+   o pedido de montar ("monta um funil pra consultoria", "quero um app de
+   agenda") não é tarefa nem pergunta: vai para a conversa do assistente, que
+   pergunta o que falta e mostra o rascunho (shared/build.js). a duração
+   continua mandando — "montar o funil 2h" é tarefa de hoje. */
+const ROUTE_ICON = { task: "check", ask: "spark", note: "pencil", read: "spark", build: "spark" };
 const WEEKDAY = ["dom", "seg", "ter", "qua", "qui", "sex", "sáb"];
 
 /* "hoje", "amanhã" ou "sex 17/10": a data do jeito que se confere de relance */
@@ -297,7 +303,8 @@ function Composer({ tasks, b, moment, smart, onAsk, readContext }) {
   const field = useRef(null);
   const date = today();
   const route = routeLine(text);
-  const willRead = smart && needsReading(text, route);
+  const build = route && route.kind !== "task" ? buildIntent(text) : null;
+  const willRead = smart && !build && needsReading(text, route);
 
   const clear = () => {
     setText("");
@@ -343,6 +350,7 @@ function Composer({ tasks, b, moment, smart, onAsk, readContext }) {
   const submit = async () => {
     if (draft) { create(); return; }
     if (!route || reading) return;
+    if (build) { askMerlin(text.trim()); clear(); return; }
     if (route.kind === "ask") { onAsk(route.text); clear(); return; }
     if (!willRead) { byRule(route); return; }
     const said = text;
@@ -367,11 +375,12 @@ function Composer({ tasks, b, moment, smart, onAsk, readContext }) {
     clear();
   };
 
-  const kind = reading || willRead ? "read" : route ? route.kind : "";
+  const kind = build ? "build" : reading || willRead ? "read" : route ? route.kind : "";
   const hint = reading ? "o Merlin está lendo…"
     : draft ? "Enter cria · Esc volta ao texto"
     : !route ? (smart ? "escreva do seu jeito: o Merlin separa tarefa, data, hora e ideia · a pergunta ele responde aqui em cima"
                       : "com a duração (45m, 1h30) entra em hoje · pergunta vai para o Merlin · o resto vira ideia")
+    : build ? "montar o " + BUILD[build].label + " com o Merlin · ele pergunta o que falta e mostra o rascunho"
     : route.kind === "ask" ? (smart ? "perguntar ao Merlin · a resposta aparece lá em cima" : "perguntar ao Merlin")
     : willRead ? "o Merlin lê e mostra o que entendeu antes de criar"
     : route.kind === "task" ? (route.reserved ? "reservar em hoje · " : "pôr em hoje · ") + fmt(route.min) + (route.reserved ? "" : route.min > b.slack ? " · não cabe hoje" : " · cabe")

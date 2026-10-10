@@ -832,5 +832,48 @@ const dataLeft = () => globalThis.localStorage.keys().filter((k) => k in DATA);
   check("github: PR mergeado", gh.prs.length === 1 && gh.prs[0].action === "merged");
 }
 
+/* ---- montar com o Merlin: o pedido, as respostas e o rascunho que vira documento ---- */
+{
+  const B = await import("./build.js?n=" + (++n));
+  check("montar: reconhece o pedido de funil", B.buildIntent("monta um funil pra minha consultoria") === "funnel" && B.buildIntent("Me ajuda a desenhar o funil do curso") === "funnel");
+  check("montar: reconhece mapa e app", B.buildIntent("cria um mapa mental do lançamento") === "map" && B.buildIntent("quero um app de agenda para salão") === "app" && B.buildIntent("desenha o SaaS de cobrança") === "app");
+  check("montar: o que vem primeiro manda", B.buildIntent("monta um mapa do funil de vendas") === "map");
+  check("montar: falar do funil não é pedir um", B.buildIntent("revisar o funil da Ana") === null && B.buildIntent("o app caiu de novo") === null && B.buildIntent("funil") === null);
+  check("montar: as respostas viram linhas, sem as puladas",
+    B.answersText([{ q: "O que vende?" }, { q: "Canal?" }, { q: "Números?" }], { 0: "consultoria", 2: " " }) === "O que vende? consultoria");
+  let k = 0;
+  const id = () => "i" + (++k);
+  const funnel = {
+    name: "Consultoria", channel: "Meta Ads",
+    stages: [
+      { nodeType: "ad", title: "Anúncio", note: "" },
+      { nodeType: "lp", title: "Página", note: "" },
+      { nodeType: "checkout", title: "Checkout", note: "" },
+      { nodeType: "upsell", title: "Mentoria", note: "" },
+      { nodeType: "downsell", title: "Grupo", note: "", after: "checkout" },
+      { nodeType: "inventado", title: "Obrigado", note: "" }
+    ],
+    creatives: [{ title: "antes e depois", format: "video", angle: "x", stage: "anúncio" }],
+    automations: [{ name: "carrinho", trigger: "saiu", action: "e-mail", tool: "", stage: "Checkout" }],
+    offers: [{ name: "consultoria", price: 4997.5, type: "main", promise: "", guarantee: "", stage: "nenhuma" }],
+    triggers: []
+  };
+  const f = B.docFromDraft("funnel", funnel, id);
+  const nodeOf = (t) => f.doc.nodes.find((x) => x.title === t);
+  check("montar: o funil vai para funis e abre nele", f.collection === "funnels" && f.href === "funnels.html#" + f.doc.id);
+  check("montar: a etapa liga na anterior", f.doc.edges.some((e) => e.from === nodeOf("Anúncio").id && e.to === nodeOf("Página").id));
+  check("montar: o ramo liga em quem o Merlin apontou", f.doc.edges.some((e) => e.from === nodeOf("Checkout").id && e.to === nodeOf("Grupo").id) && !f.doc.edges.some((e) => e.to === nodeOf("Grupo").id && e.from === nodeOf("Mentoria").id));
+  check("montar: etapa que não existe vira livre", nodeOf("Obrigado").type === "custom");
+  check("montar: o que pende de etapa acha a dela pelo título", f.doc.creatives[0].node === nodeOf("Anúncio").id && f.doc.automations[0].node === nodeOf("Checkout").id && f.doc.offers[0].node === "");
+  check("montar: o preço vai em centavos", f.doc.offers[0].price === 499750);
+  check("montar: as etapas ganham lugar no palco", new Set(f.doc.nodes.map((x) => x.x + "," + x.y)).size === f.doc.nodes.length);
+  const m = B.docFromDraft("map", { name: "Lançamento", tree: { title: "lançamento", note: "", children: [{ title: "oferta", note: "", children: [] }] } }, id);
+  check("montar: o mapa nasce com ids e abre nele", m.collection === "maps" && m.doc.root.id && m.doc.root.children[0].id && m.doc.root.children[0].title === "oferta");
+  const a = B.docFromDraft("app", { name: "Agenda", pitch: "agenda de salão", features: [{ title: "agendar", phase: "mvp" }], entities: [{ name: "Cliente", fields: [{ name: "nome", type: "text" }] }, { name: "Horário", fields: [{ name: "cliente", type: "ref", ref: "Cliente" }] }], screens: [{ name: "Agenda", entities: ["Horário"] }], flows: [] }, id);
+  const cliente = a.doc.entities.find((e) => e.name === "Cliente");
+  check("montar: o app resolve nome em id", a.collection === "apps" && a.doc.name === "Agenda" && a.doc.entities[1].fields.some((x) => x.type === "ref" && x.ref === cliente.id), JSON.stringify(a.doc.entities[1].fields));
+  check("montar: a carta do funil resume", B.draftView("funnel", funnel).lines[0].text.startsWith("Anúncio → Página") && B.draftView("funnel", funnel).lines[1].text === "consultoria · R$ 4.997,50", B.draftView("funnel", funnel).lines[1].text);
+}
+
 console.log("\n" + passed + " passaram, " + failures.length + " falharam");
 if (failures.length) { console.log("\nFALHAS:"); failures.forEach((f) => console.log("  - " + f)); process.exit(1); }
