@@ -861,3 +861,46 @@ O Arthur, depois da seção 9: ainda não era um assistente pessoal. Agora o **i
 - **revisão da semana** (sexta à noite até domingo) e **do mês** (três últimos dias), na coleção `reviews`;
 - **a floresta** (`shared/forest.jsx`), escolhida entre quatro temas, acompanha a hora;
 - **dock embaixo no lugar da barra lateral**, com o início, as seis seções e o "+".
+
+---
+
+## 11. O que veio do Promethee (10/10/2026)
+
+O Arthur pediu para estudar o Promethee (um app de foco instalado na máquina dele) e trazer o
+que servisse. A leitura dos textos da interface dele mostrou sete pilares: a sessão de foco
+como unidade, um mentor de IA que sabe o que você fez, rastreamento automático de apps, uma
+camada de jogo (XP, ligas, temporadas, cartas), metas de horas e teto de reunião, guildas e
+um ambiente com som e paisagem.
+
+**Entrou:**
+
+- **A sessão de foco** (`shared/focus.js`). Começa na tarefa da vez — no rastreador ou no
+  início — e termina com um **recibo**: quanto levou contra o que você estimou. É o que o
+  Merlin tem e o Promethee não: a estimativa é o que faz a sobra do dia ser honesta, e a
+  sessão diz se ela estava certa. Uma sessão por vez; a coleção é `sessions`.
+- **A meta de horas e o teto de reunião** (perfil, "o seu ritmo"). O foco da semana é a soma
+  das sessões; a reunião da semana são as reservas com cara de reunião (a mesma lista que faz
+  "daily" virar reserva). O teto é limite, não meta: passar dele tira o destaque, como o dia
+  que estoura — não há vermelho.
+- **O GitHub**, só o público e só leitura. O navegador lê os eventos do usuário direto da
+  `api.github.com` — nada passa pelo servidor e nenhum token é guardado. Os commits e PRs do
+  dia aparecem no início ("entregue hoje"), no fechamento do dia e na fala do Merlin.
+  Repositório privado fica de fora até existir um token opcional.
+
+**Ficou de fora, de propósito:**
+
+- **XP, ligas, temporadas e cartas.** Brigam com o princípio do número neutro: ranking de horas
+  premia esticar o dia, e o Merlin existe para fazer o dia caber. A sequência de dias fechados
+  é a única recompensa.
+- **Som ambiente.** O Arthur preferiu sem.
+- **Rastreamento automático de apps e abas, e bloqueio de sites.** Invasivos e dependentes de
+  permissão de sistema; se vierem, vêm opcionais e só no app de desktop.
+
+**Mapeado para depois: as guildas.** No Promethee, uma guilda é um grupo pequeno que foca
+junto — fundadores, uma turma, o time do standup —, com página própria, painel da semana,
+chat, convites, moderação e um placar do grupo. É a forma do "lugar onde as pessoas entram
+para trabalhar" da seção 8.5, e cabe na regra de uma pessoa por vez (8.4) se ficar em **ver e
+publicar**: a guilda vê que você está em sessão, quanto focou na semana e o que entregou; ela
+nunca escreve no seu dia, no seu cliente nem no seu financeiro. O que precisa existir antes:
+perfil público (o que de você outra pessoa pode ver), sessões públicas como opção por sessão,
+e o feed. O placar, se existir, mede dias fechados, e não horas.

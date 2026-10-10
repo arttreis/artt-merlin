@@ -28,6 +28,7 @@ import { normalize as normalizeTask, dayDoc, overdue, topOrder, newTask, readLin
 import { normalize as normalizeHabit, isExpected, toggleMark } from "./shared/habits-data.js";
 import { distribute, fmt, longFmt, clock, costOf } from "./shared/day.js";
 import { Forest, phaseOf } from "./shared/forest.jsx";
+import { runningOf, minutesOf, receipt, focusMinutes, meetingMinutes, githubDay } from "./shared/focus.js";
 
 const door = isNewHere() && !seen("landing");
 initPage("home");
@@ -124,6 +125,7 @@ const STEPS = [
   { key: "name", ask: () => "Oi. Eu sou o Merlin. Vou te ajudar a fazer o dia caber — e, para isso, preciso te conhecer. Como posso te chamar?", placeholder: "seu nome", required: true },
   { key: "work", ask: (a) => "Prazer, " + a.name + ". Com o que você trabalha?", placeholder: "ex.: sou dev, faço SaaS sozinho e atendo dois clientes" },
   { key: "building", ask: () => "E o que você está construindo agora? Me diz o nome e, se quiser, uma frase.", placeholder: "ex.: Agenda do salão — agendamento pelo WhatsApp" },
+  { key: "github", ask: () => "Se você usa GitHub, qual é o seu usuário? Eu leio o que você entregar no dia — só o que é público, sem senha nem token.", placeholder: "ex.: arttreis" },
   { key: "window", ask: () => "Que horas o seu dia de trabalho começa e termina?", placeholder: "ex.: 9 às 18" },
   { key: "habit", ask: () => "Um hábito que você quer manter todo dia?", placeholder: "ex.: treinar, ler 20 páginas, dormir 7h" }
 ];
@@ -154,6 +156,11 @@ function Onboarding({ profile, apps, habits, onDone }) {
       apps.save(app);
       saveProfile({ building: value });
       return "criei o produto “" + app.name + "” em Produtos";
+    }
+    if (key === "github") {
+      const login = value.replace(/^@/, "").replace(/^https?:\/\/github\.com\//, "").split(/[/\s]/)[0];
+      saveProfile({ github: login });
+      return "vou ler o que você entregar em github.com/" + login;
     }
     if (key === "window") {
       const w = parseWindow(value);
@@ -298,7 +305,7 @@ function Composer({ tasks, b, moment }) {
    a pergunta da noite tem forma: o que ficou aberto hoje passa uma a uma —
    feito, amanhã ou largar — e depois o "como foi o dia". só então o dia
    conta na sequência. nada rola sozinho: é a pessoa que decide cada uma. */
-function Closing({ tasks, journal, closes, date, onClose }) {
+function Closing({ tasks, journal, closes, date, onClose, gh }) {
   const doc = dayDoc(tasks.all(), date, readPrefs());
   const open = doc.tasks.filter((t) => !t.done && !t.reserved);
   const [fate, setFate] = useState({});
@@ -340,6 +347,9 @@ function Closing({ tasks, journal, closes, date, onClose }) {
               </li>
             ))}
           </ul>
+        )}
+        {gh && (gh.commits.length > 0 || gh.prs.length > 0) && (
+          <p className="cl__shipped">no GitHub hoje: <b>{gh.commits.length} {gh.commits.length === 1 ? "commit" : "commits"}</b> e <b>{gh.prs.length} {gh.prs.length === 1 ? "PR" : "PRs"}</b></p>
         )}
         <label className="cl__journal">
           <span>e como foi o dia?</span>
@@ -387,7 +397,23 @@ function Review({ reviews, due }) {
 /* ================================================================
    os blocos do hoje
    ================================================================ */
-function DayCard({ tasks, doc, b, slots, cut }) {
+function DayCard({ tasks, doc, b, slots, cut, sessions }) {
+  const running = runningOf(sessions.all());
+  const [slip, setSlip] = useState(null);
+  const start = (t) => {
+    const cur = runningOf(sessions.all());
+    if (cur) sessions.save({ ...cur, end: Date.now(), updatedAt: Date.now() });
+    const at = Date.now();
+    sessions.save({ id: newId(), task: t.id, title: t.title, start: at, end: null, planned: t.min || 0, createdAt: at, updatedAt: at });
+    setSlip(null);
+  };
+  const stop = () => {
+    const cur = runningOf(sessions.all());
+    if (!cur) return;
+    const done = { ...cur, end: Date.now(), updatedAt: Date.now() };
+    sessions.save(done);
+    setSlip({ ...receipt(done), title: cur.title });
+  };
   const open = b.open;
   const done = doc.tasks.filter((t) => t.done && !t.reserved).length;
   const width = (min) => ({ flex: "0 0 " + ((min / b.window) * 100) + "%" });
@@ -412,15 +438,63 @@ function DayCard({ tasks, doc, b, slots, cut }) {
           {b.committed < b.remaining && <i className="is-free" />}
         </div>
       )}
+      {running && (
+        <p className="hm-focus"><i className="hm-focus__dot" />em foco · <b>{running.title}</b> <span className="t-mono">{longFmt(minutesOf(running))}{running.planned ? " / " + fmt(running.planned) : ""}</span>
+          <button type="button" className="pill" onClick={stop}>parar</button></p>
+      )}
+      {slip && <p className="hm-slip">{slip.title} levou <b className="t-mono">{longFmt(slip.took)}</b>{slip.planned ? " de " + fmt(slip.planned) + " · " + slip.verdict : ""} <button type="button" onClick={() => setSlip(null)}>ok</button></p>}
       <ul className="hm-list">
         {open.slice(0, 6).map((t, i) => (
           <li key={t.id} className={cut >= 0 && i >= cut ? "is-out" : ""}>
             <button type="button" className="hm-check" aria-label={"Concluir " + t.title} onClick={() => complete(t)} />
             <span className="hm-list__title">{t.title}</span>
             <span className="t-mono hm-list__min">{fmt(costOf(t))}</span>
+            {(!running || running.task !== t.id) && (
+              <button type="button" className="hm-play" title="começar uma sessão de foco" aria-label={"Começar " + t.title} onClick={() => start(t)}>
+                <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5.5v13l10.5-6.5z" /></svg>
+              </button>
+            )}
           </li>
         ))}
         {!open.length && <li className="hm-empty">nada na fila — escreva acima o que precisa caber</li>}
+      </ul>
+    </section>
+  );
+}
+
+/* a semana: foco contra a meta, reunião contra o teto. o teto é limite, não
+   meta — passar dele tira o destaque, do mesmo jeito que o dia que estoura */
+function WeekCard({ me, sessions, tasks, date }) {
+  const focus = focusMinutes(sessions.all(), date);
+  const meet = meetingMinutes(tasks.all(), date);
+  const goal = (+me.focusGoal || 0) * 60, cap = (+me.meetingCap || 0) * 60;
+  const bar = (v, max) => ({ width: Math.min(100, max ? (v / max) * 100 : 0) + "%" });
+  return (
+    <section className="hm-card">
+      <p className="hm-card__head">{NAV_ICONS.week}a semana<a href="profile.html" className="hm-card__go" aria-label="Mudar a meta e o teto">{icon("arrow")}</a></p>
+      <div className="hm-meter">
+        <span>foco</span><b className="t-mono">{longFmt(focus)}{goal ? " de " + fmt(goal) : ""}</b>
+        {goal ? <i className="hm-meter__bar"><i style={bar(focus, goal)} /></i> : <a href="profile.html">definir a meta de horas</a>}
+      </div>
+      <div className="hm-meter" data-over={cap && meet > cap ? "yes" : "no"}>
+        <span>reunião</span><b className="t-mono">{longFmt(meet)}{cap ? " · teto " + fmt(cap) : ""}</b>
+        {cap ? <i className="hm-meter__bar"><i style={bar(meet, cap)} /></i> : <a href="profile.html">definir o teto de reunião</a>}
+      </div>
+    </section>
+  );
+}
+
+function ShippedCard({ gh, login }) {
+  const items = gh ? [...gh.prs.map((p) => ({ k: "PR " + (p.action === "merged" ? "mergeado" : p.action === "opened" ? "aberto" : p.action), t: p.title, r: p.repo })), ...gh.commits.map((c) => ({ k: "commit", t: c.message, r: c.repo }))] : [];
+  return (
+    <section className="hm-card">
+      <p className="hm-card__head">{NAV_ICONS.apps}entregue hoje <span className="hm-card__aside t-mono">{gh ? gh.commits.length + " commits · " + gh.prs.length + " PRs" : ""}</span>
+        <a href={"https://github.com/" + encodeURIComponent(login)} target="_blank" rel="noreferrer" className="hm-card__go" aria-label="Abrir o GitHub">{icon("arrow")}</a></p>
+      <ul className="hm-list">
+        {items.slice(0, 6).map((x, i) => (
+          <li key={i}><span className="t-mono hm-list__at">{x.k}</span><span className="hm-list__title">{x.t}</span><span className="t-mono hm-list__min">{x.r}</span></li>
+        ))}
+        {!items.length && <li className="hm-empty">{gh ? "nada público no GitHub hoje ainda" : "lendo o GitHub…"}</li>}
       </ul>
     </section>
   );
@@ -473,6 +547,33 @@ function AgendaCard({ doc }) {
 }
 
 /* ================================================================
+   o GitHub do dia (VISAO, 11)
+   ================================================================
+   o navegador lê os eventos públicos do usuário direto da api.github.com —
+   nada passa pelo servidor e nenhum token é guardado. uma leitura por hora
+   (a API sem token aceita 60 por hora por IP), guardada no navegador. */
+const GH_KEY = "merlin:github";
+function useGithub(login, day) {
+  const [data, setData] = useState(() => {
+    try { const c = JSON.parse(localStorage.getItem(GH_KEY)); return c && c.login === login && c.day === day ? c : null; } catch (e) { return null; }
+  });
+  useEffect(() => {
+    if (!login) return;
+    if (data && data.login === login && data.day === day && Date.now() - data.at < 3600e3) return;
+    fetch("https://api.github.com/users/" + encodeURIComponent(login) + "/events/public?per_page=100")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((events) => {
+        if (!events) return;
+        const d = { login, day, at: Date.now(), ...githubDay(events, day) };
+        setData(d);
+        try { localStorage.setItem(GH_KEY, JSON.stringify(d)); } catch (e) {}
+      })
+      .catch(() => {});
+  }, [login, day]);
+  return data && data.login === login && data.day === day ? data : null;
+}
+
+/* ================================================================
    a fala do Merlin
    ================================================================
    a pergunta do alto é fixa; embaixo dela o Merlin fala do dia de VERDADE —
@@ -513,13 +614,14 @@ function Home() {
   const closes = useCollection("closes");
   const reviews = useCollection("reviews");
   const apps = useCollection("apps");
+  const sessions = useCollection("sessions");
   useCollection("prefs");
   const [, tick] = useState(0);
   useEffect(() => { const t = setInterval(() => tick((n) => n + 1), 30000); return () => clearInterval(t); }, []);
-  const [closing, setClosing] = useState(false);
   const [, redraw] = useState(0);
 
   const me = profile.get("me");
+  const gh = useGithub(me && me.github, today());
   const h = hourNow();
   const phase = phaseOf(h);
   const date = today();
@@ -532,7 +634,15 @@ function Home() {
       </div>
     );
   }
+  return <Today c={c} tasks={tasks} habits={habits} journal={journal} closes={closes} reviews={reviews}
+                apps={apps} sessions={sessions} me={me} gh={gh} h={h} phase={phase} date={date} />;
+}
 
+/* o dia de quem já passou pelo onboarding. é um componente à parte porque o
+   onboarding volta antes: os hooks daqui (a fala do Merlin) não podem
+   aparecer de repente no meio do mesmo componente quando ele termina */
+function Today({ c, tasks, habits, journal, closes, reviews, apps, sessions, me, gh, h, phase, date }) {
+  const [closing, setClosing] = useState(false);
   const moment = momentOf(h);
   const doc = dayDoc(tasks.all(), date, readPrefs());
   const { b, slots, cut } = distribute(doc);
@@ -551,7 +661,10 @@ function Home() {
     late,
     habits: habits.all().filter((x) => !x.archived && isExpected(x, date)).map((x) => x.name + (x.marks[date] ? " (feito)" : "")),
     streak,
-    products: apps.all().map((a) => a.name).slice(0, 5)
+    products: apps.all().map((a) => a.name).slice(0, 5),
+    github: gh ? [...gh.prs.map((p) => "PR " + p.action + ": " + p.title), ...gh.commits.map((c) => c.repo + ": " + c.message)].slice(0, 12) : [],
+    focusWeek: fmt(focusMinutes(sessions.all(), date)) + (me.focusGoal ? " de " + me.focusGoal + "h" : ""),
+    meetingWeek: fmt(meetingMinutes(tasks.all(), date)) + (me.meetingCap ? " (teto " + me.meetingCap + "h)" : "")
   }));
 
   return (
@@ -578,13 +691,15 @@ function Home() {
 
       <p className="hm-label t-mono">hoje</p>
       <div className="hm-grid">
-        <DayCard tasks={tasks} doc={doc} b={b} slots={slots} cut={cut} />
+        <DayCard tasks={tasks} doc={doc} b={b} slots={slots} cut={cut} sessions={sessions} />
         <HabitsCard habits={habits} date={date} />
         <AgendaCard doc={doc} />
+        <WeekCard me={me} sessions={sessions} tasks={tasks} date={date} />
+        {me.github && <ShippedCard gh={gh} login={me.github} />}
         {due.map((d) => <Review key={d.id} reviews={reviews} due={d} />)}
       </div>
 
-      {closing && <Closing tasks={tasks} journal={journal} closes={closes} date={date} onClose={() => setClosing(false)} />}
+      {closing && <Closing tasks={tasks} journal={journal} closes={closes} date={date} gh={gh} onClose={() => setClosing(false)} />}
     </div>
   );
 }

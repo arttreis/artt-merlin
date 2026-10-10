@@ -196,3 +196,28 @@ html.bare body::before,html.bare body::after{opacity:0}
 html:has(.hm) body{overflow-x:clip}
 .hm-hero__merlin{display:flex;align-items:flex-start;gap:8px;max-width:620px;margin:14px auto 0;padding:10px 14px;border-radius:14px;text-align:left;font-size:13.5px;line-height:1.5;color:#fff;background:rgba(10,12,20,.42);border:1px solid rgba(255,255,255,.12);backdrop-filter:blur(8px)}
 .hm-hero__merlin svg{flex:none;width:14px;height:14px;margin-top:3px;color:var(--accent)}
+
+/* ---------- a sessão de foco, a semana e o GitHub (VISAO, 11) ---------- */
+.hm-play{flex:none;width:22px;height:22px;border-radius:50%;display:grid;place-items:center;color:var(--ink-30);opacity:0;transition:opacity var(--t),background var(--t),color var(--t)}
+.hm-list li:hover .hm-play,.hm-play:focus-visible{opacity:1}
+.hm-play:hover{background:var(--accent);color:var(--on-accent)}
+.hm-play svg{width:10px;height:10px;margin-left:1px}
+@media (hover:none){.hm-play{opacity:1}}
+.hm-focus{display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin:0 0 10px;padding:8px 10px;border-radius:var(--br2);border:1px solid var(--accent);font-size:12.5px;color:var(--ink-50)}
+.hm-focus b{color:var(--ink);font-weight:500}
+.hm-focus .pill{margin-left:auto;height:26px}
+.hm-focus__dot{width:8px;height:8px;border-radius:50%;background:var(--accent);animation:hm-pulse 1.6s ease-in-out infinite}
+@keyframes hm-pulse{0%,100%{opacity:1}50%{opacity:.35}}
+@media (prefers-reduced-motion:reduce){.hm-focus__dot{animation:none}}
+.hm-slip{margin:0 0 10px;padding:8px 10px;border-radius:var(--br2);background:var(--fill);font-size:12.5px;color:var(--ink-50)}
+.hm-slip b{color:var(--ink);font-weight:500}
+.hm-slip button{margin-left:6px;font-size:12px;color:var(--ink-70);text-decoration:underline}
+.hm-meter{display:grid;grid-template-columns:auto 1fr;gap:4px 10px;align-items:baseline;margin-bottom:12px;font-size:12.5px;color:var(--ink-50)}
+.hm-meter b{justify-self:end;font-weight:500;font-size:12px;color:var(--ink)}
+.hm-meter a{grid-column:1 / -1;font-size:12px;color:var(--ink-50);text-decoration:underline}
+.hm-meter__bar{grid-column:1 / -1;display:block;height:6px;border-radius:100px;background:var(--fill-hover);overflow:hidden}
+.hm-meter__bar i{display:block;height:100%;background:var(--accent);border-radius:100px}
+/* o teto que estoura: o destaque some, como no dia — não há vermelho */
+.hm-meter[data-over="yes"] .hm-meter__bar i{background:repeating-linear-gradient(45deg,var(--ink-30) 0 3px,transparent 3px 6px)}
+.cl__shipped{margin:0 0 14px;font-size:13px;color:var(--ink-50)}
+.cl__shipped b{color:var(--ink);font-weight:500}

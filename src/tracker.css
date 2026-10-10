@@ -115,3 +115,15 @@ html.tracker .notice{top:4px;bottom:auto;max-width:calc(100vw - 20px);font-size:
 }
 .tk-chip:hover{background:var(--fill-hover);color:var(--ink)}
 .tk-chip[data-fits="no"]{color:var(--ink-30)}
+
+/* ---------- a sessão de foco (VISAO, 11) ---------- */
+.tk-n--focus{color:var(--accent)}
+.tk-play{flex:none;display:grid;place-items:center;width:26px;height:26px;border-radius:50%;background:var(--accent);color:var(--on-accent)}
+.tk-play svg{width:12px;height:12px;margin-left:1px}
+.tk-now--focus{border-color:var(--accent)}
+.tk-pulse{flex:none;width:9px;height:9px;margin-left:4px;border-radius:50%;background:var(--accent);animation:tk-pulse 1.6s ease-in-out infinite}
+@keyframes tk-pulse{0%,100%{opacity:1}50%{opacity:.35}}
+@media (prefers-reduced-motion:reduce){.tk-pulse{animation:none}}
+.tk-slip{display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:8px 10px;border-radius:var(--br3);background:var(--fill);font-size:12px;color:var(--ink-50)}
+.tk-slip__text{flex:1 1 180px;min-width:0}
+.tk-slip b{color:var(--ink);font-weight:500}

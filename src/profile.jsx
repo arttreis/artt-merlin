@@ -38,6 +38,34 @@ const THEMES = [
   { id: "dark", label: "escuro" }
 ];
 
+/* o que o Merlin usa para medir a semana e para saber o que você entregou:
+   a meta de horas de foco, o teto de reunião e o usuário do GitHub. mora no
+   perfil (profile/me), o mesmo documento que o onboarding cria */
+function Rhythm() {
+  const profile = collection("profile");
+  const me = profile.get("me") || { id: "me", createdAt: Date.now() };
+  const [v, setV] = useState({ github: me.github || "", focusGoal: me.focusGoal || "", meetingCap: me.meetingCap || "" });
+  const save = (e) => {
+    e.preventDefault();
+    const num = (x) => { const n = Math.round(+String(x).replace(",", ".") || 0); return n > 0 && n <= 120 ? n : ""; };
+    profile.save({ ...me, github: v.github.trim().replace(/^@/, ""), focusGoal: num(v.focusGoal), meetingCap: num(v.meetingCap), updatedAt: Date.now() });
+    notify("ritmo guardado");
+  };
+  const bind = (k) => ({ value: v[k], onChange: (e) => setV({ ...v, [k]: e.currentTarget.value }) });
+  return (
+    <section className="block col-12">
+      <p className="heading"><span className="t-mono">o seu ritmo</span></p>
+      <p className="note">A semana do início mede o foco contra a meta e a reunião contra o teto. O teto é um limite: a semana boa fica abaixo dele.</p>
+      <form className="pf-rhythm" onSubmit={save}>
+        <label><span>meta de foco por semana</span><input className="input" inputMode="numeric" placeholder="ex.: 25" {...bind("focusGoal")} /><small>horas</small></label>
+        <label><span>teto de reunião por semana</span><input className="input" inputMode="numeric" placeholder="ex.: 6" {...bind("meetingCap")} /><small>horas</small></label>
+        <label><span>usuário do GitHub</span><input className="input" placeholder="ex.: arttreis" {...bind("github")} /><small>só o público</small></label>
+        <button className="pill pill--accent" type="submit">guardar</button>
+      </form>
+    </section>
+  );
+}
+
 function Profile() {
   const c = useCloud();
   /* o tema nao mora em estado: mora na classe do <html>, e o core e quem
@@ -136,6 +164,9 @@ function Profile() {
             )}
           </div>
         </section>
+
+        {/* ---------- o ritmo (VISAO, 11) ---------- */}
+        <Rhythm />
 
         {/* ---------- o que está guardado ---------- */}
         <section className="block col-12">

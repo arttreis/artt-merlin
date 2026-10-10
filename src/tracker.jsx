@@ -21,7 +21,8 @@
    sempre aberta e nao tem bandeja nem botao de esconder. */
 import "./shared/base.css";
 import "./tracker.css";
-import { initPage, today, notify, readPrefs, readDuration, currentBrand } from "./shared/core.js";
+import { initPage, today, notify, readPrefs, readDuration, currentBrand, newId } from "./shared/core.js";
+import { runningOf, minutesOf, receipt } from "./shared/focus.js";
 import { useState, useEffect, useLayoutEffect, useRef } from "react";
 import { mount, useCollection } from "./shared/ui.jsx";
 import { LOGO, GL_MARK } from "./shared/icons.jsx";
@@ -50,6 +51,16 @@ function Tracker() {
   const store = useCollection("tasks", { normalize });
   useCollection("prefs"); /* a janela do dia mudou no outro lugar: redesenha */
   const [, setTick] = useState(0);
+  /* a sessão de foco (VISAO, 11): começa na tarefa da vez, e o fim dá o
+     recibo — quanto levou contra o que você estimou */
+  const sessions = useCollection("sessions");
+  const running = runningOf(sessions.all());
+  const [slip, setSlip] = useState(null);   /* o recibo da sessão que acabou */
+  useEffect(() => {
+    if (!running) return;
+    const id = setInterval(() => setTick((n) => n + 1), 1000);
+    return () => clearInterval(id);
+  }, [!!running]);
   const desktop = isDesktop();
   const [compact, setCompact] = useState(desktop);
   const root = useRef(null);
@@ -117,7 +128,9 @@ function Tracker() {
   const late = overdue(all, date).length;
 
   /* a bandeja repete o numero grande, para quem nem abriu esta janela */
-  const status = "merlin · " + m.n + " " + m.label + (now ? " · agora: " + now.title : "");
+  const status = running
+    ? "merlin · em foco " + fmt(minutesOf(running)) + " · " + running.title
+    : "merlin · " + m.n + " " + m.label + (now ? " · agora: " + now.title : "");
   useEffect(() => { setStatus(status); }, [status]);
 
   const create = (spec) => {
@@ -131,6 +144,19 @@ function Tracker() {
       const back = store.get(t.id);
       if (back && back.done) store.save({ ...back, done: false, updatedAt: Date.now() });
     });
+  };
+  const start = (t) => {
+    if (running) stop();
+    const at = Date.now();
+    sessions.save({ id: newId(), task: t.id, title: t.title, start: at, end: null, planned: t.min || 0, createdAt: at, updatedAt: at });
+    setSlip(null);
+  };
+  const stop = () => {
+    const cur = runningOf(sessions.all());
+    if (!cur) return;
+    const done = { ...cur, end: Date.now(), updatedAt: Date.now() };
+    sessions.save(done);
+    setSlip({ ...receipt(done), task: cur.task, title: cur.title });
   };
   const toDay = (e) => { if (desktop) { e.preventDefault(); openMain(DAY_PATH); } };
 
@@ -146,8 +172,9 @@ function Tracker() {
         <div className="tk-strip" data-tauri-drag-region>
           <span className="tk-grip" data-tauri-drag-region title="arraste para mudar de lugar">{mark}</span>
           <button className="tk-peek" type="button" onClick={() => expand(false)} title="abrir (Alt+Shift+M)">
-            <span className="tk-n" data-tone={m.tone}>{m.n}</span>
-            <span className="tk-peek__text">{now ? now.title : m.label}</span>
+            {running
+              ? <><span className="tk-n tk-n--focus">{timer(running)}</span><span className="tk-peek__text">em foco · {running.title}</span></>
+              : <><span className="tk-n" data-tone={m.tone}>{m.n}</span><span className="tk-peek__text">{now ? now.title : m.label}</span></>}
           </button>
           <button className="tk-btn" type="button" onClick={() => expand(true)} title="abrir e escrever (Alt+Shift+M)" aria-label="Abrir o rastreador">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M6 15l6-6 6 6" /></svg>
@@ -186,11 +213,34 @@ function Tracker() {
 
       <Track b={b} slots={slots} />
 
-      {now ? (
+      {slip && (
+        <div className="tk-slip">
+          <span className="tk-slip__text">
+            <b>{slip.title}</b> levou <b className="t-mono">{longFmt(slip.took)}</b>
+            {slip.planned ? <> de {fmt(slip.planned)} estimados · {slip.verdict}</> : null}
+          </span>
+          {store.get(slip.task) && !store.get(slip.task).done && (
+            <button type="button" className="tk-chip" onClick={() => { complete(store.get(slip.task)); setSlip(null); }}>concluir</button>
+          )}
+          <button type="button" className="tk-chip" onClick={() => setSlip(null)}>ok</button>
+        </div>
+      )}
+
+      {running ? (
+        <div className="tk-now tk-now--focus">
+          <span className="tk-pulse" aria-hidden="true" />
+          <span className="tk-title">{running.title}</span>
+          <span className="tk-min t-mono">{timer(running)}{running.planned ? " / " + fmt(running.planned) : ""}</span>
+          <button type="button" className="tk-chip" onClick={stop}>parar</button>
+        </div>
+      ) : now ? (
         <div className={"tk-now" + (cut === 0 ? " is-out" : "")} title={range(now)}>
           <button className="tk-check" type="button" onClick={() => complete(now)} title="concluir" aria-label={"Concluir " + now.title} />
           <span className="tk-title">{now.title}</span>
           <span className="tk-min t-mono">{now.min ? fmt(now.min) : "~" + fmt(guessMin())}</span>
+          <button type="button" className="tk-play" onClick={() => start(now)} title="começar uma sessão de foco" aria-label={"Começar " + now.title}>
+            <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5.5v13l10.5-6.5z" /></svg>
+          </button>
         </div>
       ) : (
         <p className="tk-none">nada na fila de hoje</p>
@@ -211,6 +261,13 @@ function Tracker() {
       <Composer b={b} onCreate={create} onLeave={desktop ? () => setCompact(true) : null} />
     </div>
   );
+}
+
+/* o cronômetro da sessão: mm:ss até a primeira hora, depois h:mm */
+function timer(s) {
+  const sec = Math.max(0, Math.floor((Date.now() - s.start) / 1000));
+  const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), x = sec % 60;
+  return h ? h + ":" + String(m).padStart(2, "0") : String(m).padStart(2, "0") + ":" + String(x).padStart(2, "0");
 }
 
 /* a barra, do mesmo jeito que o calendario a desenha: tudo e % da mesma

@@ -811,7 +811,7 @@ const TEXT_TASKS = {
       ({ start: "É o começo do dia: ajude a decidir o que precisa caber, apontando o que parece mais importante ou o que não vai caber.",
          during: "É o meio do dia: diga como o dia está andando frente ao que sobra, e qual a próxima coisa a atacar.",
          close: "É o fim do dia: ajude a fechar — reconheça o que andou e diga o que fazer com o que ficou aberto." }[String(c.moment)] || "") +
-      " Use os títulos reais da fila. Se a sequência de dias fechados for boa, reconheça em poucas palavras. Nunca invente tarefas ou números. " +
+      " Use os títulos reais da fila. Se houver entregas no GitHub, reconheça-as pelo nome no fim do dia. Se a reunião da semana passou do teto, diga sem drama. Se a sequência de dias fechados for boa, reconheça em poucas palavras. Nunca invente tarefas ou números. " +
       'Formato: {"text":"…"}',
     context:
       "Momento: " + String(c.moment || "").slice(0, 10) + " · hora " + String(c.hour || "").slice(0, 5) + "\n" +
@@ -821,7 +821,10 @@ const TEXT_TASKS = {
       (+c.late ? "Abertas de dias anteriores: " + Math.round(+c.late) + "\n" : "") +
       "Hábitos de hoje: " + listOf(c.habits) + "\n" +
       "Dias seguidos fechando o dia: " + Math.round(+c.streak || 0) + "\n" +
-      (Array.isArray(c.products) && c.products.length ? "Produtos em construção: " + listOf(c.products) + "\n" : "")
+      (Array.isArray(c.products) && c.products.length ? "Produtos em construção: " + listOf(c.products) + "\n" : "") +
+      (Array.isArray(c.github) && c.github.length ? "Entregue hoje no GitHub:\n" + linesOf(c.github, 12) + "\n" : "") +
+      (c.focusWeek ? "Foco na semana: " + String(c.focusWeek).slice(0, 40) + "\n" : "") +
+      (c.meetingWeek ? "Reunião na semana: " + String(c.meetingWeek).slice(0, 40) + "\n" : "")
   }),
   /* a semana: o que fechou, o que ficou, por cliente */
   week: (c) => ({
