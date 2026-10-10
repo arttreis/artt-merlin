@@ -282,6 +282,20 @@ export function routeLine(text) {
   return title ? { kind: "note", title, client: m.client || "" } : null;
 }
 
+/* quando a regra sozinha não basta (o campo da home, desde 10/10/2026): o
+   que ela mandaria para ideias, a data escrita por extenso e duas durações
+   na mesma linha vão antes para o Merlin ler. a pergunta não passa por aqui
+   — ela já tem destino. o resto (uma tarefa com duração e sem data) segue
+   na hora, sem rede, como sempre foi. */
+const DATE_RE = /(?:^|\s)(?:amanh[ãa]|segunda|ter[çc]a|quarta|quinta|sexta|s[áa]bado|domingo|semana que vem|pr[óo]xima semana|dia \d{1,2}(?!\d)|[àa]s \d{1,2}(?:h|:\d{2}))/i;
+const DURATIONS_RE = /(?:^|\s)\d+\s*(?:h\d*|min|m)(?=$|[\s,.;])/gi;
+export function needsReading(text, route) {
+  if (!route || route.kind === "ask") return false;
+  if (route.kind === "note") return true;
+  const raw = String(text || "");
+  return DATE_RE.test(raw) || /\n/.test(raw.trim()) || (raw.match(DURATIONS_RE) || []).length > 1;
+}
+
 /* ---------- a juncao das duas colecoes antigas ----------
    roda antes da primeira pintura e de novo depois que a nuvem responde, como
    a mudanca de nome das ideias. o que ela aprendeu com aquela:

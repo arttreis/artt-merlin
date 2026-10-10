@@ -19,13 +19,17 @@ import "./shared/base.css";
 import "./index.css";
 import {
   initPage, signIn, seen, markSeen, isNewHere, today, addDays, dateOf, notify, newId,
-  newNote, askMerlin, readPrefs, savePrefs, prefsStore, formatMin, collection, api, foldKey,
+  newNote, askMerlin, readPrefs, savePrefs, prefsStore, formatMin, collection, api, listClients, foldKey,
   onboardingState, onboardingSettled
 } from "./shared/core.js";
 import { Children, useState, useEffect, useLayoutEffect, useRef } from "react";
-import { mount, useCloud, useCollection, icon } from "./shared/ui.jsx";
+import { mount, useCloud, useCollection, icon, Markdown, ProposalDialog } from "./shared/ui.jsx";
 import { LOGO, NAV_ICONS } from "./shared/icons.jsx";
-import { normalize as normalizeTask, dayDoc, overdue, topOrder, newTask, routeLine, readClock } from "./shared/tasks.js";
+import {
+  normalize as normalizeTask, dayDoc, overdue, topOrder, newTask, routeLine, readClock,
+  needsReading, isReserve, stripPrefix
+} from "./shared/tasks.js";
+import { MAX_TURNS, normalizeChat, chatTitle, turnsOf } from "./shared/assistant-actions.js";
 import { normalize as normalizeHabit, isExpected, toggleMark } from "./shared/habits-data.js";
 import { distribute, fmt, longFmt, clock, costOf } from "./shared/day.js";
 import { Forest, phaseOf } from "./shared/forest.jsx";
@@ -282,47 +286,165 @@ function Onboarding({ profile, apps, habits, veteran, onDone }) {
    um campo só, sem abas: o Merlin lê o que foi escrito e decide pela regra
    única (routeLine, no tasks.js) — com duração é tarefa de hoje, pergunta vai
    para a conversa, o resto vira ideia. a linha de baixo diz o que o Enter vai
-   fazer ANTES de ele fazer, e todo destino tem desfazer no aviso. */
-const ROUTE_ICON = { task: "check", ask: "spark", note: "pencil" };
+   fazer ANTES de ele fazer, e todo destino tem desfazer no aviso.
 
-function Composer({ tasks, b, moment }) {
+   desde 10/10/2026, com sessão, o Merlin lê o que a regra não resolve
+   (needsReading, no tasks.js): "ligar pro João amanhã às 15h", três tarefas
+   numa linha, a ação escrita sem duração. ele devolve o que entendeu num
+   cartão embaixo do campo, e nada é criado antes do ok. a pergunta não sai
+   mais da tela: a resposta aparece no balão do Merlin, lá em cima. sem
+   sessão, sem rede ou se a leitura falhar, vale a regra de antes. */
+const ROUTE_ICON = { task: "check", ask: "spark", note: "pencil", read: "spark" };
+const WEEKDAY = ["dom", "seg", "ter", "qua", "qui", "sex", "sáb"];
+
+/* "hoje", "amanhã" ou "sex 17/10": a data do jeito que se confere de relance */
+function dayLabel(date, base) {
+  if (!date || date === base) return "hoje";
+  if (date === addDays(base, 1)) return "amanhã";
+  const d = dateOf(date);
+  return WEEKDAY[d.getDay()] + " " + String(d.getDate()).padStart(2, "0") + "/" + String(d.getMonth() + 1).padStart(2, "0");
+}
+const draftMeta = (it, base) => it.kind === "note" ? "ideia"
+  : [dayLabel(it.date, base), it.at, it.min ? (it.guess ? "~" : "") + fmt(it.min) : "", it.client].filter(Boolean).join(" · ");
+
+/* o cliente volta da IA pelo nome; a tarefa guarda o id, como a @menção */
+function clientId(name) {
+  const k = foldKey(name);
+  const c = k ? listClients().find((x) => foldKey(x.name) === k) : null;
+  return c ? c.id : "";
+}
+
+/* a leitura: a lista do que a linha vira, ou null quando não deu (sem rede,
+   cota, resposta torta) — e aí quem chamou segue pela regra */
+async function readWithMerlin(text, context) {
+  try {
+    const r = await api("/merlin", { method: "POST", body: JSON.stringify({ task: "capture", context: { ...context, text } }) });
+    return r && r.ok && r.body && Array.isArray(r.body.items) ? r.body.items : null;
+  } catch (e) { return null; }
+}
+
+function Composer({ tasks, b, moment, smart, onAsk, readContext }) {
   const [text, setText] = useState("");
+  const [reading, setReading] = useState(false);
+  const [draft, setDraft] = useState(null); // { text, items }: o que o Merlin entendeu, esperando o ok
   const field = useRef(null);
   const date = today();
   const route = routeLine(text);
+  const willRead = smart && needsReading(text, route);
 
-  const submit = () => {
-    if (!route) return;
-    if (route.kind === "ask") { askMerlin(route.text); setText(""); return; }
-    if (route.kind === "task") {
-      const t = newTask({ title: route.title, min: route.min, reserved: route.reserved, clickup: route.clickup, client: route.client, date, order: topOrder(tasks.all(), date) });
-      tasks.save(t);
-      notify((route.reserved ? "reservado em hoje · " : "entrou em hoje · ") + formatMin(route.min), () => tasks.remove(t.id));
-    } else {
-      const n = newNote({ title: route.title, client: route.client });
-      if (n) notify("guardado em ideias", () => collection("notes").remove(n.id));
-    }
+  const clear = () => {
     setText("");
+    setDraft(null);
     if (field.current) field.current.focus();
   };
 
-  const hint = !route ? "com a duração (45m, 1h30) entra em hoje · pergunta vai para o Merlin · o resto vira ideia"
+  /* o caminho da regra, sem rede: o de sempre, e o de quando a leitura falha */
+  const byRule = (r) => {
+    if (r.kind === "task") {
+      const t = newTask({ title: r.title, min: r.min, reserved: r.reserved, clickup: r.clickup, client: r.client, date, order: topOrder(tasks.all(), date) });
+      tasks.save(t);
+      notify((r.reserved ? "reservado em hoje · " : "entrou em hoje · ") + formatMin(r.min), () => tasks.remove(t.id));
+    } else {
+      const n = newNote({ title: r.title, client: r.client });
+      if (n) notify("guardado em ideias", () => collection("notes").remove(n.id));
+    }
+    clear();
+  };
+
+  const create = () => {
+    const undo = [];
+    let nTasks = 0, nNotes = 0;
+    draft.items.forEach((it) => {
+      const client = clientId(it.client);
+      if (it.kind === "task") {
+        const day = it.date || date;
+        const at = it.at ? readClock(it.at) : null;
+        const t = newTask({ title: stripPrefix(it.title), min: it.min, reserved: isReserve(it.title), client, date: day, at: at == null ? null : at, order: topOrder(tasks.all(), day) });
+        tasks.save(t);
+        undo.push(() => tasks.remove(t.id));
+        nTasks++;
+      } else {
+        const n = newNote({ title: it.title, client });
+        if (n) { undo.push(() => collection("notes").remove(n.id)); nNotes++; }
+      }
+    });
+    const parts = [nTasks && nTasks + (nTasks === 1 ? " tarefa" : " tarefas"), nNotes && nNotes + (nNotes === 1 ? " ideia" : " ideias")].filter(Boolean);
+    if (parts.length) notify(parts.join(" e ") + (nTasks + nNotes === 1 ? " criada" : " criadas"), () => undo.forEach((f) => f()));
+    clear();
+  };
+
+  const submit = async () => {
+    if (draft) { create(); return; }
+    if (!route || reading) return;
+    if (route.kind === "ask") { onAsk(route.text); clear(); return; }
+    if (!willRead) { byRule(route); return; }
+    const said = text;
+    setReading(true);
+    const items = await readWithMerlin(said, readContext());
+    setReading(false);
+    /* lista vazia é o Merlin dizendo que a linha inteira é uma pergunta */
+    if (items && !items.length) { onAsk(said.trim()); clear(); return; }
+    /* uma ideia só, onde a regra já via uma ideia: grava com as palavras da
+       pessoa, sem cartão para confirmar o que não mudou */
+    if (items && !(items.length === 1 && items[0].kind === "note" && route.kind === "note")) { setDraft({ text: said, items }); return; }
+    byRule(route);
+  };
+
+  const drop = (i) => {
+    const items = draft.items.filter((_, j) => j !== i);
+    setDraft(items.length ? { ...draft, items } : null);
+  };
+  const asIdea = () => {
+    const n = newNote({ title: draft.text.replace(/\s+/g, " ").trim() });
+    if (n) notify("guardado em ideias", () => collection("notes").remove(n.id));
+    clear();
+  };
+
+  const kind = reading || willRead ? "read" : route ? route.kind : "";
+  const hint = reading ? "o Merlin está lendo…"
+    : draft ? "Enter cria · Esc volta ao texto"
+    : !route ? (smart ? "escreva do seu jeito: o Merlin separa tarefa, data, hora e ideia · a pergunta ele responde aqui em cima"
+                      : "com a duração (45m, 1h30) entra em hoje · pergunta vai para o Merlin · o resto vira ideia")
+    : route.kind === "ask" ? (smart ? "perguntar ao Merlin · a resposta aparece lá em cima" : "perguntar ao Merlin")
+    : willRead ? "o Merlin lê e mostra o que entendeu antes de criar"
     : route.kind === "task" ? (route.reserved ? "reservar em hoje · " : "pôr em hoje · ") + fmt(route.min) + (route.reserved ? "" : route.min > b.slack ? " · não cabe hoje" : " · cabe")
-    : route.kind === "ask" ? "perguntar ao Merlin"
     : "guardar em ideias · com a duração no fim, entra em hoje";
 
   return (
-    <form className="hm-field" onSubmit={(e) => { e.preventDefault(); submit(); }}>
+    <form className="hm-field" aria-busy={reading} onSubmit={(e) => { e.preventDefault(); submit(); }}>
       <textarea ref={field} rows={2} maxLength="300" value={text} autoFocus={moment === "start"}
-                placeholder="uma tarefa (revisar a landing 45m), uma pergunta ou uma ideia"
-                onChange={(e) => setText(e.currentTarget.value)}
-                onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); submit(); } }} />
+                placeholder={smart ? "ligar pro João amanhã às 15h, uma pergunta, uma ideia — do seu jeito" : "uma tarefa (revisar a landing 45m), uma pergunta ou uma ideia"}
+                onChange={(e) => { setText(e.currentTarget.value); if (draft) setDraft(null); }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); submit(); }
+                  else if (e.key === "Escape" && draft) { e.preventDefault(); setDraft(null); }
+                }} />
       <div className="hm-field__foot">
-        <span className="hm-field__hint" data-kind={route ? route.kind : ""} aria-live="polite">
-          {route && icon(ROUTE_ICON[route.kind])}{hint}
+        <span className="hm-field__hint" data-kind={kind} aria-live="polite">
+          {kind && icon(ROUTE_ICON[kind])}{hint}
         </span>
-        <button type="submit" className="hm-field__send" aria-label={route ? hint : "Enviar"} disabled={!route}>{icon("arrow")}</button>
+        <button type="submit" className="hm-field__send" aria-label={route || draft ? hint : "Enviar"} disabled={reading || (!route && !draft)}>{icon("arrow")}</button>
       </div>
+      {draft && (
+        <div className="hm-draft">
+          <p className="hm-draft__head">{icon("spark")}o Merlin entendeu</p>
+          <ul className="hm-draft__list">
+            {draft.items.map((it, i) => (
+              <li key={i}>
+                {icon(it.kind === "task" ? "check" : "pencil")}
+                <span className="hm-draft__title">{it.title}</span>
+                <span className="hm-draft__meta t-mono">{draftMeta(it, date)}</span>
+                <button type="button" className="hm-draft__drop" aria-label={"Tirar " + it.title} title="tirar" onClick={() => drop(i)}>{icon("x")}</button>
+              </li>
+            ))}
+          </ul>
+          <div className="hm-draft__actions">
+            <button type="button" className="pill" onClick={() => { setDraft(null); if (field.current) field.current.focus(); }}>voltar ao texto</button>
+            <button type="button" className="pill" onClick={asIdea}>guardar como ideia</button>
+            <button type="submit" className="pill pill--accent">{draft.items.length === 1 ? "criar" : "criar as " + draft.items.length}</button>
+          </div>
+        </div>
+      )}
     </form>
   );
 }
@@ -696,6 +818,17 @@ function Home() {
                 apps={apps} sessions={sessions} me={me} gh={gh} h={h} phase={phase} date={date} />;
 }
 
+/* o dia em poucas linhas, para a pergunta feita no início chegar ao Merlin
+   sabendo o mesmo que a fala dele sabe */
+const briefOf = (x) => [
+  "Agora " + x.hour + " · janela " + x.window + " · " + x.slack,
+  "Fila aberta: " + (x.open.join("; ") || "nada"),
+  "Feitas hoje: " + (x.done.join("; ") || "nada"),
+  x.late ? "Abertas de dias anteriores: " + x.late : "",
+  "Hábitos de hoje: " + (x.habits.join("; ") || "nenhum"),
+  "Foco na semana: " + x.focusWeek + " · reunião na semana: " + x.meetingWeek
+].filter(Boolean).join("\n");
+
 /* o dia de quem já passou pelo onboarding. é um componente à parte porque o
    onboarding volta antes: os hooks daqui (a fala do Merlin) não podem
    aparecer de repente no meio do mesmo componente quando ele termina */
@@ -709,7 +842,7 @@ function Today({ c, tasks, habits, journal, closes, reviews, apps, sessions, me,
   const late = overdue(tasks.all(), date).length;
   const name = cleanName(me.name || (c.email ? String(c.email).split("@")[0] : ""));
   const due = reviewsDue(date, h);
-  const saying = useCheckin(c.signedIn, date + ":" + moment + (closed ? ":closed" : ""), () => ({
+  const dayContext = () => ({
     moment: closed ? "close" : moment,
     hour: clock(h * 60 + new Date().getMinutes()),
     window: clock(doc.start) + "–" + clock(doc.end),
@@ -723,7 +856,53 @@ function Today({ c, tasks, habits, journal, closes, reviews, apps, sessions, me,
     github: gh ? [...gh.prs.map((p) => "PR " + p.action + ": " + p.title), ...gh.commits.map((c) => c.repo + ": " + c.message)].slice(0, 12) : [],
     focusWeek: fmt(focusMinutes(sessions.all(), date)) + (me.focusGoal ? " de " + me.focusGoal + "h" : ""),
     meetingWeek: fmt(meetingMinutes(tasks.all(), date)) + (me.meetingCap ? " (teto " + me.meetingCap + "h)" : "")
-  }));
+  });
+  const saying = useCheckin(c.signedIn, date + ":" + moment + (closed ? ":closed" : ""), dayContext);
+  const readContext = () => ({
+    today: date + " (" + new Date().toLocaleDateString("pt-BR", { weekday: "long" }) + ")",
+    hour: clock(h * 60 + new Date().getMinutes()),
+    window: clock(doc.start) + "–" + clock(doc.end),
+    clients: listClients().map((x) => x.name)
+  });
+
+  /* a pergunta feita aqui é respondida aqui, no balão do Merlin. vira uma
+     conversa de verdade (a coleção `chats`, a mesma da tela do assistente):
+     dá para continuar lá, e a próxima pergunta daqui segue o fio desta. */
+  const chats = useCollection("chats", { normalize: normalizeChat });
+  const [talk, setTalk] = useState([]);
+  const [asking, setAsking] = useState(false);
+  const [proposal, setProposal] = useState(null);
+  const talkId = useRef("");
+  const keepTalk = (list) => {
+    setTalk(list);
+    if (!talkId.current) talkId.current = newId();
+    const before = chats.get(talkId.current);
+    const now = Date.now();
+    chats.save({ id: talkId.current, title: chatTitle(list), messages: list.slice(-MAX_TURNS), createdAt: before ? before.createdAt : now, updatedAt: now });
+  };
+  const ask = async (q) => {
+    if (!c.signedIn) { askMerlin(q); return; }
+    if (asking) return;
+    const mine = talk.concat([{ from: "me", text: q }]);
+    setTalk(mine);
+    setAsking(true);
+    let reply;
+    try {
+      const r = await api("/merlin", { method: "POST", body: JSON.stringify({
+        task: "assistant",
+        context: { message: q, page: "home", pageContext: briefOf(dayContext()), history: turnsOf(talk) }
+      }) });
+      const s = r.ok && (r.body.suggestions || [])[0];
+      const said = r.ok ? r.body.clarify : (r.body && r.body.error) || "não consegui pensar nisso agora";
+      reply = [said && { from: "merlin", text: said }, s && { from: "merlin", proposal: s }].filter(Boolean);
+      if (!reply.length) reply = [{ from: "merlin", text: "não entendi bem — pode dizer de outro jeito?" }];
+    } catch (e) {
+      reply = [{ from: "merlin", text: "não consegui falar com o Merlin" }];
+    }
+    setAsking(false);
+    keepTalk(mine.concat(reply));
+  };
+  const lastQ = talk.map((m) => m.from).lastIndexOf("me");
 
   return (
     <div className="hm">
@@ -736,11 +915,29 @@ function Today({ c, tasks, habits, journal, closes, reviews, apps, sessions, me,
             : "feche o dia hoje à noite para começar a sua sequência"}
           {late > 0 && <> · <a href="calendar.html#day">{late} {late === 1 ? "aberta" : "abertas"} de antes de hoje</a></>}
         </p>
-        {saying && <p className="hm-hero__merlin">{icon("spark")}{saying}</p>}
+        {talk.length > 0
+          ? <div className="hm-hero__merlin hm-talk" aria-live="polite">
+              {icon("spark")}
+              <div className="hm-talk__body">
+                {lastQ >= 0 && <p className="hm-talk__q">{talk[lastQ].text}</p>}
+                {asking
+                  ? <p className="hm-talk__wait">pensando…</p>
+                  : talk.slice(lastQ + 1).map((m, i) => m.proposal
+                      ? <button key={i} type="button" className="pill pill--accent hm-talk__do" onClick={() => setProposal(m.proposal)}>{icon("spark")}{m.proposal.title}</button>
+                      : <Markdown key={i} className="hm-talk__a" text={m.text} />)}
+                {!asking && (
+                  <p className="hm-talk__foot">
+                    <a href={"assistant.html#" + talkId.current}>continuar na conversa</a>
+                    <button type="button" onClick={() => { setTalk([]); talkId.current = ""; }}>voltar ao dia</button>
+                  </p>
+                )}
+              </div>
+            </div>
+          : saying && <p className="hm-hero__merlin">{icon("spark")}{saying}</p>}
       </header>
 
       <div className="hm-center">
-        <Composer tasks={tasks} b={b} moment={moment} />
+        <Composer tasks={tasks} b={b} moment={moment} smart={c.signedIn} onAsk={ask} readContext={readContext} />
         {moment === "close" && !closed && (
           <button type="button" className="hm-close" onClick={() => setClosing(true)}>{icon("check")}fechar o dia</button>
         )}
@@ -758,6 +955,7 @@ function Today({ c, tasks, habits, journal, closes, reviews, apps, sessions, me,
       </Columns>
 
       {closing && <Closing tasks={tasks} journal={journal} closes={closes} date={date} gh={gh} onClose={() => setClosing(false)} />}
+      {proposal && <ProposalDialog proposal={proposal} onClose={() => setProposal(null)} />}
     </div>
   );
 }

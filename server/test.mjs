@@ -418,6 +418,31 @@ claudeAnswer = { stop_reason: "end_turn", content: [{ type: "text", text: '{"tex
 r = await call("POST", "/merlin", { task: "appReview", context: { spec: "# salão" } }, cookie);
 body = await r.json();
 check("merlin revisa o app", r.status === 200 && /## banco/.test(body.text), JSON.stringify(body));
+/* a captura do inicio: a linha vira itens limpos, no Haiku e numa cota propria */
+let claudeModel = "";
+const realFetch = globalThis.fetch;
+globalThis.fetch = async (url, opts) => {
+  if (String(url).includes("api.anthropic.com")) { const q = JSON.parse(opts.body); claudeModel = q.model + "/" + q.output_config.effort; }
+  return realFetch(url, opts);
+};
+claudeAnswer = { stop_reason: "end_turn", content: [{ type: "text", text: JSON.stringify({ items: [
+  { kind: "task", title: "ligar pro João", min: 30, guess: true, date: "2026-10-11", at: "15:00", client: "" },
+  { kind: "note", title: "modo offline", min: 40, date: "2026-10-11", at: "9:00" },
+  { kind: "evento", title: "inventado" },
+  { kind: "task", title: "   " },
+  { kind: "task", title: "maratona", min: 5000, date: "amanhã", at: "tarde" }
+] }) }] };
+const adviceBefore = db.advice.filter((x) => x.hour > 0).reduce((s, x) => s + x.n, 0);
+r = await call("POST", "/merlin", { task: "capture", context: { text: "ligar pro João amanhã às 15h e se o merlin tivesse modo offline", today: "2026-10-10 (sábado)", hour: "14:20", clients: ["Ana"] } }, cookie);
+body = await r.json();
+check("captura devolve itens", r.status === 200 && body.items.length === 3, JSON.stringify(body));
+check("captura guarda data, hora e estimativa da tarefa", body.items[0].date === "2026-10-11" && body.items[0].at === "15:00" && body.items[0].guess === true);
+check("captura zera o que ideia não tem", body.items[1].min === 0 && body.items[1].date === "" && body.items[1].at === "");
+check("captura corta duração e larga data e hora inválidas", body.items[2].min === 720 && body.items[2].date === "" && body.items[2].at === "");
+check("captura vai no Haiku com pouco esforço", claudeModel === "claude-haiku-5-5/low", claudeModel);
+check("captura manda a linha e os clientes", /ligar pro João/.test(claudeAsked) && /Clientes: Ana/.test(claudeAsked));
+check("captura não gasta a cota do conselho", db.advice.filter((x) => x.hour > 0).reduce((s, x) => s + x.n, 0) === adviceBefore && db.advice.some((x) => x.hour < 0));
+globalThis.fetch = realFetch;
 /* "da pra fazer com Claude?": a estimativa tem que subir junto, senao o
    veredicto nao teria como falar em minutos */
 claudeAnswer = { stop_reason: "end_turn", content: [{ type: "text", text: '{"text":"**dá** — o Claude lê a planilha e escreve as descrições.\\n\\nMontar: escrever a skill de conferência"}' }] };
