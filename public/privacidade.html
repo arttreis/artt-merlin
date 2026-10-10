@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0d0d0d">
+<title>Privacidade · Merlin</title>
+<!-- merlin · privacidade
+     o que o Merlin guarda, onde e quem mais ve, em linguagem de gente. a
+     landing passou a coletar e-mail (a lista de espera), e e isto que ela
+     aponta. a pagina mora em public/ porque nao tem nada para o vite fazer:
+     sem JS, o CSS aqui dentro. cada frase sai do codigo; mudou o codigo
+     (worker.js, core.js), muda aqui. -->
+<meta name="description" content="O que o Merlin guarda, onde guarda e quem mais vê.">
+<link rel="canonical" href="https://merlin.arttreis.com.br/privacidade">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 472.5 472.5' fill='%232EE86B'><path d='M236.31,236.23c-3.63,128.42,107.71,238.95,236.22,236.22v-118.11c-64.78,2.88-121-53.42-118.11-118.11h-118.11Z'/><path d='M236.22,0C239.85,128.42,128.52,238.95,0,236.22v-118.11C64.78,120.99,121,64.69,118.11,0h118.11Z'/><path d='M315.07,0h77.61c44.09,0,79.89,35.8,79.89,79.89v77.61h-157.5V0h0Z'/><path d='M79.96,315H.07v78.75h78.75v78.75h78.75v-79.89c0-42.86-34.75-77.61-77.61-77.61Z'/></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600&display=swap" rel="stylesheet">
+<script>/* o tema escolhido no Merlin vale aqui tambem */
+try{var t=localStorage.getItem("merlin:theme");if(t?t==="light":matchMedia("(prefers-color-scheme: light)").matches)document.documentElement.classList.add("light")}catch(e){}</script>
+<style>
+:root{--bg:#0d0d0d;--surface:#141414;--ink:#f2f2f2;--ink-70:rgba(242,242,242,.7);--ink-50:rgba(242,242,242,.5);--line:rgba(242,242,242,.13);--accent:#2EE86B;--accent-ink:#2EE86B;color-scheme:dark}
+html.light{--bg:#f2f2f0;--surface:#fff;--ink:#0d0d0d;--ink-70:rgba(13,13,13,.7);--ink-50:rgba(13,13,13,.55);--line:rgba(13,13,13,.14);--accent-ink:#0d8038;color-scheme:light}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font-family:"Sora",system-ui,-apple-system,sans-serif;font-size:15px;line-height:1.65;letter-spacing:-.01em;-webkit-font-smoothing:antialiased}
+a{color:var(--accent-ink);text-underline-offset:3px}
+.pv{max-width:680px;margin:0 auto;padding:28px 20px 80px}
+.pv__top{display:flex;align-items:center;justify-content:space-between;margin-bottom:64px}
+.pv__logo{display:inline-flex;align-items:center;gap:9px;font-weight:600;color:var(--ink);text-decoration:none}
+.pv__logo svg{width:20px;height:20px;color:var(--accent)}
+.pv__back{font-size:13.5px;color:var(--ink-70);text-decoration:none}
+.pv__back:hover{color:var(--ink)}
+h1{margin:0;font-size:clamp(34px,6vw,52px);font-weight:600;letter-spacing:-.05em;line-height:1.05}
+.pv__when{margin:12px 0 0;font-size:13px;color:var(--ink-50)}
+.pv__lead{margin:28px 0 0;font-size:17px;color:var(--ink-70)}
+h2{margin:48px 0 10px;font-size:20px;font-weight:600;letter-spacing:-.03em}
+p,li{color:var(--ink-70)}
+ul{padding-left:20px;margin:10px 0 0}
+li{margin:6px 0}
+li::marker{color:var(--accent)}
+b{color:var(--ink);font-weight:600}
+.pv__box{margin-top:48px;padding:20px 22px;border:1px solid var(--line);border-radius:16px;background:var(--surface)}
+.pv__box h2{margin-top:0}
+.pv__foot{margin-top:64px;padding-top:20px;border-top:1px solid var(--line);font-size:12.5px;color:var(--ink-50)}
+</style>
+</head>
+<body>
+<main class="pv">
+  <header class="pv__top">
+    <a class="pv__logo" href="/" aria-label="Merlin, início">
+      <svg viewBox="0 0 472.5 472.5" fill="currentColor" aria-hidden="true"><path d="M236.31,236.23c-3.63,128.42,107.71,238.95,236.22,236.22v-118.11c-64.78,2.88-121-53.42-118.11-118.11h-118.11Z"/><path d="M236.22,0C239.85,128.42,128.52,238.95,0,236.22v-118.11C64.78,120.99,121,64.69,118.11,0h118.11Z"/><path d="M315.07,0h77.61c44.09,0,79.89,35.8,79.89,79.89v77.61h-157.5V0h0Z"/><path d="M79.96,315H.07v78.75h78.75v78.75h78.75v-79.89c0-42.86-34.75-77.61-77.61-77.61Z"/></svg>
+      merlin
+    </a>
+    <a class="pv__back" href="/">voltar para o Merlin</a>
+  </header>
+
+  <h1>privacidade</h1>
+  <p class="pv__when">atualizada em 10/10/2026</p>
+  <p class="pv__lead">O Merlin é feito por Arthur Reis. Esta página diz o que o Merlin guarda, onde guarda e quem mais vê. Se alguma coisa aqui não estiver clara, escreva para <a href="mailto:arthur@guessless.com.br">arthur@guessless.com.br</a>.</p>
+
+  <h2>sem conta</h2>
+  <p>Tudo o que você escreve fica no armazenamento do seu navegador e não sobe para servidor nenhum. Apagar os dados deste site no navegador apaga o seu Merlin.</p>
+
+  <h2>com conta</h2>
+  <ul>
+    <li>O seu <b>e-mail</b> é a sua identidade. O Merlin não pede senha, telefone nem documento.</li>
+    <li>Para entrar, mandamos um <b>código de seis dígitos</b> por e-mail. O banco guarda só uma impressão do código (um hash), e ele vence em 10 minutos.</li>
+    <li>A sessão é um <b>cookie</b> deste site, que o JavaScript da página não lê, e dura 90 dias. É o único cookie do Merlin: não há cookie de anúncio nem de rastreamento.</li>
+    <li>O que você guarda no Merlin (tarefas, notas, clientes, funis, mapas, financeiro, hábitos, a conversa com o Merlin) é copiado para o nosso banco, para chegar aos seus outros aparelhos. Os prints anexados a uma ideia vão para um armazenamento de arquivos. Os dois ficam na Cloudflare e são separados por conta: nenhuma tela mostra o seu Merlin para outra pessoa. Quem administra o servidor tem acesso técnico ao banco e só o usa para manter o serviço funcionando ou para atender um pedido seu.</li>
+    <li>Sair da conta, no perfil, apaga do navegador os dados do Merlin, a não ser que ainda haja alguma coisa esperando para sincronizar.</li>
+  </ul>
+
+  <h2>o Merlin, a inteligência artificial</h2>
+  <p>Quando você pede alguma coisa ao Merlin, o pedido vai para a <b>Anthropic</b>, que gera a resposta com o modelo Claude. Vai junto o que você escreveu, o que estava na tela naquela hora e o seu perfil (o nome, com o que trabalha, o que está construindo e um hábito). Contamos quantos pedidos cada conta faz por hora, para o uso caber no limite. A forma como a Anthropic trata esses dados está na <a href="https://www.anthropic.com/legal/privacy" rel="noopener">política de privacidade dela</a>.</p>
+
+  <h2>links públicos</h2>
+  <p>Se você criar um link público de um mapa ou de um funil, qualquer pessoa com o link lê aquele documento, sempre na versão de agora. Revogar o link corta o acesso na hora.</p>
+
+  <h2>GitHub</h2>
+  <p>Se você informar o seu usuário do GitHub, o seu navegador lê os seus eventos públicos direto do GitHub. Isso não passa pelo nosso servidor, e nenhum token é pedido nem guardado.</p>
+
+  <h2>lista de espera</h2>
+  <p>Se você deixar o e-mail na lista de espera, guardamos o e-mail e a data em que ele chegou. Usamos só para avisar quando a sua conta abrir.</p>
+
+  <h2>quem mais participa</h2>
+  <ul>
+    <li><b>Cloudflare</b> hospeda o site, o banco e os arquivos.</li>
+    <li><b>Resend</b> envia o e-mail com o código de entrada.</li>
+    <li><b>Anthropic</b> gera as respostas do Merlin.</li>
+    <li><b>Google Fonts</b> entrega as fontes da página: o seu navegador as baixa de lá.</li>
+  </ul>
+
+  <section class="pv__box">
+    <h2>os seus direitos</h2>
+    <p>Você pode pedir uma cópia dos seus dados, a correção deles, a exclusão da conta e de tudo que está nela, ou a saída da lista de espera. Escreva para <a href="mailto:arthur@guessless.com.br">arthur@guessless.com.br</a> a partir do e-mail da conta, e a resposta chega em até 15 dias.</p>
+  </section>
+
+  <p class="pv__foot">© 2026 Arthur Reis · <a href="https://arttreis.com.br" rel="noopener">arttreis.com.br</a></p>
+</main>
+</body>
+</html>

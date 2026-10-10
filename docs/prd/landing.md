@@ -1,7 +1,7 @@
 # Landing · a página de quem nunca ouviu falar do Merlin
 
-**Status:** ✅ No ar desde 2026-10-10, versão `2f70532a` do worker (a anterior, para voltar, é a
-`d0c507b1`). O Arthur pediu para desenvolver direto, sem `/plan-project`, e as recomendações
+**Status:** ✅ No ar desde 2026-10-10. A versão do worker é a `37f1a9d1`, com a privacidade; a
+primeira da landing foi a `2f70532a`, e a de antes dela, para voltar, é a `d0c507b1`. O Arthur pediu para desenvolver direto, sem `/plan-project`, e as recomendações
 abaixo viraram as decisões.
 **Owner:** Arthur Reis
 **Criado em:** 2026-10-10
@@ -36,24 +36,35 @@ Merlin no navegador cai direto na casa sem a landing piscar e sem baixar o `land
    finge gravar o robô sem gravar; quem já tem Merlin no navegador cai na casa sem baixar o
    `landing.jsx`.
 
-Duas coisas desta máquina que travam o deploy:
+Duas coisas desta máquina que travavam o deploy:
 
-- **O Wrangler pede Node 22 ou mais novo** e o nvm está no 20. O deploy rodou com o Node 24 que
+- **O Wrangler pede Node 22 ou mais novo** e o nvm está no 20. O deploy roda com o Node 24 que
   já está instalado, só naquele processo:
   `$env:PATH = "$env:LOCALAPPDATA\nvm\v24.14.0;" + $env:PATH`.
 - **O login do Wrangler enxerga duas contas** (arttreis e GuessLess) e, fora de um terminal
-  interativo, não escolhe sozinho. O Merlin mora na **arttreis**
-  (`CLOUDFLARE_ACCOUNT_ID=44b57dda1251f236beacc8a2f068f056`). Pôr `account_id` no
-  `wrangler.toml` acaba com a pergunta.
+  interativo, não escolhia sozinho. Desde 2026-10-10 o `wrangler.toml` diz a conta
+  (`account_id` da **arttreis**), por decisão do Arthur.
 
-Falta:
+### A segunda rodada (2026-10-10)
 
-- Conferir a prévia do link colado no WhatsApp e no LinkedIn.
-- **Privacidade.** A landing passou a coletar e-mail. O texto embaixo do campo diz para que ele
-  serve, mas uma página de privacidade continua faltando.
-- Ligar o Cloudflare Web Analytics no painel.
-- Em aberto: o endereço (D4), a assinatura do rodapé (D6, hoje "Arthur Reis") e quando a fila
-  vira conta (VISAO 8.6).
+- ✅ **Privacidade:** `public/privacidade.html`, servida em `/privacidade`. Diz o que o Merlin
+  guarda sem conta e com conta, o que vai para a Anthropic, os links públicos, o GitHub, a
+  lista de espera, quem mais participa (Cloudflare, Resend, Anthropic, Google Fonts) e como
+  pedir cópia ou exclusão. O contato é o que o arttreis.com.br já publica
+  (arthur@guessless.com.br). É um texto em linguagem de gente, tirado do código, e não passou
+  por advogado. Mudou o `worker.js` ou o `core.js` no que toca a dado, muda a página. A
+  landing aponta para ela no rodapé e embaixo da lista de espera.
+- ✅ **Assinatura (D6):** fica arttreis: "© 2026 Arthur Reis · arttreis.com.br".
+- ✅ **Prévia de link:** conferida em produção fazendo o pedido como os robôs do WhatsApp, do
+  Facebook, do LinkedIn e do X: a página responde 200 a todos, com as 8 tags `og:`, e a
+  `og.jpg` (106 KB, JPEG) também. Colar o link num chat de verdade fica com o Arthur.
+- ⏳ **Cloudflare Web Analytics:** o login do Wrangler não tem permissão para ele (a API devolve
+  403), então ligá-lo é um clique no painel: *Analytics & Logs → Web Analytics → Add a site →
+  merlin.arttreis.com.br*. Se a instalação automática não pegar no Worker, o painel dá um
+  `<script>` com um token público, que entra no `<head>` do `index.html`. Quando ligar, a
+  página de privacidade ganha uma linha: a medição é da Cloudflare, sem cookie.
+- O endereço (D4) continua `merlin.arttreis.com.br`. Quando a fila vira conta segue em aberto
+  (VISAO 8.6).
 
 ---
 
@@ -236,7 +247,7 @@ A frase do nome, como a citação de McLuhan no Notion. Colunas: produto, baixar
 | D3 | **Onde a página mora.** (a) `/` vira a landing estática e o início muda para `inicio.html`, com um script no `<head>` mandando quem já tem Merlin no navegador para lá antes da primeira pintura. (b) O Worker decide pela sessão (`run_worker_first` em `/`), mas o visitante sem conta não tem cookie e cairia na landing. (c) Um domínio separado só para a página. | (a). O buscador e a prévia de link leem `/`, e o Worker continua sem trabalho. O custo é trocar umas 28 referências ao início em `core.js`, `ui.jsx`, `index.css` e no `lib.rs` do desktop. | **tomada outra**, mais barata que a (a): a landing é escrita no próprio `index.html`, ao lado do `<main id="app">`, e o script do `<head>` põe `html.in` (esconde a landing) ou `html.bare` (esconde a barra e o dock). O buscador lê `/` com o texto inteiro, e o início não mudou de endereço: nenhuma referência, nem o desktop, precisou mudar |
 | D4 | **Endereço:** continuar em `merlin.arttreis.com.br` ou ir para um domínio próprio (VISAO 8.6). | Decidir **antes** de publicar. Trocar o endereço depois apaga o que o buscador já aprendeu sobre a página. | em aberto |
 | D5 | **Prova social:** sem depoimento de terceiros até existir usuário de fora. | O bloco "o seu dia é só seu", mais o bloco do fundador se o Arthur topar aparecer. | **tomada** sem o bloco do fundador, que depende do Arthur |
-| D6 | **Assinatura no rodapé:** Arthur Reis, Guessless ou GL Suite. | — | em aberto; hoje está "Arthur Reis", com link para arttreis.com.br, porque o domínio e o design system são de lá |
+| D6 | **Assinatura no rodapé:** Arthur Reis, Guessless ou GL Suite. | — | **tomada** pelo Arthur em 2026-10-10: arttreis. "© 2026 Arthur Reis · arttreis.com.br" |
 | D7 | **Baixar:** o app de Windows ainda não tem instalador público (hoje roda por `npm run dev` em `desktop/`). | Enquanto não houver instalador assinado, o botão secundário é "ver como funciona", que rola até o bento, e "baixar" leva só à extensão de Chrome. | **tomada**, mais estrita: a extensão também não está na loja, então "baixar" saiu da barra, e a faixa "funciona com" lista só o que quem chega consegue usar (GitHub, Claude Code, Postgres, Mermaid, Markdown) |
 
 ## Escopo
