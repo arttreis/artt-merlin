@@ -734,6 +734,10 @@ const dataLeft = () => globalThis.localStorage.keys().filter((k) => k in DATA);
   check("regra: ? no fim é pergunta", T.routeLine("qual funil para um SaaS de nicho?").kind === "ask");
   check("regra: ? no começo é pergunta, sem o ?", T.routeLine("? quanto cobrar").text === "quanto cobrar");
   check("regra: vazio não vai a lugar nenhum", T.routeLine("   ") === null && T.routeLine("?") === null);
+  check("regra: palavra de pergunta sem ? também pergunta", T.routeLine("como precifico o plano anual").kind === "ask" && T.routeLine("me ajuda a priorizar a semana").kind === "ask");
+  check("regra: o nome do Merlin sai da pergunta", T.routeLine("merlin, vale lançar sexta").text === "vale lançar sexta", JSON.stringify(T.routeLine("merlin, vale lançar sexta")));
+  check("regra: duração vence a palavra de pergunta", T.routeLine("como fazer o deck 45m").kind === "task");
+  check("regra: sem pergunta e sem duração continua ideia", T.routeLine("comprar domínio do app").kind === "note");
 
   /* a janela anda com o relógio de verdade: começa uma hora atrás e acaba em
      quatro, então a conta é a mesma a qualquer hora em que o teste rodar */

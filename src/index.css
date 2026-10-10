@@ -100,22 +100,15 @@ html.bare body::before,html.bare body::after{opacity:0}
 /* o campo do meio, com os três modos */
 .hm-center{max-width:620px;margin:0 auto;display:flex;flex-direction:column;align-items:center;gap:12px}
 .hm-field{width:100%;background:var(--surface);border:1px solid var(--line);border-radius:var(--br);box-shadow:var(--sombra-2);overflow:hidden}
-.hm-field__modes{display:flex;gap:2px;padding:6px 8px 0;border-bottom:1px solid var(--line-soft)}
-.hm-field__modes button{display:inline-flex;align-items:center;gap:6px;height:32px;padding:0 10px;font-size:12.5px;color:var(--ink-50);border-bottom:2px solid transparent;margin-bottom:-1px}
-.hm-field__modes button svg{width:13px;height:13px}
-.hm-field__modes button[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--accent)}
 .hm-field textarea{display:block;width:100%;resize:none;border:0;outline:0;background:none;padding:14px 16px 6px;font:inherit;font-size:14.5px;color:var(--ink)}
 .hm-field textarea::placeholder{color:var(--ink-30)}
 .hm-field__foot{display:flex;align-items:center;gap:8px;padding:6px 8px 8px 16px}
-.hm-field__hint{flex:1 1 auto;font-size:11.5px;color:var(--ink-30)}
+.hm-field__hint{flex:1 1 auto;display:inline-flex;align-items:center;gap:6px;font-size:11.5px;color:var(--ink-30)}
+.hm-field__hint svg{width:12px;height:12px;flex:none}
+.hm-field__hint[data-kind]:not([data-kind=""]){color:var(--ink-50)}
 .hm-field__send{width:32px;height:32px;border-radius:50%;display:grid;place-items:center;background:var(--accent);color:var(--on-accent)}
+.hm-field__send:disabled{opacity:.4}
 .hm-field__send svg{width:15px;height:15px}
-.hm-field__chips{display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding:10px 16px 0;font-size:12px;color:var(--ink-50)}
-.hm-field__chips span{flex:1 1 100%}
-.hm-field__chips b{color:var(--ink-70);font-weight:500}
-.hm-field__chips button{height:26px;padding:0 11px;border-radius:var(--br-pill);background:var(--fill);border:1px solid var(--line);font-size:11.5px;color:var(--ink-70)}
-.hm-field__chips button:hover{background:var(--fill-hover);color:var(--ink)}
-.hm-field__chips button[data-fits="no"]{color:var(--ink-30)}
 .hm-close{display:inline-flex;align-items:center;gap:8px;height:38px;padding:0 18px;border-radius:var(--br-pill);background:var(--accent);color:var(--on-accent);font-weight:600;font-size:13.5px}
 .hm-close svg{width:14px;height:14px}
 .hm-closed{margin:0;font-size:11.5px;color:var(--ink-50)}
