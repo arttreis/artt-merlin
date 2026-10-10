@@ -96,3 +96,16 @@ CREATE TABLE IF NOT EXISTS shares (
 );
 -- "este documento ja tem link?" e a pergunta que a tela faz ao abrir
 CREATE INDEX IF NOT EXISTS shares_person ON shares(person, type, id);
+
+-- a lista de espera da landing (index.html, docs/prd/landing.md). quem chega
+-- de fora abre o Merlin sem conta, mas a conversa com ele e a sincronizacao
+-- pedem uma, e as contas abrem aos poucos (VISAO, 8.6). esta tabela nao tem
+-- `person` porque ainda nao ha pessoa: e so o endereco e quando ele chegou.
+-- entrar na lista nao abre porta nenhuma — quem entra continua sendo quem
+-- esta em OWNER_EMAILS.
+CREATE TABLE IF NOT EXISTS waitlist (
+  email       TEXT PRIMARY KEY,         -- normalizado em minusculas, como em people
+  created_at  INTEGER NOT NULL          -- epoch ms
+);
+-- o teto da rota conta quantos chegaram na ultima hora
+CREATE INDEX IF NOT EXISTS waitlist_created_at ON waitlist(created_at);

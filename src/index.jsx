@@ -14,17 +14,18 @@
 
    em volta, a floresta (shared/forest.jsx), que acompanha a hora.
 
-   quem nunca esteve aqui e não entrou vê antes a porta (o <Landing/>). */
+   quem nunca esteve aqui e não entrou vê antes a porta: a landing, que é
+   HTML estático no index.html e ganha vida no landing.jsx. */
 import "./shared/base.css";
 import "./index.css";
 import {
-  initPage, signIn, seen, markSeen, isNewHere, today, addDays, dateOf, notify, newId,
+  initPage, seen, markSeen, isNewHere, today, addDays, dateOf, notify, newId,
   newNote, askMerlin, readPrefs, savePrefs, prefsStore, formatMin, collection, api, listClients, foldKey,
   onboardingState, onboardingSettled
 } from "./shared/core.js";
 import { Children, useState, useEffect, useLayoutEffect, useRef } from "react";
 import { mount, useCloud, useCollection, icon, Markdown, ProposalDialog } from "./shared/ui.jsx";
-import { LOGO, NAV_ICONS } from "./shared/icons.jsx";
+import { NAV_ICONS } from "./shared/icons.jsx";
 import {
   normalize as normalizeTask, dayDoc, overdue, topOrder, newTask, routeLine, readClock,
   needsReading, isReserve, stripPrefix
@@ -80,40 +81,6 @@ function streakOf(closes, day) {
   let d = closes.get(day) ? day : addDays(day, -1);
   while (closes.get(d)) { n++; d = addDays(d, -1); }
   return n;
-}
-
-/* ================================================================
-   a porta
-   ================================================================ */
-function Landing({ onGuest }) {
-  return (
-    <div className="lg">
-      <div className="lg__art">
-        <span className="lg__logo">{LOGO}<b>merlin</b></span>
-        <div className="lg__grade" aria-hidden="true" />
-        <div className="lg__words">
-          <p className="lg__badge"><i />um assistente de uma pessoa só</p>
-          <h1>o dia é o único lugar com <em>minutos</em></h1>
-          <p className="lg__sub">
-            O Merlin pergunta pelo seu dia, pela sua semana e pelo seu mês, e guarda o que
-            você responde: as tarefas, as ideias, o produto que você está construindo e quem
-            chega até ele. O trabalho entra no dia quando cabe — é por isso que o número
-            grande é confiável.
-          </p>
-        </div>
-      </div>
-      <div className="lg__door">
-        <h2>comece agora</h2>
-        <p className="lg__lead">Sem cadastro, sem cartão, sem espera. O Merlin nasce
-        neste navegador e é seu no primeiro clique.</p>
-        <button className="lg__cta" type="button" onClick={onGuest}>abrir o meu Merlin</button>
-        <p className="lg__fine">Fica só aqui. Nada sobe para lugar nenhum enquanto você não entrar.</p>
-        <div className="lg__or"><span>já tem acesso?</span></div>
-        <button className="lg__ghost" type="button" onClick={() => signIn.show()}>entrar com e-mail</button>
-        <p className="lg__fine">Um código de seis dígitos, sem senha para decorar.</p>
-      </div>
-    </div>
-  );
 }
 
 /* ================================================================
@@ -960,13 +927,32 @@ function Today({ c, tasks, habits, journal, closes, reviews, apps, sessions, me,
   );
 }
 
+/* a porta mora no index.html, escrita à mão, e o script do <head> já decidiu
+   se ela aparece antes da primeira pintura. daqui só sai a palavra final
+   (isNewHere, que sabe mais que a miniatura do <head>) e o fim da porta:
+   abrir o Merlin, ou a sessão chegando de outro aparelho. o que a porta tem
+   de vivo vem no landing.jsx, que só quem está nela baixa. */
+const TITLE = "merlin";
 function Root() {
   const c = useCloud();
   const [bare, setBare] = useState(door);
   const showDoor = bare && !c.signedIn;
-  useLayoutEffect(() => { document.documentElement.classList.toggle("bare", showDoor); }, [showDoor]);
+  useLayoutEffect(() => {
+    const html = document.documentElement;
+    html.classList.toggle("bare", showDoor);
+    html.classList.toggle("in", !showDoor);
+    if (!showDoor) document.title = TITLE;
+  }, [showDoor]);
   useEffect(() => { if (bare && c.signedIn) { markSeen("landing"); setBare(false); } }, [bare, c.signedIn]);
-  return showDoor ? <Landing onGuest={() => { markSeen("landing"); setBare(false); }} /> : <Home />;
+  useEffect(() => {
+    if (!showDoor) return;
+    let live = true, sleep = null;
+    import("./landing.jsx").then((m) => {
+      if (live) sleep = m.wake({ onGuest: () => { markSeen("landing"); setBare(false); window.scrollTo(0, 0); } });
+    });
+    return () => { live = false; if (sleep) sleep(); };
+  }, [showDoor]);
+  return showDoor ? null : <Home />;
 }
 
 mount(<Root />, "app");

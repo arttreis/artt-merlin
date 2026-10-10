@@ -4,7 +4,23 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#0d0d0d">
-<title>merlin</title>
+<title>Merlin · o assistente de quem constrói sozinho</title>
+<!-- a porta é a página que o buscador e a prévia de link leem: o texto mora
+     aqui, no HTML, e não depende do JS. quem já entrou troca o título no
+     index.jsx, porque a aba de quem usa continua se chamando merlin. -->
+<meta name="description" content="Desenhe o app e saia com o prompt para o Claude Code, monte o lançamento e saiba quanto disso cabe hoje. O Merlin é o assistente de quem constrói SaaS sozinho.">
+<link rel="canonical" href="https://merlin.arttreis.com.br/">
+<meta property="og:type" content="website">
+<meta property="og:locale" content="pt_BR">
+<meta property="og:site_name" content="Merlin">
+<meta property="og:url" content="https://merlin.arttreis.com.br/">
+<meta property="og:title" content="Merlin · o assistente de quem constrói sozinho">
+<meta property="og:description" content="Desenhe o app, monte o lançamento e saiba quanto disso cabe hoje.">
+<meta property="og:image" content="https://merlin.arttreis.com.br/og.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"SoftwareApplication","name":"Merlin","url":"https://merlin.arttreis.com.br/","applicationCategory":"BusinessApplication","operatingSystem":"Web","inLanguage":"pt-BR","description":"O assistente de quem constrói SaaS sozinho: desenha o app e sai com o prompt para o Claude Code, monta o lançamento e mostra quanto disso cabe no dia.","offers":{"@type":"Offer","price":"0","priceCurrency":"BRL"},"author":{"@type":"Person","name":"Arthur Reis","url":"https://arttreis.com.br"}}</script>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 472.5 472.5' fill='%232EE86B'><path d='M236.31,236.23c-3.63,128.42,107.71,238.95,236.22,236.22v-118.11c-64.78,2.88-121-53.42-118.11-118.11h-118.11Z'/><path d='M236.22,0C239.85,128.42,128.52,238.95,0,236.22v-118.11C64.78,120.99,121,64.69,118.11,0h118.11Z'/><path d='M315.07,0h77.61c44.09,0,79.89,35.8,79.89,79.89v77.61h-157.5V0h0Z'/><path d='M79.96,315H.07v78.75h78.75v78.75h78.75v-79.89c0-42.86-34.75-77.61-77.61-77.61Z'/></svg>">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -12,14 +28,283 @@
      Guessless (html.gl). o navegador so baixa os arquivos das familias que a
      marca ativa usar: o que cresce aqui e a folha de estilo, nao a pagina. -->
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@500;600;700&family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;500&family=Manrope:wght@400;500;600;700&family=Sora:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/src/landing.css">
 <script>/* o tema E a marca antes da primeira pintura: sem isto, quem e da casa
    ve um quadro de Merlin antes do proprio Merlin. a marca sai do e-mail com
    que a pessoa entrou, e o core a grava em merlin:brand. */
 try{var t=localStorage.getItem("merlin:theme");if(t?t==="light":matchMedia("(prefers-color-scheme: light)").matches)document.documentElement.classList.add("light");
 var b=localStorage.getItem("merlin:brand");if(b&&/^[a-z]{2,12}$/.test(b)){document.documentElement.classList.add(b);
 if(b==="gl"){var l=document.querySelector("link[rel=icon]");if(l)l.href="/guessless-isotipo.svg"}}}catch(e){}</script>
+<script>/* a porta antes da primeira pintura. a landing esta escrita aqui embaixo
+   e aparece para todo mundo que nao rodar este script, que e o caso do
+   buscador. quem ja tem um Merlin neste navegador ganha html.in, e ela some
+   antes de ser vista. e o isNewHere() do core.js em miniatura, com a mesma
+   lista de colecoes que guardam trabalho (o test.mjs confere as duas). na
+   duvida, a casa: esconder o trabalho de quem usa atras de uma pagina de
+   marketing custa mais do que deixar de mostrar a porta.
+   a fase da floresta tambem sai daqui, para o ceu de reserva ja nascer na
+   cor da hora em vez de piscar de noite para dia quando o JS chegar. */
+(function(){var d=document.documentElement,h=new Date().getHours(),known=true;
+d.setAttribute("data-phase",h>=5&&h<8?"dawn":h>=8&&h<17?"day":h>=17&&h<19?"dusk":"night");
+try{var L=localStorage,s=[];try{s=JSON.parse(L.getItem("merlin:seen")||"[]")}catch(e){}
+known=!!L.getItem("merlin:who")||(Array.isArray(s)&&s.indexOf("landing")>=0);
+for(var i=0;i<L.length&&!known;i++){var k=L.key(i),m=/^merlin:(notes|clients|tasks|week|maps|funnels|apps|finance|habits|plans|bookmarks|content|cadence|profile|closes|reviews|sessions|day|inbox)$/.exec(k);if(!m)continue;
+try{var v=JSON.parse(L.getItem(k));known=!!v&&(m[1]==="day"?(v.tasks||[]).length>0:m[1]==="inbox"?Array.isArray(v)&&v.length>0:!!v.items&&Object.keys(v.items).length>0)}catch(e){}}}catch(e){}
+d.classList.add(known?"in":"bare")})();</script>
 </head>
 <body>
+<div class="ld" id="ld">
+  <header class="ld-nav">
+    <a class="ld-nav__logo" href="/" aria-label="Merlin, início">
+      <svg viewBox="0 0 472.5 472.5" fill="currentColor" aria-hidden="true"><path d="M236.31,236.23c-3.63,128.42,107.71,238.95,236.22,236.22v-118.11c-64.78,2.88-121-53.42-118.11-118.11h-118.11Z"/><path d="M236.22,0C239.85,128.42,128.52,238.95,0,236.22v-118.11C64.78,120.99,121,64.69,118.11,0h118.11Z"/><path d="M315.07,0h77.61c44.09,0,79.89,35.8,79.89,79.89v77.61h-157.5V0h0Z"/><path d="M79.96,315H.07v78.75h78.75v78.75h78.75v-79.89c0-42.86-34.75-77.61-77.61-77.61Z"/></svg>
+      <b>merlin</b>
+    </a>
+    <nav class="ld-nav__links" aria-label="o produto">
+      <a href="#construir">construir</a>
+      <a href="#distribuir">distribuir</a>
+      <a href="#o-dia">o dia</a>
+    </nav>
+    <div class="ld-nav__act">
+      <button type="button" class="ld-btn ld-btn--quiet" data-ld="signin">entrar</button>
+      <button type="button" class="ld-btn ld-btn--accent" data-ld="open">abrir o meu Merlin</button>
+    </div>
+  </header>
+
+  <section class="ld-hero">
+    <div class="ld-hero__scene" id="ld-scene" aria-hidden="true"></div>
+    <div class="ld-hero__words">
+      <h1>você constrói sozinho.<br>o Merlin faz o dia <span class="ld-pill"><i></i>caber</span>.</h1>
+      <p class="ld-hero__sub">Desenhe o app e saia com o prompt para o Claude Code, monte o lançamento e saiba quanto disso cabe hoje.</p>
+      <div class="ld-hero__cta">
+        <button type="button" class="ld-btn ld-btn--accent ld-btn--lg" data-ld="open">abrir o meu Merlin</button>
+        <a class="ld-btn ld-btn--glass ld-btn--lg" href="#como">ver como funciona</a>
+      </div>
+      <p class="ld-hero__fine">sem cadastro e sem cartão · fica no seu navegador</p>
+    </div>
+
+    <!-- a janela do início. o que está aqui é a foto parada, para quem não roda
+         JS; a ilha (landing.jsx) troca pelo mesmo desenho andando: escreve uma
+         tarefa, ela entra no dia, o relógio corre e a barra se gasta. -->
+    <figure class="ld-win" aria-label="O início do Merlin: o dia, os hábitos e o que você entregou">
+      <div class="ld-win__bar" aria-hidden="true"><i></i><i></i><i></i><span>merlin · início</span></div>
+      <div class="ld-win__body" id="ld-demo">
+        <p class="ld-demo__hi">Boa tarde. Como está indo o dia?</p>
+        <div class="ld-demo__field" id="ld-field">
+          <span class="ld-demo__text"><span class="ld-demo__ph">uma tarefa (revisar a landing 45m), uma pergunta ou uma ideia</span></span>
+          <span class="ld-demo__hint">com a duração (45m, 1h30) entra em hoje · pergunta vai para o Merlin · o resto vira ideia</span>
+        </div>
+        <div class="ld-demo__grid">
+          <section class="ld-dc ld-dc--day" id="ld-day">
+            <p class="ld-dc__head"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/><rect x="7" y="13" width="3.4" height="3.4" rx="1" fill="currentColor" stroke="none"/></svg>o dia <span>3 na fila · 1 feita</span></p>
+            <p class="ld-dc__n"><b>2h10</b><span>ainda cabe</span></p>
+            <div class="ld-track" aria-hidden="true">
+              <i class="is-spent" style="flex-basis:51.67%"></i><i class="is-slot" style="flex-basis:5%"></i><i class="is-slot" style="flex-basis:15%"></i><i class="is-slot" style="flex-basis:6.67%"></i><i class="is-free"></i>
+            </div>
+            <ul class="ld-dc__list">
+              <li><i class="ld-check"></i><span>responder os testers do beta</span><small>30m</small></li>
+              <li><i class="ld-check"></i><span>gravar o reels do lançamento</span><small>1h30</small></li>
+              <li><i class="ld-check"></i><span>escrever o e-mail da lista</span><small>40m</small></li>
+              <li class="is-done"><i class="ld-check"></i><span>revisar o fluxo de cobrança</span><small>45m</small></li>
+              <li class="is-done is-reserve"><i class="ld-check"></i><span>call com o contador</span><small>30m</small></li>
+            </ul>
+            <p class="ld-dc__foot">agora 14:10 · a janela vai até 19:00</p>
+          </section>
+          <div class="ld-demo__side">
+            <section class="ld-dc">
+              <p class="ld-dc__head"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M8 13l2 2 4-4M8 18h2M14 17h2"/></svg>hábitos de hoje <span>1/2</span></p>
+              <ul class="ld-dc__list">
+                <li class="is-done"><i class="ld-check"></i><span>treinar</span><small>12d</small></li>
+                <li><i class="ld-check"></i><span>ler 20 páginas</span><small>4d</small></li>
+              </ul>
+            </section>
+            <section class="ld-dc">
+              <p class="ld-dc__head"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="11" height="8" rx="1.5"/><rect x="14" y="14" width="7" height="6" rx="1.5"/><path d="M3 7h11M8.5 12v5.5a1.5 1.5 0 001.5 1.5H14"/></svg>entregue hoje <span>6 commits · 1 PR</span></p>
+              <ul class="ld-dc__list ld-dc__list--log">
+                <li><small>11:02</small><span>a cobrança aceita Pix</span><small>agenda</small></li>
+                <li><small>12:47</small><span>PR · lembrete pelo WhatsApp</span><small>agenda</small></li>
+                <li><small>13:30</small><span>o painel mostra o mês</span><small>agenda</small></li>
+              </ul>
+            </section>
+          </div>
+        </div>
+      </div>
+    </figure>
+  </section>
+
+  <section class="ld-works" aria-label="Funciona com">
+    <p>funciona com o que você já usa</p>
+    <ul>
+      <li>GitHub</li>
+      <li>Claude Code</li>
+      <li>Postgres</li>
+      <li>Mermaid</li>
+      <li>Markdown</li>
+    </ul>
+  </section>
+
+  <section class="ld-sec" id="como">
+    <h2>construir e distribuir disputam o mesmo dia.</h2>
+    <p class="ld-sec__sub">O Merlin ajuda nas duas metades do trabalho e diz quanto delas cabe hoje.</p>
+
+    <div class="ld-bento">
+      <article class="ld-card" id="construir">
+        <div class="ld-card__words">
+          <p class="ld-card__eyebrow">produtos</p>
+          <h3>do conceito ao prompt do Claude Code.</h3>
+          <p>Descreva o app em duas frases. O Merlin rascunha as funcionalidades, o banco e as telas, e você sai com o SQL, os diagramas e a especificação.</p>
+        </div>
+        <div class="ld-mock ld-build" aria-hidden="true">
+          <div class="ld-build__er">
+            <div class="ld-ent"><b>salons</b><span>id</span><span>name</span><span>whatsapp</span></div>
+            <div class="ld-ent ld-ent--main"><b>bookings</b><span>id</span><span>salon_id <em>→</em></span><span>client_id <em>→</em></span><span>starts_at</span></div>
+            <div class="ld-ent"><b>clients</b><span>id</span><span>name</span><span>phone</span></div>
+          </div>
+          <div class="ld-build__out">
+            <p class="ld-tabs"><span class="is-on">SQL</span><span>mermaid</span><span>spec</span><span>prompt</span></p>
+            <pre><code><b>create table</b> bookings (
+  id uuid <b>primary key</b>,
+  salon_id uuid <b>references</b> salons,
+  client_id uuid <b>references</b> clients,
+  starts_at timestamptz <b>not null</b>
+);</code></pre>
+            <span class="ld-fake">copiar o prompt para o Claude Code</span>
+          </div>
+        </div>
+      </article>
+
+      <article class="ld-card" id="distribuir">
+        <div class="ld-card__words">
+          <p class="ld-card__eyebrow">distribuição</p>
+          <h3>o lançamento e as peças que ainda não foram ao ar.</h3>
+          <p>O funil vira um grafo com a vazão de cada etapa, e o quadro de conteúdo mostra o que falta publicar na semana.</p>
+        </div>
+        <div class="ld-mock ld-dist" aria-hidden="true">
+          <ol class="ld-flow">
+            <li><span>anúncio</span><b>12.400</b></li>
+            <li><span>página</span><b>3.100</b></li>
+            <li><span>teste grátis</span><b>410</b></li>
+            <li class="is-end"><span>plano pago</span><b>62</b></li>
+          </ol>
+          <div class="ld-pieces">
+            <p class="ld-pieces__top">esta semana · faltam 2 reels</p>
+            <span><i>reels</i>o bastidor do lançamento<em>roteiro</em></span>
+            <span><i>carrossel</i>5 erros de quem agenda pelo direct<em>gravar</em></span>
+            <span><i>e-mail</i>a lista de espera abriu<em>agendado</em></span>
+          </div>
+        </div>
+      </article>
+
+      <article class="ld-card ld-card--wide" id="o-dia">
+        <div class="ld-card__words">
+          <p class="ld-card__eyebrow">hoje</p>
+          <h3>só o dia tem minutos.</h3>
+          <p>Toda tarefa tem duração, e a barra do dia se gasta com o relógio. O número grande é quanto ainda cabe. Quando o dia estoura, nada fica vermelho: o Merlin só diz quanto passou.</p>
+        </div>
+        <div class="ld-mock ld-days" aria-hidden="true">
+          <div class="ld-dayrow">
+            <p><b>2h10</b> ainda cabe</p>
+            <div class="ld-track ld-track--big"><i class="is-spent" style="flex-basis:38%"></i><i class="is-reserved" style="flex-basis:8%"></i><i class="is-slot" style="flex-basis:12%"></i><i class="is-slot" style="flex-basis:20%"></i><i class="is-free"></i></div>
+            <p class="ld-scale"><span>09:00</span><span>agora 12:48</span><span>19:00</span></p>
+          </div>
+          <div class="ld-dayrow ld-dayrow--over">
+            <p><b>40m</b> além das 19:00</p>
+            <div class="ld-track ld-track--big ld-track--over"><i class="is-spent" style="flex-basis:38%"></i><i class="is-reserved" style="flex-basis:8%"></i><i class="is-slot" style="flex-basis:12%"></i><i class="is-slot" style="flex-basis:20%"></i><i class="is-slot" style="flex-basis:22%"></i></div>
+            <p class="ld-scale"><span>com mais 2h50 na fila</span><span>o verde some, e é só isso</span></p>
+          </div>
+        </div>
+      </article>
+    </div>
+  </section>
+
+  <section class="ld-sec ld-sec--tight">
+    <h2 class="ld-h-small">o que o Merlin faz no seu dia</h2>
+    <ul class="ld-uses">
+      <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.5 11.5a8.5 8.5 0 01-12.4 7.6L3.5 20.5l1.4-4.4A8.5 8.5 0 1120.5 11.5z"/></svg><p>Escreva uma linha. Com duração ela vira tarefa, com “?” vira pergunta e, sem nada, vira ideia.</p></li>
+      <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12.5l5.5 5.5L20 6.5"/></svg><p>Feche o dia em um minuto: o que ficou aberto vai para amanhã ou sai da fila.</p></li>
+      <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7.5V12l3 2"/></svg><p>Sessão de foco com recibo: quanto levou contra o que você estimou.</p></li>
+      <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="11" height="8" rx="1.5"/><rect x="14" y="14" width="7" height="6" rx="1.5"/><path d="M3 7h11M8.5 12v5.5a1.5 1.5 0 001.5 1.5H14"/></svg><p>Os commits e PRs do dia aparecem sozinhos, lidos do seu GitHub público.</p></li>
+      <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 4h18l-7 8.5V20l-4-2v-5.5z"/></svg><p>Comece um funil por um dos 39 modelos prontos, do lançamento ao teste grátis.</p></li>
+      <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="2.5"/><circle cx="4.5" cy="6" r="2"/><circle cx="19.5" cy="6" r="2"/><circle cx="4.5" cy="18" r="2"/><circle cx="19.5" cy="18" r="2"/><path d="M6.3 7l3.7 3.5M17.7 7L14 10.5M6.3 17l3.7-3.5M17.7 17L14 13.5"/></svg><p>Transforme um mapa mental em mermaid ou num link só de leitura.</p></li>
+    </ul>
+  </section>
+
+  <section class="ld-sec">
+    <h2>o seu dia é só seu.</h2>
+    <div class="ld-trust">
+      <article>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="3.75"/><path d="M4.5 20.5a7.5 7.5 0 0115 0"/></svg>
+        <h3>uma pessoa por vez.</h3>
+        <p>Cada conta é um Merlin inteiro. Ninguém mais vê o seu dia, os seus clientes nem o seu dinheiro.</p>
+      </article>
+      <article>
+        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2l1.9 6.1L20 10l-6.1 1.9L12 18l-1.9-6.1L4 10l6.1-1.9L12 2z"/></svg>
+        <h3>o Merlin propõe, você confirma.</h3>
+        <p>Ele sugere tarefas, funis e roteiros. Nada vira documento sem o seu clique.</p>
+      </article>
+      <article>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 10.5L12 4l8 6.5V19a1.5 1.5 0 01-1.5 1.5h-13A1.5 1.5 0 014 19v-8.5z"/><path d="M9.5 20.5v-6h5v6"/></svg>
+        <h3>começa sem conta.</h3>
+        <p>Tudo fica no seu navegador. A conta serve para levar os dados ao celular e para conversar com o Merlin.</p>
+      </article>
+    </div>
+  </section>
+
+  <section class="ld-facts" aria-label="O Merlin em números">
+    <div class="ld-facts__track">
+      <ul>
+        <li>39 funis prontos para começar</li>
+        <li>19 mapas prontos</li>
+        <li>seis seções, um dia</li>
+        <li>nenhum vermelho na tela</li>
+        <li>código por e-mail, sem senha</li>
+        <li>o prompt do Claude Code a um clique</li>
+      </ul>
+      <ul aria-hidden="true">
+        <li>39 funis prontos para começar</li>
+        <li>19 mapas prontos</li>
+        <li>seis seções, um dia</li>
+        <li>nenhum vermelho na tela</li>
+        <li>código por e-mail, sem senha</li>
+        <li>o prompt do Claude Code a um clique</li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="ld-end" id="comecar">
+    <h2>o dia de hoje ainda cabe.</h2>
+    <p>Abra o Merlin agora, sem cadastro. Para conversar com ele e sincronizar entre aparelhos você precisa de uma conta, e as contas estão abrindo aos poucos.</p>
+    <div class="ld-end__cta">
+      <button type="button" class="ld-btn ld-btn--accent ld-btn--lg" data-ld="open">abrir o meu Merlin</button>
+      <button type="button" class="ld-btn ld-btn--ghost ld-btn--lg" data-ld="signin">já tenho conta</button>
+    </div>
+    <form class="ld-wait" id="fila" data-ld="wait" novalidate>
+      <label for="ld-email">quero uma conta</label>
+      <div class="ld-wait__row">
+        <input id="ld-email" type="email" name="email" required maxlength="200" placeholder="seu@email.com" autocomplete="email">
+        <!-- o campo que ninguém vê: robô preenche tudo, e o servidor finge que gravou -->
+        <input class="ld-wait__hp" type="text" name="site" tabindex="-1" autocomplete="off" aria-hidden="true">
+        <button type="submit" class="ld-btn ld-btn--accent">entrar na fila</button>
+      </div>
+      <p class="ld-wait__note" aria-live="polite">Usamos o e-mail só para avisar quando a sua conta abrir.</p>
+    </form>
+  </section>
+
+  <footer class="ld-foot">
+    <div class="ld-foot__brand">
+      <a class="ld-nav__logo" href="/" aria-label="Merlin, início">
+        <svg viewBox="0 0 472.5 472.5" fill="currentColor" aria-hidden="true"><path d="M236.31,236.23c-3.63,128.42,107.71,238.95,236.22,236.22v-118.11c-64.78,2.88-121-53.42-118.11-118.11h-118.11Z"/><path d="M236.22,0C239.85,128.42,128.52,238.95,0,236.22v-118.11C64.78,120.99,121,64.69,118.11,0h118.11Z"/><path d="M315.07,0h77.61c44.09,0,79.89,35.8,79.89,79.89v77.61h-157.5V0h0Z"/><path d="M79.96,315H.07v78.75h78.75v78.75h78.75v-79.89c0-42.86-34.75-77.61-77.61-77.61Z"/></svg>
+        <b>merlin</b>
+      </a>
+      <blockquote>“O conselheiro do rei Arthur: não governa, aconselha.”<cite>de onde vem o nome</cite></blockquote>
+    </div>
+    <nav class="ld-foot__cols" aria-label="Rodapé">
+      <div><p>produto</p><a href="#construir">construir</a><a href="#distribuir">distribuir</a><a href="#o-dia">o dia</a></div>
+      <div><p>começar</p><button type="button" data-ld="open">abrir o meu Merlin</button><button type="button" data-ld="signin">entrar</button><a href="#fila">lista de espera</a></div>
+      <div><p>quem faz</p><a href="https://arttreis.com.br" rel="noopener">Arthur Reis</a></div>
+    </nav>
+    <p class="ld-foot__fine">© 2026 Arthur Reis</p>
+  </footer>
+</div>
 <main class="page" id="app"></main>
 <script type="module" src="/src/index.jsx"></script>
 </body>

@@ -3,7 +3,7 @@
 import worker from "./worker.js";
 
 /* ---- D1 falso: entende so as consultas que o worker faz ---- */
-const db = { people: [], codes: [], days: [], docs: [], advice: [], shares: [] };
+const db = { people: [], codes: [], days: [], docs: [], advice: [], shares: [], waitlist: [] };
 let sentEmails = [];
 
 function prepare(sql) {
@@ -22,6 +22,14 @@ function run(sql, a, mode) {
 
   if (s.startsWith("SELECT COUNT(*) AS n FROM codes")) {
     return { n: db.codes.filter(c => c.email === a[0] && c.expires_at > a[1]).length };
+  }
+  if (s.startsWith("SELECT COUNT(*) AS n FROM waitlist")) {
+    return { n: db.waitlist.filter(w => w.created_at > a[0]).length };
+  }
+  if (s.startsWith("INSERT OR IGNORE INTO waitlist")) {
+    if (db.waitlist.some(w => w.email === a[0])) return { meta: { changes: 0 } };
+    db.waitlist.push({ email: a[0], created_at: a[1] });
+    return { meta: { changes: 1 } };
   }
   if (s.startsWith("INSERT OR REPLACE INTO codes")) {
     db.codes = db.codes.filter(c => c.hash !== a[0]);
@@ -622,6 +630,35 @@ check("revogado, o link morre na hora", r.status === 404, String(r.status));
 
 r = await call("GET", "/shared/" + shareToken, null, cookie);
 check("nem com sessão o link revogado volta", r.status === 404, String(r.status));
+
+/* ---- 13.6 a lista de espera da landing ----
+   a única escrita sem sessão: precisa aceitar quem ainda não tem conta e
+   não pode virar porta de entrada nem de enchente */
+r = await call("POST", "/waitlist", { email: "  Bia@Exemplo.COM " });
+check("lista de espera aceita sem sessão", r.status === 200, String(r.status));
+check("lista de espera normaliza o e-mail", db.waitlist.length === 1 && db.waitlist[0].email === "bia@exemplo.com", JSON.stringify(db.waitlist));
+r = await call("POST", "/waitlist", { email: "bia@exemplo.com" });
+check("entrar de novo responde igual e não duplica", r.status === 200 && db.waitlist.length === 1, String(db.waitlist.length));
+r = await call("POST", "/waitlist", { email: "naoehemail" });
+check("lista de espera recusa e-mail inválido", r.status === 400, String(r.status));
+r = await call("POST", "/waitlist", { email: "robo@exemplo.com", site: "http://spam" });
+check("o campo escondido finge que gravou", r.status === 200 && !db.waitlist.some(w => w.email === "robo@exemplo.com"));
+r = await call("GET", "/waitlist");
+check("a lista não se lê de fora", r.status === 405, String(r.status));
+{
+  const owners = env.OWNER_EMAILS, sent = sentEmails.length;
+  env.OWNER_EMAILS = "arthur@exemplo.com";
+  r = await call("POST", "/code", { email: "bia@exemplo.com" });
+  check("estar na lista não abre a porta", r.status === 200 && sentEmails.length === sent, String(sentEmails.length - sent));
+  env.OWNER_EMAILS = owners;
+}
+{
+  const keep = db.waitlist;
+  db.waitlist = Array.from({ length: 300 }, (_, i) => ({ email: "x" + i + "@exemplo.com", created_at: Date.now() }));
+  r = await call("POST", "/waitlist", { email: "tarde@exemplo.com" });
+  check("o teto da hora segura a enchente", r.status === 429, String(r.status));
+  db.waitlist = keep;
+}
 
 /* ---- 14. o site sai do mesmo worker que a api ---- */
 const raw = (path) => worker.fetch(new Request("https://x.com" + path), env);

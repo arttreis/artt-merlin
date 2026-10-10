@@ -29,7 +29,7 @@ está em [MIGRATION.md](MIGRATION.md).
 
 | página | o que é |
 | --- | --- |
-| `index.html` | a porta de quem nunca entrou: o que o Merlin é e o gesto de começar sem conta. Quem já entrou é encaminhado para o Hoje antes de ver qualquer coisa. |
+| `index.html` | a porta de quem nunca entrou: a landing, escrita no próprio HTML para o buscador e a prévia de link lerem, com o produto andando numa janela, o gesto de começar sem conta e a lista de espera ([docs/prd/landing.md](docs/prd/landing.md)). Quem já tem um Merlin no navegador nunca a vê: o `<head>` decide antes da primeira pintura. |
 | `calendar.html` | **o Hoje**, a primeira tela: **uma** coleção de tarefas com data, e três jeitos de olhar para ela. O **dia** é a fila de hoje, com a barra que se gasta e a sobra — o único lugar com minutos —, e ao lado os hábitos do dia, o "como foi o dia" e as notas. A **semana** são sete colunas. O **mês** é a grade. `day.html` e `week.html` continuam existindo e encaminham para cá. |
 | `assistant.html` | a conversa com o Merlin. Não está na barra: chega-se pelo `Ctrl+K` (texto com "?") ou pelo `Ctrl+J`. Cada resposta é no máximo uma **proposta** — ela só vira documento quando você confirma numa caixa com os campos. |
 | `routine.html` | a rotina: a semana de sempre, sem datas. Cada bloco tem dias, hora e duração, e vira tarefa quando o calendário abre a semana. |

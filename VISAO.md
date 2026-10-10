@@ -780,7 +780,10 @@ Depois, e não agora: uma rede social, e um lugar onde as pessoas entram para tr
 
 - Quanto crédito cada plano tem, quanto custa, e como cada pedido pesa (o projeto de app gasta
   três vezes a saída de um conselho comum).
-- O que substitui `OWNER_EMAILS` como porta: cadastro aberto, convite ou lista de espera.
+- O que substitui `OWNER_EMAILS` como porta: cadastro aberto, convite ou lista de espera. Em
+  10/10/2026 a landing passou a guardar uma **lista de espera** (`/api/waitlist`); a porta
+  continua sendo `OWNER_EMAILS` até alguém decidir como a fila vira conta
+  ([docs/prd/landing.md](docs/prd/landing.md)).
 - Os modelos de quem lança SaaS (canais, funis de lançamento, conteúdo de construir em público),
   ao lado dos que já existem.
 - Por qual celular começar, e o endereço do produto.

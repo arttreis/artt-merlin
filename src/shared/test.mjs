@@ -561,6 +561,50 @@ const dataLeft = () => globalThis.localStorage.keys().filter((k) => k in DATA);
     check("chave corrompida não quebra a pergunta", isNewHere());
   }
 
+  /* ---- a porta decidida no <head> ----
+     a landing é HTML escrito no index.html, e um script no <head> decide se
+     ela aparece antes da primeira pintura, com uma miniatura do isNewHere().
+     se as duas discordarem, quem já usa vê a landing piscar antes da casa, ou
+     quem chega vê a casa piscar antes da porta. a lista de coleções que a
+     miniatura conhece tem que ser a do core: ela é lida do próprio core.js. */
+  {
+    const fs = await import("node:fs");
+    const path = await import("node:path");
+    const { fileURLToPath } = await import("node:url");
+    const root = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
+    const html = fs.readFileSync(path.join(root, "index.html"), "utf8");
+    const door = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((m) => m[1]).find((s) => s.includes("merlin:seen"));
+    check("o index.html decide a porta no <head>", !!door);
+    const core = fs.readFileSync(path.join(root, "src", "shared", "core.js"), "utf8");
+    const types = JSON.parse(core.match(/const PURGE_TYPES = (\[[^\]]*\])/)[1]);
+    const headOpens = (seed) => {
+      const added = [];
+      const doc = { documentElement: { classList: { add: (c) => added.push(c) }, setAttribute: () => {} } };
+      new Function("document", "localStorage", door)(doc, makeStorage(seed));
+      return added.includes("bare");
+    };
+    const seeds = [
+      {}, { ...PREFS }, { "merlin:seen": '["tour"]' }, { "merlin:seen": '["landing"]' },
+      { "merlin:who": "arthur@exemplo.com" }, { "merlin:notes": col(0) }, { "merlin:notes": "{isso nao e json" },
+      { "merlin:day": '{"day":"2026-09-08","tasks":[{"title":"algo"}]}' }, { "merlin:day": '{"day":"2026-09-08","tasks":[]}' },
+      { "merlin:inbox": '[{"title":"algo"}]' }, { "merlin:inbox": "[]" },
+      ...types.map((t) => ({ ["merlin:" + t]: col(1) }))
+    ];
+    for (const seed of seeds) {
+      const c = await fresh(seed);
+      const want = c.isNewHere() && !c.seen("landing");
+      check("o <head> e o core concordam sobre a porta: " + (Object.keys(seed).join(",") || "vazio"), headOpens(seed) === want, "head " + headOpens(seed) + ", core " + want);
+    }
+
+    /* os números da faixa e dos cartões são escritos à mão no HTML; eles
+       envelhecem em silêncio se ninguém os conferir contra os modelos */
+    const T = await import("./templates.js");
+    const funnels = [...html.matchAll(/(\d+) (?:funis|modelos) prontos/g)].map((m) => +m[1]);
+    const maps = [...html.matchAll(/(\d+) mapas prontos/g)].map((m) => +m[1]);
+    check("a landing conta os funis que existem", funnels.length >= 2 && funnels.every((x) => x === T.FUNNEL_TEMPLATES.length), funnels.join(",") + " de " + T.FUNNEL_TEMPLATES.length);
+    check("a landing conta os mapas que existem", maps.length >= 1 && maps.every((x) => x === T.MAP_TEMPLATES.length), maps.join(",") + " de " + T.MAP_TEMPLATES.length);
+  }
+
   /* ---- o endereço de um favorito ----
      ele vira href de um <a> e destino de um location.href na busca: um
      "javascript:" que entrasse por aqui seria execução num clique. */

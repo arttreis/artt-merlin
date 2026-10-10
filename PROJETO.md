@@ -56,7 +56,7 @@ os pares sozinho; não há lista de rotas. Nunca escreva no `localStorage` diret
 
 | página | arquivo | observação |
 | --- | --- | --- |
-| porta | `index.jsx` | só quem nunca entrou (landing e login); o resto vai direto para o Hoje |
+| porta | `index.html` + `landing.jsx` | a landing é HTML estático no `index.html`, com o CSS em `landing.css`, e um script no `<head>` decide antes da primeira pintura quem a vê. `landing.jsx` só acorda o que se mexe (a floresta, a janela de demonstração, a lista de espera) para quem está na porta. Ver `docs/prd/landing.md` |
 | hoje (calendário) | `calendar.jsx` | a primeira tela: dia / semana / mês sobre **uma** coleção `tasks`, com hábitos e "como foi o dia" ao lado (`today-block.jsx`) e a apresentação (`tour.jsx`); `day.html`, `week.html`, `journal.html` e `plans.html` só redirecionam |
 | rotina | `routine.jsx` | semana-modelo sem datas; vira tarefas (`shared/routine.js`) |
 | assistente | `assistant.jsx` | conversa com o Merlin, fora da barra (chega-se pelo `Ctrl+K`); respostas viram **propostas** confirmadas (`assistant-actions.js`) |
@@ -87,7 +87,8 @@ os pares sozinho; não há lista de rotas. Nunca escreva no `localStorage` diret
 
 `/api/code`, `/api/sign-in`, `/api/sign-out`, `/api/me`, `/api/days`, `/api/docs`,
 `/api/merlin` (conselheiro, teto `ADVICE_PER_HOUR = 30` por pessoa), `/api/quick-note`
-(extensão), `/api/files/:id` (R2), `/api/share` e `/api/shared/:token` (link público).
+(extensão), `/api/files/:id` (R2), `/api/share` e `/api/shared/:token` (link público),
+`/api/waitlist` (a lista de espera da landing, sem sessão).
 Detalhes de cada uma no `server/README.md`.
 
 ## Rodar, testar e publicar
