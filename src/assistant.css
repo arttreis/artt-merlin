@@ -10,13 +10,20 @@
    coluna fixa a direita, como a lista das notas — nao e um painel que abre e
    fecha, porque uma conversa comeca quase sempre olhando para as outras. */
 .page--chat{padding:0;height:100dvh;overflow:hidden}
-/* a barra de cima so existe no estreito; no desktop ela e a coluna da
-   esquerda, e reservar a altura dela deixaria uma faixa morta no topo */
-@media (max-width:899px){.page--chat{padding-top:var(--nav-h)}}
+/* a faixa do alto e o dock flutuam por cima de tudo (shell.css). a casca
+   reserva o espaco deles no .page, mas ela mora numa @layer e este arquivo
+   nao — o padding:0 de cima vencia, e o campo da conversa ia parar embaixo
+   do dock. aqui a reserva volta: 52px da faixa, e o dock (14px do chao +
+   50px de altura) com um respiro. */
+html.merlin .page--chat{padding:var(--nav-h) 0 76px}
+html.onboarding .page--chat{padding-bottom:0}
 
-.chat{position:relative;height:100%;display:grid;grid-template-columns:minmax(0,1fr) 288px}
+/* a linha da grade presa na altura da pagina: com a linha auto, um cartao
+   comprido (o rascunho do funil) esticava a coluna inteira, o campo saia
+   pelo rodape e a conversa parava de rolar — quem rola e o .chat__log */
+.chat{position:relative;height:100%;display:grid;grid-template-columns:minmax(0,1fr) 288px;grid-template-rows:minmax(0,1fr)}
 .chat__main{
-  display:flex;flex-direction:column;min-width:0;
+  display:flex;flex-direction:column;min-width:0;min-height:0;
   padding:var(--pd) clamp(16px,3vw,40px) calc(var(--pd) * 1.25);
 }
 
