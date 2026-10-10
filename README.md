@@ -3,9 +3,12 @@
 Sistema pessoal, de uma pessoa só — e agora de uma pessoa só **por vez**: o time da Guessless
 entra pelo mesmo endereço e cada um ganha um Merlin inteiro, que ninguém mais vê. Nasceu como
 o `artt · planner` — um controle
-de tarefas de um dia — e virou um conjunto de módulos ligados entre si: o dia, a semana, as
-notas, os clientes (com canais), os funis, os mapas mentais, o financeiro, os
-hábitos e os planos. A visão completa e as decisões estão em [VISAO.md](VISAO.md).
+de tarefas de um dia — e virou um conjunto de módulos ligados entre si, organizados em **seis
+seções**: **hoje** (o calendário, a rotina e os hábitos), **ideias** (notas e mapas),
+**produtos**, **distribuição** (funis e conteúdo), **clientes** (leads e clientes) e
+**dinheiro** (financeiro e vitrine). O `Ctrl+K` é o campo de tudo: com duração vai para hoje,
+sem duração vira ideia, com "?" pergunta ao Merlin. A visão completa e as decisões estão em
+[VISAO.md](VISAO.md) — a organização em seções é a seção 9.
 
 Cada módulo é **uma página**: um HTML na raiz, com o CSS dela inline, e um módulo em
 [`src/`](src/) com a tela. A tela é **React 19 com JSX**, e o build é o **Vite**, que cospe as
@@ -26,27 +29,26 @@ está em [MIGRATION.md](MIGRATION.md).
 
 | página | o que é |
 | --- | --- |
-| `index.html` | o início: um campo no meio, as notas e os favoritos numa faixa, e os atalhos embaixo dizendo o número que faria você abrir cada um. Para quem nunca esteve aqui, é a porta — com o gesto de começar sem conta. |
-| `calendar.html` | o calendário: **uma** coleção de tarefas com data, e três jeitos de olhar para ela. O **dia** é a fila de hoje, com a barra que se gasta e a sobra — o único lugar com minutos. A **semana** são sete colunas. O **mês** é a grade. `day.html` e `week.html` continuam existindo e encaminham para cá. |
-| `assistant.html` | a conversa com o Merlin: os três começos (mapa mental, funil, simulação financeira), a conversa no meio e o histórico à direita. O campo da home e a busca da sidebar desaguam aqui. Cada resposta é no máximo uma **proposta** — ela só vira documento quando você confirma numa caixa com os campos. |
+| `index.html` | a porta de quem nunca entrou: o que o Merlin é e o gesto de começar sem conta. Quem já entrou é encaminhado para o Hoje antes de ver qualquer coisa. |
+| `calendar.html` | **o Hoje**, a primeira tela: **uma** coleção de tarefas com data, e três jeitos de olhar para ela. O **dia** é a fila de hoje, com a barra que se gasta e a sobra — o único lugar com minutos —, e ao lado os hábitos do dia, o "como foi o dia" e as notas. A **semana** são sete colunas. O **mês** é a grade. `day.html` e `week.html` continuam existindo e encaminham para cá. |
+| `assistant.html` | a conversa com o Merlin. Não está na barra: chega-se pelo `Ctrl+K` (texto com "?") ou pelo `Ctrl+J`. Cada resposta é no máximo uma **proposta** — ela só vira documento quando você confirma numa caixa com os campos. |
 | `routine.html` | a rotina: a semana de sempre, sem datas. Cada bloco tem dias, hora e duração, e vira tarefa quando o calendário abre a semana. |
 | `notes.html` | o que ainda não é tarefa, numa caixa de entrada: lista por dia à esquerda, a nota aberta à direita com corpo, estágio, checklist e histórico. |
-| `journal.html` | o diário: uma página por dia, o registro do que o dia foi. Não vira tarefa nem nada. |
-| `prospecting.html` | quem ainda não fechou: um quadro por etapa (lead → negociação). O prospecto é o mesmo documento do cliente — "fechou" só muda o status. |
+| `prospecting.html` | os leads, quem ainda não fechou: um quadro por etapa (lead → negociação). O prospecto é o mesmo documento do cliente — "fechou" só muda o status. |
 | `clients.html` | clientes com canais (Mercado Livre, Shopee, TikTok Shop…), backlog, diário, objetivos, ficha e cofre. Um cliente novo abre com os primeiros passos. |
 | `content.html` | o que vai ao ar: um quadro por etapa (ideia → publicado), um cartão por peça, com o roteiro dentro do cartão. |
 | `funnels.html` | funil como grafo com tipos de nó, vazão por etapa, criativos, automações, ofertas e gatilhos. |
 | `maps.html` | mapa mental com teclado e layout automático. Sai como texto (copiar mermaid ou outline), como arquivo (png, .md, .mmd) ou como link só de leitura; e volta colando o mermaid, num mapa novo ou como ramo de um que já existe. |
-| `apps.html` | o projeto de app: conceito e funcionalidades com fase (primeira versão, depois, talvez), o banco (entidades, campos e relações num diagrama), as telas e as ações entre elas, e a saída pronta para construir — SQL do Postgres, mermaid do banco e dos fluxos, a especificação em markdown e o prompt para o Claude Code. O Merlin rascunha o projeto a partir de duas frases e revisa o que está desenhado; o app se liga ao funil de lançamento e às peças de conteúdo. |
+| `apps.html` | **os produtos**, o centro: abrir um mostra a visão geral — o que está construído e o que falta, o funil e as peças, os mapas ligados. Por dentro, o projeto de app: conceito e funcionalidades com fase (primeira versão, depois, talvez), o banco (entidades, campos e relações num diagrama), as telas e as ações entre elas, e a saída pronta para construir — SQL do Postgres, mermaid do banco e dos fluxos, a especificação em markdown e o prompt para o Claude Code. O Merlin rascunha o projeto a partir de duas frases e revisa o que está desenhado; o app se liga ao funil de lançamento e às peças de conteúdo. |
 | `finance.html` | do jeito da planilha: o mês dia a dia com saldo previsto, o ano em doze colunas, e o painel com saídas fixas, entradas fixas, compras no cartão e dívidas, mais a divisão 50/30/20. |
 | `wishlist.html` | a vitrine: o que se quer comprar, em coletâneas, com preço, link e foto. "comprei" lança a saída no financeiro; desfazer a compra tira o lançamento. |
 | `habits.html` | a grade do mês: hábitos nas linhas, dias nas colunas, uma marca por dia. Sequência e taxa do mês. |
-| `plans.html` | trimestre, mês e semana lado a lado: desdobrar de um horizonte para o outro. Acender um objetivo apaga tudo que não tem parentesco com ele nas outras colunas. |
 | `share.html` | a leitura de um mapa ou funil por link público (`share.html#<token>`), sem conta. |
+| `tracker.html` | o rastreador: o número grande, a barra, o que é agora e o que vem depois, e um campo para pôr mais coisa na fila. É a janela pequena do app de desktop ([desktop/](desktop/README.md)), mas abre no navegador também. |
 | `profile.html` | o perfil: a sessão, a aparência (o tema mora aqui), a apresentação e o inventário do que está guardado. |
 
 Em toda tela, criar é o mesmo gesto: um botão "+" abre uma caixa (pop-up) com os campos. Nenhuma
-lista tem formulário aberto no meio, e nenhuma tela tem filtro — a busca da sidebar acha qualquer
+lista tem formulário aberto no meio, e nenhuma tela tem filtro — o `Ctrl+K` acha qualquer
 coisa pelo nome.
 
 Tela vazia não diz "nada aqui": ela **oferece**. Clientes, financeiro e hábitos começam por uma

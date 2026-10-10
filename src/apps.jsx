@@ -20,6 +20,7 @@ import {
   mount, useCollection, useHash, setHash, useFields,
   Form, Field, Dialog, Markdown, NewItemRow, icon
 } from "./shared/ui.jsx";
+import { NAV_ICONS } from "./shared/icons.jsx";
 import { TaskDialog } from "./shared/task-form.jsx";
 import { FUNNEL_TEMPLATES, buildFunnel } from "./shared/templates.js";
 import { layoutNodes } from "./shared/funnel-layout.js";
@@ -91,11 +92,11 @@ function AppList({ store, missing }) {
     <>
       <div className="header">
         <div>
-          <h1>apps</h1>
-          <p className="sub">do conceito ao banco: desenhe o app e saia com tudo pronto para construir</p>
+          <h1>produtos</h1>
+          <p className="sub">o que você está construindo: desenhe o app, saia com tudo pronto para construir e veja como gente chega até ele</p>
         </div>
         <div className="actions">
-          <button className="pill pill--accent" type="button" onClick={() => setForm(true)}>{icon("plus")}app</button>
+          <button className="pill pill--accent" type="button" onClick={() => setForm(true)}>{icon("plus")}produto</button>
         </div>
       </div>
       {missing && <p className="ap-note">esse projeto não existe mais (ou ainda não chegou da nuvem).</p>}
@@ -115,12 +116,12 @@ function AppList({ store, missing }) {
         </div>
       ) : (
         <div className="ap-start block">
-          <p className="ap-start__title">Desenhe o primeiro app</p>
+          <p className="ap-start__title">Desenhe o primeiro produto</p>
           <p className="ap-start__text">
             Descreva o app em duas frases e o Merlin rascunha o conceito, as funcionalidades, o banco e as telas.
             Você ajusta o que quiser e exporta o SQL, os diagramas e o prompt para o Claude Code.
           </p>
-          <button className="pill pill--accent" type="button" onClick={() => setForm(true)}>{icon("plus")}novo app</button>
+          <button className="pill pill--accent" type="button" onClick={() => setForm(true)}>{icon("plus")}novo produto</button>
         </div>
       )}
       {form && <NewAppForm store={store} onClose={() => setForm(false)} />}
@@ -146,7 +147,7 @@ function NewAppForm({ store, onClose }) {
     setHash(doc.id);
   };
   return (
-    <Form title="novo app" submit="criar" onSubmit={submit} onClose={onClose}>
+    <Form title="novo produto" submit="criar" onSubmit={submit} onClose={onClose}>
       <Field label="nome" full><input className="input" {...bind("name")} maxLength={120} placeholder="ex.: agenda do salão" /></Field>
       <Field label="o que ele faz, para quem" full>
         <textarea className="textarea" rows={4} {...bind("description")} placeholder="ex.: app para salões de beleza agendarem horários pelo WhatsApp, com lembrete automático e pagamento antecipado" />
@@ -161,16 +162,20 @@ function NewAppForm({ store, onClose }) {
 /* ================================================================
    o app aberto
    ================================================================ */
+/* a visao geral e a primeira (VISAO, 9): o produto e o centro, e abri-lo
+   mostra de uma vez o que esta construido, como gente chega ate ele e os
+   mapas em que ele foi pensado. as outras abas sao onde cada parte se edita. */
 const TABS = [
+  { id: "overview", label: "visão geral" },
   { id: "concept", label: "conceito" },
   { id: "data", label: "dados" },
   { id: "flows", label: "fluxos" },
   { id: "export", label: "exportar" },
-  { id: "launch", label: "lançamento" }
+  { id: "launch", label: "distribuição" }
 ];
 
 function AppView({ app, store }) {
-  const [tab, setTab] = useState("concept");
+  const [tab, setTab] = useState("overview");
   const [edit, setEdit] = useState(false);
   const [draftAsk, setDraftAsk] = useState(false);
   const [busy, setBusy] = useState("");
@@ -226,7 +231,7 @@ function AppView({ app, store }) {
     <>
       <div className="header ap-head">
         <div className="ap-head__title">
-          <button className="ap-back" type="button" onClick={() => setHash("")} aria-label="voltar para os apps">{icon("arrowLeft")}apps</button>
+          <button className="ap-back" type="button" onClick={() => setHash("")} aria-label="voltar para os produtos">{icon("arrowLeft")}produtos</button>
           <h1><button type="button" className="ap-name" onClick={() => setEdit(true)} title="mudar o nome">{app.name}</button></h1>
           <p className="sub">{app.pitch || "sem a frase que explica o app"}</p>
         </div>
@@ -253,6 +258,7 @@ function AppView({ app, store }) {
 
       {busy === "draft" && <p className="ap-note">O Merlin está desenhando o projeto — banco, telas e fluxos levam um minutinho.</p>}
 
+      {tab === "overview" && <OverviewTab app={app} problems={left} setTab={setTab} />}
       {tab === "concept" && <ConceptTab app={app} save={save} saveUndo={saveUndo} />}
       {tab === "data" && <DataTab app={app} save={save} saveUndo={saveUndo} />}
       {tab === "flows" && <FlowsTab app={app} save={save} saveUndo={saveUndo} />}
@@ -970,6 +976,125 @@ function ExportTab({ app, problems }) {
           <button className="pill pill--accent" type="button" onClick={() => copy(text, out.what)}>copiar</button>
         </div>
         <pre className="ap-pre">{text}</pre>
+      </section>
+    </div>
+  );
+}
+
+/* ================================================================
+   visao geral: o produto como centro (VISAO, 9)
+   tres colunas, uma por trabalho — construir, distribuir, pensar — e em cada
+   uma o que esta ligado ao produto e o proximo passo. quase nada se edita
+   aqui: cada coisa abre onde mora (a aba, o funil, a peca, o mapa). a excecao
+   e ligar e desligar mapa, porque o mapa nao tem outro lugar onde isso caiba.
+   ================================================================ */
+const MAP_ROOT = (title) => ({ id: newId(), title, note: "", color: 0, collapsed: false, link: "", children: [] });
+
+function OverviewTab({ app, problems, setTab }) {
+  const funnels = useCollection("funnels");
+  const content = useCollection("content");
+  const maps = useCollection("maps");
+  const funnel = app.funnel ? funnels.get(app.funnel) : null;
+  const pieces = content.all().filter((c) => c.app === app.id);
+  const live = pieces.filter((c) => c.stage !== "published");
+  const published = pieces.length - live.length;
+  const linkedMaps = maps.all().filter((m) => m.app === app.id).sort((a, b) => b.updatedAt - a.updatedAt);
+  const looseMaps = maps.all().filter((m) => !m.app).sort((a, b) => String(a.name).localeCompare(String(b.name)));
+  const mvp = app.features.filter((f) => f.phase === "mvp").length;
+  /* o primeiro problema diz para que aba ir */
+  const fixTab = problems.length ? ({ dados: "data", fluxos: "flows" }[problems[0].where] || "concept") : "export";
+
+  /* o mapa nasce com o nome do produto no centro e ja ligado; e a mesma forma
+     que o maps.jsx normaliza, entao abrir la nao muda nada */
+  const newMap = () => {
+    const now = Date.now();
+    const m = { id: newId(), name: app.name, root: MAP_ROOT(app.name), items: [], client: app.client || "", idea: "", funnel: "", app: app.id, createdAt: now, updatedAt: now };
+    maps.save(m);
+    location.href = "maps.html#" + encodeURIComponent(m.id);
+  };
+  const linkMap = (id) => {
+    const m = maps.get(id);
+    if (m) maps.save({ ...m, app: app.id, updatedAt: Date.now() });
+  };
+  const unlinkMap = (m) => {
+    maps.save({ ...m, app: "", updatedAt: Date.now() });
+    notify("mapa desligado do produto", () => {
+      const cur = maps.get(m.id);
+      if (cur) maps.save({ ...cur, app: app.id, updatedAt: Date.now() });
+    });
+  };
+
+  return (
+    <div className="ap-hub">
+      <section className="block ap-hub__col">
+        <p className="ap-hub__head">{NAV_ICONS.apps}construir</p>
+        <ul className="ap-hub__facts">
+          <li><b>{mvp}</b> {mvp === 1 ? "funcionalidade" : "funcionalidades"} na primeira versão</li>
+          <li><b>{app.entities.length}</b> {app.entities.length === 1 ? "entidade" : "entidades"} no banco</li>
+          <li><b>{app.screens.length}</b> {app.screens.length === 1 ? "tela" : "telas"}</li>
+        </ul>
+        {problems.length ? (
+          <>
+            <p className="ap-hub__sub">falta antes de construir</p>
+            <ul className="ap-hub__list">
+              {problems.slice(0, 3).map((p, i) => <li key={i}><span className="ap-linked__meta">{p.where}</span> {p.text}</li>)}
+              {problems.length > 3 && <li className="ap-linked__meta">e mais {problems.length - 3}</li>}
+            </ul>
+          </>
+        ) : <p className="ap-hub__ok">pronto para construir</p>}
+        <div className="ap-hub__actions">
+          <button type="button" className="pill" onClick={() => setTab(fixTab)}>{problems.length ? "resolver o que falta" : "exportar"}</button>
+          <button type="button" className="pill" onClick={() => copy(toPrompt(app), "prompt para o Claude Code")}>copiar o prompt</button>
+        </div>
+      </section>
+
+      <section className="block ap-hub__col">
+        <p className="ap-hub__head">{NAV_ICONS.funnels}distribuir</p>
+        {funnel ? (
+          <div className="ap-linked">
+            <a className="ap-linked__name" href={"funnels.html#" + encodeURIComponent(funnel.id)}>{funnel.name}</a>
+            <span className="ap-linked__meta">{(funnel.nodes || []).length} etapas</span>
+          </div>
+        ) : <p className="ap-hub__empty">nenhum funil ligado. como alguém chega até o produto?</p>}
+        <p className="ap-hub__sub">
+          {pieces.length ? pieces.length + (pieces.length === 1 ? " peça" : " peças") + (published ? " · " + published + " no ar" : "") : "nenhuma peça de conteúdo"}
+        </p>
+        {live.length > 0 && (
+          <ul className="ap-hub__list">
+            {live.slice(0, 4).map((c) => (
+              <li key={c.id}>
+                <a href={"content.html#" + encodeURIComponent(c.id)}>{c.title || "peça sem título"}</a>{" "}
+                <span className="ap-linked__meta">{CONTENT_STAGES[c.stage] || c.stage}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+        <div className="ap-hub__actions">
+          <button type="button" className="pill" onClick={() => setTab("launch")}>{funnel ? "funil e peças" : "ligar um funil"}</button>
+        </div>
+      </section>
+
+      <section className="block ap-hub__col">
+        <p className="ap-hub__head">{NAV_ICONS.maps}pensar</p>
+        {linkedMaps.length ? (
+          <ul className="ap-hub__list">
+            {linkedMaps.map((m) => (
+              <li key={m.id} className="ap-hub__map">
+                <a href={"maps.html#" + encodeURIComponent(m.id)}>{m.name}</a>
+                <button type="button" className="ap-hub__unlink" title="desligar do produto" onClick={() => unlinkMap(m)}>desligar</button>
+              </li>
+            ))}
+          </ul>
+        ) : <p className="ap-hub__empty">nenhum mapa ligado. o mapa é para pensar solto: público, ângulos, o que vem depois.</p>}
+        <div className="ap-hub__actions">
+          <button type="button" className="pill" onClick={newMap}>{icon("plus")}mapa</button>
+          {looseMaps.length > 0 && (
+            <select className="select" value="" onChange={(e) => e.target.value && linkMap(e.target.value)}>
+              <option value="">ligar um mapa…</option>
+              {looseMaps.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
+            </select>
+          )}
+        </div>
       </section>
     </div>
   );

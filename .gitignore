@@ -52,3 +52,9 @@ server/site/
 
 # builds de trabalho de uma pagina so
 .tmp/
+
+# o app de desktop: o que o cargo compila e o que o `tauri icon` gera a
+# partir do desktop/icon.svg (a fonte e o svg; os png, ico e icns saem dele)
+desktop/src-tauri/target/
+desktop/src-tauri/gen/
+desktop/src-tauri/icons/

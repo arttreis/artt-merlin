@@ -52,6 +52,9 @@ function normalize(d) {
     client: d.client || "",
     idea: d.idea || "",
     funnel: d.funnel || "",
+    /* o produto a que o mapa pertence (VISAO, 9): o projeto de app e o
+       centro, e mostra os mapas ligados a ele. vazio e mapa solto */
+    app: d.app || "",
     createdAt: +d.createdAt || Date.now(),
     updatedAt: +d.updatedAt || Date.now()
   };
@@ -953,6 +956,7 @@ function MapRow({ m, notes, funnels, maps, renaming, onRename, onRenamed, onDupl
   const n = countNodes(m.root);
   const note = m.idea ? notes.get(m.idea) : null;
   const funnel = m.funnel ? funnels.get(m.funnel) : null;
+  const product = m.app ? collection("apps").get(m.app) : null;
   const open = () => { location.hash = m.id; };
   const stop = (e) => e.stopPropagation();
   return (
@@ -966,6 +970,7 @@ function MapRow({ m, notes, funnels, maps, renaming, onRename, onRenamed, onDupl
         {note && <a className="pill pill--mini" href={"notes.html#" + m.idea} title="abrir a nota" onClick={stop}>{NAV_ICONS.notes}{note.title || "nota"}</a>}
         {m.client && <a className="pill pill--mini" href={"clients.html#" + m.client} title="abrir o cliente" onClick={stop}>{NAV_ICONS.clients}{clientName(m.client) || "cliente"}</a>}
         {funnel && <a className="pill pill--mini" href={"funnels.html#" + m.funnel} title="abrir o funil" onClick={stop}>{NAV_ICONS.funnels}{funnel.name || "funil"}</a>}
+        {product && <a className="pill pill--mini" href={"apps.html#" + m.app} title="abrir o produto" onClick={stop}>{NAV_ICONS.apps}{product.name || "produto"}</a>}
       </span>
       <span className="row-actions">
         <button className="action" type="button" title="abrir">{icon("arrow")}</button>

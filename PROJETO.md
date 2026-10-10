@@ -27,6 +27,9 @@ por documento num **Cloudflare Worker + D1**, com login por código de 6 dígito
 - **Back:** um Cloudflare Worker sem dependências (`server/worker.js`), D1 (SQLite), Resend
   (e-mail), R2 para anexos (bucket `merlin-files`), Anthropic (`MODEL` em `worker.js`).
 - **Extensão:** `extension/` — Chrome MV3, "nota rápida" (`Alt+Shift+N`) → `POST /api/quick-note`.
+- **Desktop:** `desktop/` — Tauri 2, uma casca que abre o site publicado: a janela inteira,
+  o rastreador (`tracker.html`) sempre por cima, a bandeja e `Alt+Shift+M`. Ver
+  [desktop/README.md](desktop/README.md).
 - **Testes:** scripts Node puros, sem framework (`src/shared/test.mjs`, `board.test.mjs`,
   `server/test.mjs`).
 
@@ -44,7 +47,8 @@ server/worker.js  /api/*  ──  D1: people, codes, days, docs, advice, shares
                   resto   ──  server/site/ (saída do vite build)
 ```
 
-**Regra de ouro:** página nova = `nome.html` na raiz + `src/nome.jsx`. O `vite.config.js` acha
+**Regra de ouro:** página nova = `nome.html` na raiz + `src/nome.jsx`, e uma aba numa das seis
+seções de `SECTIONS` no `core.js` (VISAO, 9) — página nova não ganha item próprio na barra. O `vite.config.js` acha
 os pares sozinho; não há lista de rotas. Nunca escreva no `localStorage` direto — use
 `collection()` / `useCollection()`.
 
@@ -52,24 +56,23 @@ os pares sozinho; não há lista de rotas. Nunca escreva no `localStorage` diret
 
 | página | arquivo | observação |
 | --- | --- | --- |
-| início | `index.jsx` | porta de entrada e login |
-| calendário | `calendar.jsx` | dia / semana / mês sobre **uma** coleção `tasks`; `day.html`/`week.html` só redirecionam |
+| porta | `index.jsx` | só quem nunca entrou (landing e login); o resto vai direto para o Hoje |
+| hoje (calendário) | `calendar.jsx` | a primeira tela: dia / semana / mês sobre **uma** coleção `tasks`, com hábitos e "como foi o dia" ao lado (`today-block.jsx`) e a apresentação (`tour.jsx`); `day.html`, `week.html`, `journal.html` e `plans.html` só redirecionam |
 | rotina | `routine.jsx` | semana-modelo sem datas; vira tarefas (`shared/routine.js`) |
-| assistente | `assistant.jsx` | conversa com o Merlin; respostas viram **propostas** confirmadas (`assistant-actions.js`) |
+| assistente | `assistant.jsx` | conversa com o Merlin, fora da barra (chega-se pelo `Ctrl+K`); respostas viram **propostas** confirmadas (`assistant-actions.js`) |
 | notas | `notes.jsx` | caixa de entrada (antiga "ideias") |
-| diário | `journal.jsx` | uma página por dia |
 | prospecção | `prospecting.jsx` | quadro de leads; mesmo documento de cliente (`client-doc.js`) |
 | clientes | `clients.jsx` | canais, backlog, cofre |
 | conteúdo | `content.jsx` | quadro de peças com roteiro |
 | funis | `funnels.jsx` | grafo de etapas |
 | mapas | `maps.jsx` + `maps-board.jsx` | mapa mental + quadro livre (estilo Miro, `board.js`) |
-| apps | `apps.jsx` | projeto de app: conceito, banco, telas e fluxos → SQL, mermaid, spec e prompt (`app-spec.js`) |
+| produtos | `apps.jsx` | o centro: visão geral (construir, distribuir, pensar) + projeto de app: conceito, banco, telas e fluxos → SQL, mermaid, spec e prompt (`app-spec.js`) |
 | financeiro | `finance.jsx` | mês, ano, painel 50/30/20 |
 | wishlist | `wishlist.jsx` | "comprei" lança no financeiro |
 | hábitos | `habits.jsx` | grade do mês |
-| planos | `plans.jsx` | trimestre / mês / semana |
 | perfil | `profile.jsx` | sessão, tema, inventário |
 | link público | `share.jsx` | leitura sem conta de mapa/funil |
+| rastreador | `tracker.jsx` | a janela pequena do app de desktop; mesma conta do dia (`distribute` em `day.js`, `readLine` em `tasks.js`) |
 
 ## Dados e sincronização
 

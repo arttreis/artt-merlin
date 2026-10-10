@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-hide-tracker"
+description = "Enables the hide_tracker command without any pre-configured scope."
+commands.allow = ["hide_tracker"]
+
+[[permission]]
+identifier = "deny-hide-tracker"
+description = "Denies the hide_tracker command without any pre-configured scope."
+commands.deny = ["hide_tracker"]

@@ -70,6 +70,31 @@ export function budget(doc, open) {
   };
 }
 
+/* ---------- onde cada tarefa cai dentro do dia ----------
+   e a partir de qual delas nao da mais tempo. tarefa sem estimativa entra
+   pelo palpite: ela desloca o cursor e pode disparar o corte como qualquer
+   outra — so aparece marcada como palpite. morava no calendar.jsx; desceu
+   para ca quando o rastreador do desktop passou a desenhar a mesma barra. */
+export function distribute(doc, open) {
+  const b = budget(doc, open);
+  const slots = new Map();
+  /* a reserva ocupa a frente do que resta: o trabalho comeca depois dela.
+     nao e o horario real do almoco — e o espaco que ele tira do dia. */
+  let cursor = b.elapsed + b.liveReserve;
+  let cut = -1;
+  b.open.forEach((t, i) => {
+    const cost = costOf(t);
+    const available = b.window - cursor;
+    if (available <= 0) { if (cut < 0) cut = i; return; }
+    const use = Math.min(cost, available);
+    const partial = use < cost;
+    if (partial && cut < 0) cut = i;
+    slots.set(t.id, { from: cursor, min: use, partial, guess: !t.min });
+    cursor += use;
+  });
+  return { b, slots, cut };
+}
+
 /* ---------- como um punhado de minutos se escreve ---------- */
 
 /* "—" para zero: e assim que a chamada diz "nao sobrou nada" sem um numero */

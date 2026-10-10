@@ -75,6 +75,10 @@ function run(sql, a, mode) {
     if (v > ex.v) { ex.doc = doc; ex.v = v; return { meta: { changes: 1 } }; }
     return { meta: { changes: 0 } };
   }
+  /* o perfil que o conselheiro le a cada pedido (worker.js, profileOf) */
+  if (s.startsWith("SELECT doc FROM docs WHERE person = ? AND type = 'profile'")) {
+    return db.docs.find((d) => d.person === a[0] && d.type === "profile" && d.id === "me") || null;
+  }
   if (s.startsWith("SELECT doc, v FROM docs")) {
     return db.docs.find(d => d.person === a[0] && d.type === a[1] && d.id === a[2]) || null;
   }
@@ -121,10 +125,12 @@ function run(sql, a, mode) {
 let claudeAnswer = null;
 let claudeAsked = null;   /* o ultimo pedido que subiu, para conferir o contexto */
 let claudeMessages = null;   /* o array `messages` inteiro, para conferir o historico do assistente */
+let claudeSystem = "";       /* o system, para conferir que o perfil vai junto */
 globalThis.fetch = async (url, opts) => {
   if (String(url).includes("api.anthropic.com")) {
     const request = JSON.parse(opts.body);
     claudeMessages = request.messages;
+    claudeSystem = request.system;
     claudeAsked = request.messages.at(-1).content;
     check("merlin manda a chave", opts.headers["x-api-key"] === "sk-teste");
     check("merlin pede JSON no sistema", /JSON/.test(request.system));
@@ -387,6 +393,15 @@ claudeAnswer = { stop_reason: "end_turn", content: [{ type: "text", text: '{"tex
 r = await call("POST", "/merlin", { task: "week", context: { range: "1-7 set", cards: ["seg · artt · x · 1h · sim"] } }, cookie);
 body = await r.json();
 check("merlin responde texto", r.status === 200 && /Semana/.test(body.text), JSON.stringify(body));
+/* a fala do inicio (VISAO, 10): leva a fila e a sequencia, e o perfil gravado
+   pelo onboarding vai no system — e o que faz o Merlin falar com a pessoa */
+r = await call("POST", "/docs", { type: "profile", id: "me", v: Date.now(), doc: { id: "me", name: "Arthur", work: "SaaS sozinho", building: "Agenda do salão" } }, cookie);
+claudeAnswer = { stop_reason: "end_turn", content: [{ type: "text", text: '{"text":"Cabem 2h; comece pela landing."}' }] };
+r = await call("POST", "/merlin", { task: "checkin", context: { moment: "start", hour: "09:10", window: "09:00–18:00", slack: "cabem 2h", open: ["revisar landing · 45m"], done: [], habits: ["treinar"], streak: 3, products: ["Agenda do salão"] } }, cookie);
+body = await r.json();
+check("checkin responde texto", r.status === 200 && /landing/.test(body.text), JSON.stringify(body));
+check("checkin manda a fila real", /revisar landing/.test(claudeAsked) && /seguidos fechando o dia: 3/.test(claudeAsked), String(claudeAsked).slice(0, 200));
+check("o perfil vai no system", /Arthur/.test(claudeSystem) && /Agenda do salão/.test(claudeSystem), claudeSystem.slice(-200));
 claudeAnswer = { stop_reason: "end_turn", content: [{ type: "text", text: '{"suggestions":[{"type":"step","title":"validar com 3 clientes","note":"antes de codar"}]}' }] };
 r = await call("POST", "/merlin", { task: "expand", context: { title: "app", steps: [] } }, cookie);
 body = await r.json();

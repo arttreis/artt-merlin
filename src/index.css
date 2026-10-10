@@ -1,344 +1,7 @@
-/* merlin · o CSS desta pagina
+/* merlin · a porta (index.html)
    o comum vive numa camada de cascata (@layer base, no shell.css); o que e da
    pagina fica fora dela e ganha todo empate, independente da ordem em que as
    folhas chegam no <head>. */
-
-/* ---------- a coluna ----------
-   larga o suficiente para o bento respirar, e centrada: o relogio e o campo
-   sao o eixo da pagina, e tudo se pendura neles. */
-.hm{max-width:1080px;margin:0 auto}
-
-/* ---------- o alto ---------- */
-.hm-top{
-  display:flex;align-items:center;justify-content:space-between;gap:var(--pd2);
-  margin-bottom:clamp(18px,5vh,52px);
-}
-.hm-hello{
-  display:inline-flex;align-items:center;height:32px;padding:0 14px;
-  border-radius:var(--br-pill);background:var(--surface);border:1px solid var(--line);
-  font-size:13px;color:var(--ink-70);
-}
-.hm-me{
-  display:inline-flex;align-items:center;gap:9px;height:32px;padding:0 12px 0 4px;
-  border-radius:var(--br-pill);background:var(--surface);border:1px solid var(--line);
-  font-size:12px;color:var(--ink-30);transition:border-color var(--t),color var(--t);
-}
-.hm-me:hover{border-color:var(--ink-30);color:var(--ink-70)}
-.hm-me__av{
-  width:24px;height:24px;border-radius:50%;display:grid;place-items:center;flex:none;
-  background:var(--accent);color:var(--on-accent);font-weight:600;font-size:11px;
-}
-.hm-me__av.is-out{background:var(--fill-hover);color:var(--ink-50)}
-
-/* ---------- o relogio ----------
-   o maior elemento da tela, de proposito: e a unica coisa aqui que muda
-   sozinha, e a pagina inteira e sobre o tempo passar. */
-.hm-clock{text-align:center;margin-bottom:clamp(16px,3vh,28px)}
-.hm-time{
-  margin:0;font-family:var(--mono);font-weight:500;
-  font-size:clamp(56px,10vw,116px);line-height:.94;letter-spacing:-.05em;color:var(--ink);
-  font-variant-numeric:tabular-nums;
-}
-/* os dois pontos piscam devagar: o unico movimento de uma tela parada */
-.hm-time i{font-style:normal;color:var(--ink-30);animation:hm-blink 2s steps(1,end) infinite}
-@keyframes hm-blink{0%,60%{opacity:1}61%,100%{opacity:.25}}
-@media (prefers-reduced-motion:reduce){.hm-time i{animation:none}}
-.hm-date{margin:6px 0 0;font-size:13.5px;color:var(--ink-30)}
-
-/* ---------- o campo ---------- */
-.hm-capture{max-width:620px;margin:0 auto clamp(22px,5vh,44px)}
-.hm-capture__field{
-  display:flex;align-items:center;gap:11px;
-  padding:0 8px 0 17px;height:54px;border-radius:var(--br-pill);
-  background:var(--surface);border:1px solid var(--line);box-shadow:var(--sombra);
-  transition:border-color var(--t),box-shadow var(--t);
-}
-.hm-capture__field:focus-within{border-color:var(--ink-30);box-shadow:var(--sombra-2)}
-.hm-capture__field > svg{width:16px;height:16px;flex:none;color:var(--accent-ink)}
-.hm-capture__field input{
-  flex:1 1 auto;min-width:0;background:none;border:0;outline:none;
-  font-size:15px;color:var(--ink);
-}
-.hm-capture__field input::placeholder{color:var(--ink-30)}
-/* guardar como tarefa ou nota: o que o Enter fazia ate 22/09/2026 e agora e
-   um botao, porque o Enter passou a abrir a conversa */
-.hm-capture__keep{
-  flex:none;width:32px;height:32px;display:grid;place-items:center;border-radius:50%;
-  color:var(--ink-30);transition:color var(--t),background var(--t);
-}
-.hm-capture__keep:hover{color:var(--ink);background:var(--fill-hover)}
-.hm-capture__keep svg{width:16px;height:16px}
-.hm-capture__field kbd{flex:none;opacity:0;transition:opacity var(--t)}
-.hm-capture__field:focus-within kbd{opacity:1}
-.hm-ghost{margin:11px 0 0;text-align:center;font-size:12.5px;line-height:1.4;color:var(--ink-30)}
-.hm-ghost b{color:var(--ink-70);font-weight:500}
-
-/* ---------- o bento ----------
-   quatro colunas, e os blocos ocupam pedacos DIFERENTES dela. e a diferenca
-   entre um bento e uma grade de cartoes iguais: o dia e alto porque tem um
-   numero grande e uma fila; a citacao e larga porque e uma frase. */
-/* os blocos ESTICAM ate a altura da linha: com align-items:start, o favorito
-   (curto) deixava um buraco do tamanho da grade de atalhos ao lado dele, e a
-   pagina parecia inacabada em vez de arejada. */
-.hm-bento{
-  display:grid;gap:var(--pd2);
-  grid-template-columns:repeat(4,minmax(0,1fr));
-}
-.bx{
-  position:relative;display:flex;flex-direction:column;
-  padding:16px 17px;border-radius:var(--br);
-  background:var(--surface);border:1px solid var(--line);box-shadow:var(--sombra);
-  grid-column:span 2;min-width:0;
-}
-.bx__head{
-  display:flex;align-items:center;justify-content:space-between;gap:10px;
-  margin:0 0 12px;color:var(--ink-30);
-}
-.bx__aside{font-size:11px;color:var(--ink-30);transition:color var(--t)}
-a.bx__aside:hover{color:var(--ink-70)}
-.bx__add{
-  width:22px;height:22px;display:grid;place-items:center;border-radius:var(--br2);
-  color:var(--ink-30);transition:color var(--t),background var(--t);
-}
-.bx__add:hover{color:var(--ink);background:var(--fill-hover)}
-.bx__add svg{width:13px;height:13px}
-.bx__empty{margin:0;padding:10px 0 4px;font-size:12.5px;color:var(--ink-30)}
-
-/* o dia: alto, com o numero grande e a barra */
-.bx--day{grid-column:span 2;grid-row:span 2}
-.bx__big{
-  margin:0 0 14px;font-family:var(--mono);font-weight:500;
-  font-size:clamp(30px,4vw,44px);line-height:1;letter-spacing:-.04em;color:var(--accent-ink);
-}
-.bx__big.is-over{color:var(--ink)}
-.bx__big small{
-  display:block;margin-top:7px;font-family:var(--sans);font-size:12.5px;
-  font-weight:400;letter-spacing:0;color:var(--ink-30);
-}
-/* a barra do dia em miniatura: o que ja passou, o que esta prometido, a sobra */
-.bx__track{height:7px;border-radius:100px;background:var(--fill-hover);overflow:hidden;display:flex;margin-bottom:14px}
-.bx__used{background:repeating-linear-gradient(135deg,var(--line) 0 3px,transparent 3px 6px)}
-.bx__busy{background:var(--accent)}
-.bx__queue{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:1px;flex:1 1 auto}
-.bx__queue li{display:flex;align-items:center;gap:9px;padding:6px 0;min-width:0}
-.bx__queue b{flex:1 1 auto;min-width:0;font-size:13px;font-weight:400;color:var(--ink-70);overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
-.bx__queue .t-mono{flex:none;font-size:10.5px;color:var(--ink-30)}
-.bx__dot{width:5px;height:5px;border-radius:50%;background:var(--accent);flex:none;opacity:.65}
-.bx__none{color:var(--ink-30);font-size:12.5px}
-.bx__more{margin:8px 0 0;font-size:10px;color:var(--ink-30)}
-a.bx--day{transition:border-color var(--t)}
-a.bx--day:hover{border-color:var(--ink-30)}
-
-/* hoje: os habitos esperados, um toque pra marcar, e o diario do dia logo
-   embaixo — o lugar que era da grade de atalhos */
-.bx--today{grid-column:span 2}
-.today-habits{list-style:none;margin:0 0 12px;padding:0;display:flex;flex-direction:column;gap:1px}
-.today-habits li{display:flex;align-items:center;gap:10px;padding:5px 2px;min-width:0}
-.today-habits__check{
-  flex:none;width:20px;height:20px;border-radius:7px;display:grid;place-items:center;
-  border:1px solid var(--line);color:transparent;transition:background var(--t),border-color var(--t),color var(--t);
-}
-.today-habits__check:hover{border-color:var(--ink-30)}
-.today-habits__check svg{width:12px;height:12px}
-.today-habits__check.is-done{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
-.today-habits__name{font-size:13px;color:var(--ink-70);overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
-.today-journal{display:flex;flex-direction:column;gap:6px;flex:1 1 auto}
-.today-journal__label{color:var(--ink-30)}
-.today-journal textarea{
-  flex:1 1 auto;resize:none;border:1px solid var(--line-soft);border-radius:var(--br2);
-  background:var(--surface-2);padding:8px 9px;font:inherit;font-size:12.5px;color:var(--ink);
-  min-height:60px;
-}
-.today-journal textarea:focus{outline:none;border-color:var(--ink-30)}
-
-/* favoritos: marca com a inicial, nome e dominio */
-.favs{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:1px}
-.favs li{display:flex;align-items:center;gap:10px;padding:5px 4px;border-radius:var(--br2);min-width:0;transition:background var(--t)}
-.favs li:hover{background:var(--fill)}
-.favs__mark{
-  flex:none;width:26px;height:26px;border-radius:9px;display:grid;place-items:center;
-  background:var(--fill-hover);color:var(--ink-50);font-size:11px;
-}
-.favs li > a{flex:1 1 auto;min-width:0;display:flex;align-items:baseline;gap:8px}
-.favs b{font-size:13px;font-weight:400;color:var(--ink);overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
-.favs small{flex:none;font-size:11px;color:var(--ink-30)}
-.favs__edit{
-  flex:none;width:22px;height:22px;display:grid;place-items:center;border-radius:var(--br2);
-  color:var(--ink-30);opacity:0;transition:opacity var(--t),color var(--t);
-}
-.favs li:hover .favs__edit,.favs li:focus-within .favs__edit{opacity:1}
-.favs__edit:hover{color:var(--ink)}
-.favs__edit svg{width:12px;height:12px}
-@media (hover:none){.favs__edit{opacity:1}}
-
-/* notas */
-.notes-mini{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:1px;flex:1 1 auto}
-.notes-mini a{display:block;padding:6px 4px;border-radius:var(--br2);font-size:13px;color:var(--ink-70);
-  overflow:hidden;white-space:nowrap;text-overflow:ellipsis;transition:background var(--t),color var(--t)}
-.notes-mini a:hover{background:var(--fill);color:var(--ink)}
-.notes-mini__form{margin-top:10px}
-.notes-mini__form input{
-  width:100%;background:var(--fill);border:1px solid var(--line-soft);
-  border-radius:var(--br-pill);padding:7px 13px;font-size:12.5px;color:var(--ink);
-}
-.notes-mini__form input:focus{outline:none;border-color:var(--ink-30);background:var(--fill-hover)}
-.notes-mini__form input::placeholder{color:var(--ink-30)}
-
-/* a citacao: larga, tipo serifado, sem preenchimento de cartao — ela e o
-   respiro entre os blocos, e mais um cartao cheio seria mais do mesmo */
-.bx--quote{
-  grid-column:span 2;background:none;border-style:dashed;box-shadow:none;
-  justify-content:center;padding:20px 22px;
-}
-.quote__mark{
-  font-family:"Instrument Serif",Georgia,serif;font-size:44px;line-height:.6;
-  color:var(--accent-ink);opacity:.5;
-}
-.quote__text{
-  margin:6px 0 0;font-family:"Instrument Serif",Georgia,serif;
-  font-size:clamp(17px,2.1vw,22px);line-height:1.35;letter-spacing:-.01em;color:var(--ink);
-}
-.quote__who{margin:10px 0 0;font-size:10px;color:var(--ink-30)}
-
-.hm-foot{margin:clamp(22px,5vh,44px) 0 0;text-align:center;font-size:12px;color:var(--ink-30)}
-.hm-foot .pill{color:var(--ink-50)}
-.hm-foot .pill:hover{color:var(--ink)}
-
-@media (max-width:900px){
-  .hm-bento{grid-template-columns:repeat(2,minmax(0,1fr))}
-  .bx,.bx--day,.bx--today,.bx--quote{grid-column:span 2;grid-row:auto}
-}
-
-/* ================================================================
-   a apresentacao
-   ================================================================
-   um passo de cada vez, com o desenho em cima e o rodape dizendo onde voce
-   esta. quatro cartoes de texto empilhados numa caixa eram quatro paragrafos
-   que ninguem le ate o fim. */
-.tour{
-  position:fixed;inset:0;z-index:90;display:grid;place-items:center;padding:20px;
-  background:color-mix(in srgb,var(--bg) 92%,transparent);backdrop-filter:blur(6px);
-}
-.tour__box{
-  position:relative;width:min(420px,100%);
-  border-radius:calc(var(--br) * 1.3);overflow:hidden;
-  background:var(--surface);border:1px solid var(--line);box-shadow:var(--sombra-2);
-  display:flex;flex-direction:column;
-}
-.tour__skip{
-  position:absolute;top:14px;right:16px;z-index:2;
-  font-size:12px;color:var(--ink-30);transition:color var(--t);
-}
-.tour__skip:hover{color:var(--ink)}
-/* o desenho: um palco com um pedaco de tela de verdade dentro */
-.tour__art{
-  height:230px;display:grid;place-items:center;padding:24px;
-  background:
-    radial-gradient(90% 70% at 50% 0%,color-mix(in srgb,var(--accent) 14%,transparent),transparent 70%),
-    var(--surface-2);
-  border-bottom:1px solid var(--line-soft);
-}
-.tour__words{padding:20px 24px 6px;min-height:136px}
-.tour__count{margin:0 0 6px !important;font-size:11.5px !important;color:var(--ink-30) !important}
-.tour__words h2{margin:0;font-size:20px;font-weight:600;letter-spacing:-.03em;color:var(--ink)}
-.tour__words p{margin:9px 0 0;font-size:13.5px;line-height:1.55;color:var(--ink-50)}
-.tour__foot{display:flex;align-items:center;justify-content:space-between;gap:var(--pd2);padding:16px 24px 22px}
-.tour__dots{display:flex;gap:2px;align-items:center}
-.tour__dots button{display:grid;place-items:center;height:20px;padding:0 2px;background:none;border:0;cursor:pointer}
-.tour__dots i{display:block;width:6px;height:6px;border-radius:50%;background:var(--line);transition:background var(--t),width var(--t)}
-.tour__dots button:hover i{background:var(--ink-30)}
-.tour__dots button.is-on i{width:18px;border-radius:100px;background:var(--accent)}
-.tour__nav{display:flex;align-items:center;gap:6px}
-.tour__back{height:40px;padding:0 14px;border-radius:var(--br-pill);font-size:13px;color:var(--ink-50);transition:color var(--t)}
-.tour__back:hover{color:var(--ink)}
-.tour__next{
-  height:40px;padding:0 22px;border-radius:var(--br-pill);
-  background:var(--ink);color:var(--bg);font-size:13.5px;font-weight:500;
-  transition:filter var(--t);
-}
-.tour__next:hover{filter:brightness(1.15)}
-
-/* os desenhos, feitos de pedacos do proprio produto */
-.ta{width:100%;max-width:290px;font-size:11px;color:var(--ink-70)}
-.ta small{font-size:10px;color:var(--ink-30)}
-.ta__bar{display:block;height:5px;border-radius:100px;background:var(--fill-hover);overflow:hidden}
-.ta__bar i{display:block;height:100%;background:var(--accent);border-radius:100px}
-.ta__arrow{display:grid;place-items:center;width:26px;height:26px;border-radius:50%;background:var(--accent);color:var(--on-accent);flex:none}
-.ta__arrow svg{width:13px;height:13px}
-
-/* 1 · o calendario: as tres visoes, uma semana e a barra do dia */
-.ta__tabs{display:flex;gap:4px;margin-bottom:10px}
-.ta__tabs span{padding:3px 9px;border-radius:100px;border:1px solid var(--line-soft);font-size:10px;color:var(--ink-30)}
-.ta__tabs span.is-on{color:var(--ink);border-color:var(--line);background:var(--fill-hover)}
-.ta__week{display:grid;grid-template-columns:repeat(5,1fr);gap:4px;height:92px}
-.ta__col{display:flex;flex-direction:column;gap:3px;padding:4px;border-radius:7px;background:var(--fill)}
-.ta__col small{font-size:9px;text-align:center}
-.ta__blk{display:block;border-radius:4px;background:color-mix(in srgb,var(--accent) 55%,transparent)}
-.ta__blk--soft{background:transparent;border:1px dashed var(--ink-30)}
-.ta__blk--meet{background:var(--ink-30)}
-.ta__daybar{display:grid;grid-template-columns:auto 1fr;align-items:center;gap:4px 10px;margin-top:10px}
-.ta__daybar b{font-family:var(--mono);font-size:16px;font-weight:500;color:var(--accent-ink)}
-.ta__daybar small{grid-column:1 / -1}
-
-/* 2 · a rotina: um bloco vira cinco dias */
-.ta--routine{display:flex;flex-direction:column;align-items:center;gap:10px}
-.ta__rblock{width:70%;padding:9px 12px;border-radius:var(--br3);border:1px solid var(--line);background:var(--surface);text-align:center}
-.ta__rblock b{display:block;font-size:12px;color:var(--ink);font-weight:600}
-.ta__rdays{display:grid;grid-template-columns:repeat(5,1fr);gap:5px;width:100%}
-.ta__rdays span{display:flex;flex-direction:column;align-items:center;gap:4px;padding:6px 0;border-radius:7px;background:var(--fill)}
-.ta__rdays i{display:block;width:70%;height:16px;border-radius:4px;background:color-mix(in srgb,var(--accent) 55%,transparent)}
-.ta--routine .ta__arrow svg{transform:rotate(90deg)}
-
-/* 3 · nota com checklist vira tarefa */
-.ta--pull{display:flex;flex-direction:column;align-items:center;gap:8px}
-.ta__card{width:100%;padding:10px 12px;border-radius:var(--br3);background:var(--surface);border:1px solid var(--line-soft);color:var(--ink)}
-.ta__card b{display:block;font-size:12px;font-weight:600;margin-bottom:5px}
-.ta__card small{display:block;margin-top:2px}
-.ta__check{display:flex;align-items:center;gap:7px;margin-top:4px;font-size:10.5px;color:var(--ink-70)}
-.ta__check::before{content:"";width:11px;height:11px;border-radius:3px;border:1px solid var(--line);flex:none}
-.ta__check.is-done{color:var(--ink-30);text-decoration:line-through}
-.ta__check.is-done::before{background:var(--accent);border-color:var(--accent)}
-.ta__card--task{border-color:color-mix(in srgb,var(--accent) 45%,transparent)}
-.ta__card--task b{margin:0}
-
-/* 4 · o quadro da prospeccao e o que atrai */
-.ta__stages{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
-.ta__stages div{display:flex;flex-direction:column;gap:5px;min-height:92px;padding:6px;border-radius:8px;background:var(--fill)}
-.ta__stages i{display:block;height:20px;border-radius:5px;background:var(--surface);border:1px solid var(--line-soft)}
-.ta__stages i.is-hot{border-color:var(--ink-30)}
-.ta__stages .is-won{background:color-mix(in srgb,var(--accent) 12%,transparent)}
-.ta__stages .is-won i{border-color:color-mix(in srgb,var(--accent) 55%,transparent)}
-.ta__chips{display:flex;justify-content:center;gap:6px;margin-top:10px}
-.ta__chips span{display:inline-flex;align-items:center;gap:5px;padding:3px 9px 3px 7px;border-radius:100px;border:1px solid var(--line-soft);font-size:10px;color:var(--ink-50)}
-.ta__chips svg{width:11px;height:11px}
-
-/* 5 · o dinheiro em dois tempos e a grade dos habitos */
-.ta__money{margin:0 0 8px;display:flex;align-items:baseline;justify-content:space-between}
-.ta__money b{font-family:var(--mono);font-size:20px;font-weight:500;color:var(--ink)}
-.ta__split{display:flex;height:7px;border-radius:100px;background:var(--fill-hover);overflow:hidden}
-.ta__split i{display:block;background:var(--accent)}
-.ta__split em{display:block;background:repeating-linear-gradient(135deg,var(--ink-30) 0 2px,transparent 2px 5px)}
-.ta__legend{display:flex;align-items:center;gap:5px;margin:7px 0 14px;font-size:10px;color:var(--ink-30)}
-.ta__legend i{display:inline-block;width:12px;height:5px;border-radius:100px}
-.ta__legend i + i,.ta__legend i:not(:first-child){margin-left:6px}
-.ta__legend .is-real{background:var(--accent)}
-.ta__legend .is-forecast{border:1px dashed var(--ink-30)}
-.ta__habits{display:grid;grid-template-columns:repeat(12,1fr);gap:4px}
-.ta__habits i{display:block;aspect-ratio:1;border-radius:4px;border:1px solid var(--line)}
-.ta__habits i.is-on{background:var(--accent);border-color:var(--accent)}
-
-/* 6 · os gestos e os aparelhos */
-.ta--keys{display:flex;flex-direction:column;align-items:center;gap:22px}
-.ta__keyrow{display:flex;align-items:center;gap:10px}
-.ta__key{display:inline-flex;align-items:center;gap:4px;height:38px;min-width:38px;padding:0 10px;justify-content:center;border-radius:11px;background:var(--surface);border:1px solid var(--line);color:var(--ink-70)}
-.ta__key svg{width:15px;height:15px}
-.ta__key--plus{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
-.ta__key--spark{color:var(--accent-ink)}
-.ta__key kbd{font-size:10px}
-.ta__sync{display:flex;align-items:center;gap:12px}
-.ta__device{display:grid;place-items:center;width:42px;height:42px;border-radius:12px;background:var(--surface);border:1px solid var(--line);color:var(--ink-50)}
-.ta__device svg{width:18px;height:18px}
-.ta__link{width:34px;height:1px;background:repeating-linear-gradient(90deg,var(--accent) 0 4px,transparent 4px 8px)}
 
 /* ================================================================
    a landing
@@ -411,3 +74,125 @@ html.bare body::before,html.bare body::after{opacity:0}
   position:relative;padding:0 12px;background:var(--bg);
   font-family:var(--mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-30);
 }
+
+/* ================================================================
+   o início que conversa (VISAO, 10)
+   ================================================================
+   a floresta ocupa o alto da tela de ponta a ponta, por trás da faixa do
+   topo, e se dissolve no fundo; a pergunta fica sobre ela, e o campo nasce
+   na linha onde a cena acaba. os blocos do hoje vêm embaixo. */
+.hm{position:relative;max-width:1080px;margin:0 auto}
+.hm-scene{
+  position:absolute;top:-200px;left:50%;width:100vw;transform:translateX(-50%);
+  height:calc(min(58vh,500px) + 120px);z-index:0;overflow:hidden;pointer-events:none;
+}
+.hm-scene::after{content:"";position:absolute;inset:auto 0 0 0;height:45%;background:linear-gradient(to bottom,transparent,var(--bg))}
+.hm > *:not(.hm-scene){position:relative;z-index:1}
+
+.hm-hero{text-align:center;padding:clamp(56px,13vh,128px) 16px 0;min-height:calc(min(58vh,500px) - 160px)}
+.hm-hero h1{
+  margin:0;font-size:clamp(24px,3.2vw,34px);font-weight:600;letter-spacing:-.03em;color:#fff;
+  text-shadow:0 2px 18px rgba(0,0,0,.45);
+}
+.hm-hero__sub{margin:10px 0 0;font-size:13px;color:rgba(255,255,255,.8);text-shadow:0 1px 10px rgba(0,0,0,.5)}
+.hm-hero__sub a{color:#fff;text-decoration:underline;text-decoration-color:rgba(255,255,255,.4)}
+
+/* o campo do meio, com os três modos */
+.hm-center{max-width:620px;margin:0 auto;display:flex;flex-direction:column;align-items:center;gap:12px}
+.hm-field{width:100%;background:var(--surface);border:1px solid var(--line);border-radius:var(--br);box-shadow:var(--sombra-2);overflow:hidden}
+.hm-field__modes{display:flex;gap:2px;padding:6px 8px 0;border-bottom:1px solid var(--line-soft)}
+.hm-field__modes button{display:inline-flex;align-items:center;gap:6px;height:32px;padding:0 10px;font-size:12.5px;color:var(--ink-50);border-bottom:2px solid transparent;margin-bottom:-1px}
+.hm-field__modes button svg{width:13px;height:13px}
+.hm-field__modes button[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--accent)}
+.hm-field textarea{display:block;width:100%;resize:none;border:0;outline:0;background:none;padding:14px 16px 6px;font:inherit;font-size:14.5px;color:var(--ink)}
+.hm-field textarea::placeholder{color:var(--ink-30)}
+.hm-field__foot{display:flex;align-items:center;gap:8px;padding:6px 8px 8px 16px}
+.hm-field__hint{flex:1 1 auto;font-size:11.5px;color:var(--ink-30)}
+.hm-field__send{width:32px;height:32px;border-radius:50%;display:grid;place-items:center;background:var(--accent);color:var(--on-accent)}
+.hm-field__send svg{width:15px;height:15px}
+.hm-field__chips{display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding:10px 16px 0;font-size:12px;color:var(--ink-50)}
+.hm-field__chips span{flex:1 1 100%}
+.hm-field__chips b{color:var(--ink-70);font-weight:500}
+.hm-field__chips button{height:26px;padding:0 11px;border-radius:var(--br-pill);background:var(--fill);border:1px solid var(--line);font-size:11.5px;color:var(--ink-70)}
+.hm-field__chips button:hover{background:var(--fill-hover);color:var(--ink)}
+.hm-field__chips button[data-fits="no"]{color:var(--ink-30)}
+.hm-close{display:inline-flex;align-items:center;gap:8px;height:38px;padding:0 18px;border-radius:var(--br-pill);background:var(--accent);color:var(--on-accent);font-weight:600;font-size:13.5px}
+.hm-close svg{width:14px;height:14px}
+.hm-closed{margin:0;font-size:11.5px;color:var(--ink-50)}
+
+/* os blocos do hoje */
+.hm-label{margin:clamp(28px,5vh,48px) 0 10px;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-30)}
+.hm-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:var(--pd);align-items:start}
+@media (max-width:900px){.hm-grid{grid-template-columns:minmax(0,1fr)}}
+.hm-card{background:var(--surface);border:1px solid var(--line);border-radius:var(--br);padding:14px 16px;min-width:0}
+.hm-card__head{display:flex;align-items:center;gap:8px;margin:0 0 10px;font-size:13px;font-weight:600;color:var(--ink)}
+.hm-card__head svg{width:15px;height:15px;color:var(--accent-ink)}
+.hm-card__aside{font-weight:400;font-size:11px;color:var(--ink-30)}
+.hm-card__go{margin-left:auto;color:var(--ink-30)}
+.hm-card__go:hover{color:var(--ink)}
+.hm-card__go svg{width:14px;height:14px;color:inherit}
+.hm-day__n{display:flex;align-items:baseline;gap:8px;margin:0 0 10px}
+.hm-day__n b{font-size:28px;font-weight:500;letter-spacing:-.04em;color:var(--accent)}
+.hm-day__n[data-tone="over"] b{color:var(--ink)}
+.hm-day__n span{font-size:12.5px;color:var(--ink-50)}
+.hm-track{display:flex;height:8px;border-radius:var(--br2);overflow:hidden;background:var(--bg);border:1px solid var(--line-soft);margin-bottom:10px}
+.hm-track i{min-width:0}
+.hm-track i+i{box-shadow:inset 1px 0 0 var(--bg)}
+.hm-track .is-reserved{background:repeating-linear-gradient(90deg,var(--fill) 0 2px,var(--bg) 2px 5px)}
+.hm-track .is-slot{background:var(--fill-hover)}
+.hm-track .is-guess{background:repeating-linear-gradient(45deg,var(--fill-hover) 0 4px,transparent 4px 8px)}
+.hm-track .is-free{background:var(--accent);flex:1 1 auto}
+.hm-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:2px}
+.hm-list li{display:flex;align-items:center;gap:10px;min-height:30px;min-width:0}
+.hm-list li.is-out .hm-list__title{color:var(--ink-30)}
+.hm-list__title{flex:1 1 auto;min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-size:13px;color:var(--ink-70)}
+.hm-list__min,.hm-list__at{flex:none;font-size:11px;color:var(--ink-30)}
+.hm-list__at{color:var(--ink-50)}
+.hm-check{flex:none;width:18px;height:18px;border-radius:6px;display:grid;place-items:center;border:1px solid var(--line);color:transparent}
+.hm-check:hover{border-color:var(--ink-30)}
+.hm-check.is-done{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
+.hm-check svg{width:11px;height:11px}
+.hm-empty{font-size:12.5px;color:var(--ink-30)}
+.hm-empty a{color:var(--ink-50);text-decoration:underline}
+.hm-review__q{margin:0 0 8px;font-size:13.5px;color:var(--ink)}
+.hm-review textarea{width:100%;resize:vertical;border:1px solid var(--line-soft);border-radius:var(--br2);background:var(--surface-2);padding:8px 9px;font:inherit;font-size:12.5px;color:var(--ink)}
+.hm-review__actions{display:flex;justify-content:flex-end;gap:8px;margin-top:8px}
+
+/* o onboarding: a conversa sobre a cena */
+.hm--onboarding .hm-scene{height:calc(min(70vh,560px) + 140px)}
+.ob{max-width:560px;margin:clamp(40px,10vh,110px) auto 0;display:flex;flex-direction:column;gap:12px}
+.ob__log{display:flex;flex-direction:column;gap:8px;max-height:52vh;overflow-y:auto;padding:4px;scrollbar-width:none;mask-image:linear-gradient(to bottom,transparent,#000 48px)}
+.ob__msg{margin:0;max-width:86%;padding:10px 14px;border-radius:16px;font-size:14px;line-height:1.5}
+.ob__msg--merlin{align-self:flex-start;background:color-mix(in srgb,var(--surface) 92%,transparent);border:1px solid var(--line);color:var(--ink);backdrop-filter:blur(8px);border-bottom-left-radius:4px}
+.ob__msg--me{align-self:flex-end;background:var(--accent);color:var(--on-accent);border-bottom-right-radius:4px}
+.ob__msg.is-note{display:inline-flex;align-items:center;gap:7px;padding:6px 12px;font-size:12px;color:var(--ink-70);background:var(--fill);border-style:dashed}
+.ob__msg.is-note svg{width:12px;height:12px;color:var(--accent-ink)}
+.ob__form{display:flex;align-items:center;gap:8px;padding:6px;background:var(--surface);border:1px solid var(--line);border-radius:var(--br);box-shadow:var(--sombra-2)}
+.ob__field{flex:1 1 auto;min-width:0;height:40px;border:0;outline:0;background:none;padding:0 10px;font:inherit;font-size:14.5px;color:var(--ink)}
+.ob__skip{font-size:12px;color:var(--ink-30);padding:0 8px}
+.ob__skip:hover{color:var(--ink)}
+.ob__send{width:36px;height:36px;border-radius:50%;display:grid;place-items:center;background:var(--accent);color:var(--on-accent)}
+.ob__send:disabled{opacity:.4}
+.ob__send svg{width:15px;height:15px}
+
+/* fechar o dia */
+.cl{position:fixed;inset:0;z-index:90;display:grid;place-items:center;padding:16px;background:var(--scrim)}
+.cl__box{width:min(560px,100%);max-height:calc(100dvh - 32px);overflow:auto;background:var(--surface-2);border:1px solid var(--line);border-radius:var(--br);box-shadow:var(--sombra-2);padding:22px}
+.cl__eyebrow{margin:0 0 6px;font-size:11px;color:var(--ink-30)}
+.cl__box h2{margin:0 0 14px;font-size:18px;font-weight:600;letter-spacing:-.02em;color:var(--ink)}
+.cl__list{list-style:none;margin:0 0 16px;padding:0;display:flex;flex-direction:column;gap:6px}
+.cl__list li{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:8px 10px;border-radius:var(--br2);background:var(--fill)}
+.cl__title{flex:1 1 200px;min-width:0;font-size:13.5px;color:var(--ink)}
+.cl__title small{margin-left:8px;font-size:11px;color:var(--ink-30)}
+.cl__fates{display:flex;gap:4px}
+.cl__fates button{height:26px;padding:0 10px;border-radius:var(--br-pill);border:1px solid var(--line);font-size:12px;color:var(--ink-50)}
+.cl__fates button[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
+.cl__journal{display:flex;flex-direction:column;gap:6px;font-size:13px;color:var(--ink-70)}
+.cl__journal textarea{resize:vertical;border:1px solid var(--line-soft);border-radius:var(--br2);background:var(--surface);padding:9px 10px;font:inherit;font-size:13px;color:var(--ink)}
+.cl__actions{display:flex;justify-content:flex-end;gap:8px;margin-top:16px}
+
+/* a floresta tem 100vw, que conta a barra de rolagem: sem isto a pagina
+   ganhava rolagem lateral */
+html:has(.hm) body{overflow-x:clip}
+.hm-hero__merlin{display:flex;align-items:flex-start;gap:8px;max-width:620px;margin:14px auto 0;padding:10px 14px;border-radius:14px;text-align:left;font-size:13.5px;line-height:1.5;color:#fff;background:rgba(10,12,20,.42);border:1px solid rgba(255,255,255,.12);backdrop-filter:blur(8px)}
+.hm-hero__merlin svg{flex:none;width:14px;height:14px;margin-top:3px;color:var(--accent)}

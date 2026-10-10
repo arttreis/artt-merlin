@@ -1,500 +1,81 @@
 /* merlin · o início
-   a página inicial no sentido que o navegador deu à palavra: o relógio grande,
-   um campo no meio, e um bento embaixo com blocos de formatos diferentes —
-   favoritos, atalhos em grade de ícones, o dia, as notas e a citação.
+   a primeira tela de quem entra, e desde 10/10/2026 ela é uma CONVERSA
+   (VISAO, 10): o Merlin é um assistente pessoal, e o início é onde ele
+   pergunta. de manhã, o que precisa caber hoje; à tarde, como está indo; à
+   noite, como fechamos o dia — e, no fim da semana e do mês, como foram. as
+   respostas viram tarefa, nota, o "como foi o dia" e as revisões, e os blocos
+   embaixo mostram o que essa conversa já sabe.
 
-   por que ela existe: até aqui a porta de entrada do Merlin era o dia, e
-   entrar no sistema significava ser recebido por uma fila com minutos. o dia
-   continua sendo o centro, mas ele agora é um destino, não o corredor.
+   quem chega pela primeira vez passa por um onboarding que é a mesma
+   conversa: o nome, com o que trabalha, o que está construindo, a janela do
+   dia e um hábito. cada resposta cria o documento na hora (o perfil, o
+   produto, a janela, o hábito), e o perfil vai junto em todo pedido ao
+   conselheiro (worker.js, profileOf) — é isso que o faz falar com uma pessoa.
 
-   o que ela NÃO é: um painel de métricas. e a fila de hoje é uma JANELA —
-   clicar leva ao dia, que continua sendo o único que escreve no documento do
-   dia. um segundo escritor é a forma exata do bug que o vínculo com a semana
-   fechou.
+   em volta, a floresta (shared/forest.jsx), que acompanha a hora.
 
-   quem nunca esteve aqui não vê nada disso: vê a porta (o <Landing/>), que é
-   um estado deste mesmo arquivo. */
+   quem nunca esteve aqui e não entrou vê antes a porta (o <Landing/>). */
 import "./shared/base.css";
 import "./index.css";
 import {
-  initPage, today, dateOf, newId, notify, signIn,
-  sendToDay, newNote, parseMentions, readDuration, clientName, seen, markSeen,
-  isNewHere, safeUrl, hostOf, readPrefs, askMerlin
+  initPage, signIn, seen, markSeen, isNewHere, today, addDays, dateOf, notify, newId,
+  newNote, askMerlin, readPrefs, savePrefs, formatMin, collection, api
 } from "./shared/core.js";
-import { budget, pendingOf, costOf, fmt, longFmt, clock } from "./shared/day.js";
-import { normalize as normalizeTask, dayDoc, overdue } from "./shared/tasks.js";
-import { normalize as normalizeBlock, copyRoutine } from "./shared/routine.js";
-import { normalize as normalizeHabit, isExpected, toggleMark } from "./shared/habits-data.js";
 import { useState, useEffect, useLayoutEffect, useRef } from "react";
-import { mount, useCollection, useCloud, useClients, Form, Field, useFields, icon } from "./shared/ui.jsx";
-import { NAV_ICONS, LOGO } from "./shared/icons.jsx";
+import { mount, useCloud, useCollection, icon } from "./shared/ui.jsx";
+import { LOGO, NAV_ICONS } from "./shared/icons.jsx";
+import { normalize as normalizeTask, dayDoc, overdue, topOrder, newTask, readLine, isReserve, stripPrefix, readClock } from "./shared/tasks.js";
+import { normalize as normalizeHabit, isExpected, toggleMark } from "./shared/habits-data.js";
+import { distribute, fmt, longFmt, clock, costOf } from "./shared/day.js";
+import { Forest, phaseOf } from "./shared/forest.jsx";
 
+const door = isNewHere() && !seen("landing");
 initPage("home");
 
-/* ---------- a hora do dia, em palavra ---------- */
-function greeting() {
-  const h = new Date().getHours();
-  if (h < 5) return "boa madrugada";
-  if (h < 12) return "bom dia";
-  if (h < 18) return "boa tarde";
-  return "boa noite";
-}
-const longDate = () =>
-  new Intl.DateTimeFormat("pt-BR", { weekday: "long", day: "numeric", month: "long" })
-    .format(dateOf(today()));
+const CHIPS = [15, 30, 60, 120];
 
-/* ---------- a citação do dia ----------
-   uma lista fixa, e o dia do ano escolhe. sem servidor e sem sorteio: sorteio
-   trocaria a frase a cada pintura, e uma citação que muda quando você volta
-   para a aba não é uma citação — é ruído. o mesmo dia devolve a mesma frase. */
-const QUOTES = [
-  ["Não é que temos pouco tempo: é que perdemos muito dele.", "Sêneca"],
-  ["O que se mede melhora. O que se mede todo dia, muda.", "Peter Drucker"],
-  ["A melhor maneira de prever o futuro é criá-lo.", "Peter Drucker"],
-  ["Simplicidade é o último grau de sofisticação.", "Leonardo da Vinci"],
-  ["Não basta estar ocupado. A pergunta é: ocupado com o quê?", "Thoreau"],
-  ["Quem tem um porquê enfrenta quase qualquer como.", "Nietzsche"],
-  ["Comece de onde você está. Use o que você tem. Faça o que puder.", "Arthur Ashe"],
-  ["A perfeição se alcança quando não há mais nada a tirar.", "Saint-Exupéry"],
-  ["Ordem e simplificação são os primeiros passos para dominar um assunto.", "Thomas Mann"],
-  ["Amadores esperam inspiração. O resto de nós apenas aparece e trabalha.", "Chuck Close"],
-  ["Disciplina é escolher entre o que você quer agora e o que você mais quer.", "Abraham Lincoln"],
-  ["Feito é melhor que perfeito.", "Sheryl Sandberg"],
-  ["Um objetivo sem um plano é apenas um desejo.", "Saint-Exupéry"],
-  ["O tempo é o recurso mais escasso; se ele não for gerido, nada mais pode ser.", "Peter Drucker"],
-  ["Nada é particularmente difícil se você o divide em tarefas pequenas.", "Henry Ford"],
-  ["A qualidade não é um ato, é um hábito.", "Aristóteles"],
-  ["Fique longe de quem tenta diminuir suas ambições.", "Mark Twain"],
-  ["O segredo de ir em frente é começar.", "Mark Twain"],
-  ["Concentrar-se é dizer não.", "Steve Jobs"],
-  ["Se você não sabe para onde vai, qualquer caminho serve.", "Lewis Carroll"],
-  ["Você não sobe uma montanha olhando para o topo, e sim para o próximo passo.", "provérbio"],
-  ["Quem quer fazer alguma coisa encontra um meio; quem não quer encontra uma desculpa.", "provérbio árabe"],
-  ["Devagar se vai ao longe.", "provérbio português"],
-  ["A pressa é inimiga da precisão, não do progresso.", "anônimo"],
-  ["Escolher é abrir mão. É por isso que é difícil.", "anônimo"],
-  ["Um dia de cada vez ainda é a única velocidade que existe.", "anônimo"],
-  ["O plano não sobrevive ao contato com a semana. Ter um plano, sim.", "anônimo"],
-  ["Trabalho que não cabe no dia não é prioridade: é vontade.", "anônimo"],
-  ["Lista sem duração é lista de desejos.", "anônimo"],
-  ["O que você não escreve, você carrega.", "anônimo"]
-];
-/* o dia do ano escolhe, então a frase é a mesma da manhã até a noite */
-function quoteOfDay() {
-  const d = dateOf(today());
-  const day = Math.floor((d - new Date(d.getFullYear(), 0, 0)) / 86400000);
-  return QUOTES[day % QUOTES.length];
+/* ================================================================
+   o tempo da conversa
+   ================================================================ */
+const hourNow = () => new Date().getHours();
+const greet = (h) => (h < 5 ? "Boa madrugada" : h < 12 ? "Bom dia" : h < 18 ? "Boa tarde" : "Boa noite");
+/* a pergunta segue a hora: começar, acompanhar, fechar */
+const momentOf = (h) => (h >= 5 && h < 12 ? "start" : h >= 12 && h < 17 ? "during" : "close");
+const QUESTION = {
+  start: "O que precisa caber hoje?",
+  during: "Como está indo o dia?",
+  close: "Como fechamos o dia?"
+};
+
+/* a semana se revisa de sexta à noite até domingo; o mês, nos três últimos
+   dias. a chave da semana é o domingo em que ela começou, como no calendário */
+function weekKey(day) {
+  const d = dateOf(day);
+  d.setDate(d.getDate() - d.getDay());
+  return "w-" + d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+}
+const monthKey = (day) => "m-" + day.slice(0, 7);
+function reviewsDue(day, h) {
+  const d = dateOf(day);
+  const due = [];
+  if ((d.getDay() === 5 && h >= 17) || d.getDay() === 6 || d.getDay() === 0) due.push({ id: weekKey(day), kind: "week" });
+  const last = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+  if (d.getDate() >= last - 2) due.push({ id: monthKey(day), kind: "month" });
+  return due;
 }
 
-/* ---------- a apresentação ----------
-   um passo de cada vez, com o rodapé mostrando onde você está e o "pular"
-   sempre à mão. cada passo tem um desenho feito de pedaços do próprio produto,
-   porque um ícone genérico não ensina nada.
-
-   reescrita em 13/09/2026: a de antes era de quando o Merlin tinha o dia, a
-   semana e as ideias. falava em "cartão da semana" e "puxar com pedágio" —
-   coisas que não existem mais — e não dizia uma palavra sobre calendário,
-   rotina, clientes ou financeiro. são seis passos, um por família de telas,
-   na ordem em que alguém usa: o tempo, o que vira tempo, quem paga, o dinheiro
-   e os hábitos, e por fim os gestos que valem em todo lugar. */
-const TOUR = [
-  {
-    title: "o calendário é o seu tempo",
-    text: "Tudo que tem data é tarefa e mora num lugar só, visto como dia, semana ou mês. Só o dia faz conta de minutos: a barra se gasta com o relógio e avisa quando não cabe."
-  },
-  {
-    title: "a semana de sempre se monta sozinha",
-    text: "O que se repete — almoço, academia, a reunião de segunda — fica na rotina e vira tarefa sozinho quando a semana abre. Mudou a rotina, muda o que ninguém mexeu."
-  },
-  {
-    title: "o que ainda não é tarefa",
-    text: "Ideia vira nota, com checklist; meta vira objetivo do trimestre, do mês ou da semana. Quando chega a hora, um botão transforma em tarefa, com dia e duração."
-  },
-  {
-    title: "de quem chega a quem paga",
-    text: "A prospecção é o quadro de quem ainda não fechou; fechou, vira cliente, com tudo que se soube no caminho. Conteúdo, funis e mapas ajudam a atrair e a explicar."
-  },
-  {
-    title: "dinheiro e hábitos, sem se enganar",
-    text: "No financeiro, cheio é o que aconteceu e tracejado é o que você previu; fixos e parcelas chegam como sugestão e só contam depois de lançados. Nos hábitos, uma marca por dia."
-  },
-  {
-    title: "o mesmo jeito em toda tela",
-    text: "O “+” cria, Ctrl K acha qualquer coisa pelo nome e o ✦ chama o Merlin onde ele ajuda. Tudo mora no seu navegador; entrando com o e-mail, o mesmo Merlin aparece em qualquer aparelho."
-  }
-];
-
-function Tour({ onClose }) {
-  const [i, setI] = useState(0);
-  const last = i === TOUR.length - 1;
-  const step = TOUR[i];
-  const go = (n) => setI(Math.max(0, Math.min(TOUR.length - 1, n)));
-  /* setas andam, Esc pula — quem lê com a mão no teclado não precisa do mouse */
-  useEffect(() => {
-    const f = (e) => {
-      if (e.key === "ArrowRight") { e.preventDefault(); last ? onClose() : go(i + 1); }
-      else if (e.key === "ArrowLeft") { e.preventDefault(); go(i - 1); }
-      else if (e.key === "Escape") { e.preventDefault(); onClose(); }
-    };
-    window.addEventListener("keydown", f);
-    return () => window.removeEventListener("keydown", f);
-  }, [i, last, onClose]);
-  return (
-    <div className="tour" role="dialog" aria-modal="true" aria-label="Apresentação do Merlin">
-      <div className="tour__box">
-        <button className="tour__skip" type="button" onClick={onClose}>pular</button>
-        <div className="tour__art"><TourArt step={i} /></div>
-        <div className="tour__words" aria-live="polite">
-          <p className="tour__count">{i + 1} de {TOUR.length}</p>
-          <h2>{step.title}</h2>
-          <p>{step.text}</p>
-        </div>
-        <div className="tour__foot">
-          <span className="tour__dots">
-            {TOUR.map((s, n) => (
-              <button key={s.title} type="button" className={n === i ? "is-on" : ""}
-                      aria-label={"passo " + (n + 1) + ": " + s.title} aria-current={n === i ? "step" : undefined}
-                      onClick={() => go(n)}><i /></button>
-            ))}
-          </span>
-          <span className="tour__nav">
-            {i > 0 && <button className="tour__back" type="button" onClick={() => go(i - 1)}>voltar</button>}
-            <button className="tour__next" type="button" onClick={() => (last ? onClose() : go(i + 1))}>
-              {last ? "começar" : "continuar"}
-            </button>
-          </span>
-        </div>
-      </div>
-    </div>
-  );
+/* a sequência: dias seguidos com o dia fechado. hoje ainda aberto não quebra
+   a conta — ela conta a partir de ontem até a noite chegar */
+function streakOf(closes, day) {
+  let n = 0;
+  let d = closes.get(day) ? day : addDays(day, -1);
+  while (closes.get(d)) { n++; d = addDays(d, -1); }
+  return n;
 }
 
-/* o desenho de cada passo: pedaços de tela de verdade, em miniatura, e cada
-   um com a forma do que ensina — uma grade, um fluxo, um quadro, uma barra */
-function TourArt({ step }) {
-  if (step === 0) return (
-    <div className="ta ta--cal" aria-hidden="true">
-      <div className="ta__tabs"><span>dia</span><span className="is-on">semana</span><span>mês</span></div>
-      <div className="ta__week">
-        {["seg", "ter", "qua", "qui", "sex"].map((d, n) => (
-          <div key={d} className="ta__col">
-            <small>{d}</small>
-            {n === 0 && <i className="ta__blk" style={{ height: 30 }} />}
-            {n === 1 && <><i className="ta__blk ta__blk--soft" style={{ height: 16 }} /><i className="ta__blk" style={{ height: 22 }} /></>}
-            {n === 2 && <i className="ta__blk ta__blk--meet" style={{ height: 20, marginTop: 12 }} />}
-            {n === 3 && <i className="ta__blk" style={{ height: 40 }} />}
-            {n === 4 && <i className="ta__blk ta__blk--soft" style={{ height: 18, marginTop: 20 }} />}
-          </div>
-        ))}
-      </div>
-      <div className="ta__daybar"><b>2h40</b><span className="ta__bar"><i style={{ width: "58%" }} /></span><small>ainda cabe hoje</small></div>
-    </div>
-  );
-  if (step === 1) return (
-    <div className="ta ta--routine" aria-hidden="true">
-      <div className="ta__rblock"><b>almoço</b><small>seg a sex · 12h · 1h</small></div>
-      <span className="ta__arrow">{icon("arrow")}</span>
-      <div className="ta__rdays">
-        {["seg", "ter", "qua", "qui", "sex"].map((d) => <span key={d}><small>{d}</small><i /></span>)}
-      </div>
-    </div>
-  );
-  if (step === 2) return (
-    <div className="ta ta--pull" aria-hidden="true">
-      <div className="ta__card">
-        <b>site da Lirie</b>
-        <span className="ta__check is-done">trocar a foto do hero</span>
-        <span className="ta__check">revisar os textos</span>
-      </div>
-      <span className="ta__arrow">{icon("task")}</span>
-      <div className="ta__card ta__card--task"><b>revisar os textos</b><small>qui · 45m</small></div>
-    </div>
-  );
-  if (step === 3) return (
-    <div className="ta ta--pipe" aria-hidden="true">
-      <div className="ta__stages">
-        <div><small>lead</small><i /><i /></div>
-        <div><small>proposta</small><i className="is-hot" /></div>
-        <div className="is-won"><small>cliente</small><i /></div>
-      </div>
-      <div className="ta__chips"><span>{NAV_ICONS.content}conteúdo</span><span>{NAV_ICONS.funnels}funis</span><span>{NAV_ICONS.maps}mapas</span></div>
-    </div>
-  );
-  if (step === 4) return (
-    <div className="ta ta--money" aria-hidden="true">
-      <p className="ta__money"><small>na conta</small><b>R$ 3.210</b></p>
-      <span className="ta__split"><i style={{ width: "46%" }} /><em style={{ width: "30%" }} /></span>
-      <p className="ta__legend"><i className="is-real" />aconteceu <i className="is-forecast" />previsto</p>
-      <div className="ta__habits">
-        {[1, 1, 0, 1, 1, 1, 0, 1, 1, 0, 1, 1].map((on, n) => <i key={n} className={on ? "is-on" : ""} />)}
-      </div>
-    </div>
-  );
-  return (
-    <div className="ta ta--keys" aria-hidden="true">
-      <div className="ta__keyrow">
-        <span className="ta__key ta__key--plus">{icon("plus")}</span>
-        <span className="ta__key"><kbd>ctrl</kbd><kbd>k</kbd></span>
-        <span className="ta__key ta__key--spark">{icon("spark")}</span>
-      </div>
-      <div className="ta__sync">
-        <span className="ta__device">{NAV_ICONS.home}</span>
-        <span className="ta__link" />
-        <span className="ta__device">{NAV_ICONS.calendar}</span>
-      </div>
-    </div>
-  );
-}
-
-/* ---------- o campo do meio ----------
-   o analogo da barra de endereco. ate 22/09/2026 o Enter dele guardava: com
-   duracao no texto virava tarefa do dia, sem duracao virava nota. agora o
-   Enter CONVERSA — leva o que esta escrito pra tela do Merlin, que e de onde
-   quase tudo comeca — e guardar passou a ser o botao de "+" do lado, com a
-   mesma gramatica estrita do core e a mesma linha fantasma dizendo onde
-   aquilo vai cair. o gesto mais comum ficou no Enter; o outro continua a um
-   toque de distancia, e nenhum dos dois virou menu. */
-function Capture() {
-  const [text, setText] = useState("");
-  const read = (raw) => {
-    const m = parseMentions(raw);
-    const { min, title } = readDuration(m.title);
-    return { title: title.trim(), min, client: m.client || "" };
-  };
-  const ghost = text.trim() ? read(text) : null;
-  const keep = () => {
-    const r = read(text);
-    if (!r.title) return;
-    sendToDay({ title: r.title, min: r.min, client: r.client });
-    setText("");
-  };
-  return (
-    <form className="hm-capture" autoComplete="off"
-          onSubmit={(e) => { e.preventDefault(); if (text.trim()) askMerlin(text); }}>
-      <label className="hm-capture__field">
-        {icon("spark")}
-        <input id="hm-field" maxLength="300" placeholder="escreva o que apareceu…"
-               aria-label="Escreva para o Merlin, ou guarde como tarefa ou nota"
-               value={text} onChange={(e) => setText(e.currentTarget.value)} />
-        <button type="button" className="hm-capture__keep" title="guardar como tarefa ou nota"
-                aria-label="Guardar como tarefa ou nota" onClick={keep}>{icon("plus")}</button>
-        <kbd>enter</kbd>
-      </label>
-      {ghost && ghost.title && (
-        <p className="hm-ghost">
-          <b>enter</b> conversa com o Merlin · o <b>+</b>{" "}
-          {ghost.min
-            ? <>põe na <b>fila de hoje</b>, ocupando {longFmt(ghost.min)}</>
-            : <>guarda como <b>uma nota</b> — sem duração, não custa minuto nenhum</>}
-          {ghost.client && clientName(ghost.client) ? <> · {clientName(ghost.client)}</> : null}
-        </p>
-      )}
-    </form>
-  );
-}
-
-/* ---------- os blocos ---------- */
-
-/* o dia, no bloco alto: o número grande e a barra que se gasta. é o mesmo
-   budget() da tela do dia — uma sobra calculada de dois jeitos seriam duas
-   verdades sobre o mesmo dia, e a que aparece primeiro vence.
-
-   "outro dia" morreu junto com o documento do dia: a fila de hoje é sempre a
-   de hoje, porque hoje é uma consulta por data e não um estado guardado. o
-   que ficou para trás tem lugar próprio, e é o calendário quem o mostra. */
-function DayBlock({ doc, late }) {
-  const b = budget(doc);
-  const open = pendingOf(doc);
-  const used = b.window ? Math.min(100, Math.round(((b.elapsed + b.liveReserve) / b.window) * 100)) : 0;
-  const busy = b.window ? Math.max(0, Math.min(100 - used, Math.round((b.committed / b.window) * 100))) : 0;
-  return (
-    <a className="bx bx--day" href="calendar.html#day">
-      <p className="bx__head">
-        <span className="t-mono">o dia</span>
-        <span className="t-mono bx__aside">{clock(doc.start)}–{clock(doc.end)}</span>
-      </p>
-      {/* três estados, e o terceiro é o que aparece toda noite: passou da hora
-          de fechar. sem ele o bloco dizia "— além do que cabe" às 20h com a
-          fila vazia, porque a sobra e o estouro são ambos zero quando a janela
-          acabou. o dia não estourou: ele terminou. */}
-      {b.overtime
-        ? <p className="bx__big is-over">{clock(doc.end)}<small>{open.length ? "passou, e ainda há fila" : "passou. o dia fechou."}</small></p>
-        : <p className={"bx__big" + (b.slack > 0 ? "" : " is-over")}>
-            {b.slack > 0 ? fmt(b.slack) : fmt(b.overflow)}
-            <small>{b.slack > 0 ? "ainda cabe" : "além do que cabe"}</small>
-          </p>}
-      <div className="bx__track" aria-hidden="true">
-        <i className="bx__used" style={{ width: used + "%" }} />
-        <i className="bx__busy" style={{ width: busy + "%" }} />
-      </div>
-      <ul className="bx__queue">
-        {open.slice(0, 4).map((t) => (
-          <li key={t.id}>
-            <span className="bx__dot" aria-hidden="true" />
-            <b>{t.title}</b>
-            <span className="t-mono">{fmt(costOf(t))}</span>
-          </li>))}
-        {!open.length && <li className="bx__none">nada na fila</li>}
-      </ul>
-      {open.length > 4 && <p className="bx__more t-mono">e mais {open.length - 4}</p>}
-      {late > 0 && <p className="bx__more t-mono">{late + (late === 1 ? " de antes de hoje" : " abertas de antes de hoje")}</p>}
-    </a>
-  );
-}
-
-/* o que se repete todo dia: os hábitos esperados de hoje, com um toque para
-   marcar, e a página do diário de hoje, escrevendo sem sair da home. era a
-   grade de 9 atalhos — trocada porque atalho não é tarefa, e o que a pessoa
-   precisa cadastrar todo dia (o que fez, o que viveu) merecia o lugar de
-   maior destaque, não uma página a mais para abrir. as outras páginas
-   continuam a um clique pela barra lateral. */
-function TodayBlock({ habits, journal, t }) {
-  const list = habits.all()
-    .filter((h) => !h.archived && isExpected(h, t))
-    .sort((a, b) => a.order - b.order || a.createdAt - b.createdAt);
-  const entry = journal.get(t);
-  const [draft, setDraft] = useState(() => (entry && entry.body) || "");
-  const draftRef = useRef(draft);
-  draftRef.current = draft;
-  const timer = useRef(null);
-  useEffect(() => { setDraft((entry && entry.body) || ""); }, [entry && entry.body]);
-  const write = (v) => {
-    setDraft(v);
-    clearTimeout(timer.current);
-    timer.current = setTimeout(() => {
-      journal.save({ id: t, body: draftRef.current, createdAt: (entry && entry.createdAt) || Date.now(), updatedAt: Date.now() });
-    }, 700);
-  };
-  return (
-    <section className="bx bx--today">
-      <p className="bx__head">
-        <span className="t-mono">hoje</span>
-        <a className="bx__aside" href="habits.html">ver hábitos e diário</a>
-      </p>
-      {list.length
-        ? <ul className="today-habits">
-            {list.map((h) => (
-              <li key={h.id}>
-                <button type="button" className={"today-habits__check" + (h.marks[t] ? " is-done" : "")}
-                        aria-label={(h.marks[t] ? "desmarcar " : "marcar ") + h.name}
-                        onClick={() => toggleMark(habits, h, t, t)}>
-                  {h.marks[t] && icon("check")}
-                </button>
-                <span className="today-habits__name">{h.name}</span>
-              </li>))}
-          </ul>
-        : <p className="bx__empty">nenhum hábito esperado hoje</p>}
-      <label className="today-journal">
-        <span className="t-mono today-journal__label">diário de hoje</span>
-        <textarea rows={3} placeholder="como foi o dia?" value={draft} onChange={(e) => write(e.target.value)} />
-      </label>
-    </section>
-  );
-}
-
-function FavBlock({ bookmarks }) {
-  const [form, setForm] = useState(null);
-  const list = bookmarks.all().sort((a, b) => (a.order || 0) - (b.order || 0));
-  return (
-    <section className="bx">
-      <p className="bx__head">
-        <span className="t-mono">favoritos</span>
-        <button className="bx__add" type="button" aria-label="Guardar um site" onClick={() => setForm({ id: "" })}>{icon("plus")}</button>
-      </p>
-      {list.length
-        ? <ul className="favs">
-            {list.slice(0, 6).map((k) => (
-              <li key={k.id}>
-                {/* a marca é a inicial, não um favicon: pedir o ícone a um
-                    serviço de terceiro entregaria a ele a lista de tudo que
-                    você guarda, e o produto é feito sobre o contrário. */}
-                <span className="favs__mark t-mono" aria-hidden="true">{(k.name || hostOf(k.url) || "?").trim()[0].toUpperCase()}</span>
-                <a href={k.url} target="_blank" rel="noreferrer">
-                  <b>{k.name || hostOf(k.url)}</b>
-                  <small>{hostOf(k.url)}</small>
-                </a>
-                <button className="favs__edit" type="button" aria-label="Editar" onClick={() => setForm({ id: k.id })}>{icon("pencil")}</button>
-              </li>))}
-          </ul>
-        : <p className="bx__empty">Nenhum site guardado ainda.</p>}
-      {form && <BookmarkForm bookmarks={bookmarks} id={form.id} count={list.length} onClose={() => setForm(null)} />}
-    </section>
-  );
-}
-
-function BookmarkForm({ bookmarks, id, count, onClose }) {
-  const k = id ? bookmarks.get(id) : null;
-  const [v, bind] = useFields({ name: k ? k.name : "", url: k ? k.url : "" });
-  const submit = () => {
-    const url = safeUrl(v.url);
-    if (!url) { notify("preciso de um endereço que dê para abrir"); return false; }
-    const now = Date.now();
-    bookmarks.save(k
-      ? { ...k, name: v.name.trim().slice(0, 60), url, updatedAt: now }
-      : { id: newId(), name: v.name.trim().slice(0, 60), url, order: count, createdAt: now, updatedAt: now });
-  };
-  const remove = () => {
-    const before = bookmarks.remove(id);
-    if (before) notify("favorito apagado", () => bookmarks.save(before));
-  };
-  return (
-    <Form title={k ? "editar favorito" : "novo favorito"} submit="guardar"
-          remove={k ? "apagar" : ""} onRemove={k ? remove : null}
-          onSubmit={submit} onClose={onClose}>
-      <Field label="nome" full><input className="input" maxLength="60" placeholder="como você chama esse lugar" {...bind("name")} /></Field>
-      <Field label="endereço" full><input className="input" required maxLength="500" placeholder="mercadolivre.com.br" {...bind("url")} /></Field>
-    </Form>
-  );
-}
-
-function NoteBlock({ notes }) {
-  const live = notes.all()
-    .filter((n) => n.stage !== "archived")
-    .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
-  const [text, setText] = useState("");
-  const add = (e) => {
-    e.preventDefault();
-    const m = parseMentions(text);
-    const title = m.title.trim();
-    if (!title) return;
-    newNote({ title, client: m.client || "" });
-    setText("");
-  };
-  return (
-    <section className="bx">
-      <p className="bx__head">
-        <span className="t-mono">notas</span>
-        <a className="bx__aside" href="notes.html">todas</a>
-      </p>
-      {live.length
-        ? <ul className="notes-mini">
-            {live.slice(0, 4).map((n) => (
-              <li key={n.id}><a href={"notes.html#" + encodeURIComponent(n.id)}>{n.title || "sem título"}</a></li>))}
-          </ul>
-        : <p className="bx__empty">Nada guardado. O que não é tarefa cabe aqui.</p>}
-      <form className="notes-mini__form" autoComplete="off" onSubmit={add}>
-        <input maxLength="300" placeholder="uma nota…" aria-label="Nova nota"
-               value={text} onChange={(e) => setText(e.currentTarget.value)} />
-      </form>
-    </section>
-  );
-}
-
-function QuoteBlock() {
-  const [text, who] = quoteOfDay();
-  return (
-    <section className="bx bx--quote">
-      <span className="quote__mark" aria-hidden="true">“</span>
-      <p className="quote__text">{text}</p>
-      <p className="quote__who t-mono">{who}</p>
-    </section>
-  );
-}
-
-/* ---------- a landing ----------
-   o primeiro quadro de quem nunca esteve aqui. não há fila de espera porque
-   não há fila: o Merlin já funciona inteiro sem conta, e a porta diz isso.
-   ela não é uma rota — é um estado deste mesmo arquivo. */
+/* ================================================================
+   a porta
+   ================================================================ */
 function Landing({ onGuest }) {
   return (
     <div className="lg">
@@ -502,16 +83,16 @@ function Landing({ onGuest }) {
         <span className="lg__logo">{LOGO}<b>merlin</b></span>
         <div className="lg__grade" aria-hidden="true" />
         <div className="lg__words">
-          <p className="lg__badge"><i />um sistema de uma pessoa só</p>
+          <p className="lg__badge"><i />um assistente de uma pessoa só</p>
           <h1>o dia é o único lugar com <em>minutos</em></h1>
           <p className="lg__sub">
-            Tudo o mais — as notas, a semana, os clientes, os funis, o dinheiro — é
-            reservatório sem hora. O trabalho entra no seu dia quando você puxa, e
-            pagando o pedágio da duração. É por isso que o número grande é confiável.
+            O Merlin pergunta pelo seu dia, pela sua semana e pelo seu mês, e guarda o que
+            você responde: as tarefas, as ideias, o produto que você está construindo e quem
+            chega até ele. O trabalho entra no dia quando cabe — é por isso que o número
+            grande é confiável.
           </p>
         </div>
       </div>
-
       <div className="lg__door">
         <h2>comece agora</h2>
         <p className="lg__lead">Sem cadastro, sem cartão, sem espera. O Merlin nasce
@@ -526,110 +107,495 @@ function Landing({ onGuest }) {
   );
 }
 
-function Home() {
-  const c = useCloud();
-  useClients();
-  const tasks = useCollection("tasks", { normalize: normalizeTask });
-  const notes = useCollection("notes");
-  const habits = useCollection("habits", { normalize: normalizeHabit });
-  const journal = useCollection("journal");
-  const bookmarks = useCollection("bookmarks");
-  const routine = useCollection("routine", { normalize: normalizeBlock });
+/* ================================================================
+   o onboarding: a primeira conversa
+   ================================================================
+   cinco perguntas, e cada resposta vira alguma coisa NA HORA — o Merlin diz
+   o que anotou, e a pessoa vê o sistema se montar. tudo menos o nome pode ser
+   pulado. sem rede e sem IA: é roteiro, e funciona no primeiro minuto. */
+function parseWindow(text) {
+  const parts = String(text || "").toLowerCase().split(/\s*(?:às|as|a|até|ate|-|–|—)\s*/).filter(Boolean);
+  if (parts.length < 2) return null;
+  const s = readClock(parts[0]), e = readClock(parts[1]);
+  return s != null && e != null && e > s ? { dayStart: s, dayEnd: e } : null;
+}
 
-  /* o início mostra o dia, e o dia pode ter reunião da rotina: copia a semana
-     daqui também, senão ela só apareceria depois de abrir o calendário */
-  useEffect(() => {
-    const run = () => copyRoutine(routine, tasks);
-    run();
-    const offs = [tasks.onChange(run), routine.onChange(run), c.onStatus(run)];
-    return () => offs.forEach((off) => off());
-  }, []);
+const STEPS = [
+  { key: "name", ask: () => "Oi. Eu sou o Merlin. Vou te ajudar a fazer o dia caber — e, para isso, preciso te conhecer. Como posso te chamar?", placeholder: "seu nome", required: true },
+  { key: "work", ask: (a) => "Prazer, " + a.name + ". Com o que você trabalha?", placeholder: "ex.: sou dev, faço SaaS sozinho e atendo dois clientes" },
+  { key: "building", ask: () => "E o que você está construindo agora? Me diz o nome e, se quiser, uma frase.", placeholder: "ex.: Agenda do salão — agendamento pelo WhatsApp" },
+  { key: "window", ask: () => "Que horas o seu dia de trabalho começa e termina?", placeholder: "ex.: 9 às 18" },
+  { key: "habit", ask: () => "Um hábito que você quer manter todo dia?", placeholder: "ex.: treinar, ler 20 páginas, dormir 7h" }
+];
 
-  /* o dia virou uma consulta na coleção de tarefas: a coleção já avisa quando
-     muda (outra aba, nuvem), então aqui só resta o relógio — a barra se gasta
-     sozinha, e é ele quem redesenha. */
-  const [, tick] = useState(0);
-  useEffect(() => {
-    const t = setInterval(() => tick((n) => n + 1), 30000);
-    return () => clearInterval(t);
-  }, []);
+function Onboarding({ profile, apps, habits, onDone }) {
+  const [answers, setAnswers] = useState({});
+  const [log, setLog] = useState([{ from: "merlin", text: STEPS[0].ask({}) }]);
+  const [i, setI] = useState(0);
+  const [text, setText] = useState("");
+  const field = useRef(null);
+  const end = useRef(null);
+  useEffect(() => { if (field.current) field.current.focus(); }, [i]);
+  useEffect(() => { if (end.current) end.current.scrollIntoView({ block: "end", behavior: "smooth" }); }, [log]);
 
-  const [tour, setTour] = useState(() => !seen("tour") || location.hash === "#apresentacao");
-  const closeTour = () => {
-    setTour(false);
-    markSeen("tour");
-    if (location.hash) history.replaceState(null, "", location.pathname);
-    /* a quick win: quem acabou de ler é devolvido ao campo, com o cursor
-       dentro. o pior quadro depois de uma apresentação é não saber o que fazer. */
-    requestAnimationFrame(() => { const f = document.getElementById("hm-field"); if (f) f.focus(); });
+  const now = Date.now();
+  const saveProfile = (patch) => {
+    const cur = profile.get("me") || { id: "me", createdAt: now };
+    profile.save({ ...cur, ...patch, updatedAt: Date.now() });
   };
-  useEffect(() => {
-    const f = () => { if (location.hash === "#apresentacao") setTour(true); };
-    window.addEventListener("hashchange", f);
-    return () => window.removeEventListener("hashchange", f);
-  }, []);
 
-  const t = today();
-  const allTasks = tasks.all();
-  const today_ = dayDoc(allTasks, t, readPrefs());
-  const late = overdue(allTasks, t).length;
+  /* o que cada resposta vira, e o que o Merlin diz que anotou */
+  const apply = (key, value) => {
+    if (key === "name") { saveProfile({ name: value }); return "anotei: " + value; }
+    if (key === "work") { saveProfile({ work: value }); return "anotei no seu perfil"; }
+    if (key === "building") {
+      const [name, ...rest] = value.split(/\s+[—–-]\s+|:\s+/);
+      const app = { id: newId(), name: name.trim().slice(0, 120), pitch: rest.join(" — ").trim().slice(0, 300), createdAt: Date.now(), updatedAt: Date.now() };
+      apps.save(app);
+      saveProfile({ building: value });
+      return "criei o produto “" + app.name + "” em Produtos";
+    }
+    if (key === "window") {
+      const w = parseWindow(value);
+      if (!w) return null;
+      savePrefs(w);
+      return "seu dia vai de " + clock(w.dayStart) + " a " + clock(w.dayEnd);
+    }
+    if (key === "habit") {
+      habits.save(normalizeHabit({ id: newId(), name: value.slice(0, 80), schedule: { type: "daily" }, order: 0, createdAt: Date.now() }));
+      saveProfile({ habit: value });
+      return "o hábito “" + value + "” entrou na sua lista de hoje";
+    }
+    return "";
+  };
 
-  const now = new Date();
-  const name = c.signedIn && c.email ? String(c.email).split("@")[0] : "";
+  const next = (value) => {
+    const step = STEPS[i];
+    const out = [...log, { from: "me", text: value || "pular" }];
+    if (value) {
+      const note = apply(step.key, value);
+      if (note === null) {
+        setLog([...out, { from: "merlin", text: "Não entendi o horário. Me diz assim: 9 às 18." }]);
+        setText("");
+        return;
+      }
+      if (note) out.push({ from: "merlin", note: true, text: note });
+    }
+    const a = { ...answers, [step.key]: value };
+    setAnswers(a);
+    setText("");
+    if (i + 1 < STEPS.length) {
+      out.push({ from: "merlin", text: STEPS[i + 1].ask(a) });
+      setLog(out);
+      setI(i + 1);
+    } else {
+      out.push({ from: "merlin", text: "Pronto, " + (a.name || "") + ". A partir de agora eu pergunto pelo seu dia toda vez que você chegar. Vamos começar: o que precisa caber hoje?" });
+      setLog(out);
+      saveProfile({ onboarded: true });
+      setTimeout(onDone, 1600);
+    }
+  };
 
+  const step = STEPS[i];
   return (
-    <div className="hm">
-      <header className="hm-top">
-        <span className="hm-hello">{greeting()}{name ? ", " + name : ""}</span>
-        <a className="hm-me" href="profile.html">
-          <span className={"hm-me__av" + (name ? "" : " is-out")}>{name ? name[0].toUpperCase() : "?"}</span>
-          <span>{c.signedIn ? "sincronizado" : "só neste navegador"}</span>
-        </a>
-      </header>
-
-      <section className="hm-clock">
-        <p className="hm-time">{String(now.getHours()).padStart(2, "0")}<i>:</i>{String(now.getMinutes()).padStart(2, "0")}</p>
-        <p className="hm-date">{longDate()}</p>
-      </section>
-
-      <Capture />
-
-      <section className="hm-bento">
-        <FavBlock bookmarks={bookmarks} />
-        <TodayBlock habits={habits} journal={journal} t={t} />
-        <DayBlock doc={today_} late={late} />
-        <NoteBlock notes={notes} />
-        <QuoteBlock />
-      </section>
-
-      <p className="hm-foot">
-        <a className="pill pill--mini" href="index.html#apresentacao" title="ver a apresentação" onClick={(e) => { e.preventDefault(); setTour(true); }}>{icon("eye")}a apresentação</a>
-      </p>
-
-      {tour && <Tour onClose={closeTour} />}
+    <div className="ob">
+      <div className="ob__log" aria-live="polite">
+        {log.map((m, n) => (
+          <p key={n} className={"ob__msg ob__msg--" + m.from + (m.note ? " is-note" : "")}>
+            {m.note && icon("check")}{m.text}
+          </p>
+        ))}
+        <span ref={end} />
+      </div>
+      <form className="ob__form" onSubmit={(e) => { e.preventDefault(); const v = text.trim(); if (v || !step.required) next(v); }}>
+        <input ref={field} className="ob__field" value={text} maxLength="200" placeholder={step.placeholder}
+               onChange={(e) => setText(e.currentTarget.value)} aria-label={step.ask(answers)} />
+        {!step.required && <button type="button" className="ob__skip" onClick={() => next("")}>pular</button>}
+        <button type="submit" className="ob__send" aria-label="Responder" disabled={step.required && !text.trim()}>{icon("arrow")}</button>
+      </form>
     </div>
   );
 }
 
-/* ---------- qual dos dois quadros ----------
-   decidido de forma SÍNCRONA, aqui no módulo, antes do mount: esperar o
-   servidor dizer quem é você faria a página nascer vazia e se corrigir depois,
-   e o Merlin funciona inteiro sem conexão.
+/* ================================================================
+   o campo do meio: tarefa, perguntar, nota
+   ================================================================ */
+const MODES = [
+  { id: "task", label: "tarefa", icon: "check", placeholder: "o que precisa ser feito? ex.: revisar a landing 45m" },
+  { id: "ask", label: "perguntar ao Merlin", icon: "spark", placeholder: "pergunte qualquer coisa sobre o seu dia, o produto ou o lançamento" },
+  { id: "note", label: "nota", icon: "pencil", placeholder: "o que apareceu e ainda não é tarefa" }
+];
 
-   `bare` na raiz tira a barra de navegação. tira a BARRA, não a casca: o
-   diálogo de entrar mora dentro dela, e é ele que a landing abre.
+function Composer({ tasks, b, moment }) {
+  const [mode, setMode] = useState("task");
+  const [text, setText] = useState("");
+  const [pending, setPending] = useState(null);
+  const field = useRef(null);
+  const m = MODES.find((x) => x.id === mode);
+  const date = today();
 
-   entrar também abre a porta. sem isto, quem entrava pela landing — o
-   celular novo, sempre — acertava o código e continuava olhando a landing,
-   que parece exatamente "deslogado" (o erro de 29/09/2026). */
+  const create = (spec) => {
+    const t = newTask({ ...spec, date, order: topOrder(tasks.all(), date) });
+    tasks.save(t);
+    notify((spec.reserved ? "reservado em hoje · " : "entrou em hoje · ") + formatMin(spec.min), () => tasks.remove(t.id));
+    setText(""); setPending(null);
+    if (field.current) field.current.focus();
+  };
+  const submit = () => {
+    const raw = text.replace(/\s+/g, " ").trim();
+    if (!raw) return;
+    if (mode === "ask") { askMerlin(raw); return; }
+    if (mode === "note") {
+      const n = newNote({ title: raw });
+      if (n) notify("guardado em ideias", () => collection("notes").remove(n.id));
+      setText("");
+      return;
+    }
+    if (pending) { const min = readLine(" " + raw + " ").min; if (min) create({ ...pending, min }); return; }
+    const l = readLine(raw);
+    const name = String(l.title || raw).replace(/\s+/g, " ").trim();
+    const spec = { title: stripPrefix(name), reserved: isReserve(name), clickup: l.clickup, client: l.client || "" };
+    if (l.min) create({ ...spec, min: l.min });
+    else { setPending(spec); setText(""); }
+  };
+  const read = mode === "task" && !pending && text.trim() ? readLine(text) : null;
+
+  return (
+    <form className="hm-field" onSubmit={(e) => { e.preventDefault(); submit(); }}>
+      <div className="hm-field__modes" role="tablist">
+        {MODES.map((x) => (
+          <button key={x.id} type="button" role="tab" aria-selected={mode === x.id}
+                  onClick={() => { setMode(x.id); setPending(null); if (field.current) field.current.focus(); }}>
+            {icon(x.icon)}{x.label}
+          </button>
+        ))}
+      </div>
+      {pending && (
+        <div className="hm-field__chips">
+          <span><b>{pending.title}</b> — quanto leva?</span>
+          {CHIPS.map((min) => <button key={min} type="button" className="t-mono" data-fits={min <= b.slack ? "yes" : "no"} onClick={() => create({ ...pending, min })}>{fmt(min)}</button>)}
+          <button type="button" onClick={() => { const n = newNote({ title: pending.title }); if (n) notify("guardado em ideias"); setPending(null); }}>guardar como ideia</button>
+        </div>
+      )}
+      <textarea ref={field} rows={2} maxLength="300" value={text} autoFocus={moment === "start"}
+                placeholder={pending ? "ou escreva o tempo: 45m, 1h30…" : m.placeholder}
+                onChange={(e) => setText(e.currentTarget.value)}
+                onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); submit(); } if (e.key === "Escape") setPending(null); }} />
+      <div className="hm-field__foot">
+        <span className="hm-field__hint">
+          {read && read.min ? <>{fmt(read.min)}{read.min > b.slack ? " · não cabe hoje" : " · cabe"}</> :
+            mode === "task" ? "escreva a duração no fim: 45m, 1h30" : mode === "ask" ? "a resposta abre na conversa com o Merlin" : "vai para Ideias"}
+        </span>
+        <button type="submit" className="hm-field__send" aria-label="Enviar">{icon("arrow")}</button>
+      </div>
+    </form>
+  );
+}
+
+/* ================================================================
+   fechar o dia
+   ================================================================
+   a pergunta da noite tem forma: o que ficou aberto hoje passa uma a uma —
+   feito, amanhã ou largar — e depois o "como foi o dia". só então o dia
+   conta na sequência. nada rola sozinho: é a pessoa que decide cada uma. */
+function Closing({ tasks, journal, closes, date, onClose }) {
+  const doc = dayDoc(tasks.all(), date, readPrefs());
+  const open = doc.tasks.filter((t) => !t.done && !t.reserved);
+  const [fate, setFate] = useState({});
+  const entry = journal.get(date);
+  const [body, setBody] = useState((entry && entry.body) || "");
+  const tally = { done: 0, moved: 0, dropped: 0 };
+  Object.values(fate).forEach((f) => { tally[f]++; });
+
+  const finish = () => {
+    const tomorrow = addDays(date, 1);
+    open.forEach((t) => {
+      const f = fate[t.id];
+      if (f === "done") tasks.save({ ...t, done: true, updatedAt: Date.now() });
+      else if (f === "moved") tasks.save({ ...t, date: tomorrow, order: topOrder(tasks.all(), tomorrow), updatedAt: Date.now() });
+      else if (f === "dropped") tasks.remove(t.id);
+    });
+    if (body.trim()) journal.save({ id: date, body: body.trim(), createdAt: (entry && entry.createdAt) || Date.now(), updatedAt: Date.now() });
+    const done = doc.tasks.filter((t) => t.done && !t.reserved).length + tally.done;
+    closes.save({ id: date, date, done, moved: tally.moved, dropped: tally.dropped, createdAt: Date.now(), updatedAt: Date.now() });
+    notify("dia fechado. até amanhã.");
+    onClose();
+  };
+
+  return (
+    <div className="cl" role="dialog" aria-modal="true" aria-label="Fechar o dia" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="cl__box">
+        <p className="cl__eyebrow t-mono">fechar o dia</p>
+        <h2>{open.length ? "O que ficou aberto, e o que fazemos com cada um?" : "Nada ficou aberto hoje."}</h2>
+        {open.length > 0 && (
+          <ul className="cl__list">
+            {open.map((t) => (
+              <li key={t.id}>
+                <span className="cl__title">{t.title}<small className="t-mono">{fmt(costOf(t))}</small></span>
+                <span className="cl__fates">
+                  {[["done", "feito"], ["moved", "amanhã"], ["dropped", "largar"]].map(([id, label]) => (
+                    <button key={id} type="button" aria-pressed={fate[t.id] === id} onClick={() => setFate({ ...fate, [t.id]: fate[t.id] === id ? undefined : id })}>{label}</button>
+                  ))}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+        <label className="cl__journal">
+          <span>e como foi o dia?</span>
+          <textarea rows={3} value={body} placeholder="o que fez, o que viveu, o que aprendeu…" onChange={(e) => setBody(e.currentTarget.value)} />
+        </label>
+        <div className="cl__actions">
+          <button type="button" className="pill" onClick={onClose}>depois</button>
+          <button type="button" className="pill pill--accent" onClick={finish}
+                  disabled={open.some((t) => !fate[t.id])} title={open.some((t) => !fate[t.id]) ? "decida cada tarefa aberta" : ""}>
+            fechar o dia
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* a revisão da semana e do mês: a mesma pergunta, num horizonte maior */
+function Review({ reviews, due }) {
+  const cur = reviews.get(due.id);
+  const [body, setBody] = useState((cur && cur.body) || "");
+  const [open, setOpen] = useState(false);
+  if (cur && cur.body && !open) return null;
+  const isWeek = due.kind === "week";
+  const save = () => {
+    if (!body.trim()) return;
+    reviews.save({ id: due.id, kind: due.kind, body: body.trim(), createdAt: (cur && cur.createdAt) || Date.now(), updatedAt: Date.now() });
+    notify(isWeek ? "semana revisada" : "mês revisado");
+    setOpen(false);
+  };
+  return (
+    <section className="hm-card hm-review">
+      <p className="hm-card__head">{isWeek ? NAV_ICONS.calendar : NAV_ICONS.plans}{isWeek ? "a semana" : "o mês"}</p>
+      <p className="hm-review__q">{isWeek ? "Como foi a semana? O que muda na próxima?" : "Como foi o mês? O que fica e o que sai no próximo?"}</p>
+      <textarea rows={3} value={body} onFocus={() => setOpen(true)} onChange={(e) => setBody(e.currentTarget.value)}
+                placeholder={isWeek ? "o que andou, o que travou, a única coisa da próxima semana" : "o que o mês construiu, o que ficou pelo caminho"} />
+      <div className="hm-review__actions">
+        <button type="button" className="pill" onClick={() => askMerlin((isWeek ? "Me ajuda a revisar a minha semana. " : "Me ajuda a revisar o meu mês. ") + body)}>{icon("spark")}pensar com o Merlin</button>
+        <button type="button" className="pill pill--accent" onClick={save} disabled={!body.trim()}>guardar</button>
+      </div>
+    </section>
+  );
+}
+
+/* ================================================================
+   os blocos do hoje
+   ================================================================ */
+function DayCard({ tasks, doc, b, slots, cut }) {
+  const open = b.open;
+  const done = doc.tasks.filter((t) => t.done && !t.reserved).length;
+  const width = (min) => ({ flex: "0 0 " + ((min / b.window) * 100) + "%" });
+  const complete = (t) => {
+    const cur = tasks.get(t.id);
+    if (!cur || cur.done) return;
+    tasks.save({ ...cur, done: true, updatedAt: Date.now() });
+    notify(t.min ? "+" + longFmt(t.min) + " de volta pro dia" : "feita.", () => { const back = tasks.get(t.id); if (back) tasks.save({ ...back, done: false, updatedAt: Date.now() }); });
+  };
+  return (
+    <section className="hm-card hm-day">
+      <p className="hm-card__head">{NAV_ICONS.calendar}o dia <span className="hm-card__aside t-mono">{open.length} na fila · {done} feitas</span><a href="calendar.html" className="hm-card__go" aria-label="Abrir o dia">{icon("arrow")}</a></p>
+      <p className="hm-day__n" data-tone={b.slack < 0 || b.overtime ? "over" : ""}>
+        <b className="t-mono">{b.overtime ? clock(doc.end) : b.slack >= 0 ? (b.unestimated ? "~" : "") + fmt(b.slack) : fmt(b.overflow)}</b>
+        <span>{b.overtime ? (open.length ? "passou, e ainda há fila" : "o dia acabou") : b.slack >= 0 ? "ainda cabe" : "além do que cabe"}</span>
+      </p>
+      {b.window > 0 && (
+        <div className="hm-track" aria-hidden="true">
+          {b.elapsed > 0 && <i className="is-spent" style={width(b.elapsed)} />}
+          {b.liveReserve > 0 && <i className="is-reserved" style={width(b.liveReserve)} />}
+          {open.map((t) => { const s = slots.get(t.id); return s ? <i key={t.id} className={"is-slot" + (s.guess ? " is-guess" : "")} style={width(s.min)} /> : null; })}
+          {b.committed < b.remaining && <i className="is-free" />}
+        </div>
+      )}
+      <ul className="hm-list">
+        {open.slice(0, 6).map((t, i) => (
+          <li key={t.id} className={cut >= 0 && i >= cut ? "is-out" : ""}>
+            <button type="button" className="hm-check" aria-label={"Concluir " + t.title} onClick={() => complete(t)} />
+            <span className="hm-list__title">{t.title}</span>
+            <span className="t-mono hm-list__min">{fmt(costOf(t))}</span>
+          </li>
+        ))}
+        {!open.length && <li className="hm-empty">nada na fila — escreva acima o que precisa caber</li>}
+      </ul>
+    </section>
+  );
+}
+
+function habitStreak(h, day) {
+  let n = 0, d = h.marks[day] ? day : addDays(day, -1);
+  while (h.marks[d]) { n++; d = addDays(d, -1); }
+  return n;
+}
+
+function HabitsCard({ habits, date }) {
+  const list = habits.all().filter((h) => !h.archived && isExpected(h, date)).sort((a, b) => a.order - b.order || a.createdAt - b.createdAt);
+  const marked = list.filter((h) => h.marks[date]).length;
+  return (
+    <section className="hm-card">
+      <p className="hm-card__head">{NAV_ICONS.habits}hábitos de hoje <span className="hm-card__aside t-mono">{marked}/{list.length}</span><a href="habits.html" className="hm-card__go" aria-label="Abrir os hábitos">{icon("arrow")}</a></p>
+      <ul className="hm-list">
+        {list.map((h) => (
+          <li key={h.id}>
+            <button type="button" className={"hm-check" + (h.marks[date] ? " is-done" : "")} aria-label={(h.marks[date] ? "desmarcar " : "marcar ") + h.name}
+                    onClick={() => toggleMark(habits, h, date, date)}>{h.marks[date] && icon("check")}</button>
+            <span className="hm-list__title">{h.name}</span>
+            <span className="t-mono hm-list__min">{habitStreak(h, date) ? habitStreak(h, date) + "d" : ""}</span>
+          </li>
+        ))}
+        {!list.length && <li className="hm-empty">nenhum hábito para hoje — <a href="habits.html">criar um</a></li>}
+      </ul>
+    </section>
+  );
+}
+
+function AgendaCard({ doc }) {
+  const timed = doc.tasks.filter((t) => t.at != null && !t.done).sort((a, b) => a.at - b.at);
+  return (
+    <section className="hm-card">
+      <p className="hm-card__head">{NAV_ICONS.routine}agenda <a href="calendar.html#week" className="hm-card__go" aria-label="Abrir a semana">{icon("arrow")}</a></p>
+      <ul className="hm-list">
+        {timed.map((t) => (
+          <li key={t.id}>
+            <span className="t-mono hm-list__at">{clock(t.at)}</span>
+            <span className="hm-list__title">{t.title}</span>
+            <span className="t-mono hm-list__min">{t.min ? fmt(t.min) : ""}</span>
+          </li>
+        ))}
+        {!timed.length && <li className="hm-empty">nada com hora marcada hoje</li>}
+      </ul>
+    </section>
+  );
+}
+
+/* ================================================================
+   a fala do Merlin
+   ================================================================
+   a pergunta do alto é fixa; embaixo dela o Merlin fala do dia de VERDADE —
+   a fila, a sobra, os hábitos, a sequência — escrito pela IA (a tarefa
+   "checkin" do worker, que já recebe o perfil). uma vez por momento do dia
+   (manhã, tarde, noite), guardada no navegador: voltar ao início não gasta
+   outro conselho. sem sessão, sem rede ou sem chave, fica só a pergunta. */
+const CHECKIN_KEY = "merlin:checkin";
+function useCheckin(signedIn, key, buildContext) {
+  const [text, setText] = useState(() => {
+    try { const c = JSON.parse(localStorage.getItem(CHECKIN_KEY)); return c && c.key === key ? c.text : ""; } catch (e) { return ""; }
+  });
+  const asked = useRef("");
+  useEffect(() => {
+    if (!signedIn || text || asked.current === key) return;
+    asked.current = key;
+    api("/merlin", { method: "POST", body: JSON.stringify({ task: "checkin", context: buildContext() }) })
+      .then((r) => {
+        const t = r && r.ok && r.body && String(r.body.text || "").trim();
+        if (!t) return;
+        setText(t);
+        try { localStorage.setItem(CHECKIN_KEY, JSON.stringify({ key, text: t })); } catch (e) {}
+      })
+      .catch(() => {});
+  }, [signedIn, key]);
+  return text;
+}
+
+/* ================================================================
+   o início
+   ================================================================ */
+function Home() {
+  const c = useCloud();
+  const profile = useCollection("profile");
+  const tasks = useCollection("tasks", { normalize: normalizeTask });
+  const habits = useCollection("habits", { normalize: normalizeHabit });
+  const journal = useCollection("journal");
+  const closes = useCollection("closes");
+  const reviews = useCollection("reviews");
+  const apps = useCollection("apps");
+  useCollection("prefs");
+  const [, tick] = useState(0);
+  useEffect(() => { const t = setInterval(() => tick((n) => n + 1), 30000); return () => clearInterval(t); }, []);
+  const [closing, setClosing] = useState(false);
+  const [, redraw] = useState(0);
+
+  const me = profile.get("me");
+  const h = hourNow();
+  const phase = phaseOf(h);
+  const date = today();
+
+  if (!me || !me.onboarded) {
+    return (
+      <div className="hm hm--onboarding">
+        <div className="hm-scene"><Forest phase={phase} /></div>
+        <Onboarding profile={profile} apps={apps} habits={habits} onDone={() => redraw((n) => n + 1)} />
+      </div>
+    );
+  }
+
+  const moment = momentOf(h);
+  const doc = dayDoc(tasks.all(), date, readPrefs());
+  const { b, slots, cut } = distribute(doc);
+  const closed = closes.get(date);
+  const streak = streakOf(closes, date);
+  const late = overdue(tasks.all(), date).length;
+  const name = me.name || (c.email ? String(c.email).split("@")[0] : "");
+  const due = reviewsDue(date, h);
+  const saying = useCheckin(c.signedIn, date + ":" + moment + (closed ? ":closed" : ""), () => ({
+    moment: closed ? "close" : moment,
+    hour: clock(h * 60 + new Date().getMinutes()),
+    window: clock(doc.start) + "–" + clock(doc.end),
+    slack: b.overtime ? "o dia já acabou" : b.slack >= 0 ? "cabem " + fmt(b.slack) : "passa " + fmt(b.overflow) + " do que cabe",
+    open: b.open.map((t) => t.title + " · " + fmt(costOf(t))),
+    done: doc.tasks.filter((t) => t.done && !t.reserved).map((t) => t.title),
+    late,
+    habits: habits.all().filter((x) => !x.archived && isExpected(x, date)).map((x) => x.name + (x.marks[date] ? " (feito)" : "")),
+    streak,
+    products: apps.all().map((a) => a.name).slice(0, 5)
+  }));
+
+  return (
+    <div className="hm">
+      <div className="hm-scene"><Forest phase={phase} /></div>
+      <header className="hm-hero">
+        <h1>{greet(h)}{name ? ", " + name : ""}. {closed ? "Dia fechado." : QUESTION[moment]}</h1>
+        <p className="hm-hero__sub">
+          {streak > 0
+            ? <>{streak} {streak === 1 ? "dia fechado" : "dias seguidos fechando o dia"}</>
+            : "feche o dia hoje à noite para começar a sua sequência"}
+          {late > 0 && <> · <a href="calendar.html#day">{late} {late === 1 ? "aberta" : "abertas"} de antes de hoje</a></>}
+        </p>
+        {saying && <p className="hm-hero__merlin">{icon("spark")}{saying}</p>}
+      </header>
+
+      <div className="hm-center">
+        <Composer tasks={tasks} b={b} moment={moment} />
+        {moment === "close" && !closed && (
+          <button type="button" className="hm-close" onClick={() => setClosing(true)}>{icon("check")}fechar o dia</button>
+        )}
+        {closed && <p className="hm-closed t-mono">fechado às {new Date(closed.createdAt).toTimeString().slice(0, 5)} · {closed.done} feitas · {closed.moved} para amanhã</p>}
+      </div>
+
+      <p className="hm-label t-mono">hoje</p>
+      <div className="hm-grid">
+        <DayCard tasks={tasks} doc={doc} b={b} slots={slots} cut={cut} />
+        <HabitsCard habits={habits} date={date} />
+        <AgendaCard doc={doc} />
+        {due.map((d) => <Review key={d.id} reviews={reviews} due={d} />)}
+      </div>
+
+      {closing && <Closing tasks={tasks} journal={journal} closes={closes} date={date} onClose={() => setClosing(false)} />}
+    </div>
+  );
+}
+
 function Root() {
   const c = useCloud();
-  const [bare, setBare] = useState(() => isNewHere() && !seen("landing"));
-  const door = bare && !c.signedIn;
-  useLayoutEffect(() => { document.documentElement.classList.toggle("bare", door); }, [door]);
+  const [bare, setBare] = useState(door);
+  const showDoor = bare && !c.signedIn;
+  useLayoutEffect(() => { document.documentElement.classList.toggle("bare", showDoor); }, [showDoor]);
   useEffect(() => { if (bare && c.signedIn) { markSeen("landing"); setBare(false); } }, [bare, c.signedIn]);
-  const enter = () => { markSeen("landing"); setBare(false); };
-  return door ? <Landing onGuest={enter} /> : <Home />;
+  return showDoor ? <Landing onGuest={() => { markSeen("landing"); setBare(false); }} /> : <Home />;
 }
 
 mount(<Root />, "app");

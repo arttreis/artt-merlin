@@ -634,13 +634,11 @@ const NODE_TYPES = [
   "upsell", "downsell", "onboarding", "repurchase", "custom"
 ].join(", ");
 
-/* o conselheiro fala com quem esta na tela, e quem esta na tela e qualquer
-   pessoa do time. por isso o contexto e da casa, nao de uma pessoa: dizer
-   "o Arthur" para quem nao e o Arthur sai errado na cara dela. */
+/* o conselheiro e sempre o Merlin (VISAO, 8.2), e nunca o de uma casa: quem
+   esta na tela pode ser qualquer pessoa que constroi o proprio SaaS. o que ele
+   sabe do negocio de cada um chega no contexto do pedido, nao aqui. */
 const SYSTEM = [
-  "Você é o Merlin, conselheiro do time da Guessless — agência de growth marketing, irmã da GL Suite (tecnologia sob demanda).",
-  "A casa faz growth, branding e desenvolvimento.",
-  "Os clientes vendem em Mercado Livre, Shopee, TikTok Shop, Amazon e sites próprios; o checkout da casa é Stripe.",
+  "Você é o Merlin, conselheiro de quem constrói o próprio SaaS — muitas vezes com IA escrevendo boa parte do código — e precisa colocá-lo no mundo: desenhar, construir, lançar e distribuir.",
   "Fale com quem está na tela, em segunda pessoa: nunca suponha o nome nem o cargo de quem perguntou.",
   "Responda SEMPRE em português do Brasil, com acentuação correta, curto e concreto: nada de frases genéricas.",
   "Responda SOMENTE com um objeto JSON, sem texto antes ou depois, sem cercas de código."
@@ -735,7 +733,7 @@ const FORMAT_IDS = "youtube, reels, carousel, story, email, other";
    a propria estrutura; nos outros formatos entra dentro do molde. e a regra
    3: o Merlin nao inventa dado. */
 const CONTENT_RULES =
-  "Método da casa (roteiro-viral), base de toda recomendação, em qualquer formato: PARAR o scroll (gancho com número, contraste ou case — nunca pergunta, nunca saudação, nunca \"oi\"), SEGURAR (abre uma curiosidade que só fecha no fim), VIRAR (o insight que faz salvar e mandar para alguém) e CONVERTER (CTA amarrado na virada, não genérico). " +
+  "Método do Merlin (roteiro-viral), base de toda recomendação, em qualquer formato: PARAR o scroll (gancho com número, contraste ou case — nunca pergunta, nunca saudação, nunca \"oi\"), SEGURAR (abre uma curiosidade que só fecha no fim), VIRAR (o insight que faz salvar e mandar para alguém) e CONVERTER (CTA amarrado na virada, não genérico). " +
   "Em Reels e story essa é a própria estrutura do roteiro. Em YouTube, carrossel e e-mail, siga o molde do formato e aplique a lógica dentro dele: gancho que para o scroll, virada antes do fim e CTA amarrado na virada. " +
   "Roteiro é bullet para falar, não texto para ler: tópicos curtos com \"- \", nada de parágrafo corrido. " +
   "NUNCA invente número, resultado, preço, depoimento ou case: só use o que estiver no contexto. Quando a peça precisar de um dado que não está confirmado no contexto, escreva o lugar dele marcado com [conferir] (ex. \"- [conferir] quanto o cliente faturou no mês\"). ";
@@ -750,7 +748,7 @@ function contentCtx(c) {
     (c.script ? "Roteiro atual:\n" + String(c.script).slice(0, 4000) + "\n" : "Roteiro atual: vazio\n");
 }
 function clientCtx(c) {
-  if (!c.client) return "Cliente: nenhum — é o conteúdo próprio da casa\n" + recentCtx(c);
+  if (!c.client) return "Cliente: nenhum — é o conteúdo próprio de quem está na tela\n" + recentCtx(c);
   return "Cliente: " + String(c.client).slice(0, 120) + "\n" +
     (c.niche ? "Nicho: " + String(c.niche).slice(0, 80) + "\n" : "") +
     (c.sells ? "O que vende: " + String(c.sells).slice(0, 120) + "\n" : "") +
@@ -804,6 +802,27 @@ Object.assign(LIST_TASKS, {
 /* tarefas que respondem com um texto, nao com uma lista: o formato e
    {"text":"…"} em markdown simples (paragrafos, listas com -, negrito). */
 const TEXT_TASKS = {
+  /* a fala do inicio (VISAO, 10): o Merlin abre o dia, acompanha e fecha,
+     olhando para o que de fato esta la. curta de proposito: e uma frase de
+     quem conhece a pessoa, nao um relatorio. */
+  checkin: (c) => ({
+    instruction:
+      "Você está abrindo a tela inicial de quem usa o Merlin. Escreva de 1 a 3 frases curtas (até 55 palavras no total), em segunda pessoa, sem saudação (a tela já cumprimenta) e sem markdown. " +
+      ({ start: "É o começo do dia: ajude a decidir o que precisa caber, apontando o que parece mais importante ou o que não vai caber.",
+         during: "É o meio do dia: diga como o dia está andando frente ao que sobra, e qual a próxima coisa a atacar.",
+         close: "É o fim do dia: ajude a fechar — reconheça o que andou e diga o que fazer com o que ficou aberto." }[String(c.moment)] || "") +
+      " Use os títulos reais da fila. Se a sequência de dias fechados for boa, reconheça em poucas palavras. Nunca invente tarefas ou números. " +
+      'Formato: {"text":"…"}',
+    context:
+      "Momento: " + String(c.moment || "").slice(0, 10) + " · hora " + String(c.hour || "").slice(0, 5) + "\n" +
+      "Janela do dia: " + String(c.window || "").slice(0, 20) + " · " + String(c.slack || "").slice(0, 40) + "\n" +
+      "Fila aberta (título · duração):\n" + linesOf(c.open, 15) + "\n" +
+      "Feitas hoje: " + listOf(c.done) + "\n" +
+      (+c.late ? "Abertas de dias anteriores: " + Math.round(+c.late) + "\n" : "") +
+      "Hábitos de hoje: " + listOf(c.habits) + "\n" +
+      "Dias seguidos fechando o dia: " + Math.round(+c.streak || 0) + "\n" +
+      (Array.isArray(c.products) && c.products.length ? "Produtos em construção: " + listOf(c.products) + "\n" : "")
+  }),
   /* a semana: o que fechou, o que ficou, por cliente */
   week: (c) => ({
     instruction:
@@ -878,7 +897,7 @@ const TEXT_TASKS = {
     instruction:
       "Diga se esta demanda pode ser feita com o Claude. Comece com uma linha só, em negrito, com o veredicto — **dá**, **dá em parte** ou **não dá** — seguida de uma frase curta dizendo por quê. " +
       "Depois, em markdown simples e no máximo 170 palavras: o que exatamente o Claude faria e de que forma; o que precisa existir antes (arquivo, acesso, conta, um exemplo do resultado certo); e o que continua sendo trabalho de quem pediu. " +
-      "As formas possíveis são: Claude Code numa pasta ou repositório (lê e escreve arquivos, roda comandos, mexe em planilha e CSV, escreve e publica código); uma skill, que são instruções salvas ensinando uma tarefa recorrente (a casa já tem uma para gerar criativos com o Nano Banana); um agente ligado por MCP a uma ferramenta que a casa já usa (ClickUp, Meta Ads, Miro, HeyGen, Magnific, Resend, Supabase, Google Drive, Google Agenda, Stripe); um artifact, que é uma página publicada com link para mandar ao cliente (relatório, painel, formulário); um agente agendado, que roda sozinho num horário; ou a API dentro de um produto, como este próprio Merlin. Escolha uma e diga qual — nunca responda que \"dá para automatizar\" sem dizer com o quê. " +
+      "As formas possíveis são: Claude Code numa pasta ou repositório (lê e escreve arquivos, roda comandos, mexe em planilha e CSV, escreve e publica código); uma skill, que são instruções salvas ensinando uma tarefa recorrente (gerar criativos, revisar um PR, escrever o changelog); um agente ligado por MCP a uma ferramenta que a pessoa já usa (GitHub, Supabase, Stripe, Resend, ClickUp, Meta Ads, Google Drive, Google Agenda); um artifact, que é uma página publicada com link para mandar ao cliente (relatório, painel, formulário); um agente agendado, que roda sozinho num horário; ou a API dentro de um produto, como este próprio Merlin. Escolha uma e diga qual — nunca responda que \"dá para automatizar\" sem dizer com o quê. " +
       "Seja honesto e sem entusiasmo: o que depende do julgamento dele, de estar presente, da relação com o cliente ou de apertar botão em ferramenta sem API é **não dá**, e uma linha explica. " +
       (+c.min > 0
         ? "A estimativa de hoje é " + Math.round(+c.min) + " minutos: diga em quantos minutos a demanda ficaria com o Claude fazendo a parte dele, contando o que sobra como supervisão. "
@@ -1076,6 +1095,29 @@ function extractJson(text) {
   try { return JSON.parse(text.slice(a, b + 1)); } catch (e) { return null; }
 }
 
+/* quem esta na tela (VISAO, 10). o onboarding do inicio grava o perfil como
+   um documento comum (type "profile", id "me"), e o worker o le aqui, a cada
+   conselho: e o que faz o Merlin falar com uma pessoa, e nao com qualquer
+   pessoa. sem perfil, o conselho continua funcionando — so fica generico. */
+async function profileOf(env, person) {
+  try {
+    const row = await env.DB.prepare(
+      "SELECT doc FROM docs WHERE person = ? AND type = 'profile' AND id = 'me'"
+    ).bind(person).first();
+    if (!row) return "";
+    const p = JSON.parse(row.doc || "{}");
+    if (p.deleted) return "";
+    const bits = [];
+    if (p.name) bits.push("Quem está na tela se chama " + String(p.name).slice(0, 60) + ": use o nome com naturalidade, sem exagero.");
+    if (p.work) bits.push("Trabalha com: " + String(p.work).slice(0, 300) + ".");
+    if (p.building) bits.push("Está construindo: " + String(p.building).slice(0, 300) + ".");
+    if (p.habit) bits.push("Quer manter o hábito: " + String(p.habit).slice(0, 120) + ".");
+    return bits.length ? " " + bits.join(" ") : "";
+  } catch (e) {
+    return "";
+  }
+}
+
 async function advise(req, env, person) {
   if (!env.ANTHROPIC_API_KEY) return fail("o Merlin ainda não tem chave: npx wrangler secret put ANTHROPIC_API_KEY", 503);
   const body = await req.json().catch(() => null);
@@ -1116,7 +1158,7 @@ async function advise(req, env, person) {
       max_tokens: BLUEPRINT_TASKS[name] ? 12000 : 4000,
       /* sugestao curta nao precisa do maximo de raciocinio: medio segura o custo */
       output_config: { effort: "medium" },
-      system: SYSTEM,
+      system: SYSTEM + (await profileOf(env, person)),
       messages: buildMessages(name, body.context, instruction, context)
     })
   });
