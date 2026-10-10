@@ -24,7 +24,7 @@ import {
 import { useState, useEffect, useLayoutEffect, useRef } from "react";
 import { mount, useCloud, useCollection, icon } from "./shared/ui.jsx";
 import { LOGO, NAV_ICONS } from "./shared/icons.jsx";
-import { normalize as normalizeTask, dayDoc, overdue, topOrder, newTask, readLine, isReserve, stripPrefix, readClock } from "./shared/tasks.js";
+import { normalize as normalizeTask, dayDoc, overdue, topOrder, newTask, routeLine, readClock } from "./shared/tasks.js";
 import { normalize as normalizeHabit, isExpected, toggleMark } from "./shared/habits-data.js";
 import { distribute, fmt, longFmt, clock, costOf } from "./shared/day.js";
 import { Forest, phaseOf } from "./shared/forest.jsx";
@@ -33,7 +33,10 @@ import { runningOf, minutesOf, receipt, focusMinutes, meetingMinutes, githubDay 
 const door = isNewHere() && !seen("landing");
 initPage("home");
 
-const CHIPS = [15, 30, 60, 120];
+/* o nome como a pessoa quer ser chamada, sem o que escapou do teclado: no
+   teclado brasileiro o til é tecla morta, e "arthur~" chegou a ser gravado
+   assim no onboarding. vale ao gravar e ao mostrar, para os que já estão salvos */
+const cleanName = (s) => String(s || "").replace(/[~^`´¨'"*_.,;:!?\-\s]+$/g, "").replace(/^[~^`´¨'"*_\-\s]+/, "").trim();
 
 /* ================================================================
    o tempo da conversa
@@ -148,7 +151,7 @@ function Onboarding({ profile, apps, habits, onDone }) {
 
   /* o que cada resposta vira, e o que o Merlin diz que anotou */
   const apply = (key, value) => {
-    if (key === "name") { saveProfile({ name: value }); return "anotei: " + value; }
+    if (key === "name") { saveProfile({ name: cleanName(value) || value }); return "anotei: " + (cleanName(value) || value); }
     if (key === "work") { saveProfile({ work: value }); return "anotei no seu perfil"; }
     if (key === "building") {
       const [name, ...rest] = value.split(/\s+[—–-]\s+|:\s+/);
@@ -188,7 +191,7 @@ function Onboarding({ profile, apps, habits, onDone }) {
       }
       if (note) out.push({ from: "merlin", note: true, text: note });
     }
-    const a = { ...answers, [step.key]: value };
+    const a = { ...answers, [step.key]: step.key === "name" ? cleanName(value) || value : value };
     setAnswers(a);
     setText("");
     if (i + 1 < STEPS.length) {
@@ -225,75 +228,51 @@ function Onboarding({ profile, apps, habits, onDone }) {
 }
 
 /* ================================================================
-   o campo do meio: tarefa, perguntar, nota
-   ================================================================ */
-const MODES = [
-  { id: "task", label: "tarefa", icon: "check", placeholder: "o que precisa ser feito? ex.: revisar a landing 45m" },
-  { id: "ask", label: "perguntar ao Merlin", icon: "spark", placeholder: "pergunte qualquer coisa sobre o seu dia, o produto ou o lançamento" },
-  { id: "note", label: "nota", icon: "pencil", placeholder: "o que apareceu e ainda não é tarefa" }
-];
+   o campo do meio
+   ================================================================
+   um campo só, sem abas: o Merlin lê o que foi escrito e decide pela regra
+   única (routeLine, no tasks.js) — com duração é tarefa de hoje, pergunta vai
+   para a conversa, o resto vira ideia. a linha de baixo diz o que o Enter vai
+   fazer ANTES de ele fazer, e todo destino tem desfazer no aviso. */
+const ROUTE_ICON = { task: "check", ask: "spark", note: "pencil" };
 
 function Composer({ tasks, b, moment }) {
-  const [mode, setMode] = useState("task");
   const [text, setText] = useState("");
-  const [pending, setPending] = useState(null);
   const field = useRef(null);
-  const m = MODES.find((x) => x.id === mode);
   const date = today();
+  const route = routeLine(text);
 
-  const create = (spec) => {
-    const t = newTask({ ...spec, date, order: topOrder(tasks.all(), date) });
-    tasks.save(t);
-    notify((spec.reserved ? "reservado em hoje · " : "entrou em hoje · ") + formatMin(spec.min), () => tasks.remove(t.id));
-    setText(""); setPending(null);
+  const submit = () => {
+    if (!route) return;
+    if (route.kind === "ask") { askMerlin(route.text); setText(""); return; }
+    if (route.kind === "task") {
+      const t = newTask({ title: route.title, min: route.min, reserved: route.reserved, clickup: route.clickup, client: route.client, date, order: topOrder(tasks.all(), date) });
+      tasks.save(t);
+      notify((route.reserved ? "reservado em hoje · " : "entrou em hoje · ") + formatMin(route.min), () => tasks.remove(t.id));
+    } else {
+      const n = newNote({ title: route.title, client: route.client });
+      if (n) notify("guardado em ideias", () => collection("notes").remove(n.id));
+    }
+    setText("");
     if (field.current) field.current.focus();
   };
-  const submit = () => {
-    const raw = text.replace(/\s+/g, " ").trim();
-    if (!raw) return;
-    if (mode === "ask") { askMerlin(raw); return; }
-    if (mode === "note") {
-      const n = newNote({ title: raw });
-      if (n) notify("guardado em ideias", () => collection("notes").remove(n.id));
-      setText("");
-      return;
-    }
-    if (pending) { const min = readLine(" " + raw + " ").min; if (min) create({ ...pending, min }); return; }
-    const l = readLine(raw);
-    const name = String(l.title || raw).replace(/\s+/g, " ").trim();
-    const spec = { title: stripPrefix(name), reserved: isReserve(name), clickup: l.clickup, client: l.client || "" };
-    if (l.min) create({ ...spec, min: l.min });
-    else { setPending(spec); setText(""); }
-  };
-  const read = mode === "task" && !pending && text.trim() ? readLine(text) : null;
+
+  const hint = !route ? "com a duração (45m, 1h30) entra em hoje · pergunta vai para o Merlin · o resto vira ideia"
+    : route.kind === "task" ? (route.reserved ? "reservar em hoje · " : "pôr em hoje · ") + fmt(route.min) + (route.reserved ? "" : route.min > b.slack ? " · não cabe hoje" : " · cabe")
+    : route.kind === "ask" ? "perguntar ao Merlin"
+    : "guardar em ideias · com a duração no fim, entra em hoje";
 
   return (
     <form className="hm-field" onSubmit={(e) => { e.preventDefault(); submit(); }}>
-      <div className="hm-field__modes" role="tablist">
-        {MODES.map((x) => (
-          <button key={x.id} type="button" role="tab" aria-selected={mode === x.id}
-                  onClick={() => { setMode(x.id); setPending(null); if (field.current) field.current.focus(); }}>
-            {icon(x.icon)}{x.label}
-          </button>
-        ))}
-      </div>
-      {pending && (
-        <div className="hm-field__chips">
-          <span><b>{pending.title}</b> — quanto leva?</span>
-          {CHIPS.map((min) => <button key={min} type="button" className="t-mono" data-fits={min <= b.slack ? "yes" : "no"} onClick={() => create({ ...pending, min })}>{fmt(min)}</button>)}
-          <button type="button" onClick={() => { const n = newNote({ title: pending.title }); if (n) notify("guardado em ideias"); setPending(null); }}>guardar como ideia</button>
-        </div>
-      )}
       <textarea ref={field} rows={2} maxLength="300" value={text} autoFocus={moment === "start"}
-                placeholder={pending ? "ou escreva o tempo: 45m, 1h30…" : m.placeholder}
+                placeholder="uma tarefa (revisar a landing 45m), uma pergunta ou uma ideia"
                 onChange={(e) => setText(e.currentTarget.value)}
-                onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); submit(); } if (e.key === "Escape") setPending(null); }} />
+                onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); submit(); } }} />
       <div className="hm-field__foot">
-        <span className="hm-field__hint">
-          {read && read.min ? <>{fmt(read.min)}{read.min > b.slack ? " · não cabe hoje" : " · cabe"}</> :
-            mode === "task" ? "escreva a duração no fim: 45m, 1h30" : mode === "ask" ? "a resposta abre na conversa com o Merlin" : "vai para Ideias"}
+        <span className="hm-field__hint" data-kind={route ? route.kind : ""} aria-live="polite">
+          {route && icon(ROUTE_ICON[route.kind])}{hint}
         </span>
-        <button type="submit" className="hm-field__send" aria-label="Enviar">{icon("arrow")}</button>
+        <button type="submit" className="hm-field__send" aria-label={route ? hint : "Enviar"} disabled={!route}>{icon("arrow")}</button>
       </div>
     </form>
   );
@@ -621,6 +600,11 @@ function Home() {
   const [, redraw] = useState(0);
 
   const me = profile.get("me");
+  /* o nome que já foi gravado com o til sobrando é corrigido uma vez, para
+     que o conselheiro (que lê o perfil no servidor) também pare de usá-lo */
+  useEffect(() => {
+    if (me && me.name && cleanName(me.name) && cleanName(me.name) !== me.name) profile.save({ ...me, name: cleanName(me.name), updatedAt: Date.now() });
+  }, [me && me.name]);
   const gh = useGithub(me && me.github, today());
   const h = hourNow();
   const phase = phaseOf(h);
@@ -649,7 +633,7 @@ function Today({ c, tasks, habits, journal, closes, reviews, apps, sessions, me,
   const closed = closes.get(date);
   const streak = streakOf(closes, date);
   const late = overdue(tasks.all(), date).length;
-  const name = me.name || (c.email ? String(c.email).split("@")[0] : "");
+  const name = cleanName(me.name || (c.email ? String(c.email).split("@")[0] : ""));
   const due = reviewsDue(date, h);
   const saying = useCheckin(c.signedIn, date + ":" + moment + (closed ? ":closed" : ""), () => ({
     moment: closed ? "close" : moment,

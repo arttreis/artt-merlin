@@ -835,7 +835,11 @@ O `Ctrl+K` virou o campo de tudo, em qualquer tela (`routeLine` no `tasks.js`, c
 
 - com **"?"** no começo ou no fim → pergunta ao Merlin;
 - com **duração** ("45m", "1h30") → tarefa de hoje;
+- começando com **palavra de pergunta** ("como", "qual", "devo", "me ajuda"…) → pergunta ao Merlin;
 - **sem duração** → ideia (uma nota).
+
+Desde 09/10/2026 o campo do início segue a mesma regra e perdeu as abas de tarefa/pergunta/nota:
+embaixo dele, uma linha diz para onde o Enter vai mandar o texto antes de mandar.
 
 A primeira linha da lista diz o que o Enter vai fazer antes de ele fazer; embaixo vem o que já
 existe com aquele nome, e com o campo vazio, as seis seções. `Ctrl+J` pergunta direto. O campo

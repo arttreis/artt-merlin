@@ -258,7 +258,14 @@ export const stripPrefix = (title) => title.replace(/^-\s*/, "").trim();
    campo da home mandava o Enter para a conversa, o da busca so buscava.
 
    o campo do dia e o do rastreador continuam cobrando a duracao em vez de
-   mandar para as ideias: neles a pessoa ja disse "isto e para hoje". */
+   mandar para as ideias: neles a pessoa ja disse "isto e para hoje".
+
+   desde 09/10/2026 o campo da home tambem segue a regra, sem as abas de
+   tarefa/pergunta/nota. por isso a pergunta deixou de depender so do "?":
+   quem escreve "como precifico o plano anual" esta perguntando, com ou sem
+   ponto. a palavra de pergunta so vale DEPOIS da duracao — "como fazer o
+   deck 45m" e tarefa. */
+const ASK_RE = /^(?:o que|o qu[eê]|qual|quais|quant[oa]s?|quando|onde|por ?qu[eê]|pra qu[eê]|como|quem|devo|deveria|vale a pena|[eé] melhor|me (?:ajud[ae]|expli[cq]u?[ae]|di[zg]a?|sugir[ae]|sugere|recomend[ae])|voc[eê] acha|vc acha|merlin\b)/i;
 export function routeLine(text) {
   const raw = String(text || "").replace(/\s+/g, " ").trim();
   if (!raw) return null;
@@ -269,6 +276,7 @@ export function routeLine(text) {
   const l = readLine(raw);
   const name = String(l.title || "").replace(/\s+/g, " ").trim() || raw;
   if (l.min) return { kind: "task", title: stripPrefix(name), min: l.min, reserved: isReserve(name), clickup: l.clickup, client: l.client || "" };
+  if (ASK_RE.test(raw)) return { kind: "ask", text: raw.replace(/^merlin[,:]?\s*/i, "") || raw };
   const m = parseMentions(raw);
   const title = String(m.title || "").replace(/\s+/g, " ").trim();
   return title ? { kind: "note", title, client: m.client || "" } : null;
