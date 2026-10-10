@@ -82,14 +82,19 @@
 .hm-review textarea{width:100%;resize:vertical;border:1px solid var(--line-soft);border-radius:var(--br2);background:var(--surface-2);padding:8px 9px;font:inherit;font-size:12.5px;color:var(--ink)}
 .hm-review__actions{display:flex;justify-content:flex-end;gap:8px;margin-top:8px}
 
-/* o onboarding: a conversa sobre a cena */
-.hm--onboarding .hm-scene{height:calc(min(70vh,560px) + 140px)}
-.ob{max-width:560px;margin:clamp(40px,10vh,110px) auto 0;display:flex;flex-direction:column;gap:12px}
-.ob__log{display:flex;flex-direction:column;gap:8px;max-height:52vh;overflow-y:auto;padding:4px;scrollbar-width:none;mask-image:linear-gradient(to bottom,transparent,#000 48px)}
+/* o onboarding: a conversa sobre a cena, no meio da tela. sem o dock, o
+   rodapé da página fica do tamanho do topo, e a caixa centra entre os dois */
+html.onboarding .page{padding-bottom:calc(var(--nav-h) + var(--pd) * 1.5)}
+.hm--onboarding{min-height:calc(100svh - (var(--nav-h) + var(--pd) * 1.5) * 2);display:flex;flex-direction:column}
+.hm--onboarding .hm-scene{position:fixed;top:0;height:100svh}
+.ob{width:100%;max-width:560px;margin:auto;display:flex;flex-direction:column;gap:12px}
+/* sem máscara no alto: sobre o céu ela desbotava o balão e parecia defeito.
+   as falas são opacas, e a que sobe só sai pela borda */
+.ob__log{display:flex;flex-direction:column;gap:8px;max-height:52vh;overflow-y:auto;padding:4px;scrollbar-width:none}
 .ob__msg{margin:0;max-width:86%;padding:10px 14px;border-radius:16px;font-size:14px;line-height:1.5}
-.ob__msg--merlin{align-self:flex-start;background:color-mix(in srgb,var(--surface) 92%,transparent);border:1px solid var(--line);color:var(--ink);backdrop-filter:blur(8px);border-bottom-left-radius:4px}
+.ob__msg--merlin{align-self:flex-start;background:var(--surface);border:1px solid var(--line);color:var(--ink);border-bottom-left-radius:4px}
 .ob__msg--me{align-self:flex-end;background:var(--accent);color:var(--on-accent);border-bottom-right-radius:4px}
-.ob__msg.is-note{display:inline-flex;align-items:center;gap:7px;padding:6px 12px;font-size:12px;color:var(--ink-70);background:var(--fill);border-style:dashed}
+.ob__msg.is-note{display:inline-flex;align-items:center;gap:7px;padding:6px 12px;font-size:12px;color:var(--ink-70);background:var(--surface-2);border-style:dashed}
 .ob__msg.is-note svg{width:12px;height:12px;color:var(--accent-ink)}
 .ob__form{display:flex;align-items:center;gap:8px;padding:6px;background:var(--surface);border:1px solid var(--line);border-radius:var(--br);box-shadow:var(--sombra-2)}
 .ob__field{flex:1 1 auto;min-width:0;height:40px;border:0;outline:0;background:none;padding:0 10px;font:inherit;font-size:14.5px;color:var(--ink)}
