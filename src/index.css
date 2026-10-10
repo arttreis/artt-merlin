@@ -116,7 +116,9 @@ html.bare body::before,html.bare body::after{opacity:0}
 /* os blocos do hoje */
 .hm-label{margin:clamp(28px,5vh,48px) 0 10px;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-30)}
 .hm-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:var(--pd);align-items:start}
-@media (max-width:900px){.hm-grid{grid-template-columns:minmax(0,1fr)}}
+.hm-col{display:flex;flex-direction:column;gap:var(--pd);min-width:0}
+.hm-cell>*{width:100%}
+@media (max-width:900px){.hm-grid{grid-template-columns:minmax(0,1fr)}.hm-col{display:contents}}
 .hm-card{background:var(--surface);border:1px solid var(--line);border-radius:var(--br);padding:14px 16px;min-width:0}
 .hm-card__head{display:flex;align-items:center;gap:8px;margin:0 0 10px;font-size:13px;font-weight:600;color:var(--ink)}
 .hm-card__head svg{width:15px;height:15px;color:var(--accent-ink)}
