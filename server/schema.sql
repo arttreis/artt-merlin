@@ -74,6 +74,25 @@ CREATE TABLE IF NOT EXISTS advice (
   FOREIGN KEY (person) REFERENCES people(id) ON DELETE CASCADE
 );
 
+-- quantos pedidos cada pessoa fez ao Merlin por dia e por tarefa, e quantos
+-- tokens eles gastaram (o `usage` que a Anthropic devolve). a `advice` acima
+-- e o teto e some de vista a cada hora; esta e a conta: e ela que mostra o que
+-- cada tarefa custa, e quanto o retrato deixa a pergunta mais cara.
+-- so contagem, nunca o texto do pedido nem o da resposta. o dia e AAAA-MM-DD
+-- em UTC (o worker nao sabe o fuso de quem pede). a tarefa e o nome que o
+-- worker da ao pedido (usageTasks): assistant:action, capture:task, build:draft...
+-- nenhuma rota le esta tabela: ela se consulta pelo `wrangler d1 execute`.
+CREATE TABLE IF NOT EXISTS usage (
+  person      TEXT NOT NULL,
+  day         TEXT NOT NULL,            -- AAAA-MM-DD, UTC
+  task        TEXT NOT NULL,
+  n           INTEGER NOT NULL,
+  tokens_in   INTEGER NOT NULL,
+  tokens_out  INTEGER NOT NULL,
+  PRIMARY KEY (person, day, task),
+  FOREIGN KEY (person) REFERENCES people(id) ON DELETE CASCADE
+);
+
 -- o link publico de um mapa ou de um funil. e a UNICA porta deste servidor que
 -- responde sem sessao, e por isso ela e a mais estreita de todas: uma linha
 -- aqui autoriza a leitura de UM documento, de UM tipo, de UMA pessoa.
