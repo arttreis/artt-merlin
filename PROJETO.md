@@ -46,7 +46,7 @@ por documento num **Cloudflare Worker + D1**, com login por código de 6 dígito
         └─ src/shared/*.js       regras puras: tasks, day, routine, board, mermaid, templates…
                  │  localStorage  merlin:<type>  (fonte de verdade local)
                  ▼
-server/worker.js  /api/*  ──  D1: people, codes, days, docs, advice, shares
+server/worker.js  /api/*  ──  D1: people, codes, days, docs, advice, usage, shares
                   resto   ──  server/site/ (saída do vite build)
 ```
 

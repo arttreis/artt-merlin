@@ -3,8 +3,14 @@
 import worker from "./worker.js";
 
 /* ---- D1 falso: entende so as consultas que o worker faz ---- */
-const db = { people: [], codes: [], days: [], docs: [], advice: [], shares: [], waitlist: [] };
+const db = { people: [], codes: [], days: [], docs: [], advice: [], usage: [], shares: [], waitlist: [] };
 let sentEmails = [];
+let failUsage = false;
+/* a linha "merlin <tarefa> in=… out=…" do worker e para o wrangler tail: aqui
+   ela vai para um vetor, e os testes da medicao a conferem */
+const logged = [];
+const realLog = console.log;
+console.log = (...x) => { if (/^merlin /.test(String(x[0]))) logged.push(x.join(" ")); else realLog(...x); };
 
 function prepare(sql) {
   let args = [];
@@ -119,6 +125,16 @@ function run(sql, a, mode) {
   if (s.startsWith("INSERT INTO advice")) {
     const ex = db.advice.find(x => x.person === a[0] && x.hour === a[1]);
     if (ex) ex.n++; else db.advice.push({ person: a[0], hour: a[1], n: 1 });
+    return { meta: { changes: 1 } };
+  }
+  /* a medicao (worker.js, recordUsage): soma n e os tokens na linha da pessoa,
+     do dia e da tarefa. failUsage simula o D1 caindo so nesta escrita. */
+  if (s.startsWith("INSERT INTO usage")) {
+    if (failUsage) throw new Error("d1 fora do ar");
+    const [person, day, task, tin, tout] = a;
+    const ex = db.usage.find(x => x.person === person && x.day === day && x.task === task);
+    if (ex) { ex.n++; ex.tokens_in += tin; ex.tokens_out += tout; }
+    else db.usage.push({ person, day, task, n: 1, tokens_in: tin, tokens_out: tout });
     return { meta: { changes: 1 } };
   }
   if (s.startsWith("DELETE FROM codes")) {
@@ -632,6 +648,123 @@ r = await worker.fetch(new Request("https://x.com/api/files", {
   method: "POST", headers: { "content-type": "application/octet-stream", "x-file-type": "image/png", cookie }, body: png
 }), noBucket);
 check("sem bucket, a rota avisa em vez de quebrar", r.status === 503, String(r.status));
+
+/* ---- 13h. a medicao ----
+   o teto (13f) conta pedidos por hora para barrar abuso; a `usage` conta por
+   dia e por tarefa, com os tokens, para saber o que cada coisa custa. so
+   entra pedido que a Anthropic respondeu, e gravar nunca derruba a resposta. */
+env.ANTHROPIC_API_KEY = "sk-teste";
+sentEmails = [];
+await call("POST", "/code", { email: "medida@exemplo.com" });
+r = await call("POST", "/sign-in", { email: "medida@exemplo.com", code: codeFromEmail() });
+const meterCookie = cookieOf(r);
+const idOf = (email) => db.people.find((p) => p.email === email).id;
+const meterId = idOf("medida@exemplo.com"), otherId = idOf("outra@exemplo.com");
+const today = new Date().toISOString().slice(0, 10);
+const usageOf = (person, task) => db.usage.find((x) => x.person === person && x.task === task);
+const usageRows = (person) => db.usage.filter((x) => x.person === person);
+const answerWith = (obj, usage) => ({ stop_reason: "end_turn", content: [{ type: "text", text: JSON.stringify(obj) }], ...(usage ? { usage } : {}) });
+const ask = (task, context, c) => call("POST", "/merlin", { task, context }, c);
+const realError = console.error;
+
+claudeAnswer = answerWith({ suggestions: [], clarify: "e pra qual etapa?" }, { input_tokens: 1000, output_tokens: 200 });
+await ask("assistant", { message: "e essa etapa" }, meterCookie);
+claudeAnswer = answerWith({ suggestions: [], clarify: "qual cliente?" }, { input_tokens: 500, output_tokens: 50 });
+await ask("assistant", { message: "e agora" }, meterCookie);
+let u = usageOf(meterId, "assistant:answer");
+check("duas perguntas que so respondem somam numa linha so", !!u && u.n === 2 && u.tokens_in === 1500 && u.tokens_out === 250, JSON.stringify(u));
+check("o dia da medicao e a data de hoje em UTC", u && u.day === today, JSON.stringify(u));
+check("a linha de log traz tarefa, tokens e retrato", logged.at(-1) === "merlin assistant:answer in=500 out=50 portrait=0", logged.at(-1));
+
+claudeAnswer = answerWith({ suggestions: [{ actionType: "task", title: "ligar pro cliente", note: "", payload: { title: "ligar pro cliente" } }], clarify: "" }, { input_tokens: 800, output_tokens: 100 });
+await ask("assistant", { message: "lembra de ligar pro cliente" }, meterCookie);
+u = usageOf(meterId, "assistant:action");
+check("o assistente que propoe vira assistant:action", !!u && u.n === 1 && u.tokens_in === 800 && u.tokens_out === 100, JSON.stringify(u));
+check("e nao mexe no assistant:answer", usageOf(meterId, "assistant:answer").n === 2);
+
+claudeAnswer = answerWith({ suggestions: [{ actionType: "nao-existe", title: "x", payload: {} }], clarify: "" }, { input_tokens: 10, output_tokens: 5 });
+await ask("assistant", { message: "qualquer coisa" }, meterCookie);
+check("proposta fora do catalogo conta como resposta", usageOf(meterId, "assistant:answer").n === 3 && usageOf(meterId, "assistant:action").n === 1);
+
+claudeAnswer = answerWith({ items: [
+  { kind: "task", title: "ligar pro Joao", min: 30, date: "2026-10-11" },
+  { kind: "task", title: "responder e-mails", min: 15 },
+  { kind: "note", title: "modo offline" }
+] }, { input_tokens: 300, output_tokens: 90 });
+await ask("capture", { text: "ligar pro Joao, responder e-mails e talvez modo offline", today: "2026-10-10" }, meterCookie);
+u = usageOf(meterId, "capture:task");
+const un = usageOf(meterId, "capture:note");
+check("a captura grava um por tipo devolvido, nao por item", !!u && u.n === 1 && !!un && un.n === 1, JSON.stringify([u, un]));
+check("os tokens da captura entram uma vez so, na primeira linha", u.tokens_in === 300 && u.tokens_out === 90 && un.tokens_in === 0 && un.tokens_out === 0, JSON.stringify([u, un]));
+
+claudeAnswer = answerWith({ items: [] }, { input_tokens: 120, output_tokens: 10 });
+await ask("capture", { text: "o que falta hoje?", today: "2026-10-10" }, meterCookie);
+u = usageOf(meterId, "capture:none");
+check("captura sem itens grava capture:none", !!u && u.n === 1 && u.tokens_in === 120, JSON.stringify(u));
+
+claudeAnswer = answerWith({ questions: [] }, { input_tokens: 200, output_tokens: 20 });
+await ask("build", { kind: "funnel", step: "brief", request: "um funil" }, meterCookie);
+claudeAnswer = answerWith({ name: "Mapa", tree: { title: "x", children: [{ title: "a" }] } }, { input_tokens: 900, output_tokens: 400 });
+await ask("build", { kind: "map", step: "draft", request: "um mapa" }, meterCookie);
+check("a montagem grava build:<passo>", usageOf(meterId, "build:brief").n === 1 && usageOf(meterId, "build:draft").tokens_out === 400, JSON.stringify(usageRows(meterId).map((x) => x.task)));
+
+claudeAnswer = answerWith({ text: "## semana\n- foi" }, { input_tokens: 700, output_tokens: 80 });
+await ask("week", { range: "1-7 set", cards: [] }, meterCookie);
+check("as outras tarefas gravam o proprio nome", usageOf(meterId, "week").n === 1 && usageOf(meterId, "week").tokens_in === 700);
+
+claudeAnswer = answerWith({ suggestions: [], clarify: "so a outra" }, { input_tokens: 40, output_tokens: 4 });
+const firstBefore = JSON.stringify(usageOf(meterId, "assistant:answer"));
+await ask("assistant", { message: "e eu?" }, otherCookie);
+u = usageOf(otherId, "assistant:answer");
+check("outra pessoa tem a linha dela, separada", !!u && u.n === 1 && u.tokens_in === 40, JSON.stringify(u));
+check("e a da primeira nao muda", JSON.stringify(usageOf(meterId, "assistant:answer")) === firstBefore);
+
+/* o que nao chegou a ser respondido nao se conta */
+claudeAnswer = answerWith({ text: "## semana\n- foi" }, { input_tokens: 9, output_tokens: 9 });
+const snapshot = () => JSON.stringify(db.usage);
+const before = snapshot();
+const spentRow = db.advice.find((x) => x.person === meterId && x.hour === Math.floor(Date.now() / 3600e3) * 4);
+const spentN = spentRow.n;
+spentRow.n = 1e6;
+r = await ask("week", { range: "1-7 set", cards: [] }, meterCookie);
+spentRow.n = spentN;
+check("pedido barrado pelo teto nao grava na usage", r.status === 429 && snapshot() === before, String(r.status));
+
+const askedFetch = globalThis.fetch;
+console.error = () => {};
+globalThis.fetch = async (url, opts) => String(url).includes("api.anthropic.com") ? new Response("falhou", { status: 500 }) : askedFetch(url, opts);
+r = await ask("week", { range: "1-7 set", cards: [] }, meterCookie);
+check("Anthropic em 500 nao grava na usage", r.status === 502 && snapshot() === before, String(r.status));
+globalThis.fetch = askedFetch;
+
+r = await ask("inventada", {}, meterCookie);
+check("tarefa invalida nao grava na usage", r.status === 400 && snapshot() === before);
+env.ANTHROPIC_API_KEY = "";
+r = await ask("week", { range: "1-7 set", cards: [] }, meterCookie);
+check("sem chave nao grava na usage", r.status === 503 && snapshot() === before);
+env.ANTHROPIC_API_KEY = "sk-teste";
+
+claudeAnswer = { stop_reason: "end_turn", content: [{ type: "text", text: '{"text":"sem usage"}' }] };
+const weekBefore = usageOf(meterId, "week").n;
+r = await ask("week", { range: "1-7 set", cards: [] }, meterCookie);
+u = usageOf(meterId, "week");
+check("resposta sem usage soma o pedido e deixa os tokens como estavam", r.status === 200 && u.n === weekBefore + 1 && u.tokens_in === 700 && u.tokens_out === 80, JSON.stringify(u));
+check("e o log mostra zero", logged.at(-1) === "merlin week in=0 out=0 portrait=0", logged.at(-1));
+
+claudeAnswer = answerWith({ text: "ainda responde" }, { input_tokens: 5, output_tokens: 5 });
+const weekN = usageOf(meterId, "week").n;
+failUsage = true;
+r = await ask("week", { range: "1-7 set", cards: [] }, meterCookie);
+failUsage = false;
+body = await r.json();
+check("falha ao gravar a usage nao derruba a resposta", r.status === 200 && body.text === "ainda responde" && usageOf(meterId, "week").n === weekN, String(r.status));
+
+/* a recusa tambem foi cobrada */
+claudeAnswer = { stop_reason: "refusal", content: [], usage: { input_tokens: 60, output_tokens: 0 } };
+r = await ask("week", { range: "1-7 set", cards: [] }, meterCookie);
+check("a recusa e repassada e conta na usage", r.status === 422 && usageOf(meterId, "week").n === weekN + 1);
+console.error = realError;
+env.ANTHROPIC_API_KEY = "";
 
 /* ---- 13.5 o link publico ----
    e a unica porta sem sessao deste servidor. o que os casos abaixo protegem:

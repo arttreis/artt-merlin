@@ -1324,6 +1324,45 @@ const QUOTA = {
   build: { slot: 2, limit: BUILD_PER_HOUR, full: "você já montou bastante nesta hora; volte daqui a pouco" }
 };
 
+/* a medicao: o que cada pedido que a Anthropic respondeu custou, por pessoa,
+   por dia e por tarefa. e a conta; o teto la em cima e outra coisa. o nome da
+   tarefa e o que a pessoa fez, nao so a rota: um assistant que propoe uma acao
+   e um assistant que so responde custam diferente, e uma captura grava uma
+   linha por tipo de item que devolveu. */
+function usageTasks(name, step, data) {
+  if (CAPTURE_TASKS[name]) {
+    const kinds = [...new Set(cleanCapture(data).map((x) => x.kind))];
+    return kinds.length ? kinds.map((k) => "capture:" + k) : ["capture:none"];
+  }
+  if (BUILD_TASKS[name]) return ["build:" + step];
+  if (name === "assistant") {
+    const raw = data && Array.isArray(data.suggestions) ? data.suggestions[0] : null;
+    return [raw && ASSISTANT_ACTIONS[raw.actionType] && raw.title ? "assistant:action" : "assistant:answer"];
+  }
+  return [name];
+}
+
+/* os tokens do pedido vao so na primeira linha: uma captura com tarefa e nota
+   grava duas, e somar os tokens nas duas contaria a fatura em dobro. gravar a
+   medicao nunca derruba a resposta de quem pediu. */
+async function recordUsage(env, person, tasks, usage, portrait = 0) {
+  const tin = Math.max(0, Math.round(+(usage && usage.input_tokens) || 0));
+  const tout = Math.max(0, Math.round(+(usage && usage.output_tokens) || 0));
+  console.log("merlin " + tasks.join(",") + " in=" + tin + " out=" + tout + " portrait=" + portrait);
+  try {
+    const day = new Date().toISOString().slice(0, 10);
+    for (let i = 0; i < tasks.length; i++) {
+      await env.DB.prepare(
+        "INSERT INTO usage (person, day, task, n, tokens_in, tokens_out) VALUES (?, ?, ?, 1, ?, ?) " +
+        "ON CONFLICT(person, day, task) DO UPDATE SET n = n + 1, " +
+        "tokens_in = tokens_in + excluded.tokens_in, tokens_out = tokens_out + excluded.tokens_out"
+      ).bind(person, day, tasks[i], i ? 0 : tin, i ? 0 : tout).run();
+    }
+  } catch (e) {
+    console.error("usage " + (e && e.message));
+  }
+}
+
 async function advise(req, env, person) {
   if (!env.ANTHROPIC_API_KEY) return fail("o Merlin ainda não tem chave: npx wrangler secret put ANTHROPIC_API_KEY", 503);
   const body = await req.json().catch(() => null);
@@ -1383,9 +1422,12 @@ async function advise(req, env, person) {
     return fail("o Merlin não respondeu (" + r.status + ")", 502);
   }
   const answer = await r.json();
-  if (answer.stop_reason === "refusal") return fail("o Merlin preferiu não responder a isso", 422);
   const text = (answer.content || []).filter((b) => b.type === "text").map((b) => b.text).join("\n");
   const data = extractJson(text);
+  /* a Anthropic respondeu, e respondeu cobrando: conta mesmo a recusa e o
+     formato torto */
+  await recordUsage(env, person, usageTasks(name, step, data), answer.usage);
+  if (answer.stop_reason === "refusal") return fail("o Merlin preferiu não responder a isso", 422);
   if (BLUEPRINT_TASKS[name]) {
     if (!data || typeof data !== "object") return fail("o Merlin respondeu fora do formato", 502);
     return json({ blueprint: cleanBlueprint(data) });

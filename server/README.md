@@ -8,7 +8,8 @@ guarda um documento por dia (tabela `days`) e guarda os documentos dos outros
 módulos por tipo e id (tabela `docs`: ideas, clients, maps, funnels,
 finance, week). Ele **não** entende nada do que há dentro — só devolve e
 diz qual versão é mais nova. A quinta tabela, `advice`, existe só para que
-ninguém gaste sozinho a chave que é do time.
+ninguém gaste sozinho a chave que é do time, e a `usage` conta o que cada
+pedido ao Merlin custou (veja "A medição").
 
 `OWNER_EMAILS` no `wrangler.toml` lista quem pode entrar. Cada entrada é um
 endereço inteiro (`arthurcastilhos@gmail.com`) ou um domínio começado por `@`
@@ -17,7 +18,7 @@ deploy por pessoa que entra. Outro e-mail recebe a mesma resposta de sucesso e
 nenhum código.
 
 **Entrar não é ver.** Quem entra ganha uma linha em `people` e um Merlin
-próprio: `days`, `docs` e `advice` são todas por `person`, e nenhuma consulta
+próprio: `days`, `docs`, `advice` e `usage` são todas por `person`, e nenhuma consulta
 aqui cruza essa coluna. O domínio abre a porta da casa, não a gaveta de
 ninguém — e o teste `13d` existe para que isso não deixe de ser verdade sem
 alguém perceber.
@@ -40,7 +41,7 @@ npx wrangler d1 create artt-planner   # o nome do banco não mudou com o do prod
 
 Copie o `database_id` que aparece e cole em `wrangler.toml`. Depois crie as
 tabelas, em produção (o schema é idempotente: rodar de novo num banco que já
-existe só cria as tabelas que faltavam — hoje a `advice`):
+existe só cria as tabelas que faltavam — hoje a `usage`):
 
 ```bash
 npx wrangler d1 execute artt-planner --remote --file schema.sql
@@ -205,6 +206,46 @@ A conta que **não** é gratuita é a da Anthropic, e é a única que cresce com
 time: cada conselho é um pedido ao Opus. O teto de `ADVICE_PER_HOUR` limita o
 estrago de um acidente, não o uso normal — se o gasto incomodar, o lugar de
 olhar é console.anthropic.com, e o de mexer é aqui.
+
+## A medição
+
+Além do teto, cada pedido que a Anthropic respondeu soma uma linha na tabela `usage`
+(`person, day, task, n, tokens_in, tokens_out`, chave `person + day + task`, apagada junto
+com a pessoa). É a conta que diz o que cada tarefa custa; o teto (`advice`) só barra abuso.
+
+- **`day` é `AAAA-MM-DD` em UTC**: o Worker não sabe o fuso de quem pede. Um pedido às 22h em
+  Brasília cai no dia seguinte.
+- **`task` é o que a pessoa fez, não só a rota**: `assistant:action` (a resposta trouxe
+  proposta) ou `assistant:answer` (só `clarify`); `capture:<kind>`, uma linha por tipo de item
+  devolvido (`capture:task`, `capture:note`), ou `capture:none` quando a lista vem vazia;
+  `build:<step>` (`brief`, `draft`, `revise`); para as outras, o nome da tarefa (`week`, `app`…).
+- **Os tokens vêm do `usage` da resposta** e, numa captura que grava mais de uma linha, entram
+  só na primeira, para a soma de tokens não contar o mesmo pedido duas vezes. Resposta sem
+  `usage` soma o pedido e deixa os tokens como estavam.
+- Conta pedido que a Anthropic **respondeu**, inclusive recusa e resposta fora do formato (os
+  tokens foram cobrados do mesmo jeito). Não conta o que foi barrado antes: teto (429), sem
+  chave (503), tarefa inválida (400) ou a Anthropic fora do ar (502).
+- Só números: nunca o texto do pedido nem o da resposta. Gravar a `usage` nunca derruba a
+  resposta (falhou, `console.error`). Nenhuma rota lê a tabela.
+- Cada pedido também escreve uma linha no log: `merlin <task> in=<n> out=<n> portrait=<caracteres ou 0>`.
+  Para ver ao vivo, `npx wrangler tail`.
+
+Três consultas prontas, por `npx wrangler d1 execute artt-planner --remote --command "…"`:
+
+```sql
+-- pedidos por tarefa, por dia
+SELECT day, task, SUM(n) AS pedidos FROM usage GROUP BY day, task ORDER BY day DESC, pedidos DESC;
+
+-- tokens médios por pedido, por tarefa
+SELECT task, SUM(n) AS pedidos, SUM(tokens_in) / SUM(n) AS entrada_media, SUM(tokens_out) / SUM(n) AS saida_media
+FROM usage GROUP BY task ORDER BY pedidos DESC;
+
+-- pessoas ativas por dia
+SELECT day, COUNT(DISTINCT person) AS pessoas FROM usage GROUP BY day ORDER BY day DESC;
+```
+
+(O `tokens_in` de uma captura com dois tipos fica todo no primeiro, então a média de
+`capture:note` por pedido sai menor que a real: leia a captura pela soma das linhas `capture:*`.)
 
 ## O link público
 
