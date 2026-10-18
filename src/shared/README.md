@@ -50,6 +50,12 @@ Vite; o build sai em `server/site/`. O que é comum vive aqui:
   área de transferência, e é a mesma gramática que o "colar mermaid como ramo" lê de volta: um
   mapa sai daqui como texto e volta inteiro. Puro, testado no `test.mjs`. Tetos: 3000 nós,
   60 níveis e o documento abaixo de 1MB.
+- `hat.js` — **o Merlin em pessoa**: o chapéu de mago desenhado em código (VISAO, 12). Cada
+  humor de `MOODS` é um alvo para uns trinta números (a ponta, a aba, as pálpebras), e
+  `createHat(svg)` leva de um para o outro por molas, então qualquer humor vira qualquer outro
+  sem corte. A forma (`hatShape`) e o humor da conversa (`chatMood`) são puros, testados no
+  `hat.test.mjs`; o DOM só é tocado dentro do `createHat`. Na tela, entra pelo `<Hat>` do
+  `ui.jsx`. A cor é `--merlin`/`--on-merlin`, que só ele usa.
 
 Identificadores, chaves, campos e classes são em inglês; texto de tela e comentários, em
 português. O dicionário completo está em [`MIGRATION.md`](../MIGRATION.md).
@@ -188,6 +194,7 @@ vezes numa montagem (esvaziar a caixa de entrada, gerar a recorrência da semana
 | `useDelegate()` → `{ask, busy, answer, close}` | "dá pra fazer com Claude?": `ask({id, title, min?, due?, client?, about?, where, origin})` pergunta ao Merlin; `busy` é o id em análise |
 | `<DelegateDialog answer onClose/>` | o veredicto, com o botão que manda o que há para montar à caixa de entrada do dia |
 | `<ClientBadge id/>` | o selo do cliente |
+| `<Hat mood look? tight? className?/>` | o Merlin em pessoa (`hat.js`). Desenha e anima sozinho; o React só passa o humor (`idle`, `listening`, `thinking`, `working`, `talking`, `done`, `confused`) e, se quiser, para onde olhar (`[x, y]` de -1 a 1). `tight` tira o céu reservado aos efeitos, para caber ao lado de um campo |
 | `clientOptionList("sem cliente")` | `<option>`s; o escolhido vai no `value` do `<select>` |
 | `icon("plus")` | um ícone de `icons.jsx` como elemento. SVG só desta página vira um componente no topo do arquivo dela |
 
@@ -302,7 +309,9 @@ toca no documento do dia. O aviso já é mostrado pelo core.
   `closest()`.
 - Canvas e SVG desenhados à mão ficam num componente com `useRef`; o desenho continua
   imperativo por dentro.
-- Nada de vermelho: o sistema é monocromático + um verde. Negativo é `--ink-50` ou hachura.
+- Nada de vermelho: o sistema é monocromático + um destaque (o `--accent`: verde no Merlin, azul
+  na Guessless). A única outra cor é o roxo `--merlin`, e ela é só do personagem (VISAO, 12):
+  nunca em botão, link ou estado. Negativo é `--ink-50` ou hachura.
 - Toda ação destrutiva passa por `notify(text, undo)`.
 - Responsivo: no celular a página vira uma coluna. Nada rola horizontal fora de
   `.table-scroll` ou de um canvas.

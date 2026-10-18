@@ -34,7 +34,7 @@ por documento num **Cloudflare Worker + D1**, com login por código de 6 dígito
   o rastreador (`tracker.html`) sempre por cima, a bandeja e `Alt+Shift+M`. Ver
   [desktop/README.md](desktop/README.md).
 - **Testes:** scripts Node puros, sem framework (`src/shared/test.mjs`, `board.test.mjs`,
-  `server/test.mjs`).
+  `hat.test.mjs`, `server/test.mjs`).
 
 ## Arquitetura em camadas
 
@@ -62,7 +62,7 @@ os pares sozinho; não há lista de rotas. Nunca escreva no `localStorage` diret
 | porta | `index.html` + `landing.jsx` | a landing é HTML estático no `index.html`, com o CSS em `landing.css`, e um script no `<head>` decide antes da primeira pintura quem a vê. `landing.jsx` só acorda o que se mexe (a floresta, a janela de demonstração, a lista de espera) para quem está na porta. Ver `docs/prd/landing.md` |
 | hoje (calendário) | `calendar.jsx` | a primeira tela: dia / semana / mês sobre **uma** coleção `tasks`, com hábitos e "como foi o dia" ao lado (`today-block.jsx`) e a apresentação (`tour.jsx`); `day.html`, `week.html`, `journal.html` e `plans.html` só redirecionam |
 | rotina | `routine.jsx` | semana-modelo sem datas; vira tarefas (`shared/routine.js`) |
-| assistente | `assistant.jsx` | conversa com o Merlin, fora da barra (chega-se pelo `Ctrl+K`); respostas viram **propostas** confirmadas (`assistant-actions.js`) |
+| assistente | `assistant.jsx` | conversa com o Merlin, fora da barra (chega-se pelo `Ctrl+K`); respostas viram **propostas** confirmadas (`assistant-actions.js`). O Merlin aparece como o chapéu de `shared/hat.js` (`<Hat>` do `ui.jsx`): grande na abertura, ao lado do campo na conversa, mudando de humor com ela (VISAO, 12) |
 | notas | `notes.jsx` | caixa de entrada (antiga "ideias") |
 | prospecção | `prospecting.jsx` | quadro de leads; mesmo documento de cliente (`client-doc.js`) |
 | clientes | `clients.jsx` | canais, backlog, cofre |

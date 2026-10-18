@@ -17,7 +17,8 @@ import "./shared/base.css";
 import "./assistant.css";
 import { initPage, newId, notify, api, takeAsk, getCurrentPage, collection } from "./shared/core.js";
 import { useState, useEffect, useRef } from "react";
-import { mount, useCollection, useHash, setHash, Markdown, ProposalDialog, icon } from "./shared/ui.jsx";
+import { mount, useCollection, useHash, setHash, Markdown, ProposalDialog, Hat, icon } from "./shared/ui.jsx";
+import { chatMood } from "./shared/hat.js";
 import { NAV_ICONS } from "./shared/icons.jsx";
 import { MAX_TURNS, normalizeChat, chatTitle, turnsOf } from "./shared/assistant-actions.js";
 import { BUILD, buildIntent, answersText, draftView, docFromDraft } from "./shared/build.js";
@@ -70,6 +71,18 @@ function agoOf(at) {
   if (d < 7) return d + " d";
   return new Date(at).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
 }
+
+/* o que a tela diz enquanto espera, e a cara do chapéu enquanto isso
+   (shared/hat.js): montar e ajustar um rascunho é trabalho, o resto é
+   pensar. o humor vem junto do texto para não depender de comparar a frase */
+const WAIT = {
+  ask: { text: "pensando…", mood: "thinking" },
+  brief: { text: "vendo o que falta saber…", mood: "thinking" },
+  draft: { text: "montando o rascunho…", mood: "working" },
+  revise: { text: "ajustando o rascunho…", mood: "working" }
+};
+/* quanto dura a reação ao que chegou, antes de o chapéu voltar a si */
+const FEEL_MS = { talking: 1500, done: 2000, confused: 2600 };
 
 /* em que pé está a montagem: a última fala de montar decide. pergunta sem
    resposta espera a resposta; rascunho espera ajuste ou o botão de criar;
@@ -150,7 +163,8 @@ function Assistant() {
   const [messages, setMessages] = useState([]); // { from: "me"|"merlin", text } | { from: "merlin", proposal }
   const [input, setInput] = useState("");
   const [startKey, setStartKey] = useState("");
-  const [thinking, setThinking] = useState(false);
+  const [thinking, setThinking] = useState(false); // false | um dos WAIT
+  const [feeling, setFeeling] = useState(null);
   const [proposal, setProposal] = useState(null);
   const [historyOpen, setHistoryOpen] = useState(false);
   /* o x do selo de montagem: a conversa segue normal, e o rascunho fica lá */
@@ -165,6 +179,16 @@ function Assistant() {
   const start = STARTS.find((s) => s.key === startKey) || null;
   const list = chats.all().sort((a, b) => b.updatedAt - a.updatedAt);
   const flow = flowOn ? flowOf(messages) : null;
+
+  /* o chapéu reage ao que acabou de chegar por um instante e volta */
+  const feelTimer = useRef(0);
+  const feel = (mood) => {
+    clearTimeout(feelTimer.current);
+    setFeeling(mood);
+    feelTimer.current = setTimeout(() => setFeeling(null), FEEL_MS[mood]);
+  };
+  useEffect(() => () => clearTimeout(feelTimer.current), []);
+  const mood = chatMood({ thinking, feeling, typing: !!input.trim() });
 
   /* grava a conversa a cada troca — documento como qualquer outro: sobe,
      volta no outro aparelho, e apagar é apagar */
@@ -196,24 +220,25 @@ function Assistant() {
     } catch (e) { return { error: "não consegui falar com o Merlin" }; }
   };
   const runDraft = async (kind, request, answers, base) => {
-    setThinking("montando o rascunho…");
+    setThinking(WAIT.draft);
     const r = await callBuild({ kind, step: "draft", request, answers });
     setThinking(false);
-    if (r.error) { keep(base.concat([{ from: "merlin", text: r.error }])); return; }
+    if (r.error) { keep(base.concat([{ from: "merlin", text: r.error }])); feel("confused"); return; }
     const data = r.body.draft;
     keep(base.concat([{ from: "merlin", draft: { kind, request, answers, data, title: draftView(kind, data).title, summary: r.body.summary || "" } }]));
+    feel("done");
   };
   const startBuild = async (kind, request) => {
     const mine = messages.concat([{ from: "me", text: request }]);
     keep(mine);
     setInput("");
     setStartKey("");
-    setThinking("vendo o que falta saber…");
+    setThinking(WAIT.brief);
     const r = await callBuild({ kind, step: "brief", request });
     setThinking(false);
-    if (r.error) { keep(mine.concat([{ from: "merlin", text: r.error }])); return; }
+    if (r.error) { keep(mine.concat([{ from: "merlin", text: r.error }])); feel("confused"); return; }
     const questions = r.body.questions || [];
-    if (questions.length) keep(mine.concat([{ from: "merlin", brief: { kind, request, questions, answered: false } }]));
+    if (questions.length) { keep(mine.concat([{ from: "merlin", brief: { kind, request, questions, answered: false } }])); feel("talking"); }
     else runDraft(kind, request, "", mine);
   };
   /* a resposta às perguntas: as escolhas do cartão, o texto livre do campo,
@@ -231,12 +256,13 @@ function Assistant() {
     const mine = messages.concat([{ from: "me", text: change }]);
     keep(mine);
     setInput("");
-    setThinking("ajustando o rascunho…");
+    setThinking(WAIT.revise);
     const r = await callBuild({ kind: d.kind, step: "revise", request: d.request, answers: d.answers, draft: d.data, change });
     setThinking(false);
-    if (r.error) { keep(mine.concat([{ from: "merlin", text: r.error }])); return; }
+    if (r.error) { keep(mine.concat([{ from: "merlin", text: r.error }])); feel("confused"); return; }
     const data = r.body.draft;
     keep(mine.concat([{ from: "merlin", draft: { ...d, data, title: draftView(d.kind, data).title, summary: r.body.summary || "" } }]));
+    feel("done");
   };
   const create = (d) => {
     const { collection: name, doc, href } = docFromDraft(d.kind, d.data, newId);
@@ -260,7 +286,7 @@ function Assistant() {
     const answer = (m) => keep(mine.concat([m]));
     keep(mine);
     setInput("");
-    setThinking(true);
+    setThinking(WAIT.ask);
     try {
       /* o contexto: o da tela de onde a pergunta veio, quando veio de alguma;
          e o resumo do financeiro quando o pedido é de simulação */
@@ -276,15 +302,19 @@ function Assistant() {
       }) });
       if (r.ok) {
         const s = (r.body.suggestions || [])[0];
-        if (s) answer({ from: "merlin", proposal: s });
-        else answer({ from: "merlin", text: r.body.clarify || "não entendi bem — pode dizer de outro jeito?" });
+        if (s) { answer({ from: "merlin", proposal: s }); feel("done"); }
+        else if (r.body.clarify) { answer({ from: "merlin", text: r.body.clarify }); feel("talking"); }
+        else { answer({ from: "merlin", text: "não entendi bem — pode dizer de outro jeito?" }); feel("confused"); }
       } else if (r.status === 401) {
         answer({ from: "merlin", text: "entre para usar o Merlin" });
+        feel("confused");
       } else {
         answer({ from: "merlin", text: r.body.error || "não consegui pensar nisso agora" });
+        feel("confused");
       }
     } catch (e) {
       answer({ from: "merlin", text: "não consegui falar com o Merlin" });
+      feel("confused");
     } finally { setThinking(false); }
   };
 
@@ -355,7 +385,7 @@ function Assistant() {
           <div className="chat__log" ref={listRef}>
             {!messages.length
               ? <div className="chat__welcome">
-                  <i className="chat__mark">{icon("spark")}</i>
+                  <Hat className="chat__mark" mood={mood} />
                   <h1>o que vamos montar?</h1>
                   <p>peça uma tarefa, uma nota, um roteiro, um lead — ou comece por um destes:</p>
                   <div className="chat__starts">
@@ -387,7 +417,7 @@ function Assistant() {
                         : <Markdown className="chat__body" text={m.text} />}
                   </div>
                 ))}
-            {thinking && <div className="chat__msg"><p className="weak">{typeof thinking === "string" ? thinking : "pensando…"}</p></div>}
+            {thinking && <div className="chat__msg"><p className="weak">{thinking.text}</p></div>}
           </div>
 
           <form className="chat__composer" autoComplete="off" onSubmit={(e) => { e.preventDefault(); ask(input); }}>
@@ -404,12 +434,15 @@ function Assistant() {
               </p>
             )}
             <div className="chat__row">
+              {/* na abertura o chapéu já está grande lá em cima; na conversa ele
+                  mora aqui, olhando para o que se escreve */}
+              {messages.length > 0 && <Hat className="chat__face" tight mood={mood} look={mood === "listening" ? [0.8, 0.35] : null} />}
               <input ref={fieldRef} className="chat__field" autoFocus maxLength="1000"
                      placeholder={flow ? (flow.brief ? "ou responda do seu jeito" : "o que mudar? ex.: tira o webinar e põe um quiz") : start ? start.placeholder : "escreva para o Merlin…"}
                      aria-label="Escreva para o Merlin"
                      value={input} onChange={(e) => setInput(e.currentTarget.value)} />
               <button className="pill pill--accent pill--icon" type="submit" aria-label="Enviar"
-                      disabled={thinking || !input.trim()}>{icon("arrow")}</button>
+                      disabled={!!thinking || !input.trim()}>{icon("arrow")}</button>
             </div>
           </form>
         </div>

@@ -72,6 +72,14 @@ input,select,textarea{font:inherit;color:inherit}
   --accent-glow:rgba(46,232,107,.3);
   --on-accent:#0d0d0d;
 
+  /* o Merlin em pessoa, o chapéu de hat.js (VISAO, 12). é a única cor fora
+     do destaque e só o personagem a usa: botão, link e estado continuam no
+     --accent. vale igual nos dois temas e nas duas marcas, por isso não se
+     redeclara embaixo: o roxo passa de 3:1 no escuro e no claro, e é a
+     cor de ação de nenhuma das duas casas */
+  --merlin:#8B5CF6;
+  --on-merlin:#ffffff;
+
   /* sombras em token porque no claro elas precisam recuar */
   --sombra:inset 0 1px 0 rgba(242,242,242,.05),0 40px 110px -44px rgba(0,0,0,.95);
   --sombra-2:0 10px 30px rgba(0,0,0,.55);

@@ -911,3 +911,45 @@ publicar**: a guilda vê que você está em sessão, quanto focou na semana e o 
 nunca escreve no seu dia, no seu cliente nem no seu financeiro. O que precisa existir antes:
 perfil público (o que de você outra pessoa pode ver), sessões públicas como opção por sessão,
 e o feed. O placar, se existir, mede dias fechados, e não horas.
+
+---
+
+## 12. O Merlin ganha rosto (17/10/2026)
+
+Veio o pedido de um personagem "igual o Grok Bot, mas com formato de chapéu de mago". Ficou um
+**chapéu de mago desenhado inteiro em código** (`shared/hat.js`), como a floresta: nada é imagem
+nem keyframe. Cada humor é um alvo para uns trinta números (quanto a ponta tomba, para onde os
+olhos olham, quanto a pálpebra desce), e uma mola leva de um para o outro. Qualquer humor vira
+qualquer outro sem corte, até no meio de uma troca.
+
+O chapéu é o que se reconhece do Merlin em qualquer tamanho, até em 16px. A ponta virou um
+segundo rosto: balança quando ele pensa, enrola num "?" quando ele não entende e fica em pé
+quando ele presta atenção.
+
+**A cor é dele, e não do destaque.** Roxo `#8B5CF6` com olho branco, igual nas duas marcas e nos
+dois temas (`--merlin` e `--on-merlin`, no `shell.css`):
+
+- verde e azul já são a cor de ação (botão, foco, seleção) do Merlin e da Guessless. Um
+  personagem da cor do botão disputa com o botão que aparece logo abaixo dele na conversa;
+- roxo lê como mago;
+- o verde some no tema claro (1,46:1 contra o fundo), e o azul também fica abaixo de 3:1 no claro
+  (2,92:1). O roxo passa nos dois temas: 4,6:1 no escuro e 3,8:1 no claro.
+
+A regra de "monocromático + um destaque" continua valendo para todo o resto: o roxo nunca vai
+para botão, link ou estado. As faíscas de quando ele termina alguma coisa usam o `--accent` de
+quem entrou.
+
+**Onde ele aparece.** Primeiro no chat (`assistant.html`): grande na abertura, no lugar da
+faísca, e pequeno ao lado do campo durante a conversa. Ali ele ouve quando a pessoa escreve,
+pensa enquanto espera, trabalha enquanto monta um rascunho, fica pronto quando chega uma
+proposta ou um rascunho e fica confuso no erro. A palavra continua escrita ("pensando…"), porque
+o leitor de tela não vê o chapéu e nem todo mundo olha para o canto. Com movimento reduzido, ele
+só pisca e troca de humor.
+
+A faísca continua nos botões de IA ("Merlin rascunha", "puxar pautas"): ali ela quer dizer "ação
+do Merlin", e não o Merlin.
+
+**Depois:** o início sobre a floresta, quando ele virar só a conversa (D2 de
+`docs/prd/a-secretaria.md`). Lá o chapéu pode dormir quando a floresta está de noite. Os outros
+humores do desenho (feliz, triste, dormindo, aviso…) entram no `MOODS` quando uma tela precisar
+deles, não antes.
