@@ -552,6 +552,14 @@ r = await call("POST", "/merlin", { task: "assistant", context: { message: "qual
 body = await r.json();
 check("tipo de ação fora do catálogo é descartado", r.status === 200 && body.suggestions.length === 0, JSON.stringify(body));
 
+/* quem pede para fechar o dia ao assistente é mandado ao campo do início, onde isso não gasta crédito */
+claudeAnswer = { stop_reason: "end_turn", content: [{ type: "text", text: '{"suggestions":[],"clarify":"é só escrever \\"fechar o dia\\" no início"}' }] };
+r = await call("POST", "/merlin", { task: "assistant", context: { message: "quero fechar o dia" } }, cookie);
+body = await r.json();
+check("assistente responde ao pedido de fechar o dia", r.status === 200 && body.suggestions.length === 0 && /fechar o dia/.test(body.clarify), JSON.stringify(body));
+check("a instrução manda escrever \"fechar o dia\" no campo do início", claudeMessages.at(-1).content.includes('é só escrever "fechar o dia" no campo do início'));
+check("a instrução também aponta \"revisar a semana\"", claudeMessages.at(-1).content.includes("revisar a semana"));
+
 /* ---- 13f. o teto do conselheiro ----
    a chave da Anthropic e uma so para o time. o teto e por pessoa e por hora:
    quem gastou espera, e quem esta ao lado nao paga por isso. */

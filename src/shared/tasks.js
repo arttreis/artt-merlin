@@ -282,6 +282,21 @@ export function routeLine(text) {
   return title ? { kind: "note", title, client: m.client || "" } : null;
 }
 
+/* os pedidos que o campo do início resolve sozinho, sem rede e sem crédito
+   (desde 17/10/2026, quando o botão da noite e os cartões de revisão saíram
+   da tela): "fechar o dia" abre o fechamento, "revisar a semana" e "revisar o
+   mês" abrem a revisão. a frase precisa ser a frase inteira — "fechar o dia
+   30m" continua sendo tarefa, porque a duração manda, e "como fecho o mês no
+   financeiro?" continua sendo pergunta. roda antes da routeLine. */
+const CLOSE_RE = /^fechar (?:o |meu |o meu )?dia$/;
+const REVIEW_RE = /^revisar (?:a |minha |a minha |o |meu |o meu )?(semana|m[eê]s)$/;
+export function askIntent(text) {
+  const raw = String(text || "").toLowerCase().replace(/\s+/g, " ").replace(/[\s.!]+$/, "").trim();
+  if (CLOSE_RE.test(raw)) return { kind: "close" };
+  const r = REVIEW_RE.exec(raw);
+  return r ? { kind: "review", period: r[1] === "semana" ? "week" : "month" } : null;
+}
+
 /* quando a regra sozinha não basta (o campo da home, desde 10/10/2026): o
    que ela mandaria para ideias, a data escrita por extenso e duas durações
    na mesma linha vão antes para o Merlin ler. a pergunta não passa por aqui
