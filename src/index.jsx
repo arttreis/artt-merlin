@@ -25,7 +25,7 @@ import {
   onboardingState, onboardingSettled
 } from "./shared/core.js";
 import { Fragment, useState, useEffect, useLayoutEffect, useRef } from "react";
-import { mount, useCloud, useCollection, icon, Markdown, ProposalDialog } from "./shared/ui.jsx";
+import { mount, useCloud, useCollection, icon, Markdown, ProposalDialog, HabitProposal, HabitForm } from "./shared/ui.jsx";
 import {
   normalize as normalizeTask, dayDoc, topOrder, newTask, routeLine, readClock,
   needsReading, isReserve, stripPrefix, askIntent, dayTasks, collectInbox
@@ -34,7 +34,7 @@ import { normalize as normalizeBlock, copyRoutine } from "./shared/routine.js";
 import { MAX_TURNS, normalizeChat, chatTitle, turnsOf, markProposal } from "./shared/assistant-actions.js";
 import { normalize as normalizeFinance, configOf, contextOf as financeContext, newEntry, undoEntry, entryLine, captureContext } from "./shared/finance-data.js";
 import { BUILD, buildIntent } from "./shared/build-intent.js";
-import { normalize as normalizeHabit } from "./shared/habits-data.js";
+import { normalize as normalizeHabit, habitStatus, markOn, undoHabit, markWhen } from "./shared/habits-data.js";
 import { distribute, fmt, clock, costOf } from "./shared/day.js";
 import { Forest, phaseOf } from "./shared/forest.jsx";
 import { githubDay } from "./shared/focus.js";
@@ -251,6 +251,11 @@ function Onboarding({ profile, apps, habits, veteran, onDone }) {
    financeiro junto com as tarefas e as notas, com um desfazer só. o que veio
    sem valor fica no cartão e se lança pela caixa de proposta.
 
+   desde 18/10/2026 também devolve hábito ("treinei", "ontem li 20 páginas"):
+   o que existe e não está marcado se marca no Enter, com o mesmo desfazer; o
+   que já estava marcado só diz isso; o que não existe espera no cartão o
+   "criar e marcar", que abre a caixa de novo hábito preenchida.
+
    o pedido de montar ("monta um funil pra consultoria", "quero um app de
    agenda") não é tarefa nem pergunta: vai para a conversa do assistente, que
    pergunta o que falta e mostra o rascunho (shared/build.js). a duração
@@ -276,10 +281,16 @@ function dayLabel(date, base) {
   const d = dateOf(date);
   return WEEKDAY[d.getDay()] + " " + String(d.getDate()).padStart(2, "0") + "/" + String(d.getMonth() + 1).padStart(2, "0");
 }
-const draftMeta = (it, base, money) => it.kind === "note" ? "ideia"
+/* o hábito lido, do jeito que o cartão o mostra: "marca hoje", "já estava
+   marcado" ou "não existe" */
+const habitMeta = (st, base) => st.error ? st.error : !st.habit ? "não existe" : st.already ? "✓ já estava marcado" + (st.day === base ? "" : " · " + markWhen(st.day, base)) : "marca " + markWhen(st.day, base);
+const draftMeta = (it, base, money, habitsNow) => it.kind === "note" ? "ideia"
   : it.kind === "money" ? entryLine(it, base, money)
+  : it.kind === "habit" ? habitMeta(habitStatus(habitsNow, it, base), base)
   : [dayLabel(it.date, base), it.at, it.min ? (it.guess ? "~" : "") + fmt(it.min) : "", it.client].filter(Boolean).join(" · ");
-const DRAFT_ICON = { task: "check", note: "pencil", money: "finance" };
+const DRAFT_ICON = { task: "check", note: "pencil", money: "finance", habit: "habits" };
+/* o hábito que existe aparece com o nome dele; o que não existe, como foi dito */
+const draftTitle = (it, habitsNow, base) => it.kind !== "habit" ? it.title : (habitStatus(habitsNow, it, base).habit || it).name;
 
 /* o gasto ou a entrada lidos na linha, como a caixa de proposta os recebe: é
    por ela que se lança o que veio sem valor */
@@ -304,7 +315,7 @@ async function readWithMerlin(text, context) {
   } catch (e) { return null; }
 }
 
-function Composer({ tasks, b, smart, onAsk, onIntent, readContext }) {
+function Composer({ tasks, habits, b, smart, onAsk, onIntent, readContext }) {
   const [text, setText] = useState("");
   const [reading, setReading] = useState(false);
   const [draft, setDraft] = useState(null); // { text, items }: o que o Merlin entendeu, esperando o ok
@@ -316,8 +327,16 @@ function Composer({ tasks, b, smart, onAsk, onIntent, readContext }) {
      leitura precisa das categorias, dos previstos e dos fixos de verdade */
   const finance = useCollection("finance", { normalize: normalizeFinance });
   const money = financeContext(finance);
-  /* o que ainda não pode ser criado: o gasto sem valor só se lança pela caixa */
-  const missing = (it) => it.kind === "money" && !!newEntry(it, configOf(finance), money, date).error;
+  const habitsNow = habits.all();
+  const habitOf = (it) => habitStatus(habitsNow, it, date);
+  /* o que ainda não pode ser criado: o gasto sem valor só se lança pela caixa,
+     e o hábito que não existe, pela caixa de novo hábito */
+  const missing = (it) => it.kind === "money" ? !!newEntry(it, configOf(finance), money, date).error
+    : it.kind === "habit" ? !habitOf(it).error && !habitOf(it).habit
+    : false;
+  /* o que não tem o que fazer: o hábito que já estava marcado, ou o de um dia
+     que ainda não chegou. o Enter o tira do cartão sem gravar nada */
+  const idle = (it) => it.kind === "habit" && (!!habitOf(it).error || habitOf(it).already);
   const route = routeLine(text);
   const build = !intent && route && route.kind !== "task" ? buildIntent(text) : null;
   const willRead = smart && !intent && !build && needsReading(text, route);
@@ -344,14 +363,24 @@ function Composer({ tasks, b, smart, onAsk, onIntent, readContext }) {
   const create = () => {
     /* o que veio sem valor fica no cartão, esperando a caixa; sem nada pronto,
        o Enter abre a caixa do primeiro */
-    const ready = draft.items.filter((it) => !missing(it));
+    const ready = draft.items.filter((it) => !missing(it) && !idle(it));
     const waiting = draft.items.filter(missing);
-    if (!ready.length) { setBoxed(draft.items.indexOf(waiting[0])); return; }
+    if (!ready.length) { if (waiting.length) setBoxed(draft.items.indexOf(waiting[0])); else clear(); return; }
     const undo = [];
+    const marked = [];
     let nTasks = 0, nNotes = 0, nMoney = 0;
     ready.forEach((it) => {
       const client = clientId(it.client);
-      if (it.kind === "money") {
+      if (it.kind === "habit") {
+        /* lido de novo a cada item: o mesmo hábito duas vezes na linha marca uma vez só */
+        const st = habitStatus(habits.all(), it, date);
+        const { doc, already } = markOn(st.habit, st.day, date);
+        if (already) return;
+        const back = undoHabit(st.habit, doc);
+        habits.save(doc);
+        undo.push(() => habits.save({ ...back.save, updatedAt: Date.now() }));
+        marked.push(doc.name + " marcado " + markWhen(st.day, date));
+      } else if (it.kind === "money") {
         const { doc } = newEntry({ ...it, chat: "home" }, configOf(finance), financeContext(finance), date);
         const before = finance.get(doc.id);
         finance.save(doc);
@@ -373,7 +402,8 @@ function Composer({ tasks, b, smart, onAsk, onIntent, readContext }) {
     const parts = [nTasks && nTasks + (nTasks === 1 ? " tarefa" : " tarefas"), nNotes && nNotes + (nNotes === 1 ? " ideia" : " ideias")].filter(Boolean);
     const said = [
       parts.length && parts.join(" e ") + (nTasks + nNotes === 1 ? " criada" : " criadas"),
-      nMoney && (nMoney === 1 ? "lançado no financeiro" : nMoney + " lançados no financeiro")
+      nMoney && (nMoney === 1 ? "lançado no financeiro" : nMoney + " lançados no financeiro"),
+      marked.length && (marked.length === 1 ? marked[0] : marked.length + " hábitos marcados")
     ].filter(Boolean);
     if (said.length) notify(said.join(" · "), () => undo.forEach((f) => f()));
     if (waiting.length) setDraft({ ...draft, items: waiting });
@@ -389,7 +419,10 @@ function Composer({ tasks, b, smart, onAsk, onIntent, readContext }) {
     if (!willRead) { byRule(route); return; }
     const said = text;
     setReading(true);
-    const items = await readWithMerlin(said, { ...readContext(), ...captureContext(configOf(finance), financeContext(finance), date) });
+    const items = await readWithMerlin(said, {
+      ...readContext(), ...captureContext(configOf(finance), financeContext(finance), date),
+      habits: habits.all().filter((x) => !x.archived).map((x) => x.name)
+    });
     setReading(false);
     /* lista vazia é o Merlin dizendo que a linha inteira é uma pergunta */
     if (items && !items.length) { onAsk(said.trim()); clear(); return; }
@@ -411,9 +444,13 @@ function Composer({ tasks, b, smart, onAsk, onIntent, readContext }) {
 
   const kind = intent ? intent.kind : build ? "build" : reading || willRead ? "read" : route ? route.kind : "";
   const lacking = draft ? draft.items.filter(missing).length : 0;
+  const readyN = draft ? draft.items.length - lacking - draft.items.filter(idle).length : 0;
+  const firstLacking = draft ? draft.items.find(missing) : null;
+  const toCreate = firstLacking && firstLacking.kind === "habit";
   const hint = reading ? "o Merlin está lendo…"
-    : draft && lacking === draft.items.length ? "Enter abre a caixa para pôr o valor · Esc volta ao texto"
-    : draft && lacking ? "Enter cria o que está pronto · o que falta o valor fica · Esc volta ao texto"
+    : draft && !readyN && !lacking ? "nada a marcar · Enter fecha · Esc volta ao texto"
+    : draft && !readyN ? "Enter abre a caixa para " + (toCreate ? "criar o hábito" : "pôr o valor") + " · Esc volta ao texto"
+    : draft && lacking ? "Enter cria o que está pronto · " + (toCreate ? "o hábito novo espera a caixa" : "o que falta o valor fica") + " · Esc volta ao texto"
     : draft ? "Enter cria · Esc volta ao texto"
     : intent ? INTENT_HINT[intent.period || intent.kind]
     : !route ? (smart ? "escreva do seu jeito: o Merlin separa tarefa, data, hora e ideia · a pergunta ele responde aqui em cima"
@@ -447,9 +484,9 @@ function Composer({ tasks, b, smart, onAsk, onIntent, readContext }) {
             {draft.items.map((it, i) => (
               <li key={i}>
                 {icon(DRAFT_ICON[it.kind] || "pencil")}
-                <span className="hm-draft__title">{it.title}</span>
-                <span className="hm-draft__meta t-mono">{draftMeta(it, date, money)}</span>
-                {missing(it) && <button type="button" className="pill pill--mini" onClick={() => setBoxed(i)}>abrir a caixa</button>}
+                <span className="hm-draft__title">{draftTitle(it, habitsNow, date)}</span>
+                <span className="hm-draft__meta t-mono">{draftMeta(it, date, money, habitsNow)}</span>
+                {missing(it) && <button type="button" className="pill pill--mini" onClick={() => setBoxed(i)}>{it.kind === "habit" ? "criar e marcar" : "abrir a caixa"}</button>}
                 <button type="button" className="hm-draft__drop" aria-label={"Tirar " + it.title} title="tirar" onClick={() => drop(i)}>{icon("x")}</button>
               </li>
             ))}
@@ -458,16 +495,18 @@ function Composer({ tasks, b, smart, onAsk, onIntent, readContext }) {
             <button type="button" className="pill" onClick={() => { setDraft(null); if (field.current) field.current.focus(); }}>voltar ao texto</button>
             <button type="button" className="pill" onClick={asIdea}>guardar como ideia</button>
             <button type="submit" className="pill pill--accent">
-              {lacking === draft.items.length ? "abrir a caixa" : draft.items.length - lacking === 1 ? "criar" : "criar as " + (draft.items.length - lacking)}
+              {!readyN && !lacking ? "ok" : !readyN ? (toCreate ? "criar e marcar" : "abrir a caixa") : readyN === 1 ? "criar" : "criar as " + readyN}
             </button>
           </div>
         </div>
       )}
     </form>
     {/* fora do <form> do campo: a caixa é outro formulário */}
-    {draft && boxed >= 0 && draft.items[boxed] && (
-      <ProposalDialog proposal={moneyProposal(draft.items[boxed])} onClose={() => setBoxed(-1)}
-                      onDone={(line) => { if (line) { if (draft.items.length === 1) clear(); else drop(boxed); } }} />
+    {draft && boxed >= 0 && draft.items[boxed] && (draft.items[boxed].kind === "habit"
+      ? <HabitForm habits={habits} draft={{ name: draft.items[boxed].name, mark: draft.items[boxed].date }} onClose={() => setBoxed(-1)}
+                   onDone={(line) => { if (line) { if (draft.items.length === 1) clear(); else drop(boxed); } }} />
+      : <ProposalDialog proposal={moneyProposal(draft.items[boxed])} onClose={() => setBoxed(-1)}
+                        onDone={(line) => { if (line) { if (draft.items.length === 1) clear(); else drop(boxed); } }} />
     )}
     </>
   );
@@ -766,6 +805,9 @@ function Today({ c, tasks, habits, journal, closes, reviews, sessions, me, h, ph
   /* a pílula confirmada vira a linha "✓ lançado · …" e não abre de novo; o
      desfazer a devolve, se a conversa ainda for a mesma */
   const markDone = (at, chat, line) => { if (talkId.current === chat) keepTalk(markProposal(talkNow.current, at, line)); };
+  /* a conversa desta pintura: o desfazer de uma marca chega depois, e pode já
+     ser outra conversa */
+  const talkChat = talkId.current;
 
   return (
     <div className="hm">
@@ -784,6 +826,9 @@ function Today({ c, tasks, habits, journal, closes, reviews, sessions, me, h, ph
                     : m.proposal
                       ? m.proposal.done
                         ? <p key={i} className="hm-talk__done t-mono">✓ {m.proposal.done.line}</p>
+                        : m.proposal.actionType === "habit-mark"
+                        ? <HabitProposal key={i} proposal={m.proposal} className="pill pill--accent hm-talk__do" doneClassName="hm-talk__done t-mono"
+                                         onDone={(line) => markDone(lastQ + 1 + i, talkChat, line)} />
                         : <button key={i} type="button" className="pill pill--accent hm-talk__do" onClick={() => setProposal({ p: m.proposal, at: lastQ + 1 + i, chat: talkId.current })}>{icon("spark")}{m.proposal.title}</button>
                       : <Fragment key={i}>
                           <Markdown className="hm-talk__a" text={m.text} />
@@ -800,7 +845,7 @@ function Today({ c, tasks, habits, journal, closes, reviews, sessions, me, h, ph
       </header>
 
       <div className="hm-center">
-        <Composer tasks={tasks} b={b} smart={c.signedIn} onAsk={ask} onIntent={openIntent} readContext={readContext} />
+        <Composer tasks={tasks} habits={habits} b={b} smart={c.signedIn} onAsk={ask} onIntent={openIntent} readContext={readContext} />
       </div>
 
       {closing && <Closing tasks={tasks} journal={journal} closes={closes} date={date} login={me.github} onClose={() => setClosing(false)} />}

@@ -18,7 +18,7 @@ import { createRoot } from "react-dom/client";
 import { createPortal } from "react-dom";
 import {
   collection, cloud, clients, listClients, clientName, md, brl, parseMoney,
-  api, notify, sendToDay, formatMin, readDuration, newId, newNote, today,
+  api, notify, sendToDay, formatMin, readDuration, parseDuration, newId, newNote, today,
   SECTIONS, sectionOf, CLOUD_STATUS, search, signIn, currentNotice, onNotice, closeNotice,
   toggleSidebar, setShellRenderer, currentBrand, share, shareOf, unshare, shareUrl,
   currentTheme, toggleTheme, askMerlin, onboardingBlocked
@@ -29,6 +29,7 @@ import { LOGO, GL_LOGO, GL_MARK, ICONS, NAV_ICONS, icon } from "./icons.jsx";
    receba uma proposta usa o mesmo. */
 import { ACTION_COLLECTIONS, ACTION_LABELS, ACTION_FIELDS, ACTION_DONE, buildDoc, previewOf } from "./assistant-actions.js";
 import { normalize as normalizeFinance, contextOf as financeContext, undoEntry } from "./finance-data.js";
+import { normalize as normalizeHabit, SCHEDULES, COLORS, WEEKDAY_NAMES, habitStatus, undoHabit, markWhen } from "./habits-data.js";
 /* o Ctrl+K cria tarefa de hoje com a mesma regra e a mesma forma do dia */
 import { tasks, newTask, topOrder, routeLine } from "./tasks.js";
 import { BUILD, buildIntent } from "./build-intent.js";
@@ -1000,6 +1001,109 @@ export function ProposalDialog({ proposal, chat, onClose, onDone }) {
               : <input className="input" type={f.type === "number" ? "number" : f.type === "date" ? "date" : "text"} {...bind(f.key)} />}
           </Field>
         ))}
+    </Form>
+  );
+}
+
+/* ---------- o hábito dito na conversa (ticket #10) ----------
+   a pílula de `habit-mark` não abre caixa: o hábito que existe se marca no
+   clique, com desfazer, e o que já estava marcado vira a linha "✓ já estava
+   marcado", sem ação. o que não existe oferece "criar e marcar", que abre a
+   caixa de novo hábito preenchida: nenhum hábito nasce sem ela.
+   `onDone(linha)` é o mesmo da caixa de proposta: a pílula vira "✓ marcado ·
+   treinar", e o desfazer a devolve com `onDone(null)`. */
+export function HabitProposal({ proposal, className, doneClassName, onDone }) {
+  const habits = useCollection("habits", { normalize: normalizeHabit });
+  const [creating, setCreating] = useState(false);
+  const p = proposal.payload || {};
+  const t = today();
+  const st = habitStatus(habits.all(), p, t);
+  const name = st.habit ? st.habit.name : String(p.name || p.habit || proposal.title || "").trim();
+  if (st.error) return <p className={doneClassName}>{name} · {st.error}</p>;
+  if (st.already) return <p className={doneClassName}>✓ já estava marcado · {name}</p>;
+  if (!st.habit) {
+    return (
+      <>
+        <button className={className} type="button" onClick={() => setCreating(true)}>{icon("plus")}{name} · não existe · criar e marcar</button>
+        {creating && <HabitForm habits={habits} draft={{ name, mark: st.day }} onClose={() => setCreating(false)} onDone={onDone} />}
+      </>
+    );
+  }
+  const mark = () => {
+    const { doc, error } = buildDoc("habit-mark", p, p, habits);
+    if (error) { notify(error); return; }
+    const before = habits.get(doc.id);
+    habits.save(doc);
+    if (onDone) onDone(ACTION_DONE["habit-mark"] + " · " + previewOf("habit-mark", { habit: doc.name, date: st.day }));
+    const undo = undoHabit(before, doc);
+    notify(doc.name + " marcado " + markWhen(st.day, t), () => {
+      habits.save({ ...undo.save, updatedAt: Date.now() });
+      if (onDone) onDone(null);
+    });
+  };
+  return <button className={className} type="button" onClick={mark}>{icon("check")}{name} · marca {markWhen(st.day, t)}</button>;
+}
+
+/* ---------- a caixa do hábito: criar e editar são a mesma ----------
+   morava em habits.jsx; veio para cá (18/10/2026) porque o início e a
+   conversa também abrem a de novo hábito, no "criar e marcar". com `draft`
+   ({ name, mark }), a caixa já vem com o nome, e criar marca o dia `mark`,
+   grava a origem na conversa e avisa com desfazer, que apaga o hábito.
+   `onDone(linha)` conta a quem abriu, como na caixa de proposta. */
+export function HabitForm({ habits, id, draft, onClose, onArchive, onSuggest, onDone }) {
+  const h = id ? habits.get(id) : null;
+  const [v, bind, set] = useFields({
+    name: h ? h.name : draft ? draft.name : "",
+    type: h ? h.schedule.type : "daily",
+    times: h ? h.schedule.times : 3,
+    weekdays: h ? h.schedule.weekdays : [1, 2, 3, 4, 5],
+    duration: h && h.min ? formatMin(h.min) : "",
+    color: h ? h.color : 5
+  });
+  if (id && !h) return null;
+  const t = today();
+  const markDay = draft && draft.mark && draft.mark <= t ? draft.mark : t;
+  const toggleWeekday = (n) => set("weekdays", v.weekdays.includes(n) ? v.weekdays.filter((x) => x !== n) : [...v.weekdays, n]);
+  const submit = () => {
+    const name = v.name.trim().slice(0, 80);
+    if (!name) { notify("o hábito precisa de um nome"); return false; }
+    if (v.type === "weekdays" && !v.weekdays.length) { notify("escolha pelo menos um dia"); return false; }
+    const now = Date.now();
+    const schedule = { type: v.type, times: Math.min(7, Math.max(1, Math.round(+v.times || 1))), weekdays: v.weekdays.slice().sort() };
+    const min = parseDuration(v.duration).min;
+    if (h) { habits.save({ ...h, name, schedule, min, color: +v.color, updatedAt: now }); return; }
+    const doc = { id: newId(), name, schedule, min, color: +v.color, order: now, archived: false, marks: {}, createdAt: now, updatedAt: now };
+    if (!draft) { habits.save(doc); return; }
+    habits.save({ ...doc, marks: { [markDay]: true }, origin: { type: "chat" } });
+    if (onDone) onDone("criado e marcado · " + name);
+    notify(name + " criado e marcado " + markWhen(markDay, t), () => {
+      habits.remove(doc.id);
+      if (onDone) onDone(null);
+    });
+  };
+  return (
+    <Form title={h ? "hábito" : "novo hábito"} sub={draft ? "criar já marca " + markWhen(markDay, t) : ""}
+        submit={h ? "salvar" : draft ? "criar e marcar" : "criar"} remove={h ? "arquivar" : ""} removeIcon="archive"
+        aside={!h && onSuggest ? <button className="dialog__remove" type="button" title="ver sugestões" aria-label="Ver sugestões" onClick={onSuggest}>{icon("spark")}</button> : null}
+        onRemove={() => onArchive(h)} onClose={onClose} onSubmit={submit}>
+      <Field label="nome" full><input className="input" maxLength="80" required placeholder="treino, leitura, água…" {...bind("name")} /></Field>
+      <Field label="frequência">
+        <select className="select" {...bind("type")}>{SCHEDULES.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}</select>
+      </Field>
+      {v.type === "perWeek" && <Field label="quantas vezes"><input className="input input--num" type="number" min="1" max="7" {...bind("times")} /></Field>}
+      {v.type === "weekdays" && (
+        <Field label="quais dias" full>
+          <div className="weekday-picker">
+            {[1, 2, 3, 4, 5, 6, 0].map((n) => (
+              <label key={n} className={v.weekdays.includes(n) ? "is-on" : ""}>
+                <input type="checkbox" checked={v.weekdays.includes(n)} onChange={() => toggleWeekday(n)} />{WEEKDAY_NAMES[n]}
+              </label>))}
+          </div>
+        </Field>)}
+      <Field label="duração sugerida"><input className="input input--mono" placeholder="30m, 1h" {...bind("duration")} /></Field>
+      <Field label="cor">
+        <select className="select" {...bind("color")}>{COLORS.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}</select>
+      </Field>
     </Form>
   );
 }

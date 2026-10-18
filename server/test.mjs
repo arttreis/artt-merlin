@@ -720,6 +720,97 @@ claudeAnswer = { stop_reason: "end_turn", content: [{ type: "text", text: '{"ite
 r = await call("POST", "/merlin", { task: "capture", context: { text: "ligar", today: "2026-10-19 (segunda)", hour: "14:20", clients: [], portrait: PORTRAIT } }, cookie);
 check("a leitura não leva o retrato", r.status === 200 && !claudeMessages.some((m) => m.content.includes("RETRATO-XYZ")), String(claudeAsked).slice(0, 200));
 
+/* ---- 13e-quater. o hábito ----
+   "treinei" escrito no início, ou dito na conversa, vira um item de hábito. o
+   que o Worker garante aqui é o que a IA não pode decidir sozinha: o nome do
+   hábito só vale se estava na lista que o navegador mandou (senão o início
+   oferece criar, e criar é uma caixa, nunca um efeito colateral da leitura), e a
+   data é um dia de verdade. */
+const habitCtx = {
+  today: "2026-10-18 (domingo)", hour: "09:10", clients: [],
+  habits: ["treinar", "ler 20 páginas"]
+};
+const habitItem = (over) => ({ kind: "habit", habit: "treinar", name: "treinei", date: "2026-10-18", ...over });
+const readHabit = async (text, items, ctx) => {
+  claudeAnswer = { stop_reason: "end_turn", content: [{ type: "text", text: JSON.stringify({ items }) }] };
+  const res = await call("POST", "/merlin", { task: "capture", context: { ...(ctx || habitCtx), text } }, cookie);
+  return { status: res.status, body: await res.json() };
+};
+
+/* existente: o nome é o de um dos hábitos enviados */
+let hab13 = await readHabit("treinei", [habitItem()]);
+check("hábito: a leitura devolve um item", hab13.status === 200 && hab13.body.items.length === 1, JSON.stringify(hab13.body));
+check("hábito: 'treinei' com 'treinar' no contexto volta com habit treinar", hab13.body.items[0].kind === "habit" && hab13.body.items[0].habit === "treinar", JSON.stringify(hab13.body.items[0]));
+check("hábito: o name é o que a pessoa disse, e a data é a dita", hab13.body.items[0].name === "treinei" && hab13.body.items[0].date === "2026-10-18", JSON.stringify(hab13.body.items[0]));
+check("hábito: o item só tem kind, habit, name e date", Object.keys(hab13.body.items[0] || {}).sort().join() === "date,habit,kind,name", JSON.stringify(hab13.body.items[0]));
+check("hábito: os nomes dos hábitos vão no pedido", /treinar/.test(claudeAsked) && /ler 20 páginas/.test(claudeAsked) && /Hábitos:/.test(claudeAsked), String(claudeAsked).slice(0, 400));
+check("hábito: a instrução ensina o tipo", /habit/.test(claudeAsked));
+
+/* inexistente: o nome que a IA inventou não passa, e o que a pessoa disse fica */
+hab13 = await readHabit("fiz yoga", [habitItem({ habit: "yoga", name: "yoga" })]);
+check("hábito: 'yoga' que não está no contexto volta com habit vazio e name yoga", hab13.body.items.length === 1 && hab13.body.items[0].habit === "" && hab13.body.items[0].name === "yoga", JSON.stringify(hab13.body.items));
+hab13 = await readHabit("fiz yoga", [habitItem({ habit: "yoga", name: undefined })]);
+check("hábito: sem name, o nome que a IA mandou em habit vira o name", hab13.body.items[0].habit === "" && hab13.body.items[0].name === "yoga", JSON.stringify(hab13.body.items));
+hab13 = await readHabit("fiz yoga", [habitItem({ habit: undefined, name: undefined, title: "yoga" })]);
+check("hábito: sem name e sem habit, o title serve de name", hab13.body.items.length === 1 && hab13.body.items[0].habit === "" && hab13.body.items[0].name === "yoga", JSON.stringify(hab13.body.items));
+hab13 = await readHabit("treinei", [habitItem()], { ...habitCtx, habits: [] });
+check("hábito: sem nenhum hábito no contexto, o habit volta vazio", hab13.body.items[0].habit === "" && hab13.body.items[0].name === "treinei", JSON.stringify(hab13.body.items));
+hab13 = await readHabit("treinei", [habitItem()], { today: habitCtx.today, hour: "09:10", clients: [] });
+check("hábito: contexto sem a chave habits não quebra, e o habit volta vazio", hab13.status === 200 && hab13.body.items[0].habit === "", JSON.stringify(hab13.body));
+
+/* o nome volta como foi enviado; só se aceita igual (sem maiúscula e espaço) */
+hab13 = await readHabit("treinei", [habitItem({ habit: "Treinar" }), habitItem({ habit: "  treinar  " }), habitItem({ habit: "LER 20 PÁGINAS" })]);
+check("hábito: maiúscula e espaços não impedem o acerto, e volta o nome enviado", hab13.body.items.map((x) => x.habit).join("|") === "treinar|treinar|ler 20 páginas", JSON.stringify(hab13.body.items));
+hab13 = await readHabit("li", [habitItem({ habit: "ler", name: "li" })]);
+check("hábito: começo do nome não vale no Worker (só igual)", hab13.body.items[0].habit === "" && hab13.body.items[0].name === "li", JSON.stringify(hab13.body.items));
+
+/* a data */
+hab13 = await readHabit("ontem li", [habitItem({ habit: "ler 20 páginas", name: "li", date: "2026-10-17" })]);
+check("hábito: a data dita (ontem) fica", hab13.body.items[0].date === "2026-10-17", JSON.stringify(hab13.body.items[0]));
+hab13 = await readHabit("treinei", [habitItem({ date: "ontem" })]);
+check("hábito: data inválida vira o dia de context.today", hab13.body.items[0].date === "2026-10-18", JSON.stringify(hab13.body.items[0]));
+hab13 = await readHabit("treinei", [habitItem({ date: undefined })]);
+check("hábito: sem data vira o dia de context.today", hab13.body.items[0].date === "2026-10-18", JSON.stringify(hab13.body.items[0]));
+hab13 = await readHabit("treinei", [habitItem({ date: "2026-10-1" })]);
+check("hábito: data fora do formato AAAA-MM-DD vira hoje", hab13.body.items[0].date === "2026-10-18", JSON.stringify(hab13.body.items[0]));
+
+/* sem nome nenhum, não é item */
+hab13 = await readHabit("hum", [{ kind: "habit", habit: "", name: "   ", date: "2026-10-18" }, { kind: "habit" }]);
+check("hábito: item sem name e sem habit é descartado", hab13.status === 200 && hab13.body.items.length === 0, JSON.stringify(hab13.body));
+
+/* o nome da IA é cortado, como o título das tarefas */
+hab13 = await readHabit("treinei", [habitItem({ habit: "", name: "x".repeat(300) })]);
+check("hábito: name enorme é cortado", hab13.body.items[0].name.length > 0 && hab13.body.items[0].name.length <= 120, String(hab13.body.items[0].name.length));
+
+/* a IA manda campo a mais e ele não passa */
+hab13 = await readHabit("treinei", [habitItem({ amount: 4500, title: "x", hack: "<script>", min: 30 })]);
+check("hábito: campo de outro tipo não vaza para o item", Object.keys(hab13.body.items[0]).sort().join() === "date,habit,kind,name", JSON.stringify(hab13.body.items[0]));
+
+/* uma linha com várias coisas: a ordem fica */
+hab13 = await readHabit("gastei 45 no almoço e treinei", [money(), habitItem()]);
+check("hábito: a linha com gasto e treino devolve os dois", hab13.body.items.length === 2, JSON.stringify(hab13.body.items));
+check("hábito: money e habit, nessa ordem", hab13.body.items.map((x) => x.kind).join() === "money,habit", hab13.body.items.map((x) => x.kind).join());
+check("hábito: o gasto continua limpo e o hábito leva o nome", hab13.body.items[0].amount === 4500 && hab13.body.items[0].title === "almoço" && hab13.body.items[1].habit === "treinar" && !("amount" in hab13.body.items[1]), JSON.stringify(hab13.body.items));
+hab13 = await readHabit("treinei, ligar pro João e ideia", [habitItem(), { kind: "task", title: "ligar pro João", min: 30, date: "2026-10-18" }, { kind: "note", title: "modo offline" }, habitItem({ habit: "yoga", name: "yoga" })]);
+check("hábito: hábito, tarefa, nota e outro hábito mantêm a ordem", hab13.body.items.map((x) => x.kind).join() === "habit,task,note,habit", hab13.body.items.map((x) => x.kind).join());
+check("hábito: o segundo hábito, que não existe, volta sem habit", hab13.body.items[3].habit === "" && hab13.body.items[3].name === "yoga", JSON.stringify(hab13.body.items[3]));
+check("hábito: a tarefa no meio continua como sempre", hab13.body.items[1].title === "ligar pro João" && hab13.body.items[1].date === "2026-10-18" && hab13.body.items[1].min === 30 && !("habit" in hab13.body.items[1]), JSON.stringify(hab13.body.items[1]));
+
+/* a medição: o hábito lido grava capture:habit (um por pedido) */
+check("hábito: a leitura grava capture:habit na usage", db.usage.some((x) => x.task === "capture:habit" && x.n >= 1), JSON.stringify(db.usage.map((x) => x.task)));
+
+/* a conversa: o catálogo ganha habit-mark, com os campos fechados */
+claudeAnswer = { stop_reason: "end_turn", content: [{ type: "text", text: JSON.stringify({ suggestions: [{ actionType: "habit-mark", title: "marcar treinar", note: "hoje", payload: {
+  habit: "treinar", name: "treinei", date: "2026-10-18", amount: 4500, id: "h1", hack: "<script>"
+} }], clarify: "" }) }] };
+r = await call("POST", "/merlin", { task: "assistant", context: { message: "treinei hoje" } }, cookie);
+body = await r.json();
+check("conversa: habit-mark entra no catálogo", r.status === 200 && body.suggestions.length === 1 && body.suggestions[0].actionType === "habit-mark", JSON.stringify(body));
+check("conversa: a proposta só tem habit, name e date", body.suggestions[0] && Object.keys(body.suggestions[0].payload).sort().join() === "date,habit,name" && !("hack" in body.suggestions[0].payload) && !("amount" in body.suggestions[0].payload), JSON.stringify(body.suggestions[0] && body.suggestions[0].payload));
+check("conversa: os campos guardam o que a IA propôs", body.suggestions[0] && body.suggestions[0].payload.habit === "treinar" && body.suggestions[0].payload.name === "treinei" && body.suggestions[0].payload.date === "2026-10-18", JSON.stringify(body.suggestions[0] && body.suggestions[0].payload));
+check("conversa: a instrução cita habit-mark", /habit-mark/.test(claudeAsked), String(claudeAsked).slice(0, 300));
+check("conversa: o tipo financeiro continua no catálogo", /finance-entry/.test(claudeAsked));
+
 /* ---- 13f. o teto do conselheiro ----
    a chave da Anthropic e uma so para o time. o teto e por pessoa e por hora:
    quem gastou espera, e quem esta ao lado nao paga por isso. */
@@ -860,6 +951,15 @@ await ask("capture", { text: "gastei 45 no almoço, recebi 3 mil da Ana e ligar 
 u = usageOf(meterId, "capture:money");
 check("o dinheiro lido grava capture:money, um por pedido", !!u && u.n === 1, JSON.stringify(usageRows(meterId).map((x) => x.task + "=" + x.n)));
 check("os tokens da captura com dinheiro entram na primeira linha, a do money", u && u.tokens_in === 400 && u.tokens_out === 120 && usageOf(meterId, "capture:task").n === 2 && usageOf(meterId, "capture:task").tokens_in === 300, JSON.stringify([u, usageOf(meterId, "capture:task")]));
+
+/* o hábito lido grava capture:habit, um por pedido, com os tokens do pedido */
+claudeAnswer = answerWith({ items: [
+  { kind: "habit", habit: "treinar", name: "treinei", date: "2026-10-10" },
+  { kind: "habit", habit: "", name: "yoga", date: "2026-10-10" }
+] }, { input_tokens: 250, output_tokens: 60 });
+await ask("capture", { text: "treinei e fiz yoga", today: "2026-10-10", habits: ["treinar"] }, meterCookie);
+u = usageOf(meterId, "capture:habit");
+check("o hábito lido grava capture:habit, um por pedido e não por item", !!u && u.n === 1 && u.tokens_in === 250 && u.tokens_out === 60, JSON.stringify(u));
 
 claudeAnswer = answerWith({ items: [] }, { input_tokens: 120, output_tokens: 10 });
 await ask("capture", { text: "o que falta hoje?", today: "2026-10-10" }, meterCookie);
