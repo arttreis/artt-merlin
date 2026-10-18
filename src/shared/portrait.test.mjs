@@ -445,7 +445,7 @@ const customer = (o) => ({ status: "active", createdAt: ago(200), journal: [{ id
 const bl = (id, due, text, o) => ({ id, text, due, done: false, ...o });
 
 {
-  check("as seções de leads e clientes vêm ao fim, nesta ordem", JSON.stringify(SECTIONS.slice(5).map((s) => s.id)) === JSON.stringify(["leads", "clients"]), JSON.stringify(SECTIONS.map((s) => s.id)));
+  check("as seções de leads e clientes vêm logo depois dos produtos, nesta ordem", JSON.stringify(SECTIONS.slice(5, 7).map((s) => s.id)) === JSON.stringify(["leads", "clients"]), JSON.stringify(SECTIONS.map((s) => s.id)));
   const l = SECTIONS.find((s) => s.id === "leads"), c = SECTIONS.find((s) => s.id === "clients");
   check("leads e clientes: rótulos e coleção de que dependem", !!l && !!c && l.label === "leads" && c.label === "clientes" && l.needs.includes("clients") && c.needs.includes("clients"));
   check("leads e clientes: os orçamentos, com rótulos e separador, cabem em 500", !!l && !!c && l.budget + c.budget + "leads:\n".length + "clientes:\n".length + 2 <= 500, l && c ? String(l.budget + c.budget) : "");
