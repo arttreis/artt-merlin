@@ -12,6 +12,9 @@ aponta para eles e preenche o que ficou desatualizado. Levantado do código em 0
 | [MIGRATION.md](MIGRATION.md) | HTML por string → Preact → React 19 + Vite; o **dicionário** PT→EN de nomes |
 | [server/README.md](server/README.md) | o Worker: subir do zero, segredos, rotas, segurança do login |
 | [src/shared/README.md](src/shared/README.md) | **como um módulo é feito**: esqueleto de página, `core.js`, `ui.jsx`, coleções |
+| [docs/workflow.md](docs/workflow.md) | **como o trabalho é feito**: descoberta → tickets (issues) → ondas de agentes → PR → merge |
+| [docs/arquitetura/c4.md](docs/arquitetura/c4.md) | os diagramas C4: contexto, contêineres e componentes |
+| [CLAUDE.md](CLAUDE.md) | o ponto de entrada dos agentes |
 | `server/wrangler.toml` | configuração comentada do deploy (domínio, D1, R2, `OWNER_EMAILS`) |
 
 ## Em uma frase
