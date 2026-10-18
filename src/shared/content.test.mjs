@@ -158,5 +158,200 @@ const check = (name, cond, detail) => { if (cond) passed++; else failures.push(n
   check("preencher: sem dia vazio, fica hoje", assignDays(["a"], { days: [] }, THU)[0].date === THU);
 }
 
+/* ---- o conteúdo no retrato (ticket 13): lateOf e contentToday ----
+   o que o Merlin lê do conteúdo: o que falta no ritmo, o que está atrasado e o
+   que vem nos próximos 7 dias. nada disso pode carregar o roteiro.
+   import por namespace: se uma função ainda não existe, só os testes dela
+   falham (com o motivo), e o resto do arquivo continua rodando. */
+import * as CS from "./content-script.js";
+{
+  const { lateOf, contentToday, DEFAULT_RULE, ALL_DAYS } = CS;
+  const attempt = (name, fn) => { try { fn(); } catch (e) { failures.push(name + " -> lançou: " + e.message); } };
+
+  /* 2026-10-21 é uma quarta. a semana vai de 19/10 (segunda) a 25/10 (domingo) */
+  const TODAY = "2026-10-21";
+  let seq = 0;
+  const piece = (o) => { seq++; return { id: "p" + seq, title: "peça " + seq, date: "", stage: "idea", format: "reels", client: "", script: "", createdAt: seq, ...o }; };
+  const ME_DOC = { id: ME, rules: [DEFAULT_RULE] };
+  const day = (n) => { const d = new Date(2026, 9, 21 + n); return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0"); };
+
+  /* ---- lateOf: o mesmo resultado da conta que morava na tela ---- */
+  attempt("lateOf", () => {
+    const old = (c, today) => c.date && c.date < today && c.stage !== "published";
+    const cases = [
+      { date: "", stage: "idea" },
+      { stage: "edit" },
+      { date: null, stage: "script" },
+      ...["idea", "script", "record", "edit", "scheduled", "published"].map((stage) => ({ date: "2026-10-20", stage })),
+      { date: "2026-10-21", stage: "edit" },
+      { date: "2026-10-21", stage: "published" },
+      { date: "2026-10-22", stage: "idea" },
+      { date: "2026-10-22", stage: "published" },
+      { date: "2025-12-31", stage: "record" },
+      { date: "2026-10-20" }
+    ];
+    check("lateOf existe", typeof lateOf === "function");
+    cases.forEach((c) => check("lateOf igual à conta antiga: " + JSON.stringify(c), !!lateOf(c, TODAY) === !!old(c, TODAY)));
+    check("lateOf: ontem em edição está atrasada", !!lateOf({ date: "2026-10-20", stage: "edit" }, TODAY));
+    check("lateOf: ontem publicada não está", !lateOf({ date: "2026-10-20", stage: "published" }, TODAY));
+    check("lateOf: hoje não está atrasada", !lateOf({ date: TODAY, stage: "edit" }, TODAY));
+    check("lateOf: sem data não está atrasada", !lateOf({ date: "", stage: "edit" }, TODAY));
+    check("lateOf: a virada do ano", !!lateOf({ date: "2026-12-31", stage: "idea" }, "2027-01-01") && !lateOf({ date: "2027-01-01", stage: "idea" }, "2027-01-01"));
+  });
+
+  /* ---- "falta peça esta semana?": o ritmo padrão do próprio ---- */
+  attempt("faltas do próprio", () => {
+    const r = contentToday([piece({ date: day(2) })], [ME_DOC], TODAY);
+    check("hoje: devolve gaps, rhythm, late e next7", ["gaps", "rhythm", "late", "next7"].every((k) => k in r), Object.keys(r).join());
+    check("faltas: o próprio com falta gera uma entrada", r.gaps.length === 1 && r.gaps[0].owner === ME, JSON.stringify(r.gaps));
+    check("faltas: o próprio chama 'seu conteúdo'", r.gaps[0].who === "seu conteúdo", r.gaps[0].who);
+    check("faltas: hoje sem peça e quarta, quinta, sábado e domingo", r.gaps[0].text === "hoje ainda sem peça · faltam 4 dias nesta semana", r.gaps[0].text);
+    check("faltas: há ritmo ativo", r.rhythm === true);
+  });
+
+  /* o dia que já passou vazio não vira cobrança, e hoje coberto sai da frase */
+  attempt("faltas: hoje coberto", () => {
+    const r = contentToday([piece({ date: TODAY }), piece({ date: day(2) })], [ME_DOC], TODAY);
+    check("faltas: com hoje coberto, só os dias que sobram", r.gaps.length === 1 && r.gaps[0].text === "faltam 3 dias nesta semana", JSON.stringify(r.gaps));
+  });
+
+  /* a semana toda coberta: sem falta, mas com ritmo (é o que diz "semana coberta") */
+  attempt("semana coberta", () => {
+    const pieces = [0, 1, 2, 3, 4].map((n) => piece({ date: day(n) })); // quarta a domingo
+    const r = contentToday(pieces, [ME_DOC], TODAY);
+    check("coberta: nenhuma falta", r.gaps.length === 0, JSON.stringify(r.gaps));
+    check("coberta: mas há ritmo", r.rhythm === true);
+  });
+
+  /* ---- ritmo semanal de cliente ---- */
+  attempt("ritmo semanal de cliente", () => {
+    const docs = [{ id: "c-a", rules: [{ n: 2, per: "week", format: "reels" }] }];
+    const nameOf = (id) => ({ "c-a": "Loja A" }[id] || "");
+    const pieces = [
+      piece({ date: day(1), format: "reels", client: "c-a" }),
+      piece({ date: day(2), format: "carousel", client: "c-a" }), // outro formato não conta
+      piece({ date: day(2), format: "reels", client: "" }) // peça do próprio não conta para o cliente
+    ];
+    const r = contentToday(pieces, docs, TODAY, nameOf);
+    check("semanal: o cliente com falta gera uma entrada", r.gaps.length === 1 && r.gaps[0].owner === "c-a", JSON.stringify(r.gaps));
+    check("semanal: 'Loja A: falta 1 reels'", r.gaps[0].who + ": " + r.gaps[0].text === "Loja A: falta 1 reels nesta semana", r.gaps[0].who + ": " + r.gaps[0].text);
+    check("semanal: sem documento do próprio, o próprio não gera falta", !r.gaps.some((g) => g.owner === ME));
+    check("semanal: há ritmo ativo", r.rhythm === true);
+    const full = contentToday([...pieces, piece({ date: day(3), format: "reels", client: "c-a" })], docs, TODAY, nameOf);
+    check("semanal: com as 2 peças, não falta", full.gaps.length === 0 && full.rhythm === true, JSON.stringify(full.gaps));
+    const noName = contentToday(pieces, docs, TODAY);
+    check("semanal: sem nameOf, o nome é o id", noName.gaps.length === 1 && noName.gaps[0].who === "c-a", JSON.stringify(noName.gaps));
+  });
+
+  /* ---- vários donos e várias regras ---- */
+  attempt("vários donos", () => {
+    const docs = [
+      { id: "c-a", rules: [{ n: 1, per: "week", format: "" }] },
+      ME_DOC
+    ];
+    const r = contentToday([], docs, TODAY, (id) => (id === "c-a" ? "Loja A" : ""));
+    check("donos: o próprio vem primeiro, mesmo depois na lista", r.gaps.length === 2 && r.gaps[0].owner === ME && r.gaps[1].owner === "c-a", JSON.stringify(r.gaps.map((g) => g.owner)));
+    check("donos: o cliente semanal sem formato fala 'peça'", r.gaps[1].text === "falta 1 peça nesta semana", r.gaps[1].text);
+
+    const two = contentToday([], [{ id: ME, rules: [DEFAULT_RULE, { n: 2, per: "week", format: "reels", days: ALL_DAYS }] }], TODAY);
+    check("donos: as faltas do mesmo dono vêm numa entrada só, separadas por ' · '",
+      two.gaps.length === 1 && two.gaps[0].text === "hoje ainda sem peça · faltam 5 dias nesta semana · faltam 2 reels nesta semana", JSON.stringify(two.gaps));
+  });
+
+  /* ---- sem ritmo, sem falta ---- */
+  attempt("sem ritmo", () => {
+    const pieces = [piece({ date: day(1) })];
+    const none = contentToday(pieces, [], TODAY);
+    check("sem documento nenhum: nenhuma falta, nem a do próprio", none.gaps.length === 0, JSON.stringify(none.gaps));
+    check("sem documento nenhum: sem ritmo", none.rhythm === false);
+    const off = contentToday(pieces, [{ id: ME, rules: [] }], TODAY);
+    check("próprio com a lista vazia: nenhuma falta", off.gaps.length === 0, JSON.stringify(off.gaps));
+    check("próprio com a lista vazia: sem ritmo", off.rhythm === false);
+    const zero = contentToday(pieces, [{ id: ME, rules: [{ n: 0, per: "day" }] }], TODAY);
+    check("regra com n zero: sem falta e sem ritmo", zero.gaps.length === 0 && zero.rhythm === false, JSON.stringify(zero));
+    const noName = contentToday([], [{ id: "c-x", rules: [{ n: 1, per: "week" }] }], TODAY, () => "");
+    check("cliente sem nome é pulado", noName.gaps.length === 0, JSON.stringify(noName.gaps));
+    const noPieces = contentToday([], [ME_DOC], TODAY);
+    check("sem nenhuma peça: nada atrasado, nada nos próximos 7, a semana inteira por cobrir", noPieces.late.length === 0 && noPieces.next7.length === 0 && noPieces.gaps.length === 1);
+  });
+
+  /* ---- atrasadas ---- */
+  attempt("atrasadas", () => {
+    const late = piece({ title: "ontem em edição", date: day(-1), stage: "edit", format: "reels", client: "c-a" });
+    const done = piece({ title: "ontem publicada", date: day(-1), stage: "published" });
+    const r = contentToday([late, done], [], TODAY);
+    check("atrasada: ontem em edição está em late", r.late.length === 1 && r.late[0].id === late.id, JSON.stringify(r.late));
+    check("atrasada: a mesma publicada não está", !r.late.some((x) => x.id === done.id));
+    check("atrasada: traz id, título, data, etapa e formato em rótulo, e o cliente",
+      JSON.stringify(r.late[0]) === JSON.stringify({ id: late.id, title: "ontem em edição", date: day(-1), stage: "editar", format: "Reels", client: "c-a" }), JSON.stringify(r.late[0]));
+
+    const many = [
+      piece({ title: "c", date: day(-1) }), piece({ title: "a", date: day(-9) }), piece({ title: "b", date: day(-4) }),
+      piece({ title: "hoje", date: TODAY }), piece({ title: "sem data" }), piece({ title: "futura", date: day(3) })
+    ];
+    const o = contentToday(many, [], TODAY);
+    check("atrasadas: ordenadas pela data, as mais velhas primeiro", o.late.map((x) => x.title).join() === "a,b,c", o.late.map((x) => x.title).join());
+    check("atrasadas: hoje, sem data e futuro não entram", o.late.length === 3);
+    for (const [stage, label] of [["idea", "ideia"], ["script", "roteiro"], ["record", "gravar"], ["edit", "editar"], ["scheduled", "agendado"]]) {
+      const x = contentToday([piece({ date: day(-1), stage })], [], TODAY).late[0];
+      check("atrasada: a etapa " + stage + " vira '" + label + "'", !!x && x.stage === label, JSON.stringify(x));
+    }
+    check("atrasada: o formato carrossel vira o rótulo", contentToday([piece({ date: day(-1), format: "carousel" })], [], TODAY).late[0].format === "carrossel");
+  });
+
+  /* ---- próximos 7 dias ---- */
+  attempt("próximos 7 dias", () => {
+    const soon = piece({ title: "daqui a 2", date: day(2), stage: "script", format: "carousel", client: "c-a" });
+    const far = piece({ title: "daqui a 9", date: day(9) });
+    const r = contentToday([far, soon], [], TODAY);
+    check("próximos 7: só a de daqui a 2 entra", r.next7.length === 1 && r.next7[0].id === soon.id, JSON.stringify(r.next7));
+    check("próximos 7: traz a etapa em rótulo, o formato em rótulo e o cliente",
+      JSON.stringify(r.next7[0]) === JSON.stringify({ id: soon.id, title: "daqui a 2", date: day(2), stage: "roteiro", format: "carrossel", client: "c-a" }), JSON.stringify(r.next7[0]));
+
+    const edge = [
+      piece({ title: "hoje", date: day(0), stage: "edit" }),
+      piece({ title: "mais 7", date: day(7) }),
+      piece({ title: "mais 8", date: day(8) }),
+      piece({ title: "ontem", date: day(-1) }),
+      piece({ title: "sem data" }),
+      piece({ title: "hoje publicada", date: day(0), stage: "published" }),
+      piece({ title: "mais 3 publicada", date: day(3), stage: "published" }),
+      piece({ title: "mais 5", date: day(5), stage: "scheduled" })
+    ];
+    const e = contentToday(edge, [], TODAY);
+    check("próximos 7: de hoje até hoje+7, inclusive, só as não publicadas, por data", e.next7.map((x) => x.title).join() === "hoje,mais 5,mais 7", e.next7.map((x) => x.title).join());
+    check("próximos 7: a etapa de hoje em edição é 'editar'", e.next7[0].stage === "editar" && e.next7[1].stage === "agendado", JSON.stringify(e.next7));
+    check("próximos 7: o atrasado não entra aqui", !e.next7.some((x) => x.title === "ontem") && e.late.some((x) => x.title === "ontem"));
+    check("próximos 7: a virada do mês", contentToday([piece({ date: "2026-11-02" })], [], "2026-10-28").next7.length === 1 && contentToday([piece({ date: "2026-11-06" })], [], "2026-10-28").next7.length === 0);
+  });
+
+  /* ---- o roteiro nunca sai daqui ---- */
+  attempt("roteiro", () => {
+    const secret = "ROTEIRO-SECRETO-XYZ";
+    const script = "# t\n## gancho\n- " + secret;
+    const pieces = [
+      piece({ title: "atrasada", date: day(-2), stage: "script", script }),
+      piece({ title: "da semana", date: day(2), stage: "record", script }),
+      piece({ title: "da Loja", date: day(1), client: "c-a", script })
+    ];
+    const r = contentToday(pieces, [ME_DOC, { id: "c-a", rules: [{ n: 1, per: "day" }] }], TODAY, () => "Loja A");
+    check("roteiro: a atrasada e a da semana vieram", r.late.length === 1 && r.next7.length === 2);
+    check("roteiro: nenhum campo carrega o roteiro", ![...r.late, ...r.next7].some((x) => "script" in x), JSON.stringify(r.next7[0]));
+    check("roteiro: o texto do roteiro não aparece em lugar nenhum do resultado", !JSON.stringify(r).includes(secret));
+    check("roteiro: só os campos combinados", [...r.late, ...r.next7].every((x) => Object.keys(x).sort().join() === "client,date,format,id,stage,title"), JSON.stringify(Object.keys(r.next7[0])));
+  });
+
+  /* ---- a peça do cliente não cobre o próprio, e a conta não mexe no que recebe ---- */
+  attempt("isolamento", () => {
+    const pieces = [piece({ date: TODAY, client: "c-a" }), piece({ date: day(1), client: "c-a" })];
+    const docs = [ME_DOC];
+    const before = JSON.stringify([pieces, docs]);
+    const r = contentToday(pieces, docs, TODAY);
+    check("isolamento: a peça de cliente não cobre o conteúdo próprio", r.gaps.length === 1 && r.gaps[0].text === "hoje ainda sem peça · faltam 5 dias nesta semana", JSON.stringify(r.gaps));
+    check("isolamento: as peças de cliente aparecem nos próximos 7", r.next7.length === 2);
+    check("contentToday não altera o que recebe", JSON.stringify([pieces, docs]) === before);
+  });
+}
+
 console.log("\n" + passed + " passaram, " + failures.length + " falharam");
 if (failures.length) { console.log("\nFALHAS:"); failures.forEach((f) => console.log("  - " + f)); process.exit(1); }

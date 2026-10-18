@@ -10,6 +10,7 @@ import { cloud, readPrefs } from "./core.js";
 import { useCollection } from "./ui.jsx";
 import { normalize as normalizeTask } from "./tasks.js";
 import { normalize as normalizeBlock } from "./routine.js";
+import { normalizeCadence } from "./content-script.js";
 import { portraitOf, portraitData, waitPortrait } from "./portrait.js";
 
 export function usePortrait() {
@@ -20,6 +21,8 @@ export function usePortrait() {
     apps: useCollection("apps"),
     closes: useCollection("closes"),
     clients: useCollection("clients"),
+    content: useCollection("content"),
+    cadence: useCollection("cadence", { normalize: normalizeCadence }),
     profile: useCollection("profile")
   };
   return async () => {
