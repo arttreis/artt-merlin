@@ -65,13 +65,13 @@ html.onboarding .page--chat{padding-bottom:0}
 .chat__body li.chk.is-done{color:var(--ink-30);text-decoration:line-through}
 
 /* ---------- a chegada ----------
-   so enquanto a conversa esta vazia: a faisca, a pergunta e os tres comecos */
+   só enquanto a conversa está vazia: o chapéu, a pergunta e os começos. o
+   halo é do roxo do Merlin, não do destaque: ele é alguém, não um botão */
 .chat__welcome{margin:auto 0;display:flex;flex-direction:column;align-items:center;text-align:center}
 .chat__mark{
-  width:56px;height:56px;display:grid;place-items:center;border-radius:50%;
-  color:var(--accent-ink);background:radial-gradient(circle at 50% 42%,var(--accent-glow),transparent 70%);
+  display:block;width:88px;height:88px;
+  background:radial-gradient(circle at 50% 64%,color-mix(in oklab,var(--merlin) 20%,transparent),transparent 64%);
 }
-.chat__mark svg{width:28px;height:28px}
 .chat__welcome h1{margin:var(--pd2) 0 0;font-size:clamp(22px,3vw,30px);font-weight:600;letter-spacing:-.03em;line-height:1.1}
 .chat__welcome > p{margin:8px 0 0;font-size:13px;color:var(--ink-50)}
 
@@ -129,6 +129,8 @@ html.onboarding .page--chat{padding-bottom:0}
 }
 .chat__composer:focus-within{border-color:var(--ink-30)}
 .chat__row{display:flex;align-items:center;gap:var(--pd2)}
+/* durante a conversa o chapéu mora no campo, ao lado do que se escreve */
+.chat__face{display:block;flex:none;width:34px;height:34px;margin-left:2px}
 .chat__field{
   flex:1 1 auto;min-width:0;height:36px;padding:0 8px;
   border:0;background:transparent;color:var(--ink);font:inherit;font-size:14px;

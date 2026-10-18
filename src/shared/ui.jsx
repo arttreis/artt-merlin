@@ -31,6 +31,7 @@ import { ACTION_COLLECTIONS, ACTION_LABELS, ACTION_FIELDS, buildDoc, previewOf }
 /* o Ctrl+K cria tarefa de hoje com a mesma regra e a mesma forma do dia */
 import { tasks, newTask, topOrder, routeLine } from "./tasks.js";
 import { BUILD, buildIntent } from "./build-intent.js";
+import { createHat } from "./hat.js";
 
 /* o CSS entra pela pagina, nao por aqui: base.css ja puxa o shell.css na
    ordem certa, e o dia carrega so o shell. */
@@ -394,6 +395,24 @@ export function ChannelThumb({ labels }) {
       {labels.length > 4 && <i>+{labels.length - 4}</i>}
     </span>
   );
+}
+
+/* ---------- o Merlin em pessoa ----------
+   o chapéu de shared/hat.js. o desenho é imperativo por dentro e o React
+   nunca toca nos filhos do svg: daqui só vão o humor e para onde olhar. o
+   chapéu não fala, então para o leitor de tela ele é enfeite; o que o
+   Merlin está fazendo continua escrito na tela. */
+export function Hat({ mood = "idle", look = null, tight = false, className = "" }) {
+  const ref = useRef(null);
+  const hat = useRef(null);
+  useEffect(() => {
+    hat.current = createHat(ref.current, { mood, tight });
+    return () => hat.current.destroy();
+  }, [tight]);
+  useEffect(() => { hat.current.set(mood); }, [mood]);
+  const [lx, ly] = look || [];
+  useEffect(() => { hat.current.look(look ? lx : null, ly); }, [lx, ly]);
+  return <svg ref={ref} className={"hat" + (className ? " " + className : "")} aria-hidden="true" focusable="false" />;
 }
 
 /* ---------- compartilhar um mapa ou um funil ----------
