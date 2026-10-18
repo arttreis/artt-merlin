@@ -20,7 +20,7 @@ import { useState, useEffect, useRef } from "react";
 import { mount, useCollection, useHash, setHash, Markdown, ProposalDialog, Hat, icon } from "./shared/ui.jsx";
 import { chatMood } from "./shared/hat.js";
 import { NAV_ICONS } from "./shared/icons.jsx";
-import { MAX_TURNS, normalizeChat, chatTitle, turnsOf } from "./shared/assistant-actions.js";
+import { MAX_TURNS, normalizeChat, chatTitle, turnsOf, markProposal } from "./shared/assistant-actions.js";
 import { BUILD, buildIntent, answersText, draftView, docFromDraft } from "./shared/build.js";
 /* o resumo do financeiro, pra esta tela responder "posso gastar x?" sem
    obrigar a pessoa a abrir o financeiro antes */
@@ -165,7 +165,7 @@ function Assistant() {
   const [startKey, setStartKey] = useState("");
   const [thinking, setThinking] = useState(false); // false | um dos WAIT
   const [feeling, setFeeling] = useState(null);
-  const [proposal, setProposal] = useState(null);
+  const [proposal, setProposal] = useState(null); // { p, at, chat }: a pílula aberta na caixa
   const [historyOpen, setHistoryOpen] = useState(false);
   /* o x do selo de montagem: a conversa segue normal, e o rascunho fica lá */
   const [flowOn, setFlowOn] = useState(true);
@@ -209,6 +209,18 @@ function Assistant() {
       createdAt: before ? before.createdAt : now,
       updatedAt: now
     });
+  };
+
+  /* a pílula confirmada vira a linha "✓ lançado · …", gravada na conversa, e o
+     chapéu comemora; o desfazer a devolve. a conversa pode já ser outra quando
+     o desfazer chega */
+  const messagesNow = useRef(messages);
+  messagesNow.current = messages;
+  const markDone = (at, chat, line) => {
+    if (line) feel("done");
+    if (idRef.current === chat) { keep(markProposal(messagesNow.current, at, line)); return; }
+    const doc = chats.get(chat);
+    if (doc) chats.save({ ...doc, messages: markProposal(doc.messages, at, line), updatedAt: Date.now() });
   };
 
   /* ---------- montar com o Merlin ---------- */
@@ -408,7 +420,9 @@ function Assistant() {
                       : m.built
                       ? <p>criei o {BUILD[m.built.kind].label} <a href={BUILD[m.built.kind].href + m.built.id}>{m.built.name}</a></p>
                       : m.proposal
-                      ? <button className="pill pill--accent" type="button" onClick={() => setProposal(m.proposal)}>{icon("spark")}{m.proposal.title}</button>
+                      ? m.proposal.done
+                        ? <p className="chat__done">✓ {m.proposal.done.line}</p>
+                        : <button className="pill pill--accent" type="button" onClick={() => setProposal({ p: m.proposal, at: i, chat: idRef.current })}>{icon("spark")}{m.proposal.title}</button>
                       : m.from === "me"
                         /* o que a pessoa escreveu sai como ela escreveu; o que o
                            Merlin responde vem em markdown e é lido como markdown —
@@ -473,7 +487,8 @@ function Assistant() {
         <button type="button" className="chat__icon chat__narrow chat__open-history" title="conversas"
                 aria-label="Conversas" onClick={() => setHistoryOpen(true)}>{icon("chat")}</button>
       </div>
-      {proposal && <ProposalDialog proposal={proposal} onClose={() => setProposal(null)} />}
+      {proposal && <ProposalDialog proposal={proposal.p} chat={proposal.chat} onClose={() => setProposal(null)}
+                                   onDone={(line) => markDone(proposal.at, proposal.chat, line)} />}
     </>
   );
 }

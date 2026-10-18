@@ -576,6 +576,97 @@ check("assistente responde ao pedido de fechar o dia", r.status === 200 && body.
 check("a instrução manda escrever \"fechar o dia\" no campo do início", claudeMessages.at(-1).content.includes('é só escrever "fechar o dia" no campo do início'));
 check("a instrução também aponta \"revisar a semana\"", claudeMessages.at(-1).content.includes("revisar a semana"));
 
+/* ---- 13e-ter. o registro de dinheiro ----
+   a leitura do inicio e a conversa passam a aceitar lancamento. o que o Worker
+   garante aqui e o que a IA nao pode decidir sozinha: a categoria so existe se
+   foi enviada, o id de previsto e de fixo so vale se estava no contexto, o
+   valor e inteiro e limitado, e "pago" vem da data — nunca do que a IA disse. */
+const moneyCtx = {
+  today: "2026-10-17 (sábado)", hour: "14:20", clients: [],
+  categories: ["Básicas/PF", "Lazer", "Freela"],
+  planned: [{ id: "p1", name: "aluguel", amount: 150000, day: "2026-10-15" }],
+  fixed: [{ id: "f1", name: "internet", amount: 12000, day: 20 }]
+};
+const money = (over) => ({ kind: "money", title: "almoço", amount: 4500, flow: "out", category: "Lazer", date: "2026-10-17", paid: true, confirm: "", fixed: "", ...over });
+const readLine = async (text, items) => {
+  claudeAnswer = { stop_reason: "end_turn", content: [{ type: "text", text: JSON.stringify({ items }) }] };
+  const res = await call("POST", "/merlin", { task: "capture", context: { ...moneyCtx, text } }, cookie);
+  return { status: res.status, body: await res.json() };
+};
+
+let money13 = await readLine("gastei 45 no almoço", [money()]);
+check("dinheiro: a leitura devolve o gasto", money13.status === 200 && money13.body.items.length === 1, JSON.stringify(money13.body));
+check("dinheiro: o gasto volta como money, saída, 4500, pago", money13.body.items[0].kind === "money" && money13.body.items[0].flow === "out" && money13.body.items[0].amount === 4500 && money13.body.items[0].paid === true, JSON.stringify(money13.body.items[0]));
+check("dinheiro: o gasto volta com título, categoria e data", money13.body.items[0].title === "almoço" && money13.body.items[0].category === "Lazer" && money13.body.items[0].date === "2026-10-17", JSON.stringify(money13.body.items[0]));
+check("dinheiro: a leitura manda as categorias, os previstos e os fixos", /Lazer/.test(claudeAsked) && /aluguel/.test(claudeAsked) && /internet/.test(claudeAsked) && /p1/.test(claudeAsked) && /f1/.test(claudeAsked), String(claudeAsked).slice(0, 400));
+
+/* paid vem da data: a IA diz "pago" para o que e de depois de hoje, e o Worker nao deixa */
+money13 = await readLine("dentista dia 25, 300", [money({ title: "dentista", amount: 30000, date: "2026-10-25", paid: true })]);
+check("dinheiro: data depois de hoje volta como previsto, mesmo com paid true", money13.body.items[0].paid === false && money13.body.items[0].date === "2026-10-25", JSON.stringify(money13.body.items[0]));
+money13 = await readLine("paguei a luz ontem", [money({ title: "luz", date: "2026-10-16", paid: false })]);
+check("dinheiro: data passada volta como pago, mesmo com paid false", money13.body.items[0].paid === true, JSON.stringify(money13.body.items[0]));
+money13 = await readLine("paguei a luz", [money({ title: "luz", date: "2026-10-17", paid: false })]);
+check("dinheiro: hoje volta como pago", money13.body.items[0].paid === true, JSON.stringify(money13.body.items[0]));
+money13 = await readLine("paguei a luz", [money({ title: "luz", date: "ontem", paid: true })]);
+check("dinheiro: data inválida vira hoje", money13.body.items[0].date === "2026-10-17" && money13.body.items[0].paid === true, JSON.stringify(money13.body.items[0]));
+
+/* confirm e fixed so valem se o id foi enviado no contexto */
+money13 = await readLine("paguei o aluguel", [money({ title: "aluguel", amount: 0, confirm: "inventado" })]);
+check("dinheiro: confirm com id que não foi enviado volta vazio", money13.body.items[0].confirm === "", JSON.stringify(money13.body.items[0]));
+money13 = await readLine("paguei o aluguel", [money({ title: "aluguel", amount: 0, confirm: "p1" })]);
+check("dinheiro: confirm com id de um previsto enviado fica", money13.body.items[0].confirm === "p1" && money13.body.items[0].amount === 0, JSON.stringify(money13.body.items[0]));
+money13 = await readLine("paguei a internet", [money({ title: "internet", fixed: "inventado" })]);
+check("dinheiro: fixed com id que não foi enviado volta vazio", money13.body.items[0].fixed === "", JSON.stringify(money13.body.items[0]));
+money13 = await readLine("paguei a internet", [money({ title: "internet", amount: 0, fixed: "f1" })]);
+check("dinheiro: fixed com id de um fixo enviado fica", money13.body.items[0].fixed === "f1", JSON.stringify(money13.body.items[0]));
+money13 = await readLine("paguei o aluguel", [money({ title: "aluguel", confirm: "f1", fixed: "p1" })]);
+check("dinheiro: id de fixo não vale como confirm, nem o de previsto como fixed", money13.body.items[0].confirm === "" && money13.body.items[0].fixed === "", JSON.stringify(money13.body.items[0]));
+
+/* o valor: inteiro, entre 0 e 100.000.000 */
+money13 = await readLine("gastei uns trocados", [money({ amount: -10 }), money({ amount: "abc" }), money({ amount: null }), money({ amount: 4550.6 }), money({ amount: 99999999999 })]);
+check("dinheiro: valor negativo volta 0", money13.body.items[0].amount === 0, JSON.stringify(money13.body.items[0]));
+check("dinheiro: valor em texto volta 0", money13.body.items[1].amount === 0, JSON.stringify(money13.body.items[1]));
+check("dinheiro: valor ausente volta 0", money13.body.items[2].amount === 0, JSON.stringify(money13.body.items[2]));
+check("dinheiro: valor quebrado volta inteiro", Number.isInteger(money13.body.items[3].amount) && Math.abs(money13.body.items[3].amount - 4550.6) <= 1, JSON.stringify(money13.body.items[3]));
+check("dinheiro: valor enorme não passa de 100.000.000", money13.body.items[4].amount >= 0 && money13.body.items[4].amount <= 100000000, JSON.stringify(money13.body.items[4]));
+
+/* categoria e entrada/saida */
+money13 = await readLine("gastei 80 na feira", [money({ category: "Mercado" }), money({ category: "Lazer" })]);
+check("dinheiro: categoria que não foi enviada volta vazia", money13.body.items[0].category === "", JSON.stringify(money13.body.items[0]));
+check("dinheiro: categoria enviada fica", money13.body.items[1].category === "Lazer", JSON.stringify(money13.body.items[1]));
+money13 = await readLine("transferi pra Ana", [money({ flow: "transfer" }), money({ flow: "in" }), money({ flow: undefined })]);
+check("dinheiro: entrada ou saída fora de in e out vira saída", money13.body.items[0].flow === "out" && money13.body.items[2].flow === "out", JSON.stringify(money13.body.items));
+check("dinheiro: a entrada continua entrada", money13.body.items[1].flow === "in", JSON.stringify(money13.body.items[1]));
+
+/* uma linha com varias coisas: a ordem do que a pessoa escreveu fica */
+money13 = await readLine("gastei 45 no almoço, recebi 3 mil da Ana e ligar pro João amanhã", [
+  money(),
+  money({ title: "Ana", amount: 300000, flow: "in", category: "Freela" }),
+  { kind: "task", title: "ligar pro João", min: 30, guess: true, date: "2026-10-18", at: "", client: "" }
+]);
+check("dinheiro: a linha com três coisas devolve três itens", money13.body.items.length === 3, JSON.stringify(money13.body.items));
+check("dinheiro: dois money e uma task, nessa ordem", money13.body.items.map((x) => x.kind).join() === "money,money,task", money13.body.items.map((x) => x.kind).join());
+check("dinheiro: o segundo é a entrada de 3 mil", money13.body.items[1].flow === "in" && money13.body.items[1].amount === 300000 && money13.body.items[1].title === "Ana", JSON.stringify(money13.body.items[1]));
+check("dinheiro: a tarefa continua limpa como sempre", money13.body.items[2].title === "ligar pro João" && money13.body.items[2].date === "2026-10-18" && money13.body.items[2].min === 30, JSON.stringify(money13.body.items[2]));
+check("dinheiro: a tarefa não leva campos de dinheiro", !("amount" in money13.body.items[2]) && !("flow" in money13.body.items[2]), JSON.stringify(money13.body.items[2]));
+money13 = await readLine("ideia, gastei 10 e talvez fazer x", [
+  { kind: "note", title: "modo offline", min: 40 }, money({ amount: 1000 }), { kind: "task", title: "fazer x", min: 15, date: "2026-10-17" }
+]);
+check("dinheiro: note, money e task misturados mantêm a ordem", money13.body.items.map((x) => x.kind).join() === "note,money,task", money13.body.items.map((x) => x.kind).join());
+money13 = await readLine("gastei", [{ kind: "money", title: "   ", amount: 100 }]);
+check("dinheiro: item sem título é descartado, como as tarefas", money13.status === 200 && money13.body.items.length === 0, JSON.stringify(money13.body));
+
+/* a conversa: o catalogo ganha finance-entry, com os campos fechados */
+claudeAnswer = { stop_reason: "end_turn", content: [{ type: "text", text: JSON.stringify({ suggestions: [{ actionType: "finance-entry", title: "gasto de R$ 45,00", note: "no almoço", payload: {
+  name: "almoço", amount: 4500, kind: "out", day: "2026-10-17", category: "Lazer", paid: true, confirm: "p1", fixed: "f1", hack: "<script>"
+} }], clarify: "" }) }] };
+r = await call("POST", "/merlin", { task: "assistant", context: { message: "gastei 45 no almoço" } }, cookie);
+body = await r.json();
+check("conversa: finance-entry entra no catálogo", r.status === 200 && body.suggestions.length === 1 && body.suggestions[0].actionType === "finance-entry", JSON.stringify(body));
+check("conversa: a proposta só tem os oito campos do catálogo", body.suggestions[0] && Object.keys(body.suggestions[0].payload).sort().join() === "amount,category,confirm,day,fixed,kind,name,paid" && !("hack" in body.suggestions[0].payload), JSON.stringify(body.suggestions[0] && body.suggestions[0].payload));
+check("conversa: os campos guardam o que a IA propôs", body.suggestions[0] && body.suggestions[0].payload.amount === 4500 && body.suggestions[0].payload.name === "almoço", JSON.stringify(body.suggestions[0] && body.suggestions[0].payload));
+check("conversa: a instrução ensina o tipo novo", /finance-entry/.test(claudeAsked), String(claudeAsked).slice(0, 300));
+
 /* ---- 13f. o teto do conselheiro ----
    a chave da Anthropic e uma so para o time. o teto e por pessoa e por hora:
    quem gastou espera, e quem esta ao lado nao paga por isso. */
@@ -704,6 +795,18 @@ u = usageOf(meterId, "capture:task");
 const un = usageOf(meterId, "capture:note");
 check("a captura grava um por tipo devolvido, nao por item", !!u && u.n === 1 && !!un && un.n === 1, JSON.stringify([u, un]));
 check("os tokens da captura entram uma vez so, na primeira linha", u.tokens_in === 300 && u.tokens_out === 90 && un.tokens_in === 0 && un.tokens_out === 0, JSON.stringify([u, un]));
+
+/* o dinheiro lido no início conta como capture:money (D7): é o que mostra, na
+   usage, quantos lançamentos a leitura propôs */
+claudeAnswer = answerWith({ items: [
+  { kind: "money", title: "almoço", amount: 4500, flow: "out", date: "2026-10-10" },
+  { kind: "money", title: "Ana", amount: 300000, flow: "in", date: "2026-10-10" },
+  { kind: "task", title: "ligar pro Joao", min: 30, date: "2026-10-11" }
+] }, { input_tokens: 400, output_tokens: 120 });
+await ask("capture", { text: "gastei 45 no almoço, recebi 3 mil da Ana e ligar pro Joao amanhã", today: "2026-10-10" }, meterCookie);
+u = usageOf(meterId, "capture:money");
+check("o dinheiro lido grava capture:money, um por pedido", !!u && u.n === 1, JSON.stringify(usageRows(meterId).map((x) => x.task + "=" + x.n)));
+check("os tokens da captura com dinheiro entram na primeira linha, a do money", u && u.tokens_in === 400 && u.tokens_out === 120 && usageOf(meterId, "capture:task").n === 2 && usageOf(meterId, "capture:task").tokens_in === 300, JSON.stringify([u, usageOf(meterId, "capture:task")]));
 
 claudeAnswer = answerWith({ items: [] }, { input_tokens: 120, output_tokens: 10 });
 await ask("capture", { text: "o que falta hoje?", today: "2026-10-10" }, meterCookie);
