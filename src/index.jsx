@@ -460,7 +460,7 @@ function Composer({ tasks, b, smart, onAsk, onIntent, readContext }) {
     {/* fora do <form> do campo: a caixa é outro formulário */}
     {draft && boxed >= 0 && draft.items[boxed] && (
       <ProposalDialog proposal={moneyProposal(draft.items[boxed])} onClose={() => setBoxed(-1)}
-                      onDone={(line) => { if (line) drop(boxed); }} />
+                      onDone={(line) => { if (line) { if (draft.items.length === 1) clear(); else drop(boxed); } }} />
     )}
     </>
   );
