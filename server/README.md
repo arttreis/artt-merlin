@@ -82,6 +82,23 @@ por hora, contado na tabela `advice` em três cotas separadas (`QUOTA`, no worke
 
 Quem estourar espera; quem está ao lado não paga por isso.
 
+Toda pergunta ao assistente (a tarefa `assistant`) leva junto o **retrato**: um resumo do
+dia, da agenda dos próximos 7 dias, da rotina, da semana e dos produtos, montado no
+navegador (`src/shared/portrait.js`) e mandado em `context.portrait`. O Worker corta o
+retrato em 6.000 caracteres (o `pageContext` continua com 1.200), descarta-o em qualquer
+outra tarefa e não lê documento nenhum para montá-lo. A resposta traz `sources`, filtrado
+por uma lista fechada, e o tamanho do retrato que foi (o já cortado) entra no
+`portrait=` da linha de medição de cada pedido, no `wrangler tail` (ver "A medição", abaixo).
+
+O retrato tem um interruptor, um quarto segredo, opcional:
+
+```bash
+npx wrangler secret put MERLIN_PORTRAIT_OFF     # qualquer valor: desliga o retrato para todos
+npx wrangler secret delete MERLIN_PORTRAIT_OFF  # liga de novo
+```
+
+Desliga sem build: o Worker descarta o retrato antes de montar o pedido à Anthropic.
+
 O `SESSION_SECRET` assina os cookies de sessão. Gere um forte e guarde:
 
 ```bash

@@ -25,6 +25,10 @@ import { BUILD, buildIntent, answersText, draftView, docFromDraft } from "./shar
 /* o resumo do financeiro, pra esta tela responder "posso gastar x?" sem
    obrigar a pessoa a abrir o financeiro antes */
 import { financeBrief } from "./shared/finance-data.js";
+/* o retrato vai em toda pergunta: é ele que faz "continuar na conversa"
+   chegar sabendo o dia, e "o que tenho quinta?" ter resposta */
+import { usePortrait } from "./shared/use-portrait.js";
+import { sourcesLine } from "./shared/portrait.js";
 
 initPage("assistant");
 
@@ -159,6 +163,7 @@ function DraftCard({ draft, live, onCreate }) {
 
 function Assistant() {
   const chats = useCollection("chats", { normalize: normalizeChat });
+  const portrait = usePortrait();
   const hash = useHash();
   const [messages, setMessages] = useState([]); // { from: "me"|"merlin", text } | { from: "merlin", proposal }
   const [input, setInput] = useState("");
@@ -301,21 +306,26 @@ function Assistant() {
     setThinking(WAIT.ask);
     try {
       /* o contexto: o da tela de onde a pergunta veio, quando veio de alguma;
-         e o resumo do financeiro quando o pedido é de simulação */
+         e o resumo do financeiro quando o pedido é de simulação. o retrato
+         vai sempre, à parte */
       const from = fromRef.current;
+      const seen = await portrait();
       const r = await api("/merlin", { method: "POST", body: JSON.stringify({
         task: "assistant",
         context: {
           message: (said && said.prefix ? said.prefix : "") + message,
           page: (from && from.page) || getCurrentPage(),
           pageContext: (from && from.pageContext) || (said && said.key === "finance" ? financeBrief() : ""),
+          portrait: seen,
           history: turnsOf(messages)
         }
       }) });
       if (r.ok) {
         const s = (r.body.suggestions || [])[0];
         if (s) { answer({ from: "merlin", proposal: s }); feel("done"); }
-        else if (r.body.clarify) { answer({ from: "merlin", text: r.body.clarify }); feel("talking"); }
+        /* a resposta diz de onde tirou ("vi a agenda"): só a que respondeu de
+           fato; o "não entendi" não viu nada */
+        else if (r.body.clarify) { answer({ from: "merlin", text: r.body.clarify, sources: r.body.sources || [] }); feel("talking"); }
         else { answer({ from: "merlin", text: "não entendi bem — pode dizer de outro jeito?" }); feel("confused"); }
       } else if (r.status === 401) {
         answer({ from: "merlin", text: "entre para usar o Merlin" });
@@ -428,7 +438,10 @@ function Assistant() {
                            Merlin responde vem em markdown e é lido como markdown —
                            lista dele e título dele viravam asterisco e cerquilha na tela */
                         ? <p>{m.text}</p>
-                        : <Markdown className="chat__body" text={m.text} />}
+                        : <>
+                            <Markdown className="chat__body" text={m.text} />
+                            {sourcesLine(m.sources) && <p className="chat__seen">{sourcesLine(m.sources)}</p>}
+                          </>}
                   </div>
                 ))}
             {thinking && <div className="chat__msg"><p className="weak">{thinking.text}</p></div>}

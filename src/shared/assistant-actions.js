@@ -9,6 +9,7 @@ import { newId, today } from "./core.js";
 import { journalEntry } from "./client-doc.js";
 import { layoutNodes } from "./funnel-layout.js";
 import { newEntry, entryLine, paidOf, configOf, contextOf } from "./finance-data.js";
+import { SOURCES } from "./portrait.js";
 
 export const ACTION_COLLECTIONS = {
   task: "tasks",
@@ -223,9 +224,15 @@ export function normalizeChat(d) {
     const built = m && normalizeBuildMsg(m);
     if (built) return built;
     const proposal = normalizeProposal(m && m.proposal);
-    return proposal
-      ? { from: "merlin", proposal }
-      : { from: m && m.from === "me" ? "me" : "merlin", text: String((m && m.text) || "").slice(0, 4000) };
+    if (proposal) return { from: "merlin", proposal };
+    if (m && m.from === "me") return { from: "me", text: String(m.text || "").slice(0, 4000) };
+    const msg = { from: "merlin", text: String((m && m.text) || "").slice(0, 4000) };
+    /* de onde a resposta saiu ("vi a agenda"): guardado com ela, para a linha
+       não sumir ao recarregar nem ao continuar a conversa na outra tela. só o
+       que está na lista fechada do retrato */
+    const sources = Array.isArray(m && m.sources) ? SOURCES.filter((x) => m.sources.includes(x)) : [];
+    if (sources.length) msg.sources = sources;
+    return msg;
   });
   return {
     id: String(d.id || ""),

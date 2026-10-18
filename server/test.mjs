@@ -23,8 +23,13 @@ function prepare(sql) {
   return api;
 }
 
+/* toda leitura da tabela docs, para provar que o retrato não faz o worker
+   ler documento nenhum além do perfil */
+let docReads = [];
+
 function run(sql, a, mode) {
   const s = sql.replace(/\s+/g, " ").trim();
+  if (/^SELECT\b.*\bFROM docs\b/.test(s)) docReads.push(s);
 
   if (s.startsWith("SELECT COUNT(*) AS n FROM codes")) {
     return { n: db.codes.filter(c => c.email === a[0] && c.expires_at > a[1]).length };
@@ -666,6 +671,35 @@ check("conversa: finance-entry entra no catálogo", r.status === 200 && body.sug
 check("conversa: a proposta só tem os oito campos do catálogo", body.suggestions[0] && Object.keys(body.suggestions[0].payload).sort().join() === "amount,category,confirm,day,fixed,kind,name,paid" && !("hack" in body.suggestions[0].payload), JSON.stringify(body.suggestions[0] && body.suggestions[0].payload));
 check("conversa: os campos guardam o que a IA propôs", body.suggestions[0] && body.suggestions[0].payload.amount === 4500 && body.suggestions[0].payload.name === "almoço", JSON.stringify(body.suggestions[0] && body.suggestions[0].payload));
 check("conversa: a instrução ensina o tipo novo", /finance-entry/.test(claudeAsked), String(claudeAsked).slice(0, 300));
+/* o retrato (PRD da secretária, D8 e D9): vai num campo próprio, com teto de
+   6.000; só na pergunta ao assistente; o segredo MERLIN_PORTRAIT_OFF o tira de
+   todos; e a resposta diz de onde tirou, numa lista fechada */
+const PORTRAIT = "RETRATO-XYZ " + "a".repeat(7988);
+claudeAnswer = { stop_reason: "end_turn", content: [{ type: "text", text: '{"suggestions":[],"clarify":"quinta às 10h, a call com a Ana","sources":["agenda","inventado"]}' }] };
+docReads = [];
+r = await call("POST", "/merlin", { task: "assistant", context: { message: "o que tenho quinta?", portrait: PORTRAIT, pageContext: "TELA-" + "b".repeat(2000) } }, cookie);
+body = await r.json();
+check("o retrato vai no pedido do assistente", r.status === 200 && claudeAsked.includes("Retrato") && claudeAsked.includes("RETRATO-XYZ"), String(claudeAsked).slice(0, 200));
+check("o retrato é cortado em 6.000", claudeAsked.includes(PORTRAIT.slice(0, 6000)) && !claudeAsked.includes(PORTRAIT.slice(0, 6001)));
+check("o contexto da tela continua com 1.200", claudeAsked.includes("TELA-" + "b".repeat(1195)) && !claudeAsked.includes("TELA-" + "b".repeat(1196)));
+check("as fontes saem filtradas pela lista fechada", JSON.stringify(body.sources) === '["agenda"]', JSON.stringify(body.sources));
+check("o retrato não faz o worker ler documento além do perfil", docReads.length === 1 && /type = 'profile'/.test(docReads[0]), JSON.stringify(docReads));
+check("a linha de medição traz o tamanho do retrato que foi, já cortado", / portrait=6000$/.test(logged.at(-1)), logged.at(-1));
+claudeAnswer = { stop_reason: "end_turn", content: [{ type: "text", text: '{"suggestions":[],"clarify":"ok"}' }] };
+r = await call("POST", "/merlin", { task: "assistant", context: { message: "e aí?" } }, cookie);
+body = await r.json();
+check("sem fontes na resposta, a lista vem vazia", r.status === 200 && Array.isArray(body.sources) && body.sources.length === 0, JSON.stringify(body));
+check("sem retrato, o pedido não fala em retrato", !claudeAsked.includes("Retrato ("), String(claudeAsked).slice(0, 200));
+env.MERLIN_PORTRAIT_OFF = "1";
+r = await call("POST", "/merlin", { task: "assistant", context: { message: "o que tenho quinta?", portrait: PORTRAIT } }, cookie);
+check("com MERLIN_PORTRAIT_OFF, o retrato não vai", r.status === 200 && !claudeAsked.includes("RETRATO-XYZ") && !claudeAsked.includes("aaaaaaaaaa"), String(claudeAsked).slice(0, 200));
+delete env.MERLIN_PORTRAIT_OFF;
+claudeAnswer = { stop_reason: "end_turn", content: [{ type: "text", text: '{"text":"Cabem 2h."}' }] };
+r = await call("POST", "/merlin", { task: "checkin", context: { moment: "start", hour: "09:10", window: "09:00–18:00", slack: "cabem 2h", open: [], done: [], habits: [], streak: 0, products: [], portrait: PORTRAIT } }, cookie);
+check("o check-in não leva o retrato", r.status === 200 && !claudeMessages.some((m) => m.content.includes("RETRATO-XYZ")), String(claudeAsked).slice(0, 200));
+claudeAnswer = { stop_reason: "end_turn", content: [{ type: "text", text: '{"items":[{"kind":"task","title":"ligar","min":15}]}' }] };
+r = await call("POST", "/merlin", { task: "capture", context: { text: "ligar", today: "2026-10-19 (segunda)", hour: "14:20", clients: [], portrait: PORTRAIT } }, cookie);
+check("a leitura não leva o retrato", r.status === 200 && !claudeMessages.some((m) => m.content.includes("RETRATO-XYZ")), String(claudeAsked).slice(0, 200));
 
 /* ---- 13f. o teto do conselheiro ----
    a chave da Anthropic e uma so para o time. o teto e por pessoa e por hora:
