@@ -76,7 +76,7 @@ os pares sozinho; não há lista de rotas. Nunca escreva no `localStorage` diret
 | hábitos | `habits.jsx` | grade do mês |
 | perfil | `profile.jsx` | sessão, tema, inventário |
 | link público | `share.jsx` | leitura sem conta de mapa/funil |
-| rastreador | `tracker.jsx` | a janela pequena do app de desktop; mesma conta do dia (`distribute` em `day.js`, `readLine` em `tasks.js`) |
+| rastreador | `tracker.jsx` | a janela pequena do app de desktop; mesma conta do dia (`distribute` em `day.js`, `dayTasks` e `readLine` em `tasks.js`) |
 
 ## Dados e sincronização
 

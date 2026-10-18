@@ -477,10 +477,18 @@ a cópia era reconhecida pelo título. O botão saiu, e as mães viraram blocos 
 - **Um bloco, vários dias.** "Almoço 12h, seg a sex" é um bloco só: mudar a hora muda todos
   os dias, porque é isso que a frase quer dizer. Quem quer a sexta diferente tira a sexta do
   bloco e cria outro.
-- **Vira tarefa quando a semana chega.** O calendário (e o início) copia os blocos para a
-  semana atual ou futura que abre, com `origin:{type:"routine", id}`. Cada bloco guarda em
-  `weeks` os domingos em que já se copiou: apagar a cópia de uma quinta não a faz renascer.
-  Dia que já passou não ganha cópia.
+- **Vira tarefa quando a semana chega.** O calendário e o início copiam os blocos para a
+  semana que abrem (o início, sempre a atual), com `origin:{type:"routine", id}`. Cada bloco
+  guarda em `weeks` os domingos em que já se copiou: apagar a cópia de uma quinta não a faz
+  renascer, e as duas telas abertas juntas não duplicam. Dia que já passou não ganha cópia.
+  Ao abrir, as duas também recolhem a caixa de entrada do dia (`merlin:inbox`, onde o "puxar
+  para o dia" dos hábitos escreve), zerando-a antes de gravar: quem só usa o celular e nunca
+  abre o calendário vê a tarefa no início.
+- **Uma sobra só (17/10/2026).** A cópia de um bloco do tipo rotina não aparece na lista do
+  calendário, mas conta na sobra do dia em todas as telas: o almoço de 60 minutos que vem da
+  rotina tira os mesmos 60 minutos no calendário, no início, no rastreador e na resposta do
+  Merlin (`dayTasks` em `shared/tasks.js`). Antes, o calendário a tirava da conta junto com a
+  lista, e mostrava uma sobra maior que as outras telas.
 - **Mudar o bloco muda daqui pra frente, menos o que você mexeu.** Mexer é a cópia ter título,
   hora, duração, cliente ou "reunião" diferente do bloco de antes. Apagar o bloco leva as
   cópias futuras intocadas, com desfazer.

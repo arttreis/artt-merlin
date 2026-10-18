@@ -26,7 +26,7 @@ import { runningOf, minutesOf, receipt } from "./shared/focus.js";
 import { useState, useEffect, useLayoutEffect, useRef } from "react";
 import { mount, useCollection } from "./shared/ui.jsx";
 import { LOGO, GL_MARK } from "./shared/icons.jsx";
-import { normalize, dayDoc, overdue, topOrder, newTask, readLine, isReserve, stripPrefix } from "./shared/tasks.js";
+import { normalize, dayDoc, dayTasks, overdue, topOrder, newTask, readLine, isReserve, stripPrefix } from "./shared/tasks.js";
 import { costOf, guessMin, distribute, fmt, longFmt, clock } from "./shared/day.js";
 import { isDesktop, setStatus, openMain, hideTracker, fitTracker } from "./shared/desktop.js";
 
@@ -120,7 +120,9 @@ function Tracker() {
 
   const date = today();
   const all = store.all();
-  const doc = dayDoc(all, date, readPrefs());
+  /* a copia da rotina conta aqui como no calendario e no inicio: as tres
+     sobras sao o mesmo numero (shared/tasks.js, dayTasks) */
+  const doc = dayDoc(dayTasks(all).count, date, readPrefs());
   const { b, slots, cut } = distribute(doc);
   const m = measureOf(doc, b);
   const now = b.open[0] || null;

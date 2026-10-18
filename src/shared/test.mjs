@@ -843,6 +843,167 @@ const dataLeft = () => globalThis.localStorage.keys().filter((k) => k in DATA);
   check("fila: não cabe meia hora", d.b.slack === -30 && d.b.overflow === 30, String(d.b.slack));
 }
 
+/* ---- a caixa de entrada e a sobra do dia (#7) ----
+   o calendário e o início esvaziam a mesma caixa com a mesma função, e as três
+   telas (calendário, início, rastreador) contam o mesmo dia: a cópia da rotina
+   fica fora da LISTA do calendário, mas dentro da CONTA. */
+{
+  globalThis.localStorage = makeStorage({});
+  const T = await import("./tasks.js?n=" + (++n));
+  const Day = await import("./day.js?n=" + n);
+  const R = await import("./routine.js?n=" + n);
+  const { collection, addDays, sundayOf, today } = await import("./core.js?n=" + n);
+  const hoje = today();   /* o copyRoutine lê o relógio de verdade, então o hoje do bloco também */
+  const mk = (id, extra) => T.normalize({ id, title: id, date: hoje, min: 30, ...extra });
+
+  /* inboxToDocs: o que vira tarefa e o que vira nota */
+  {
+    const r = T.inboxToDocs([
+      { title: "meditar", min: 15, origin: { type: "habit", id: "h1" } },
+      { title: "ideia solta" }
+    ], [], hoje);
+    check("caixa: com duração vira uma tarefa, sem duração vira uma nota", r.tasks.length === 1 && r.notes.length === 1, r.tasks.length + "/" + r.notes.length);
+    const t = r.tasks[0];
+    check("caixa: a tarefa é de hoje, com a duração dita", t.title === "meditar" && t.min === 15 && t.date === hoje, JSON.stringify(t));
+    check("caixa: a origem do hábito atravessa", t.origin && t.origin.type === "habit" && t.origin.id === "h1", JSON.stringify(t.origin));
+    check("caixa: a nota guarda o título e fica sem cliente", r.notes[0].title === "ideia solta" && r.notes[0].client === "", JSON.stringify(r.notes[0]));
+    check("caixa: a tarefa vem pronta para gravar (id e não reservada)", !!t.id && t.reserved === false);
+  }
+  {
+    const r = T.inboxToDocs([{ title: "almoço", min: 60 }, { title: "revisar proposta", min: 45, client: "c9" }], [], hoje);
+    check("caixa: almoço vira reserva", r.tasks[0].reserved === true && r.tasks[1].reserved === false);
+    check("caixa: o cliente vai junto na tarefa", r.tasks[1].client === "c9", r.tasks[1].client);
+    const n2 = T.inboxToDocs([{ title: "  ligar   para\n  o João  ", client: "c9" }], [], hoje);
+    check("caixa: a nota sai com espaços colapsados e cliente", n2.notes[0].title === "ligar para o João" && n2.notes[0].client === "c9", JSON.stringify(n2.notes[0]));
+    check("caixa: a nota para em 300 caracteres", T.inboxToDocs([{ title: "x".repeat(500) }], [], hoje).notes[0].title.length === 300);
+  }
+  {
+    const e = T.inboxToDocs([], [mk("a")], hoje);
+    check("caixa: vazia não faz nada", e.tasks.length === 0 && e.notes.length === 0);
+    const u = T.inboxToDocs(undefined, [], hoje);
+    check("caixa: sem lista também não faz nada", u.tasks.length === 0 && u.notes.length === 0);
+    const bad = T.inboxToDocs([{ min: 20 }, { title: "" , min: 10 }, { title: "   " }, null, { title: "ok", min: 5 }], [], hoje);
+    check("caixa: item sem título é ignorado, nota de espaços também", bad.tasks.length === 1 && bad.tasks[0].title === "ok" && bad.notes.length === 0, JSON.stringify(bad));
+  }
+  {
+    /* a fila: as três entram na frente de tudo o que já existe no dia, na ordem de entrada */
+    const existing = [mk("e1", { order: 0 }), mk("e2", { order: 5 }), mk("e3", { order: -2 }), mk("outro-dia", { date: addDays(hoje, 1), order: -50 })];
+    const before = JSON.stringify(existing);
+    const r = T.inboxToDocs([
+      { title: "um", min: 10 }, { title: "dois", min: 20 }, { title: "tres", min: 30 }
+    ], existing, hoje);
+    const lowest = Math.min(...existing.filter((t) => t.date === hoje).map((t) => t.order));
+    check("caixa: três com duração viram três tarefas", r.tasks.length === 3 && r.notes.length === 0);
+    check("caixa: todas ficam na frente do que já existe no dia", r.tasks.every((t) => t.order < lowest), r.tasks.map((t) => t.order).join() + " < " + lowest);
+    check("caixa: a ordem de entrada se mantém", r.tasks[0].order < r.tasks[1].order && r.tasks[1].order < r.tasks[2].order, r.tasks.map((t) => t.order).join());
+    const fila = T.onDate(existing.concat(r.tasks), hoje).map((t) => t.title).join();
+    check("caixa: a fila do dia abre com um, dois, tres", fila.startsWith("um,dois,tres,"), fila);
+    check("caixa: a ordem não olha para tarefa de outro dia (order -50 amanhã)", r.tasks.every((t) => t.order > -50) );
+    check("caixa: não mexe nas tarefas que já existem", JSON.stringify(existing) === before);
+    const mixed = T.inboxToDocs([{ title: "nota" }, { title: "primeira", min: 10 }, { title: "segunda", min: 10 }], existing, hoje);
+    check("caixa: nota no meio não quebra a ordem das tarefas", mixed.tasks.length === 2 && mixed.tasks[0].order < mixed.tasks[1].order && mixed.tasks[1].order < lowest, mixed.tasks.map((t) => t.order).join());
+  }
+
+  /* dayTasks: o que conta no dia e o que o calendário lista */
+  const routineBlock = R.normalize({ id: "b-rot", title: "almoço", days: [6], min: 60, reserved: true, kind: "routine" });
+  const eventBlock = R.normalize({ id: "b-evt", title: "daily", days: [6], min: 60, reserved: true, kind: "event" });
+  const lunch = mk("lunch", { title: "almoço", min: 60, reserved: true, origin: { type: "routine", id: "b-rot" } });
+  const daily = mk("daily", { title: "daily", min: 60, reserved: true, origin: { type: "routine", id: "b-evt" } });
+  const orphan = mk("orphan", { min: 20, origin: { type: "routine", id: "apagado" } });
+  const habit = mk("habit", { min: 15, origin: { type: "habit", id: "h1" } });
+  const plain = mk("plain", { min: 90 });
+  const everything = [plain, lunch, daily, orphan, habit];
+  const ids = (l) => l.map((t) => t.id).join();
+
+  const dt = T.dayTasks(everything, [routineBlock, eventBlock]);
+  check("dia: a conta inclui a cópia do bloco de rotina", dt.count.some((t) => t.id === "lunch") && dt.count.length === everything.length, ids(dt.count));
+  check("dia: a lista do calendário não mostra a cópia da rotina", !dt.shown.some((t) => t.id === "lunch"), ids(dt.shown));
+  check("dia: a cópia de evento continua na lista e na conta", dt.shown.some((t) => t.id === "daily") && dt.count.some((t) => t.id === "daily"));
+  check("dia: a cópia cujo bloco foi apagado continua na lista", dt.shown.some((t) => t.id === "orphan"));
+  check("dia: hábito e tarefa comum continuam na lista", dt.shown.some((t) => t.id === "habit") && dt.shown.some((t) => t.id === "plain"));
+  check("dia: só a cópia da rotina sai da lista", dt.shown.length === everything.length - 1, ids(dt.shown));
+  const none = T.dayTasks(everything, undefined);
+  check("dia: sem blocos nada sai da lista", none.count.length === everything.length && none.shown.length === everything.length);
+  const empty = T.dayTasks(everything, []);
+  check("dia: com a lista de blocos vazia nada sai da lista", empty.shown.length === everything.length);
+  const nothing = T.dayTasks([], [routineBlock]);
+  check("dia: sem tarefas devolve listas vazias", nothing.count.length === 0 && nothing.shown.length === 0);
+
+  /* a mesma sobra nas três telas: o almoço de 60 minutos da rotina desconta */
+  const now = Day.nowMin();
+  const prefs = { dayStart: now - 60, dayEnd: now + 240 };
+  {
+    const almoco = [mk("lunch", { title: "almoço", min: 60, reserved: true, origin: { type: "routine", id: "b-rot" } }), mk("w", { min: 90 })];
+    const comAlmoco = T.dayTasks(almoco, [routineBlock]);
+    const total = Day.distribute(T.dayDoc(comAlmoco.count, hoje, prefs));
+    check("sobra: o almoço de 60 min da rotina desconta do dia", total.b.liveReserve === 60 && total.b.reserved === 60, JSON.stringify(total.b));
+    const lista = Day.distribute(T.dayDoc(comAlmoco.shown, hoje, prefs));
+    check("sobra: contar só o que a lista mostra daria outro número (o defeito antigo)", lista.b.slack !== total.b.slack && lista.b.slack - total.b.slack === 60, lista.b.slack + " vs " + total.b.slack);
+    const calendario = Day.distribute(T.dayDoc(T.dayTasks(almoco, [routineBlock]).count, hoje, prefs));
+    const inicio = Day.distribute(T.dayDoc(T.dayTasks(almoco, [routineBlock]).count, hoje, prefs));
+    check("sobra: calendário e início contam o mesmo número", calendario.b.slack === inicio.b.slack && calendario.b.slack === total.b.slack, calendario.b.slack + "/" + inicio.b.slack);
+    check("sobra: o número é a janela menos o almoço menos o trabalho", total.b.slack === 300 - 60 - 60 - 90, String(total.b.slack));
+  }
+  {
+    const ev = [mk("daily", { title: "daily", min: 60, reserved: true, origin: { type: "routine", id: "b-evt" } })];
+    const r = T.dayTasks(ev, [eventBlock]);
+    check("evento: aparece na lista e na conta", r.shown.length === 1 && r.count.length === 1);
+    const d = Day.distribute(T.dayDoc(r.count, hoje, prefs));
+    check("evento: o distribute desconta os 60 minutos", d.b.liveReserve === 60, JSON.stringify(d.b));
+    const d2 = Day.distribute(T.dayDoc(r.shown, hoje, prefs));
+    check("evento: lista e conta dão a mesma sobra", d2.b.slack === d.b.slack, d2.b.slack + "/" + d.b.slack);
+  }
+
+  /* copyRoutine duas vezes na mesma semana: sem cópia duplicada */
+  {
+    globalThis.localStorage = makeStorage({});
+    const blocksCol = collection("routine", { normalize: R.normalize });
+    const tasksCol = T.tasks();
+    const block = R.newBlock({ id: "b-copy", title: "daily do time", days: [0, 1, 2, 3, 4, 5, 6], at: 540, min: 15, reserved: true, kind: "event" });
+    blocksCol.save(block);
+    const week = sundayOf(hoje);
+    const mine = () => tasksCol.all().filter((t) => R.isCopyOf(t, "b-copy"));
+    R.copyRoutine(blocksCol, tasksCol, week);
+    const first = mine();
+    check("rotina: copiar a semana gera ao menos uma cópia", first.length >= 1, String(first.length));
+    check("rotina: as cópias são do bloco, dos dias de hoje em diante, sem repetir dia", first.every((t) => t.date >= hoje) && new Set(first.map((t) => t.date)).size === first.length, first.map((t) => t.date).join());
+    R.copyRoutine(blocksCol, tasksCol, week);
+    const second = mine();
+    check("rotina: copiar de novo na mesma semana não duplica", second.length === first.length && new Set(second.map((t) => t.date)).size === second.length, first.length + " -> " + second.length);
+    check("rotina: as cópias são as mesmas, não recriadas", ids(first.slice().sort((a, b) => (a.id < b.id ? -1 : 1))) === ids(second.slice().sort((a, b) => (a.id < b.id ? -1 : 1))));
+    check("rotina: o bloco guarda a marca da semana", blocksCol.get("b-copy").weeks[week] === true);
+    const gone = first[0];
+    tasksCol.remove(gone.id);
+    R.copyRoutine(blocksCol, tasksCol, week);
+    check("rotina: apagar uma cópia não a faz renascer", mine().length === first.length - 1, String(mine().length));
+    /* o início e o calendário abertos ao mesmo tempo chamam a mesma função */
+    const lastWeek = addDays(week, 7);
+    R.copyRoutine(blocksCol, tasksCol, lastWeek);
+    R.copyRoutine(blocksCol, tasksCol, lastWeek);
+    const next = mine().filter((t) => t.date >= lastWeek);
+    check("rotina: duas aberturas da semana seguinte também não duplicam", next.length === 7 && new Set(next.map((t) => t.date)).size === 7, String(next.length));
+  }
+
+  /* collectInbox: o lado que grava. a caixa é zerada antes, então a segunda
+     tela que recebe o mesmo evento não cria a tarefa de novo */
+  {
+    const store = T.tasks();
+    localStorage.setItem("merlin:inbox", JSON.stringify([
+      { title: "alongar", min: 10, origin: { type: "habit", id: "h-col" } },
+      { title: "  " , min: 5 },
+      { title: "ler sobre retenção" }
+    ]));
+    const got = T.collectInbox(store);
+    const mine = () => store.all().filter((t) => t.origin && t.origin.id === "h-col");
+    check("recolher: uma tarefa e uma nota, e o título em branco não vira nada", got.tasks === 1 && got.notes === 1, JSON.stringify(got));
+    check("recolher: a caixa fica vazia", localStorage.getItem("merlin:inbox") === "[]");
+    check("recolher: a tarefa está na coleção, em hoje", mine().length === 1 && mine()[0].date === hoje);
+    check("recolher: a nota está nas ideias", collection("notes").all().some((x) => x.title === "ler sobre retenção"));
+    const again = T.collectInbox(store);
+    check("recolher: a segunda tela não encontra nada", again.tasks === 0 && again.notes === 0 && mine().length === 1);
+  }
+}
+
 
 /* ---- sessões de foco, meta e teto (VISAO, 11) ---- */
 {

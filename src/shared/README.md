@@ -19,7 +19,9 @@ Vite; o build sai em `server/site/`. O que é comum vive aqui:
   três visões do calendário fazem (`onDate`, `inRange`, `overdue`). É aqui que mora a junção do
   documento do dia com a coleção da semana (`mergeInto`, `migrateTasks`), que é função pura de
   propósito: ela é a decisão mais arriscada que este sistema já tomou, e dá para prová-la sem
-  navegador.
+  navegador. Também decide o que conta no dia e o que o calendário lista (`dayTasks`) e o que a
+  caixa de entrada vira (`inboxToDocs`, gravada por `collectInbox`, que o calendário e o início
+  chamam ao abrir).
 - `icons.jsx` — os SVGs comuns como elementos React. `icon("plus")` devolve um deles.
 - `ui.jsx` — a **tela**: hooks que ligam a página às coleções, componentes comuns e a
   **casca** (sidebar, busca, tema, nuvem, entrar, aviso). É o que uma página importa para

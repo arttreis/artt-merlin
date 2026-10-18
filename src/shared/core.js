@@ -1090,8 +1090,9 @@ export function parseMentions(text) {
 }
 
 /* ---------- caixa de entrada do dia ----------
-   quem quer mandar algo para hoje escreve aqui. o dia esvazia ao abrir e ao
-   receber o evento de storage. nada aqui toca no documento do dia. */
+   quem quer mandar algo para hoje escreve aqui. o calendario e o inicio
+   esvaziam ao abrir e ao receber o evento de storage (collectInbox, em
+   shared/tasks.js). nada aqui toca no documento do dia. */
 
 const INBOX_KEY = "merlin:inbox";
 export function readInbox() {
