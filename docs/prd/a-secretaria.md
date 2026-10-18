@@ -155,22 +155,24 @@ precisam distribuí-lo.
 
 ## Tickets
 
+Issues no milestone "a secretária" (#4 a #15).
+
 | # | título | pts | bloqueado por | onda |
 | --- | --- | --- | --- | --- |
-| 1 | Contar os pedidos ao Merlin por tarefa, com os tokens de cada um | 2 | — | 1 |
-| 2 | Lançar gasto e entrada escrevendo no início ou pedindo na conversa | 3 | — | 1 |
-| 3 | Mandar o retrato da semana junto de toda pergunta ao Merlin | 3 | — | 1 |
-| 4 | Fazer o início trazer a rotina e a caixa de entrada, com a mesma sobra do calendário | 3 | — | 1 |
-| 5 | Deixar o início só com a conversa, e fechar o dia e revisar pedindo | 3 | — | 1 |
-| 6 | Responder "o que falta hoje?" com a próxima coisa, uma por vez | 3 | 5 | 2 |
-| 7 | Marcar hábito pelo chat, e criar o que não existe | 3 | 2 | 2 |
-| 8 | Pôr o dinheiro no retrato | 3 | 3 | 2 |
-| 9 | Pôr clientes e leads no retrato | 2 | 3 | 2 |
-| 10 | Pôr o conteúdo no retrato | 2 | 3 | 2 |
-| 11 | Pôr hábitos e notas no retrato | 2 | 3 | 2 |
-| 12 | Perguntar na lista se as contas previstas que passaram aconteceram | 2 | 6, 8 | 3 |
+| #4 | Contar os pedidos ao Merlin por tarefa, com os tokens de cada um | 2 | — | 1 |
+| #5 | Lançar gasto e entrada escrevendo no início ou pedindo na conversa | 3 | — | 1 |
+| #6 | Mandar o retrato da semana junto de toda pergunta ao Merlin | 3 | — | 1 |
+| #7 | Fazer o início trazer a rotina e a caixa de entrada, com a mesma sobra do calendário | 3 | — | 1 |
+| #8 | Deixar o início só com a conversa, e fechar o dia e revisar pedindo | 3 | — | 1 |
+| #9 | Responder "o que falta hoje?" com a próxima coisa, uma por vez | 3 | #8 | 2 |
+| #10 | Marcar hábito pelo chat, e criar o que não existe | 3 | #5 | 2 |
+| #11 | Pôr o dinheiro no retrato | 3 | #6 | 2 |
+| #12 | Pôr clientes e leads no retrato | 2 | #6 | 2 |
+| #13 | Pôr o conteúdo no retrato | 2 | #6 | 2 |
+| #14 | Pôr hábitos e notas no retrato | 2 | #6 | 2 |
+| #15 | Perguntar na lista se as contas previstas que passaram aconteceram | 2 | #9, #11 | 3 |
 
-O #3 e o #6 criam os pontos de composição de uma linha (a lista de seções do `portrait.js` e a
+O #6 e o #9 criam os pontos de composição de uma linha (a lista de seções do `portrait.js` e a
 lista de fontes do `quests.js`), para os tickets da onda 2 não brigarem no mesmo trecho.
 
 ## Projeto 2 · o menu por área (depois)
