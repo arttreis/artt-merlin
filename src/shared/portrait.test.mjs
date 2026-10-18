@@ -435,6 +435,179 @@ const lines = (p, id) => sec(p, id).text.split("\n");
   check("espera: resolve quando as coleções descem, sem esperar o tempo todo", soon === "ok" && soonMs >= 80 && soonMs < 1500, soon + " " + soonMs + "ms");
 }
 
+/* ---- leads e clientes (#12): "quais leads estão parados?" ----
+   a conta mora em client-doc.js (pipelineToday); aqui se prova o texto que sai
+   dela, o que nunca sai da ficha, e o teto de 500 caracteres das duas seções. */
+const DAY = 86400000;
+const ago = (days) => NOW.getTime() - days * DAY;
+const lead = (o) => ({ status: "prospect", stage: "lead", stageAt: ago(1), createdAt: ago(60), nextDate: "2026-10-30", ...o });
+const customer = (o) => ({ status: "active", createdAt: ago(200), journal: [{ id: "j", at: ago(1), type: "event", text: "ligação" }], ...o });
+const bl = (id, due, text, o) => ({ id, text, due, done: false, ...o });
+
+{
+  check("as seções de leads e clientes vêm ao fim, nesta ordem", JSON.stringify(SECTIONS.slice(5).map((s) => s.id)) === JSON.stringify(["leads", "clients"]), JSON.stringify(SECTIONS.map((s) => s.id)));
+  const l = SECTIONS.find((s) => s.id === "leads"), c = SECTIONS.find((s) => s.id === "clients");
+  check("leads e clientes: rótulos e coleção de que dependem", !!l && !!c && l.label === "leads" && c.label === "clientes" && l.needs.includes("clients") && c.needs.includes("clients"));
+  check("leads e clientes: os orçamentos, com rótulos e separador, cabem em 500", !!l && !!c && l.budget + c.budget + "leads:\n".length + "clientes:\n".length + 2 <= 500, l && c ? String(l.budget + c.budget) : "");
+}
+
+/* a seção: etapas com contagem, atrasados, parados, sem próximo passo, sem registro e backlog */
+{
+  const p = run({
+    clients: [
+      lead({ id: "bruna", name: "Bruna", stage: "proposal", stageAt: ago(9) }),
+      lead({ id: "caio", name: "Caio", stage: "lead", stageAt: ago(2), nextDate: "2026-10-17" }),
+      lead({ id: "davi", name: "Davi", stage: "qualified", stageAt: ago(1), nextDate: "" }),
+      lead({ id: "lia", name: "Lia Perdida", status: "lost", stage: "proposal", stageAt: ago(30), nextDate: "" }),
+      customer({ id: "ana", name: "Ana", journal: [{ id: "j", at: ago(20), type: "event", text: "ligação" }], backlog: [
+        bl("b1", "2026-10-17", "enviar o relatório"),
+        bl("b2", TODAY, "revisar o contrato de mídia"),
+        bl("b3", THU, "marcar a reunião de metas"),
+        bl("b4", "2026-10-31", "item distante Zq"),
+        bl("b6", "2026-09-01", "vencido de 49 dias Nw"),
+        bl("b7", "2026-10-18", "item feito Ef", { done: true })
+      ] }),
+      customer({ id: "pau", name: "Paula Pausada", status: "paused", journal: [{ id: "j", at: ago(40) }] }),
+      customer({ id: "rui", name: "Rui", journal: [{ id: "j", at: ago(3) }] })
+    ]
+  });
+  const L = lines(p, "leads");
+  check("leads: a primeira linha são as etapas com contagem, só as que têm lead", L[0] === "etapas: lead 1 · qualificado 1 · proposta enviada 1", L[0]);
+  check("leads: o atrasado, com a data em dd/mm", L.includes("contato atrasado: Caio · 17/10"), JSON.stringify(L));
+  check("leads: o parado, com a etapa e os dias", L.includes("parado: Bruna · proposta enviada · 9d"), JSON.stringify(L));
+  check("leads: o sem próximo passo", L.includes("sem próximo passo: Davi"), JSON.stringify(L));
+  check("leads: o Caio (2 dias) não está parado e a Bruna não está atrasada", !L.some((x) => /^parado: Caio/.test(x) || /^contato atrasado: Bruna/.test(x)), JSON.stringify(L));
+  check("leads: o perdido não aparece em lugar nenhum", !p.text.includes("Lia Perdida"), p.text);
+  check("leads: ordem das linhas é etapas, atrasado, parado, sem próximo passo", L.findIndex((x) => x.startsWith("etapas:")) === 0 && L.findIndex((x) => x.startsWith("contato atrasado:")) < L.findIndex((x) => x.startsWith("parado:")) && L.findIndex((x) => x.startsWith("parado:")) < L.findIndex((x) => x.startsWith("sem próximo passo:")), JSON.stringify(L));
+  check("leads: cliente ativo não é lead", !sec(p, "leads").text.includes("Ana") && !sec(p, "leads").text.includes("Rui"));
+
+  const C = lines(p, "clients");
+  check("clientes: o ativo sem registro, com os dias", C.includes("sem registro há 14+ dias: Ana · 20d"), JSON.stringify(C));
+  check("clientes: o pausado e o de registro recente não estão sem registro", !C.some((x) => x.startsWith("sem registro") && (x.includes("Paula") || x.includes("Rui"))), JSON.stringify(C));
+  check("clientes: backlog vencido, com a data", C.includes("backlog vencido 17/10: Ana · enviar o relatório"), JSON.stringify(C));
+  check("clientes: backlog de hoje", C.includes("backlog hoje: Ana · revisar o contrato de mídia"), JSON.stringify(C));
+  check("clientes: backlog dos próximos dias, com dia da semana e data", C.includes("backlog qui 22/10: Ana · marcar a reunião de metas"), JSON.stringify(C));
+  check("clientes: vencido de mais de 30 dias, o prazo distante e o feito não entram", !/Nw|Zq|Ef/.test(sec(p, "clients").text), sec(p, "clients").text);
+  check("clientes: lead não entra na seção de clientes", !sec(p, "clients").text.includes("Bruna") && !sec(p, "clients").text.includes("Caio") && !sec(p, "clients").text.includes("Davi"));
+  check("leads e clientes: ninguém está carregando", !sec(p, "leads").loading && !sec(p, "clients").loading);
+  check("o retrato leva as duas seções, com rótulo", p.text.includes("\n\nleads:\netapas: ") && p.text.includes("\n\nclientes:\n"), p.text.slice(-400));
+}
+
+/* o pausado entra só pelo backlog, e o vencido há 29 dias ainda vale (como nas tarefas) */
+{
+  const p = run({ clients: [
+    customer({ id: "pau", name: "Paula Pausada", status: "paused", journal: [{ id: "j", at: ago(40) }], backlog: [bl("b8", "2026-10-20", "item da pausada")] }),
+    customer({ id: "ana", name: "Ana", backlog: [bl("b5", "2026-09-20", "vencido de 29 dias Mw")] })
+  ] });
+  const C = lines(p, "clients");
+  check("clientes: o pausado entra pelo backlog", C.includes("backlog ter 20/10: Paula Pausada · item da pausada"), JSON.stringify(C));
+  check("clientes: o pausado não entra como sem registro", !C.some((x) => x.startsWith("sem registro")), JSON.stringify(C));
+  check("clientes: vencido de 29 dias ainda entra", C.includes("backlog vencido 20/09: Ana · vencido de 29 dias Mw"), JSON.stringify(C));
+}
+
+/* nomes saem numa linha só */
+{
+  const p = run({ clients: [lead({ id: "g", name: "  Grace\n   Hopper  ", stageAt: ago(10) })] });
+  check("nome: espaço em branco colapsa, sem quebra de linha", lines(p, "leads").includes("parado: Grace Hopper · lead · 10d"), JSON.stringify(lines(p, "leads")));
+}
+
+/* só etapas, quando nada pede atenção */
+{
+  const p = run({ clients: [lead({ id: "f", name: "Fábio", stage: "call" })] });
+  check("leads: sem atrasado, parado nem sem passo, é só a linha de etapas", sec(p, "leads").text === "etapas: call marcada 1", sec(p, "leads").text);
+}
+
+/* um objeto de cliente esparso não derruba o retrato */
+{
+  let p;
+  try { p = run({ clients: [{ id: "s", name: "Esparso", status: "prospect", stageAt: ago(8) }, { id: "t", name: "Ativo esparso", status: "active", createdAt: ago(30) }, { id: "u", name: "Lead esparso" }] }); } catch (e) { p = null; check("esparso: não quebra", false, String(e)); }
+  if (p) {
+    check("esparso: o lead sem etapa vale lead e entra parado", lines(p, "leads").includes("parado: Esparso · lead · 8d"), JSON.stringify(lines(p, "leads")));
+    check("esparso: o cliente ativo sem diário vale a criação", lines(p, "clients").includes("sem registro há 14+ dias: Ativo esparso · 30d"), JSON.stringify(lines(p, "clients")));
+  }
+}
+
+/* nunca entra: só nome, etapa, dias, próximo passo (data), backlog (texto e prazo) */
+{
+  const secrets = ["fulano@segredo.example", "5511988887777", "@perfil_secreto_xk", "site-secreto-xk.example", "PROPOSTA-ESCOPO-XK", "4321000", "43.210", "43210", "DIARIO-SECRETO-XK", "SENHA-DO-COFRE-XK", "ARQUIVO-SECRETO-XK", "OFERTA-SECRETA-XK", "CONTATO-SECRETO-XK", "CONTRATO-SECRETO-XK", "RESUMO-SECRETO-XK", "DOR-SECRETA-XK", "9876543", "f-id-secreto-xk"];
+  const full = {
+    email: "fulano@segredo.example", whatsapp: "5511988887777", instagram: "@perfil_secreto_xk", site: "site-secreto-xk.example",
+    proposal: { scope: "PROPOSTA-ESCOPO-XK", value: 4321000, sentAt: "2026-10-01", link: "" }, estimate: 9876543,
+    journal: [{ id: "j1", at: ago(1), type: "note", text: "DIARIO-SECRETO-XK" }],
+    vault: { items: [{ id: "v", label: "Painel", secret: "SENHA-DO-COFRE-XK" }] },
+    files: [{ id: "f-id-secreto-xk", name: "ARQUIVO-SECRETO-XK.pdf", kind: "contrato" }],
+    offers: [{ id: "o", name: "OFERTA-SECRETA-XK" }],
+    contacts: [{ id: "k", name: "CONTATO-SECRETO-XK", phone: "5511977776666" }],
+    summary: "RESUMO-SECRETO-XK", pain: "DOR-SECRETA-XK"
+  };
+  const p = run({ clients: [
+    lead({ ...full, id: "fulano", name: "Fulano", stage: "proposal", stageAt: ago(10) }),
+    customer({ ...full, id: "cliente", name: "Cliente Secreto", createdAt: ago(100), journal: [{ id: "j1", at: ago(21), type: "note", text: "DIARIO-SECRETO-XK" }],
+      contract: { scope: "CONTRATO-SECRETO-XK", value: 9876543, recurrence: "monthly" }, backlog: [bl("b", THU, "texto do backlog que pode ir")] })
+  ] });
+  check("nunca entra: o nome, a etapa e os dias do lead aparecem", lines(p, "leads").includes("parado: Fulano · proposta enviada · 10d"), JSON.stringify(lines(p, "leads")));
+  check("nunca entra: o nome, os dias e o backlog do cliente aparecem", lines(p, "clients").includes("sem registro há 14+ dias: Cliente Secreto · 21d") && lines(p, "clients").includes("backlog qui 22/10: Cliente Secreto · texto do backlog que pode ir"), JSON.stringify(lines(p, "clients")));
+  for (const s of secrets) check("nunca entra: " + s, !p.text.includes(s), p.text);
+}
+
+/* corte por seção: 50 leads parados e muitos clientes, dentro de 500 caracteres juntos */
+{
+  const many = Array.from({ length: 50 }, (_, i) => lead({ id: "l" + i, name: "Lead número " + String(i).padStart(2, "0") + " com nome comprido", stage: "negotiation", stageAt: ago(10 + i) }));
+  const p = run({ clients: many });
+  const l = sec(p, "leads"), c = sec(p, "clients");
+  const joined = "leads:\n" + l.text + "\n\n" + "clientes:\n" + c.text;
+  check("corte: as duas seções, com rótulos e separador, não passam de 500", joined.length <= 500, String(joined.length));
+  check("corte: o retrato leva as duas seções, e o texto delas está no p.text", !!l && !!c && p.text.includes(joined), p.text.slice(-600));
+  const L = l.text.split("\n");
+  check("corte: leads termina em 'e mais N'", /^e mais \d+$/.test(L.at(-1)), L.at(-1));
+  const shown = L.slice(0, -1);
+  const okLine = (x) => /^etapas: /.test(x) || /^parado: Lead número \d\d com nome comprido · negociação · \d+d$/.test(x);
+  check("corte: nenhuma linha de lead sai pela metade", shown.length > 1 && shown.every(okLine), shown.find((x) => !okLine(x)));
+  const more = +(L.at(-1).match(/\d+/) || [0])[0];
+  check("corte: o N é o que ficou de fora (etapas e 50 parados)", shown.length + more === 51, shown.length + " + " + more);
+  check("corte: cortou mesmo (o teste não é trivial)", more > 0);
+  check("corte: sem cliente nenhum, a seção de clientes ainda cabe e fala", c.text === "nada pendente nos clientes", c.text);
+
+  const stale = Array.from({ length: 40 }, (_, i) => customer({ id: "c" + i, name: "Cliente número " + String(i).padStart(2, "0") + " de nome comprido", journal: [{ id: "j", at: ago(20 + i) }] }));
+  const q = run({ clients: [...many, ...stale] });
+  const l2 = sec(q, "leads"), c2 = sec(q, "clients");
+  const joined2 = "leads:\n" + l2.text + "\n\n" + "clientes:\n" + c2.text;
+  check("corte: com leads e clientes cheios, as duas juntas ainda cabem em 500", joined2.length <= 500, String(joined2.length));
+  check("corte: as duas dizem quanto ficou de fora", /e mais \d+$/.test(l2.text) && /e mais \d+$/.test(c2.text), l2.text.slice(-30) + " | " + c2.text.slice(-30));
+  const C2 = c2.text.split("\n").slice(0, -1);
+  check("corte: nenhuma linha de cliente sai pela metade", C2.length > 0 && C2.every((x) => /^sem registro há 14\+ dias: Cliente número \d\d de nome comprido · \d+d$/.test(x)), C2.find((x) => !/^sem registro há 14\+ dias: Cliente número \d\d de nome comprido · \d+d$/.test(x)));
+  check("corte: o retrato inteiro continua no teto", q.text.length <= PORTRAIT_MAX, String(q.text.length));
+}
+
+/* ainda carregando: a coleção de clientes não desceu */
+{
+  const p = run({ loading: ["clients"], clients: [] });
+  check("carregando: leads diz 'ainda carregando'", sec(p, "leads").text === "ainda carregando" && sec(p, "leads").loading === true, sec(p, "leads").text);
+  check("carregando: clientes diz 'ainda carregando'", sec(p, "clients").text === "ainda carregando" && sec(p, "clients").loading === true, sec(p, "clients").text);
+  check("carregando: não diz 'nenhum lead' nem 'nada pendente' onde não sabe", !/nenhum lead|nada pendente/.test(p.text), p.text);
+  check("carregando: hoje e agenda não esperam pelos clientes", sec(p, "today").loading === false && sec(p, "agenda").loading === false);
+  const t = run({ loading: ["tasks"] });
+  check("carregando: leads e clientes não esperam pelas tarefas", sec(t, "leads").loading === false && sec(t, "clients").loading === false);
+  /* o caso real: com sessão e sem descida */
+  core.cloud.signedIn = true;
+  const cc = core.collection("clients");
+  const data = portraitData({ clients: cc }, { signedIn: true, prefs: PREFS });
+  const q = portraitOf(data, NOW);
+  check("carregando: com sessão, a coleção de verdade que não desceu vira 'ainda carregando'", data.loading.includes("clients") && sec(q, "leads").text === "ainda carregando" && sec(q, "clients").text === "ainda carregando", sec(q, "leads").text);
+  core.cloud.signedIn = false;
+}
+
+/* vazio de verdade */
+{
+  const p = run({});
+  check("vazio: leads manda abrir a prospecção", sec(p, "leads").text === "nenhum lead no funil · abra a prospecção para cadastrar", sec(p, "leads").text);
+  check("vazio: clientes diz que não há nada pendente", sec(p, "clients").text === "nada pendente nos clientes", sec(p, "clients").text);
+  check("vazio: nenhuma das duas está carregando", !sec(p, "leads").loading && !sec(p, "clients").loading);
+  const only = run({ clients: [customer({ id: "a", name: "Ana" }), lead({ id: "x", name: "Perdido", status: "lost" }), lead({ id: "y", name: "Fechado", status: "closed" })] });
+  check("vazio: só cliente em dia, perdido e encerrado: continua sem lead e sem pendência", sec(only, "leads").text === "nenhum lead no funil · abra a prospecção para cadastrar" && sec(only, "clients").text === "nada pendente nos clientes", sec(only, "leads").text + " | " + sec(only, "clients").text);
+  check("vazio: perdido e encerrado não vazam o nome", !only.text.includes("Perdido") && !only.text.includes("Fechado"));
+}
+
 /* ---- sourcesLine: "vi ..." ---- */
 {
   check("fontes: duas", sourcesLine(["dia", "agenda"]) === "vi o dia e a agenda", sourcesLine(["dia", "agenda"]));

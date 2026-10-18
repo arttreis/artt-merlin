@@ -780,6 +780,135 @@ const dataLeft = () => globalThis.localStorage.keys().filter((k) => k in DATA);
   check("próximo passo: perdido tira a tarefa do calendário", !store.all().some((t) => t.origin && t.origin.id === "p1"));
 }
 
+/* ---- o funil e a carteira, contados para o retrato (#12) ----
+   "quais leads estão parados?" e "o que vence no backlog?" dependem de contas
+   que moravam nas telas (lastContact, isStale, os dias na etapa, o contato
+   atrasado). agora são puras e moram em client-doc.js: a tela e o retrato do
+   Merlin contam do mesmo jeito. o relógio é o de um segunda, 19/10/2026, 14:20. */
+{
+  globalThis.localStorage = makeStorage({});
+  const D = await import("./client-doc.js?n=" + (++n));
+  const DAY = 86400000;
+  const NOW = new Date(2026, 9, 19, 14, 20).getTime();
+  const TODAY = "2026-10-19";
+  const ago = (days) => NOW - days * DAY;
+  const ids = (list) => list.map((x) => x.id);
+
+  /* lastContact, isStale e daysSince: o "faz tempo" da lista de clientes não muda */
+  {
+    const base = { id: "a", status: "active", createdAt: ago(100), journal: [] };
+    check("lastContact: sem diário vale a criação", D.lastContact(base) === ago(100), String(D.lastContact(base)));
+    check("lastContact: é o maior registro do diário", D.lastContact({ ...base, journal: [{ at: ago(30) }, { at: ago(5) }, { at: ago(20) }] }) === ago(5));
+    check("lastContact: registro mais velho que a criação não vale menos que ela", D.lastContact({ ...base, createdAt: ago(10), journal: [{ at: ago(40) }] }) === ago(10));
+    check("isStale: 14 dias exatos não é parado", D.isStale({ ...base, journal: [{ at: ago(14) }] }, NOW) === false);
+    check("isStale: 15 dias é parado", D.isStale({ ...base, journal: [{ at: ago(15) }] }, NOW) === true);
+    check("isStale: um registro de ontem tira o traço", D.isStale({ ...base, journal: [{ at: ago(100) }, { at: ago(1) }] }, NOW) === false);
+    check("isStale: só vale para cliente ativo", !D.isStale({ ...base, status: "paused" }, NOW) && !D.isStale({ ...base, status: "prospect" }, NOW) && !D.isStale({ ...base, status: "closed" }, NOW) && !D.isStale({ ...base, status: "lost" }, NOW));
+    check("isStale: sem o 2º parâmetro usa o relógio de verdade", D.isStale({ ...base, createdAt: Date.now() - 20 * DAY }) === true && D.isStale({ ...base, createdAt: Date.now() - 2 * DAY }) === false);
+    check("daysSince: dias inteiros até o `now` dado", D.daysSince(ago(9), NOW) === 9 && D.daysSince(NOW - 9 * DAY - 3600000, NOW) === 9 && D.daysSince(NOW - 8 * DAY - 3600000, NOW) === 8);
+    check("daysSince: o futuro vale zero", D.daysSince(NOW + 5 * DAY, NOW) === 0);
+    check("daysSince: sem o 2º parâmetro usa o relógio de verdade", D.daysSince(Date.now() - 3 * DAY - 1000) === 3);
+  }
+
+  /* o funil */
+  {
+    const lead = (o) => ({ status: "prospect", stage: "lead", stageAt: ago(1), createdAt: ago(60), nextDate: "2026-10-25", ...o });
+    const clients = [
+      lead({ id: "bruna", name: "Bruna", stage: "proposal", stageAt: ago(9) }),
+      lead({ id: "caio", name: "Caio", stage: "lead", stageAt: ago(2), nextDate: "2026-10-17" }),
+      lead({ id: "davi", name: "Davi", stage: "qualified", stageAt: ago(1), nextDate: "" }),
+      lead({ id: "eva", name: "Eva", stage: "lead", stageAt: ago(3) }),
+      lead({ id: "lia", name: "Lia", status: "lost", stage: "proposal", stageAt: ago(40), nextDate: "2026-10-01" }),
+      lead({ id: "cris", name: "Cris", status: "closed", stage: "lead", stageAt: ago(40), nextDate: "" })
+    ];
+    const before = JSON.stringify(clients);
+    const r = D.pipelineToday(clients, TODAY, NOW);
+    check("funil: não altera o que recebe", JSON.stringify(clients) === before);
+    check("funil: as 5 etapas, em ordem, com a conta dos leads", JSON.stringify(r.stages) === JSON.stringify([
+      { id: "lead", label: "lead", count: 2 }, { id: "qualified", label: "qualificado", count: 1 }, { id: "call", label: "call marcada", count: 0 },
+      { id: "proposal", label: "proposta enviada", count: 1 }, { id: "negotiation", label: "negociação", count: 0 }
+    ]), JSON.stringify(r.stages));
+    check("parados: a Bruna, há 9 dias em proposta enviada, e o Caio, há 2, não", JSON.stringify(r.stuck) === JSON.stringify([{ id: "bruna", name: "Bruna", stage: "proposal", label: "proposta enviada", days: 9 }]), JSON.stringify(r.stuck));
+    check("atrasados: o Caio, com o contato de anteontem", JSON.stringify(r.late) === JSON.stringify([{ id: "caio", name: "Caio", nextDate: "2026-10-17" }]), JSON.stringify(r.late));
+    check("sem próximo passo: o lead sem data (e só ele)", JSON.stringify(r.noNext) === JSON.stringify([{ id: "davi", name: "Davi" }]), JSON.stringify(r.noNext));
+    check("perdido e encerrado ficam fora de tudo", ![r.late, r.noNext, r.stuck, r.stale, r.backlog].some((l) => l.some((x) => x.id === "lia" || x.id === "cris" || x.clientId === "lia" || x.clientId === "cris")), JSON.stringify(r));
+  }
+
+  /* o limite dos parados e a ordem das listas */
+  {
+    const lead = (o) => ({ status: "prospect", stage: "lead", createdAt: ago(90), nextDate: "2026-10-30", ...o });
+    const r = D.pipelineToday([
+      lead({ id: "a", name: "Alfa", stageAt: ago(7) }),
+      lead({ id: "b", name: "Beta", stageAt: ago(6) }),
+      lead({ id: "c", name: "Gama", stageAt: ago(20), stage: "call" }),
+      lead({ id: "d", name: "Delta", stageAt: ago(11), nextDate: "2026-10-15" }),
+      lead({ id: "e", name: "Épsilon", stageAt: ago(1), nextDate: "2026-10-10" }),
+      lead({ id: "f", name: "Zeta", stageAt: ago(1), nextDate: "2026-10-19" })
+    ], TODAY, NOW);
+    check("parados: 7 dias entra, 6 não", ids(r.stuck).includes("a") && !ids(r.stuck).includes("b"), JSON.stringify(r.stuck));
+    check("parados: do mais antigo para o mais recente", JSON.stringify(ids(r.stuck)) === JSON.stringify(["c", "d", "a"]) && r.stuck[0].days === 20 && r.stuck[0].label === "call marcada", JSON.stringify(r.stuck));
+    check("atrasados: o mais antigo primeiro", JSON.stringify(r.late.map((x) => x.id + ":" + x.nextDate)) === JSON.stringify(["e:2026-10-10", "d:2026-10-15"]), JSON.stringify(r.late));
+    check("atrasados: o contato de hoje ainda não está atrasado", !ids(r.late).includes("f"));
+  }
+
+  /* os clientes sem registro */
+  {
+    const cli = (o) => ({ status: "active", createdAt: ago(200), journal: [{ at: ago(20), type: "event", text: "ligação" }], ...o });
+    const r = D.pipelineToday([
+      cli({ id: "ana", name: "Ana" }),
+      cli({ id: "pau", name: "Paula", status: "paused" }),
+      cli({ id: "enc", name: "Enzo", status: "closed" }),
+      cli({ id: "rec", name: "Rui", journal: [{ at: ago(3) }] }),
+      cli({ id: "vel", name: "Vera", journal: [{ at: ago(45) }, { at: ago(30) }] }),
+      cli({ id: "lim", name: "Lia", journal: [{ at: ago(14) }] })
+    ], TODAY, NOW);
+    check("sem registro: o cliente ativo com último registro há 20 dias", r.stale.some((x) => x.id === "ana" && x.name === "Ana" && x.days === 20), JSON.stringify(r.stale));
+    check("sem registro: pausado não está", !ids(r.stale).includes("pau"));
+    check("sem registro: encerrado não está, nem o que tem registro recente", !ids(r.stale).includes("enc") && !ids(r.stale).includes("rec"));
+    check("sem registro: 14 dias exatos não está", !ids(r.stale).includes("lim"));
+    check("sem registro: do mais antigo para o mais recente", JSON.stringify(ids(r.stale)) === JSON.stringify(["vel", "ana"]) && r.stale[0].days === 30, JSON.stringify(r.stale));
+    check("sem registro: cliente ativo não vira lead", r.stages.every((s) => s.count === 0) && r.stuck.length === 0 && r.noNext.length === 0 && r.late.length === 0, JSON.stringify(r));
+  }
+
+  /* o backlog com prazo */
+  {
+    const item = (id, due, o) => ({ id, text: "item " + id, due, done: false, ...o });
+    const fresh = { createdAt: ago(1), journal: [{ at: ago(1) }] };
+    const r = D.pipelineToday([
+      { id: "ana", name: "Ana", status: "active", ...fresh, backlog: [
+        item("ontem", "2026-10-18"), item("hoje", TODAY), item("mais5", "2026-10-24"), item("mais7", "2026-10-26"),
+        item("mais12", "2026-10-31"), item("feito", "2026-10-18", { done: true }), item("sem-prazo", ""), item("prazo-ruim", "amanhã")
+      ] },
+      { id: "pau", name: "Paula", status: "paused", ...fresh, backlog: [item("pausado", "2026-10-20")] },
+      { id: "enc", name: "Enzo", status: "closed", ...fresh, backlog: [item("encerrado", "2026-10-20")] },
+      { id: "lia", name: "Lia", status: "lost", ...fresh, backlog: [item("perdido", "2026-10-20")] },
+      { id: "bru", name: "Bruna", status: "prospect", ...fresh, backlog: [item("do-lead", "2026-10-20")] }
+    ], TODAY, NOW);
+    const by = (id) => r.backlog.find((b) => b.id === id);
+    check("backlog: prazo de ontem é vencido", !!by("ontem") && by("ontem").when === "overdue" && by("ontem").due === "2026-10-18", JSON.stringify(r.backlog));
+    check("backlog: prazo de hoje é hoje", !!by("hoje") && by("hoje").when === "today");
+    check("backlog: daqui a 5 dias é em breve", !!by("mais5") && by("mais5").when === "soon");
+    check("backlog: daqui a 7 dias ainda entra", !!by("mais7") && by("mais7").when === "soon");
+    check("backlog: daqui a 12 dias fica fora", !by("mais12"));
+    check("backlog: o feito, o sem prazo e o prazo inválido ficam fora", !by("feito") && !by("sem-prazo") && !by("prazo-ruim"));
+    check("backlog: o item traz o cliente, o texto e o prazo", JSON.stringify(by("ontem")) === JSON.stringify({ id: "ontem", clientId: "ana", client: "Ana", text: "item ontem", due: "2026-10-18", when: "overdue" }), JSON.stringify(by("ontem")));
+    check("backlog: pausado entra", !!by("pausado") && by("pausado").client === "Paula");
+    check("backlog: encerrado, perdido e lead ficam fora", !by("encerrado") && !by("perdido") && !by("do-lead"));
+    check("backlog: do prazo mais próximo para o mais distante", JSON.stringify(r.backlog.map((b) => b.id)) === JSON.stringify(["ontem", "hoje", "pausado", "mais5", "mais7"]), JSON.stringify(r.backlog.map((b) => b.id)));
+    check("backlog: o cliente pausado não conta como sem registro", r.stale.length === 0);
+  }
+
+  /* vazio, esparso e inválido: nada quebra */
+  {
+    const empty = D.pipelineToday([], TODAY, NOW);
+    check("funil vazio: as 5 etapas com zero e o resto vazio", empty.stages.length === 5 && empty.stages.every((s) => s.count === 0) && ["late", "noNext", "stuck", "stale", "backlog"].every((k) => Array.isArray(empty[k]) && empty[k].length === 0), JSON.stringify(empty));
+    const sparse = D.pipelineToday([{ id: "x", name: "Sem nada", status: "prospect", stageAt: ago(8) }, { id: "y", status: "active", createdAt: ago(30) }], TODAY, NOW);
+    check("esparso: o documento incompleto é normalizado por dentro", sparse.stages.find((s) => s.id === "lead").count === 1 && sparse.stuck.length === 1 && sparse.stuck[0].stage === "lead" && sparse.noNext.length === 1 && sparse.stale.length === 1 && sparse.stale[0].days === 30, JSON.stringify(sparse));
+    const odd = D.pipelineToday([{ id: "z", name: "Sem status", stageAt: ago(1), nextDate: "2026-10-30" }], TODAY, NOW);
+    check("esparso: sem status vale lead (como o normalizador)", odd.stages.find((s) => s.id === "lead").count === 1);
+  }
+}
+
 /* ---- a linha e a fila, que o calendário e o rastreador do desktop dividem ----
    moraram dentro do calendar.jsx até o rastreador (tracker.jsx) passar a criar
    tarefa e a desenhar a barra. são as mesmas funções nas duas telas; o teste

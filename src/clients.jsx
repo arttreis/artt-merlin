@@ -19,7 +19,7 @@ import {
 import { NAV_ICONS } from "./shared/icons.jsx";
 import {
   normalize, STATUS_LABEL, CLIENT_STATUSES, RECURRENCES, RECURRENCE_LABEL, FILE_KINDS, kindFromName,
-  isClient, isPipeline, journalEntry, syncNext, waUrl, igUrl, siteUrl
+  isClient, isPipeline, isStale, journalEntry, syncNext, waUrl, igUrl, siteUrl
 } from "./shared/client-doc.js";
 import { normalize as normalizeTask } from "./shared/tasks.js";
 import { TaskDialog } from "./shared/task-form.jsx";
@@ -94,10 +94,6 @@ const journalDate = (at) => dateLabel(dayOf(new Date(at)), true);
 
 /* ---------- a lista ---------- */
 
-const lastContact = (c) => c.journal.reduce((m, e) => Math.max(m, +e.at || 0), c.createdAt);
-/* "faz tempo": so vale a pena avisar de quem esta ativo — cliente pausado
-   ou encerrado nao precisa de contato, entao nao ganha o traço. */
-const isStale = (c) => c.status === "active" && (Date.now() - lastContact(c)) > 14 * 86400000;
 function compareClients(a, b) {
   const pa = a.status === "active" ? 0 : 1, pb = b.status === "active" ? 0 : 1;
   return pa - pb || a.name.localeCompare(b.name, "pt-BR");
@@ -515,7 +511,7 @@ function ClientsSummary({ list }) {
   if (!list.length) return <p className="sub">quem fechou: a página, os arquivos, as tarefas e o histórico de cada um</p>;
   const active = list.filter((c) => c.status === "active");
   const monthly = active.filter((c) => c.contract.recurrence === "monthly").reduce((s, c) => s + c.contract.value, 0);
-  const stale = active.filter(isStale).length;
+  const stale = active.filter((c) => isStale(c)).length;
   const parts = [<><b>{active.length}</b> {active.length === 1 ? "ativo" : "ativos"}</>];
   if (monthly) parts.push(<><b>{brl(monthly)}</b> por mês em contrato</>);
   if (stale) parts.push(<><b>{stale}</b> sem registro há mais de 14 dias</>);

@@ -11,7 +11,7 @@
  *
  * sem React aqui: entra documento, sai documento.
  */
-import { collection, newId, isDay } from "./core.js";
+import { collection, newId, isDay, addDays } from "./core.js";
 import { tasks, newTask, topOrder } from "./tasks.js";
 
 /* ---------- status ----------
@@ -170,4 +170,47 @@ export function syncNext(c) {
 export const waUrl = (n) => { const d = String(n || "").replace(/\D/g, ""); return d ? "https://wa.me/" + (d.startsWith("55") ? d : "55" + d) : ""; };
 export const igUrl = (h) => { const u = String(h || "").trim().replace(/^@/, "").replace(/^https?:\/\/(www\.)?instagram\.com\//, ""); return u ? "https://instagram.com/" + u : ""; };
 export const siteUrl = (u) => { const s = String(u || "").trim(); return !s ? "" : /^https?:\/\//i.test(s) ? s : "https://" + s; };
-export const daysSince = (ms) => Math.max(0, Math.floor((Date.now() - (+ms || Date.now())) / 86400000));
+export const daysSince = (ms, now = Date.now()) => Math.max(0, Math.floor((now - (+ms || now)) / 86400000));
+
+/* ---------- ha quanto tempo ninguem fala com o cliente ----------
+   a lista de clientes e o retrato do Merlin contam a mesma coisa: a conta mora
+   aqui para as duas dizerem o mesmo "faz tempo". */
+export const lastContact = (c) => c.journal.reduce((m, e) => Math.max(m, +e.at || 0), c.createdAt);
+/* "faz tempo": so vale a pena avisar de quem esta ativo — cliente pausado
+   ou encerrado nao precisa de contato, entao nao ganha o traço. */
+export const isStale = (c, now = Date.now()) => c.status === "active" && (now - lastContact(c)) > 14 * 86400000;
+
+/* ---------- o funil e os clientes, do jeito que o retrato le ----------
+   o que as telas calculam cada uma por si (o cartao da prospeccao, o traço da
+   lista) numa conta so, para o Merlin responder "quais leads estao parados?"
+   sem abrir tela. `today` e o dia ("2026-10-19"), `now` os milissegundos de
+   agora. perdido e encerrado ficam fora de tudo; pausado so entra no backlog.
+   aceita documento cru: normaliza por dentro. */
+const STUCK_DAYS = 7;
+const SOON_DAYS = 7;
+export function pipelineToday(clients, today, now = Date.now()) {
+  const docs = list(clients).filter(Boolean).map(normalize);
+  const leads = docs.filter(isPipeline);
+  const byName = (a, b) => a.name.localeCompare(b.name, "pt-BR");
+  const soon = addDays(today, SOON_DAYS);
+
+  const backlog = [];
+  docs.filter((c) => c.status === "active" || c.status === "paused").forEach((c) => {
+    c.backlog.forEach((b) => {
+      if (!b || b.done || !isDay(b.due) || b.due > soon) return;
+      backlog.push({ id: String(b.id), clientId: c.id, client: c.name, text: String(b.text || ""), due: b.due, when: b.due < today ? "overdue" : b.due === today ? "today" : "soon" });
+    });
+  });
+
+  return {
+    stages: STAGES.map((s) => ({ id: s.id, label: s.label, count: leads.filter((c) => c.stage === s.id).length })),
+    late: leads.filter((c) => c.nextDate && c.nextDate < today).sort((a, b) => a.nextDate.localeCompare(b.nextDate) || byName(a, b))
+      .map((c) => ({ id: c.id, name: c.name, nextDate: c.nextDate })),
+    noNext: leads.filter((c) => !c.nextDate).sort(byName).map((c) => ({ id: c.id, name: c.name })),
+    stuck: leads.map((c) => ({ id: c.id, name: c.name, stage: c.stage, label: stageLabel(c.stage), days: daysSince(c.stageAt, now) }))
+      .filter((c) => c.days >= STUCK_DAYS).sort((a, b) => b.days - a.days || byName(a, b)),
+    stale: docs.filter((c) => isStale(c, now)).map((c) => ({ id: c.id, name: c.name, days: daysSince(lastContact(c), now) }))
+      .sort((a, b) => b.days - a.days || byName(a, b)),
+    backlog: backlog.sort((a, b) => a.due.localeCompare(b.due) || a.client.localeCompare(b.client, "pt-BR"))
+  };
+}
