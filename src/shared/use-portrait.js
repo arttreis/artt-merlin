@@ -12,6 +12,7 @@ import { normalize as normalizeTask } from "./tasks.js";
 import { normalize as normalizeBlock } from "./routine.js";
 import { normalizeCadence } from "./content-script.js";
 import { normalize as normalizeHabit } from "./habits-data.js";
+import { normalize as normalizeFinance } from "./finance-data.js";
 import { portraitOf, portraitData, waitPortrait } from "./portrait.js";
 
 export function usePortrait() {
@@ -26,6 +27,7 @@ export function usePortrait() {
     cadence: useCollection("cadence", { normalize: normalizeCadence }),
     habits: useCollection("habits", { normalize: normalizeHabit }),
     notes: useCollection("notes"),
+    finance: useCollection("finance", { normalize: normalizeFinance }),
     profile: useCollection("profile")
   };
   return async () => {

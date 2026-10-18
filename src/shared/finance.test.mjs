@@ -154,6 +154,10 @@ const sameJson = (a, b) => JSON.stringify(a) === JSON.stringify(b);
   const said = newEntry({ title: "", amount: 148000, flow: "out", date: TODAY, confirm: "p15" }, cfg, ctx, TODAY).doc;
   check("confirmar: o valor dito troca o de antes", said && said.id === "p15" && said.amount === 148000 && said.paid === true && said.day === "2026-10-15", JSON.stringify(said));
 
+  /* o retrato mostra o id como "#p15", e a IA às vezes o devolve assim */
+  const hashed = newEntry({ title: "", amount: 0, flow: "out", date: TODAY, confirm: "#p15" }, cfg, ctx, TODAY).doc;
+  check("confirmar: o id com # do retrato confirma o mesmo previsto", hashed && hashed.id === "p15" && hashed.paid === true, JSON.stringify(hashed));
+
   const named = newEntry({ title: "aluguel de outubro", amount: 0, flow: "out", date: TODAY, confirm: "p15" }, cfg, ctx, TODAY).doc;
   check("confirmar: o nome dito troca o de antes", named && named.id === "p15" && named.name === "aluguel de outubro", JSON.stringify(named));
 
@@ -196,6 +200,8 @@ const sameJson = (a, b) => JSON.stringify(a) === JSON.stringify(b);
   const undo = undoEntry(null, d);
   check("fixo: o desfazer apaga o lançamento, e a sugestão volta", undo.remove === d.id && projectionsOf("2026-10-20", ctx).length === 1);
 
+  const hashed = newEntry({ title: "", amount: 0, flow: "out", date: TODAY, fixed: "#f-net" }, cfg, ctx, TODAY).doc;
+  check("fixo: o id com # do retrato lança o fixo", hashed && hashed.origin && hashed.origin.type === "fixed" && hashed.origin.id === "f-net", JSON.stringify(hashed));
   const said = newEntry({ title: "internet", amount: 13990, flow: "out", category: "Ferramentas", date: TODAY, fixed: "f-net" }, cfg, ctx, TODAY).doc;
   check("fixo: o valor dito troca o do fixo", said && said.amount === 13990 && said.origin.type === "fixed", JSON.stringify(said));
   check("fixo: a categoria dita, se existe, troca a do fixo", said && said.category === "Ferramentas");
@@ -314,6 +320,483 @@ const sameJson = (a, b) => JSON.stringify(a) === JSON.stringify(b);
   check("newEntry é pura: o contexto fica como estava", JSON.stringify(ctx) === frozen);
   check("contextOf expõe o que o newEntry lê", ["entries", "fixed", "cards", "startBalance"].every((k) => k in contextOf(core.collection("finance", { normalize }))));
 }
+
+/* =====================================================================
+   o dinheiro no retrato (ticket #11): financeToday, moneyLines, e as contas
+   que saíram de finance.jsx para o finance-data.js sem mudar o que a tela mostra.
+
+   o que o Merlin lê aqui responde "quanto gastei no mercado?", "o que vence
+   essa semana?" e "posso assumir 3 mil por mês?". errar é número errado
+   dito com segurança: um previsto que entra no saldo de hoje, uma sugestão
+   que conta duas vezes, um valor cortado no meio ("R$ 1.2").
+   ===================================================================== */
+const FD = await import("./finance-data.js");
+const { financeToday, moneyLines, buildMonth, spentByCategory, pendingBefore, suggestionsBetween, financeBrief, configOf } = FD;
+const { brl } = core;
+
+/* um bloco que explode não pode apagar os outros: vira uma falha com o motivo */
+const section = (name, fn) => {
+  try { fn(); } catch (e) { failures.push(name + " -> exceção: " + (e && e.message)); }
+};
+
+const ent = (id, day, name, kind, amount, paid, extra) =>
+  ({ id, type: "entry", day, name, kind, amount, paid, category: "", origin: null, via: "", createdAt: 1, updatedAt: 1, ...extra });
+const mk = (o) => ({ entries: [], fixed: [], cards: [], debts: [], invests: [], startBalance: { day: "2026-10-01", amount: 0 }, ...o });
+const cfgOf = (o) => normalize({ id: "config", type: "config", ...o });
+const ids = (list) => list.map((x) => x.id);
+const lineStarting = (lines, prefix) => lines.find((l) => l.startsWith(prefix));
+const signed = (list) => list.reduce((s, e) => s + (e.kind === "in" ? e.amount : -e.amount), 0);
+/* "a; b; e mais 3" -> { items: ["a", "b"], more: 3 } */
+const parseLine = (line, prefix) => {
+  const parts = line.slice(prefix.length).split("; ");
+  const m = /^e mais (\d+)$/.exec(parts[parts.length - 1]);
+  return { items: m ? parts.slice(0, -1) : parts, more: m ? +m[1] : 0 };
+};
+const D3 = "2026-10-20", D7 = "2026-10-24", D8 = "2026-10-25", D10 = "2026-10-27";
+
+/* ---------- "quanto gastei no mercado este mês?" ---------- */
+section("mercado", () => {
+  const ctx = mk({ entries: [
+    ent("m1", "2026-10-02", "mercado", "out", 10000, true, { category: "Básicas/PF" }),
+    ent("m2", "2026-10-09", "mercado", "out", 25000, true, { category: "Básicas/PF" }),
+    ent("m3", "2026-10-15", "mercado", "out", 8000, true, { category: "Básicas/PF" }),
+    ent("m-velho", "2026-09-20", "mercado", "out", 9000, true, { category: "Básicas/PF" }),
+    ent("m-previsto", "2026-10-28", "mercado", "out", 7000, false),
+    ent("m-entrada", "2026-10-12", "mercado", "in", 5000, true),
+    ent("far", "2026-10-10", "farmácia", "out", 5000, true)
+  ] });
+  const f = financeToday(ctx, cfgOf({}), TODAY);
+  check("mercado: as três saídas viram uma só, de 430", f.top[0] && f.top[0].name === "mercado" && f.top[0].amount === 43000 && f.top[0].count === 3, JSON.stringify(f.top));
+  check("mercado: a segunda maior é a farmácia", f.top[1] && f.top[1].name === "farmácia" && f.top[1].amount === 5000 && f.top[1].count === 1, JSON.stringify(f.top));
+  check("mercado: só as saídas pagas do mês entram (nem mês passado, nem previsto, nem entrada)", f.top.length === 2, JSON.stringify(f.top));
+  const l = lineStarting(moneyLines(f, 900), "maiores saídas: ");
+  check("mercado: o texto diz 'mercado · R$ 430,00 (3×)'", !!l && l.includes("mercado · " + brl(43000) + " (3×)"), String(l));
+  check("mercado: o do mês passado e o previsto não somam no texto", !!l && !l.includes(brl(52000)) && !l.includes(brl(50000)), String(l));
+  check("mercado: uma vez só não leva '(1×)'", !!l && l.includes("farmácia · " + brl(5000)) && !l.includes("(1×)"), String(l));
+});
+
+section("maiores saídas: agrupar e limitar", () => {
+  const same = mk({ entries: [
+    ent("a", "2026-10-02", "Mercado", "out", 1000, true),
+    ent("b", "2026-10-03", " mercado ", "out", 2000, true),
+    ent("c", "2026-10-04", "MERCADO", "out", 3000, true)
+  ] });
+  const g = financeToday(same, cfgOf({}), TODAY).top;
+  check("top: maiúscula e espaço nas pontas não separam o grupo", g.length === 1 && g[0].amount === 6000 && g[0].count === 3 && g[0].name.trim().toLowerCase() === "mercado", JSON.stringify(g));
+
+  const many = mk({ entries: Array.from({ length: 10 }, (_, i) => ent("t" + i, "2026-10-05", "gasto " + i, "out", 1000 * (i + 1), true)) });
+  const t = financeToday(many, cfgOf({}), TODAY).top;
+  check("top: no máximo 8", t.length === 8, String(t.length));
+  check("top: da maior para a menor", t.every((x, i) => i === 0 || t[i - 1].amount >= x.amount) && t[0].amount === 10000, JSON.stringify(t.map((x) => x.amount)));
+  check("top: os dois menores ficam de fora", !t.some((x) => x.amount === 1000 || x.amount === 2000), JSON.stringify(t.map((x) => x.amount)));
+  const none = financeToday(mk({ entries: [ent("p", "2026-10-20", "x", "out", 100, false)] }), cfgOf({}), TODAY);
+  check("top: sem saída paga, a lista é vazia", none.top.length === 0);
+  check("top: sem saída paga, o texto não tem a linha", !lineStarting(moneyLines(none, 900), "maiores saídas: "));
+});
+
+/* ---------- gasto por categoria e a meta ---------- */
+section("categoria: 1.200 contra a meta de 1.000", () => {
+  const ctx = mk({ entries: [
+    ent("g1", "2026-10-05", "mercado", "out", 80000, true, { category: "Básicas/PF" }),
+    ent("g2", "2026-10-25", "reforma", "out", 40000, false, { category: "Básicas/PF" }),
+    ent("g3", "2026-10-06", "projeto", "in", 10000, true, { category: "Freela" }),
+    ent("g4", "2026-10-07", "bala", "out", 3000, true),
+    ent("g5", "2026-09-30", "mês passado", "out", 9999, true, { category: "Lazer" })
+  ], fixed: [{ id: "f-l", type: "fixed", name: "revista", amount: 5000, kind: "out", category: "Lazer", dayOfMonth: 28, active: true }] });
+  const days = buildMonth("2026-10", ctx, null, TODAY).filter((d) => !d.before);
+  const moved = spentByCategory(days);
+  const b = moved["Básicas/PF"] || {};
+  check("categoria: outAll é 120000 e outReal é 80000", b.outAll === 120000 && b.outReal === 80000 && b.in === 0, JSON.stringify(b));
+  check("categoria: a entrada soma em `in`, não em saída", moved["Freela"] && moved["Freela"].in === 10000 && moved["Freela"].outAll === 0, JSON.stringify(moved["Freela"]));
+  check("categoria: sem categoria vai para 'sem categoria'", moved["sem categoria"] && moved["sem categoria"].outAll === 3000 && moved["sem categoria"].outReal === 3000, JSON.stringify(moved["sem categoria"]));
+  check("categoria: sugestão de fixo não entra na conta", !moved["Lazer"], JSON.stringify(moved["Lazer"]));
+  check("categoria: sem dias, nada", JSON.stringify(spentByCategory([])) === "{}");
+
+  const cfg = cfgOf({ budgets: { "Básicas/PF": 100000, Lazer: 100000 } });
+  const f = financeToday(ctx, cfg, TODAY);
+  const c = f.categories.find((x) => x.name === "Básicas/PF");
+  check("categoria: o financeToday traz gasto, pago, meta e passou", c && c.outAll === 120000 && c.outReal === 80000 && c.goal === 100000 && c.over === true && c.in === 0, JSON.stringify(c));
+  const lines = moneyLines(f, 900);
+  const cat = lineStarting(lines, "categorias: ");
+  const expected = "Básicas/PF " + brl(120000) + " (" + brl(80000) + " pago) de " + brl(100000) + ", passou da meta";
+  check("categoria: a seção diz 'passou da meta' com o pago entre parênteses", !!cat && cat.includes(expected), String(cat));
+  const lazer = f.categories.find((x) => x.name === "Lazer");
+  check("categoria: dentro da meta, over é falso", lazer && lazer.over === false && lazer.goal === 100000, JSON.stringify(lazer));
+  check("categoria: dentro da meta, o texto não diz 'passou' nem 'pago'", !!cat && !cat.split("; ").some((i) => i.startsWith("Lazer") && /passou|pago/.test(i)), String(cat));
+  check("categoria: o mês passado não conta no Lazer", lazer && lazer.outAll === 0, JSON.stringify(lazer));
+  check("categoria: 'sem categoria' não é uma categoria da lista", !f.categories.some((x) => x.name === "sem categoria"));
+});
+
+section("categoria: meta, ordem, órfã e borda", () => {
+  const ctx = mk({ entries: [
+    ent("o1", "2026-10-05", "a", "out", 120000, true, { category: "Básicas/PF" }),
+    ent("o2", "2026-10-05", "b", "out", 5000, true, { category: "Lazer" }),
+    ent("o3", "2026-10-05", "c", "out", 90000, true, { category: "Recorrente" }),
+    ent("o4", "2026-10-05", "d", "out", 20000, true, { category: "Pets" }),
+    ent("o5", "2026-10-05", "e", "out", 70000, true, { category: "Ferramentas" })
+  ] });
+  const cfg = cfgOf({ budgets: { "Básicas/PF": 100000, Lazer: 100000, Ferramentas: 70000 } });
+  const f = financeToday(ctx, cfg, TODAY);
+  const names = f.categories.map((x) => x.name);
+  const at = (n) => names.indexOf(n);
+  check("ordem: com meta primeiro, a mais apertada no topo", at("Básicas/PF") === 0 && at("Ferramentas") === 1 && at("Lazer") === 2, JSON.stringify(names));
+  check("ordem: sem meta, a que mais gastou primeiro", at("Recorrente") === 3 && at("Pets") === 4, JSON.stringify(names));
+  check("ordem: a órfã (fora da config) com movimento aparece", at("Pets") >= 0 && !cfg.categories.includes("Pets"));
+  const ferr = f.categories[at("Ferramentas")];
+  check("borda: gastar exatamente a meta não passa dela", ferr.outAll === 70000 && ferr.goal === 70000 && ferr.over === false, JSON.stringify(ferr));
+  const cat = lineStarting(moneyLines(f, 1200), "categorias: ");
+  const items = cat.slice("categorias: ".length).split("; ");
+  check("texto: sem meta e com saída é 'nome R$ x'", items.includes("Recorrente " + brl(90000)) && items.includes("Pets " + brl(20000)), JSON.stringify(items));
+  check("texto: com meta e tudo pago, sem '(… pago)'", items.includes("Lazer " + brl(5000) + " de " + brl(100000)), JSON.stringify(items));
+  check("texto: sem nada, só o nome", items.includes("Outros"), JSON.stringify(items));
+  check("texto: no limite da meta, sem 'passou'", items.includes("Ferramentas " + brl(70000) + " de " + brl(70000)), JSON.stringify(items));
+  check("texto: a ordem do texto é a da lista", items.findIndex((i) => i.startsWith("Básicas/PF")) === 0 && items.findIndex((i) => i.startsWith("Ferramentas")) === 1, JSON.stringify(items));
+});
+
+/* ---------- saldo hoje e previsto do fim do mês ---------- */
+section("saldo e previsto", () => {
+  const ctx = mk({ startBalance: { day: "2026-10-01", amount: 100000 }, entries: [
+    ent("s1", "2026-10-05", "freela", "in", 50000, true),
+    ent("s2", "2026-10-25", "dentista", "out", 30000, false)
+  ] });
+  const f = financeToday(ctx, cfgOf({}), TODAY);
+  check("saldo: hoje é R$ 1.500,00", f.real === 150000, String(f.real));
+  check("saldo: o previsto do fim do mês é R$ 1.200,00", f.monthEnd === 120000, String(f.monthEnd));
+  check("saldo: a primeira linha diz os dois e o menor adiante", moneyLines(f, 900)[0] === "saldo hoje " + brl(150000, true) + " · fim do mês ≈ " + brl(120000, true) + " · menor ≈ " + brl(120000, true) + " em 25/10", moneyLines(f, 900)[0]);
+  check("saldo: o menor saldo adiante é o do dia 25", f.low && f.low.day === "2026-10-25" && f.low.balance === 120000, JSON.stringify(f.low));
+
+  /* sugestão de fixo: soma no previsto de hoje em diante, nunca no real */
+  const withFixed = { ...ctx, fixed: [{ id: "f-a", type: "fixed", name: "aluguel", amount: 200000, kind: "out", category: "Básicas/PF", dayOfMonth: 20, active: true }] };
+  const g = financeToday(withFixed, cfgOf({}), TODAY);
+  check("saldo: a sugestão de fixo não mexe no saldo real", g.real === 150000, String(g.real));
+  check("saldo: a sugestão de fixo entra no previsto do mês", g.monthEnd === 120000 - 200000, String(g.monthEnd));
+  const launched = { ...withFixed, entries: [...ctx.entries, ent("s3", "2026-10-20", "aluguel", "out", 200000, false, { origin: { type: "fixed", id: "f-a" } })] };
+  check("saldo: o fixo já lançado não conta duas vezes", financeToday(launched, cfgOf({}), TODAY).monthEnd === g.monthEnd, String(financeToday(launched, cfgOf({}), TODAY).monthEnd));
+  const past = { ...ctx, fixed: [{ id: "f-s", type: "fixed", name: "salário", amount: 500000, kind: "in", category: "", dayOfMonth: 5, active: true }] };
+  check("saldo: sugestão de dia que já passou não entra", financeToday(past, cfgOf({}), TODAY).monthEnd === 120000, String(financeToday(past, cfgOf({}), TODAY).monthEnd));
+  const off = { ...withFixed, fixed: [{ ...withFixed.fixed[0], active: false }] };
+  check("saldo: fixo inativo não entra", financeToday(off, cfgOf({}), TODAY).monthEnd === 120000);
+
+  const frozen = JSON.stringify(withFixed);
+  financeToday(withFixed, cfgOf({}), TODAY);
+  check("financeToday é pura: o contexto fica como estava", JSON.stringify(withFixed) === frozen);
+});
+
+/* ---------- o menor saldo à frente ---------- */
+section("menor saldo", () => {
+  const ctx = mk({ startBalance: { day: "2026-10-01", amount: 100000 }, entries: [
+    ent("l1", "2026-10-20", "reforma", "out", 200000, false),
+    ent("l2", "2026-10-28", "cliente", "in", 300000, false)
+  ] });
+  const f = financeToday(ctx, cfgOf({}), TODAY);
+  check("menor: é negativo, no dia 20", f.low && f.low.day === "2026-10-20" && f.low.balance === -100000, JSON.stringify(f.low));
+  check("menor: o fim do mês fecha no azul (o menor não é o fim)", f.monthEnd === 200000, String(f.monthEnd));
+  const l0 = moneyLines(f, 900)[0];
+  check("menor: o texto diz o valor negativo e o dia", l0.includes(" · menor ≈ " + brl(-100000, true) + " em 20/10") && l0.includes("−"), l0);
+
+  const rising = mk({ startBalance: { day: "2026-10-01", amount: 100000 }, entries: [ent("r1", D3, "cliente", "in", 50000, false)] });
+  const r = financeToday(rising, cfgOf({}), TODAY);
+  check("menor: se só sobe, o menor é hoje", r.low && r.low.day === TODAY && r.low.balance === 100000, JSON.stringify(r.low));
+
+  const dipped = mk({ startBalance: { day: "2026-10-01", amount: 100000 }, entries: [
+    ent("d1", "2026-10-10", "gasto", "out", 150000, true),
+    ent("d2", "2026-10-12", "cliente", "in", 200000, true)
+  ] });
+  const d = financeToday(dipped, cfgOf({}), TODAY);
+  check("menor: só olha de hoje em diante (o fundo do dia 10 já passou)", d.low && d.low.day >= TODAY && d.low.balance === 150000, JSON.stringify(d.low));
+
+  const late = mk({ startBalance: { day: "2026-11-01", amount: 100000 } });
+  const n = financeToday(late, cfgOf({}), TODAY);
+  check("menor: mês inteiro antes do saldo inicial não tem menor", n.low === null, JSON.stringify(n.low));
+  check("menor: sem menor, a primeira linha não o menciona", !moneyLines(n, 900)[0].includes("menor"), moneyLines(n, 900)[0]);
+});
+
+/* ---------- o que vence em 7 dias, e o resto do mês ---------- */
+section("vence em 7 dias", () => {
+  const ctx = mk({ entries: [
+    ent("v3", D3, "dentista", "out", 30000, false),
+    ent("v7", D7, "boleto no limite", "out", 4000, false),
+    ent("v8", D8, "oito dias", "out", 5000, false),
+    ent("v10", D10, "viagem", "out", 60000, false),
+    ent("v31", "2026-10-31", "fim do mês", "out", 7000, false),
+    ent("vnov", "2026-11-05", "mês que vem", "out", 8000, false),
+    ent("vhoje", TODAY, "hoje aberto", "out", 1000, false),
+    ent("vpago", D3, "já pago", "out", 2000, true),
+    ent("vin", "2026-10-21", "cliente", "in", 100000, false)
+  ] });
+  const f = financeToday(ctx, cfgOf({}), TODAY);
+  check("7 dias: entram hoje, +3 e +7 (e a entrada), por dia", JSON.stringify(ids(f.soon)) === JSON.stringify(["vhoje", "v3", "vin", "v7"]), JSON.stringify(ids(f.soon)));
+  check("7 dias: o de 10 dias e o de 8 dias não entram", !ids(f.soon).includes("v10") && !ids(f.soon).includes("v8"));
+  check("7 dias: pago não entra", !ids(f.soon).includes("vpago"));
+  check("mês: o resto do mês é o depois de +7, por dia", JSON.stringify(ids(f.later)) === JSON.stringify(["v8", "v10", "v31"]), JSON.stringify(ids(f.later)));
+  check("mês: o do mês que vem não entra no resto do mês", !ids(f.later).includes("vnov") && !ids(f.soon).includes("vnov"));
+  check("7 dias: o de hoje ainda aberto não é 'a confirmar'", !ids(f.pending).includes("vhoje"), JSON.stringify(ids(f.pending)));
+
+  const lines = moneyLines(f, 1200);
+  const soon = lineStarting(lines, "vence em 7 dias: ");
+  check("7 dias: o item é 'DD/MM nome valor #id'", !!soon && soon.includes("20/10 dentista " + brl(30000) + " #v3"), String(soon));
+  check("7 dias: entrada leva '+' antes do valor", !!soon && soon.includes("21/10 cliente +" + brl(100000) + " #vin"), String(soon));
+  check("7 dias: o de daqui a 10 dias fica fora da linha", !!soon && !soon.includes("viagem"), String(soon));
+  const later = lineStarting(lines, "previsto no mês: ");
+  check("mês: a linha 'previsto no mês' traz o de 27/10", !!later && later.includes("27/10 viagem " + brl(60000) + " #v10") && !later.includes("dentista"), String(later));
+});
+
+section("vence em 7 dias: cruza o mês", () => {
+  const T = "2026-10-28";
+  const ctx = mk({ entries: [ent("x1", "2026-11-02", "luz", "out", 25000, false), ent("x2", "2026-11-20", "longe", "out", 1000, false)] });
+  const f = financeToday(ctx, cfgOf({}), T);
+  check("cruzar o mês: 02/11 está a 5 dias de 28/10 e entra", JSON.stringify(ids(f.soon)) === JSON.stringify(["x1"]), JSON.stringify(ids(f.soon)));
+  check("cruzar o mês: o resto do mês de outubro fica vazio", f.later.length === 0, JSON.stringify(ids(f.later)));
+  check("cruzar o mês: o texto traz '02/11 luz'", (lineStarting(moneyLines(f, 900), "vence em 7 dias: ") || "").includes("02/11 luz " + brl(25000) + " #x1"));
+  const bare = moneyLines(financeToday(mk({}), cfgOf({}), TODAY), 900);
+  check("sem previstos, as linhas 'vence' e 'previsto' somem", !lineStarting(bare, "vence em 7 dias: ") && !lineStarting(bare, "previsto no mês: "), JSON.stringify(bare));
+});
+
+/* ---------- a confirmar ---------- */
+section("a confirmar", () => {
+  const ctx = mk({ startBalance: { day: "2026-09-01", amount: 100000 }, entries: [
+    ent("c3", "2026-10-14", "aluguel", "out", 150000, false),
+    ent("c10", "2026-10-10", "luz", "out", 20000, false),
+    ent("cold", "2026-09-28", "antigo", "in", 9000, false),
+    ent("cpago", "2026-10-15", "pago", "out", 700, true),
+    ent("choje", TODAY, "hoje", "out", 800, false),
+    ent("cfut", D3, "futuro", "out", 900, false)
+  ], fixed: [{ id: "f-x", type: "fixed", name: "internet", amount: 12000, kind: "out", category: "", dayOfMonth: 12, active: true }] });
+  const f = financeToday(ctx, cfgOf({}), TODAY);
+  check("confirmar: o previsto de 3 dias atrás está em 'a confirmar'", ids(f.pending).includes("c3"), JSON.stringify(ids(f.pending)));
+  check("confirmar: do mais antigo ao mais novo, mesmo de outro mês", JSON.stringify(ids(f.pending)) === JSON.stringify(["cold", "c10", "c3"]), JSON.stringify(ids(f.pending)));
+  check("confirmar: pago, de hoje e do futuro ficam de fora; a sugestão de fixo também", f.pending.length === 3);
+  check("confirmar: o previsto não pago não está no saldo real", f.real === 100000 - 700, String(f.real));
+  check("confirmar: o previsto não pago entra no previsto do mês", f.monthEnd === 100000 + signed(ctx.entries), String(f.monthEnd));
+  const l = lineStarting(moneyLines(f, 1200), "a confirmar: ");
+  const expected = "a confirmar: 14/10 aluguel " + brl(150000) + " #c3; 10/10 luz " + brl(20000) + " #c10; 28/09 antigo +" + brl(9000) + " #cold";
+  check("confirmar: no texto, os mais recentes primeiro, entrada com '+'", l === expected, String(l));
+  check("confirmar: sem nenhum, a linha some", !lineStarting(moneyLines(financeToday(mk({}), cfgOf({}), TODAY), 900), "a confirmar: "));
+});
+
+/* ---------- os fixos ---------- */
+section("fixos do mês", () => {
+  const T = "2026-11-15";
+  const ctx = mk({ startBalance: { day: "2026-11-01", amount: 0 }, entries: [
+    ent("fe", "2026-11-05", "salário", "in", 500000, true, { origin: { type: "fixed", id: "f-sal" } })
+  ], fixed: [
+    { id: "f-anual", type: "fixed", name: "plano anual", amount: 5000, kind: "out", category: "Ferramentas", dayOfMonth: 31, active: true },
+    { id: "f-alug", type: "fixed", name: "aluguel", amount: 200000, kind: "out", category: "Básicas/PF", dayOfMonth: 10, active: true },
+    { id: "f-sal", type: "fixed", name: "salário", amount: 500000, kind: "in", category: "Freela", dayOfMonth: 5, active: true },
+    { id: "f-velho", type: "fixed", name: "revista", amount: 9900, kind: "out", category: "Lazer", dayOfMonth: 15, active: false }
+  ] });
+  const f = financeToday(ctx, cfgOf({}), T);
+  check("fixos: só os ativos, por dia", JSON.stringify(ids(f.fixed)) === JSON.stringify(["f-sal", "f-alug", "f-anual"]), JSON.stringify(ids(f.fixed)));
+  check("fixos: o dia 31 em mês de 30 cai no dia 30", f.fixed[2] && f.fixed[2].day === "2026-11-30", JSON.stringify(f.fixed[2]));
+  check("fixos: traz nome, valor, tipo, categoria e o dia efetivo", f.fixed[1] && f.fixed[1].name === "aluguel" && f.fixed[1].amount === 200000 && f.fixed[1].kind === "out" && f.fixed[1].category === "Básicas/PF" && f.fixed[1].day === "2026-11-10", JSON.stringify(f.fixed[1]));
+  check("fixos: 'entered' é verdadeiro só para o já lançado no mês", f.fixed.length === 3 && f.fixed[0].entered === true && f.fixed[1].entered === false && f.fixed[2].entered === false, JSON.stringify(f.fixed.map((x) => x.entered)));
+  const l = lineStarting(moneyLines(f, 900), "fixos: ");
+  const items = (l || "").slice("fixos: ".length).split("; ");
+  check("fixos: o ainda não lançado leva o id", items.includes("aluguel " + brl(200000) + " dia 10 #f-alug"), JSON.stringify(items));
+  check("fixos: o dia 31 aparece no dia efetivo, com o id", items.includes("plano anual " + brl(5000) + " dia 30 #f-anual"), JSON.stringify(items));
+  check("fixos: o já lançado diz 'lançado', sem id, e a entrada leva '+'", items.some((i) => /^salário \+/.test(i) && i.includes(brl(500000)) && / dia 0?5 lançado$/.test(i) && !i.includes("#")), JSON.stringify(items));
+  check("fixos: o inativo não entra", !(l || "").includes("revista"));
+  check("fixos: sem fixos, a linha some", !lineStarting(moneyLines(financeToday(mk({}), cfgOf({}), TODAY), 900), "fixos: "));
+});
+
+/* ---------- vazio ---------- */
+section("vazio", () => {
+  const nothing = mk({ startBalance: null });
+  const f = financeToday(nothing, cfgOf({}), TODAY);
+  check("vazio: sem nada, empty é verdadeiro e o texto é uma linha", f.empty === true && JSON.stringify(moneyLines(f, 900)) === JSON.stringify(["sem financeiro ainda"]), JSON.stringify(moneyLines(f, 900)));
+  const onlyDebts = mk({ startBalance: null, debts: [{ id: "d", type: "debt", name: "empréstimo", creditor: "Pedro", total: 100000, paid: 0, installment: 10000, dayOfMonth: 5 }], invests: [{ id: "i", type: "invest", name: "CDB", category: "renda fixa", contributed: 100, current: 100, order: 0 }] });
+  check("vazio: só dívida e investimento é vazio", financeToday(onlyDebts, cfgOf({}), TODAY).empty === true);
+  check("vazio: só o saldo inicial não é vazio", financeToday(mk({}), cfgOf({}), TODAY).empty === false);
+  check("vazio: só um fixo não é vazio", financeToday(mk({ startBalance: null, fixed: [{ id: "f", type: "fixed", name: "x", amount: 100, kind: "out", category: "", dayOfMonth: 3, active: true }] }), cfgOf({}), TODAY).empty === false);
+  check("vazio: só um lançamento não é vazio", financeToday(mk({ startBalance: null, entries: [ent("e", "2026-10-02", "x", "out", 100, true)] }), cfgOf({}), TODAY).empty === false);
+});
+
+/* ---------- o texto: ordem, um grupo por linha, o orçamento ---------- */
+const BIG = () => {
+  const entries = [];
+  for (let i = 0; i < 12; i++) entries.push(ent("pa" + i, "2026-10-" + String(1 + i).padStart(2, "0"), "pendente número " + i, "out", 10000 + i, false));
+  for (let i = 0; i < 6; i++) entries.push(ent("so" + i, "2026-10-" + String(18 + i).padStart(2, "0"), "vencendo " + i, "out", 5000 + i, false));
+  for (let i = 0; i < 4; i++) entries.push(ent("la" + i, "2026-10-" + String(26 + i).padStart(2, "0"), "mais para o fim " + i, "out", 7000 + i, false));
+  for (let i = 0; i < 10; i++) entries.push(ent("pg" + i, "2026-10-" + String(2 + i).padStart(2, "0"), "gasto pago " + i, "out", 3000 + i * 100, true, { category: i % 2 ? "Lazer" : "Básicas/PF" }));
+  const fixed = Array.from({ length: 30 }, (_, i) => ({ id: "fx" + String(i).padStart(2, "0"), type: "fixed", name: "conta fixa comprida número " + String(i).padStart(2, "0"), amount: 123456 + i, kind: i % 5 === 0 ? "in" : "out", category: "Recorrente", dayOfMonth: 1 + (i % 28), active: true }));
+  return mk({ startBalance: { day: "2026-09-01", amount: 500000 }, entries, fixed });
+};
+section("moneyLines: a estrutura", () => {
+  const f = financeToday(BIG(), cfgOf({ budgets: { "Básicas/PF": 10000 } }), TODAY);
+  const lines = moneyLines(f, 4000);
+  check("texto: a primeira linha é a do saldo", lines[0].startsWith("saldo hoje " + brl(f.real, true) + " · fim do mês ≈ " + brl(f.monthEnd, true)), lines[0]);
+  const prefixes = ["a confirmar: ", "vence em 7 dias: ", "previsto no mês: ", "categorias: ", "maiores saídas: ", "fixos: "];
+  const found = prefixes.map((p) => lines.findIndex((l) => l.startsWith(p)));
+  check("texto: cada grupo numa linha, na ordem do contrato", found.every((i) => i > 0) && found.every((v, i) => i === 0 || v > found[i - 1]), JSON.stringify(found));
+  check("texto: nenhuma linha extra, nenhum grupo repetido", lines.length === 1 + prefixes.length, String(lines.length));
+  check("texto: sem quebra de linha dentro de um item", lines.every((l) => !l.includes("\n")));
+});
+section("moneyLines: o orçamento e o corte por item inteiro", () => {
+  const f = financeToday(BIG(), cfgOf({ budgets: { "Básicas/PF": 10000 } }), TODAY);
+  for (const budget of [400, 600, 900, 1200]) {
+    const lines = moneyLines(f, budget);
+    check("corte: com orçamento " + budget + " o texto cabe", lines.join("\n").length <= budget, String(lines.join("\n").length));
+    check("corte: com orçamento " + budget + " a primeira linha continua inteira", lines[0].startsWith("saldo hoje ") && lines[0].includes("fim do mês ≈ " + brl(f.monthEnd, true)), lines[0]);
+  }
+  const lines = moneyLines(f, 900);
+  const fx = lineStarting(lines, "fixos: ");
+  check("corte: com 30 fixos e 900, a linha dos fixos termina em 'e mais N'", !!fx && /(; |: )e mais \d+$/.test(fx), String(fx));
+  if (fx) {
+    const { items, more } = parseLine(fx, "fixos: ");
+    const expectedItem = new Set(f.fixed.map((x) => x.name + " " + (x.kind === "in" ? "+" : "") + brl(x.amount) + " dia " + Number(x.day.slice(8, 10)) + (x.entered ? " lançado" : " #" + x.id)));
+    check("corte: nenhum fixo sai cortado no meio (cada item é inteiro)", items.every((i) => expectedItem.has(i)), items.find((i) => !expectedItem.has(i)));
+    check("corte: o N é o que ficou de fora", items.length + more === 30 && more > 0, items.length + " + " + more);
+  }
+  const pend = lineStarting(lines, "a confirmar: ");
+  if (pend) {
+    const { items, more } = parseLine(pend, "a confirmar: ");
+    const expectedItem = new Set(f.pending.map((e) => e.day.slice(8, 10) + "/" + e.day.slice(5, 7) + " " + e.name + " " + brl(e.amount) + " #" + e.id));
+    check("corte: nenhum 'a confirmar' sai cortado no meio", items.every((i) => expectedItem.has(i)), items.find((i) => !expectedItem.has(i)));
+    check("corte: o 'a confirmar' conta tudo (os mais recentes primeiro)", items.length + more === 12 && (!items.length || items[0].includes("#pa11")), items[0]);
+  }
+});
+
+/* ---------- financeBrief e moneyLines dizem o mesmo ---------- */
+section("financeBrief", () => {
+  const store = core.collection("finance", { normalize });
+  /* o resto do arquivo gravou na coleção: parte do zero */
+  store.all().forEach((d) => store.remove(d.id));
+  check("brief: sem financeiro nenhum, é vazio", financeBrief() === "", JSON.stringify(financeBrief()));
+  store.save({ id: "d1", type: "debt", name: "empréstimo", creditor: "Pedro", total: 100000, paid: 0, installment: 10000, dayOfMonth: 5 });
+  store.save({ id: "i1", type: "invest", name: "CDB", category: "renda fixa", contributed: 100, current: 100, order: 0 });
+  check("brief: só dívida e investimento continua vazio", financeBrief() === "", JSON.stringify(financeBrief()));
+  const t = core.today();
+  store.save({ id: "config", type: "config", startBalance: { day: core.addDays(t, -10), amount: 100000 }, budgets: { Lazer: 1000 } });
+  store.save(ent("b1", core.addDays(t, -2), "mercado", "out", 12000, true, { category: "Lazer" }));
+  store.save(ent("b2", core.addDays(t, 2), "dentista", "out", 30000, false));
+  store.save(ent("b3", core.addDays(t, -3), "luz", "out", 9000, false));
+  const brief = financeBrief();
+  const expected = "Financeiro.\n" + moneyLines(financeToday(FD.contextOf(store), configOf(store), t), 1200).join("\n");
+  check("brief: é 'Financeiro.' e o texto do moneyLines com 1.200", brief === expected, brief.slice(0, 200));
+  check("brief: traz o saldo, a confirmar e o que vence", brief.startsWith("Financeiro.\nsaldo hoje ") && brief.includes("a confirmar: ") && brief.includes("#b3") && brief.includes("#b2"), brief);
+  check("brief: nunca leva a dívida nem o investimento", !brief.includes("Pedro") && !brief.includes("CDB") && !brief.includes("empréstimo"), brief);
+  check("brief: cabe em 1.200 caracteres", brief.length <= "Financeiro.\n".length + 1200, String(brief.length));
+  store.all().forEach((d) => store.remove(d.id));
+});
+
+/* ---------- as contas movidas continuam as mesmas ---------- */
+const FIX_CTX = {
+  startBalance: { day: "2026-09-01", amount: 100000 },
+  entries: [
+    ent("e1", "2026-09-03", "freela", "in", 300000, true, { category: "Freela" }),
+    ent("e2", "2026-09-05", "salário", "in", 500000, true, { origin: { type: "fixed", id: "f-sal" } }),
+    ent("e3", "2026-09-08", "mercado", "out", 45000, true, { category: "Básicas/PF" }),
+    ent("e4", "2026-09-20", "dentista", "out", 80000, false, { category: "Básicas/PF" }),
+    ent("e5", "2026-09-27", "reembolso", "in", 25000, false),
+    ent("e6", "2026-10-02", "mercado", "out", 38000, true, { category: "Básicas/PF" }),
+    ent("e7", "2026-10-18", "seguro", "out", 60000, false, { category: "Recorrente" })
+  ],
+  fixed: [
+    { id: "f-sal", type: "fixed", name: "salário", amount: 500000, kind: "in", category: "Freela", dayOfMonth: 5, active: true },
+    { id: "f-alug", type: "fixed", name: "aluguel", amount: 200000, kind: "out", category: "Básicas/PF", dayOfMonth: 10, active: true },
+    { id: "f-anual", type: "fixed", name: "plano anual", amount: 5000, kind: "out", category: "Ferramentas", dayOfMonth: 31, active: true },
+    { id: "f-velho", type: "fixed", name: "revista", amount: 9900, kind: "out", category: "Lazer", dayOfMonth: 15, active: false }
+  ],
+  cards: [
+    { id: "c1", type: "card", name: "notebook", card: "roxinho", total: 90000, installments: 3, start: "2026-09", dayOfMonth: 12 }
+  ],
+  debts: [], invests: []
+};
+/* gravadas rodando o buildMonth ATUAL de origin/main:src/finance.jsx (a cópia
+   literal da função), sobre o FIX_CTX acima: [dia, saldo, entrou, saiu]. nada
+   aqui foi calculado à mão nem pela função nova */
+const FIX = {
+  /* setembro tem 30 dias: o fixo do dia 31 cai no dia 30. sem sugestão: só o lançado */
+  setSemSugestao: [
+    ["2026-09-01",100000,0,0], ["2026-09-02",100000,0,0], ["2026-09-03",400000,300000,0],
+    ["2026-09-04",400000,0,0], ["2026-09-05",900000,500000,0], ["2026-09-06",900000,0,0],
+    ["2026-09-07",900000,0,0], ["2026-09-08",855000,0,45000], ["2026-09-09",855000,0,0],
+    ["2026-09-10",855000,0,0], ["2026-09-11",855000,0,0], ["2026-09-12",855000,0,0],
+    ["2026-09-13",855000,0,0], ["2026-09-14",855000,0,0], ["2026-09-15",855000,0,0],
+    ["2026-09-16",855000,0,0], ["2026-09-17",855000,0,0], ["2026-09-18",855000,0,0],
+    ["2026-09-19",855000,0,0], ["2026-09-20",775000,0,80000], ["2026-09-21",775000,0,0],
+    ["2026-09-22",775000,0,0], ["2026-09-23",775000,0,0], ["2026-09-24",775000,0,0],
+    ["2026-09-25",775000,0,0], ["2026-09-26",775000,0,0], ["2026-09-27",800000,25000,0],
+    ["2026-09-28",800000,0,0], ["2026-09-29",800000,0,0], ["2026-09-30",800000,0,0]
+  ],
+  /* sugestão a partir do dia 15: só o plano anual (dia 31 -> 30) soma */
+  setSugestaoDia15: [
+    ["2026-09-01",100000,0,0], ["2026-09-02",100000,0,0], ["2026-09-03",400000,300000,0],
+    ["2026-09-04",400000,0,0], ["2026-09-05",900000,500000,0], ["2026-09-06",900000,0,0],
+    ["2026-09-07",900000,0,0], ["2026-09-08",855000,0,45000], ["2026-09-09",855000,0,0],
+    ["2026-09-10",855000,0,0], ["2026-09-11",855000,0,0], ["2026-09-12",855000,0,0],
+    ["2026-09-13",855000,0,0], ["2026-09-14",855000,0,0], ["2026-09-15",855000,0,0],
+    ["2026-09-16",855000,0,0], ["2026-09-17",855000,0,0], ["2026-09-18",855000,0,0],
+    ["2026-09-19",855000,0,0], ["2026-09-20",775000,0,80000], ["2026-09-21",775000,0,0],
+    ["2026-09-22",775000,0,0], ["2026-09-23",775000,0,0], ["2026-09-24",775000,0,0],
+    ["2026-09-25",775000,0,0], ["2026-09-26",775000,0,0], ["2026-09-27",800000,25000,0],
+    ["2026-09-28",800000,0,0], ["2026-09-29",800000,0,0], ["2026-09-30",795000,0,5000]
+  ],
+  /* outubro com sugestão a partir do dia 10: aluguel (10), parcela 2/3 do cartão (12) e plano (31) */
+  outSugestaoDia10: [
+    ["2026-10-01",800000,0,0], ["2026-10-02",762000,0,38000], ["2026-10-03",762000,0,0],
+    ["2026-10-04",762000,0,0], ["2026-10-05",762000,0,0], ["2026-10-06",762000,0,0],
+    ["2026-10-07",762000,0,0], ["2026-10-08",762000,0,0], ["2026-10-09",762000,0,0],
+    ["2026-10-10",562000,0,200000], ["2026-10-11",562000,0,0], ["2026-10-12",532000,0,30000],
+    ["2026-10-13",532000,0,0], ["2026-10-14",532000,0,0], ["2026-10-15",532000,0,0],
+    ["2026-10-16",532000,0,0], ["2026-10-17",532000,0,0], ["2026-10-18",472000,0,60000],
+    ["2026-10-19",472000,0,0], ["2026-10-20",472000,0,0], ["2026-10-21",472000,0,0],
+    ["2026-10-22",472000,0,0], ["2026-10-23",472000,0,0], ["2026-10-24",472000,0,0],
+    ["2026-10-25",472000,0,0], ["2026-10-26",472000,0,0], ["2026-10-27",472000,0,0],
+    ["2026-10-28",472000,0,0], ["2026-10-29",472000,0,0], ["2026-10-30",472000,0,0],
+    ["2026-10-31",467000,0,5000]
+  ],
+  /* o mesmo mês, com o saldo de partida dado de fora (123456) em vez de calculado */
+  outSaldoDado: [
+    ["2026-10-01",123456,0,0], ["2026-10-02",85456,0,38000], ["2026-10-03",85456,0,0],
+    ["2026-10-04",85456,0,0], ["2026-10-05",85456,0,0], ["2026-10-06",85456,0,0],
+    ["2026-10-07",85456,0,0], ["2026-10-08",85456,0,0], ["2026-10-09",85456,0,0],
+    ["2026-10-10",-114544,0,200000], ["2026-10-11",-114544,0,0], ["2026-10-12",-144544,0,30000],
+    ["2026-10-13",-144544,0,0], ["2026-10-14",-144544,0,0], ["2026-10-15",-144544,0,0],
+    ["2026-10-16",-144544,0,0], ["2026-10-17",-144544,0,0], ["2026-10-18",-204544,0,60000],
+    ["2026-10-19",-204544,0,0], ["2026-10-20",-204544,0,0], ["2026-10-21",-204544,0,0],
+    ["2026-10-22",-204544,0,0], ["2026-10-23",-204544,0,0], ["2026-10-24",-204544,0,0],
+    ["2026-10-25",-204544,0,0], ["2026-10-26",-204544,0,0], ["2026-10-27",-204544,0,0],
+    ["2026-10-28",-204544,0,0], ["2026-10-29",-204544,0,0], ["2026-10-30",-204544,0,0],
+    ["2026-10-31",-209544,0,5000]
+  ]
+};
+const rowsOf = (days) => days.map((d) => [d.day, d.balance, d.inflow, d.outflow]);
+const firstDiff = (got, want) => {
+  const i = want.findIndex((w, k) => JSON.stringify(w) !== JSON.stringify(got[k]));
+  return i < 0 ? (got.length !== want.length ? "tamanhos " + got.length + " vs " + want.length : "") : "linha " + i + ": veio " + JSON.stringify(got[i]) + ", era " + JSON.stringify(want[i]);
+};
+section("a conta movida não muda", () => {
+  const cases = [
+    ["setembro sem sugestão", () => buildMonth("2026-09", FIX_CTX, null, undefined), FIX.setSemSugestao],
+    ["setembro com sugestão do dia 15 (dia 31 em mês de 30)", () => buildMonth("2026-09", FIX_CTX, null, "2026-09-15"), FIX.setSugestaoDia15],
+    ["outubro com sugestão do dia 10 (fixo, parcela do cartão, dia 31)", () => buildMonth("2026-10", FIX_CTX, null, "2026-10-10"), FIX.outSugestaoDia10],
+    ["outubro com o saldo de partida dado", () => buildMonth("2026-10", FIX_CTX, 123456, "2026-10-10"), FIX.outSaldoDado]
+  ];
+  for (const [name, run, want] of cases) {
+    const got = rowsOf(run());
+    check("buildMonth: " + name + " bate com a fixture", JSON.stringify(got) === JSON.stringify(want), firstDiff(got, want));
+  }
+  const aug = buildMonth("2026-08", FIX_CTX, null, undefined);
+  check("buildMonth: antes do saldo inicial o dia é vazio, parado no saldo inicial", aug.length === 31 && aug.every((d) => d.before === true && d.balance === 100000 && d.inflow === 0 && d.outflow === 0 && d.items.length === 0));
+  const oct = buildMonth("2026-10", FIX_CTX, null, "2026-10-10");
+  check("buildMonth: cada dia traz os lançamentos e as sugestões dele", oct[1].items.length === 1 && oct[9].suggestions.some((s) => s.name === "aluguel") && oct[11].suggestions.some((s) => s.name === "notebook · 2/3"), JSON.stringify(oct[11].suggestions));
+  check("buildMonth: dia sem nada traz listas vazias", oct[2].items.length === 0 && oct[2].suggestions.length === 0 && !oct[2].before);
+});
+section("pendingBefore e suggestionsBetween", () => {
+  const p = pendingBefore("2026-10-17", mk({ entries: [
+    ent("p2", "2026-10-14", "b", "out", 100, false), ent("p1", "2026-10-02", "a", "out", 100, false),
+    ent("pago", "2026-10-03", "c", "out", 100, true), ent("hoje", "2026-10-17", "d", "out", 100, false), ent("fut", "2026-10-30", "e", "out", 100, false)
+  ] }));
+  check("pendingBefore: só o não pago de antes do dia, do mais antigo ao mais novo", JSON.stringify(p.map((x) => [x.day, x.it.id])) === JSON.stringify([["2026-10-02", "p1"], ["2026-10-14", "p2"]]), JSON.stringify(p.map((x) => [x.day, x.it.id])));
+  check("pendingBefore: sem entries não quebra", pendingBefore("2026-10-17", {}).length === 0);
+  const s = suggestionsBetween("2026-09-28", "2026-10-02", FIX_CTX);
+  check("suggestionsBetween: o dia 31 cai no 30 de setembro, e só ele no intervalo", s.length === 1 && s[0].day === "2026-09-30" && s[0].it.name === "plano anual" && s[0].it.amount === 5000, JSON.stringify(s));
+  const c = suggestionsBetween("2026-09-12", "2026-09-12", FIX_CTX);
+  check("suggestionsBetween: a parcela do cartão sai como 'nome · n/total'", c.length === 1 && c[0].it.name === "notebook · 1/3" && c[0].it.amount === 30000 && c[0].it.category === "Cartão", JSON.stringify(c));
+  check("suggestionsBetween: o fixo já lançado no mês não é sugerido", suggestionsBetween("2026-09-05", "2026-09-05", FIX_CTX).length === 0);
+  check("suggestionsBetween: intervalo invertido é vazio", suggestionsBetween("2026-10-02", "2026-09-28", FIX_CTX).length === 0);
+});
 
 console.log("\n" + passed + " passaram, " + failures.length + " falharam");
 if (failures.length) { console.log("\nFALHAS:"); failures.forEach((f) => console.log("  - " + f)); process.exit(1); }

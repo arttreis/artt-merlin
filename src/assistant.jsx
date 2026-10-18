@@ -22,11 +22,9 @@ import { chatMood } from "./shared/hat.js";
 import { NAV_ICONS } from "./shared/icons.jsx";
 import { MAX_TURNS, normalizeChat, chatTitle, turnsOf, markProposal } from "./shared/assistant-actions.js";
 import { BUILD, buildIntent, answersText, draftView, docFromDraft } from "./shared/build.js";
-/* o resumo do financeiro, pra esta tela responder "posso gastar x?" sem
-   obrigar a pessoa a abrir o financeiro antes */
-import { financeBrief } from "./shared/finance-data.js";
 /* o retrato vai em toda pergunta: é ele que faz "continuar na conversa"
-   chegar sabendo o dia, e "o que tenho quinta?" ter resposta */
+   chegar sabendo o dia, "o que tenho quinta?" ter resposta e "posso gastar
+   x?" sair pelo saldo sem abrir o financeiro antes */
 import { usePortrait } from "./shared/use-portrait.js";
 import { sourcesLine } from "./shared/portrait.js";
 
@@ -305,9 +303,9 @@ function Assistant() {
     setInput("");
     setThinking(WAIT.ask);
     try {
-      /* o contexto: o da tela de onde a pergunta veio, quando veio de alguma;
-         e o resumo do financeiro quando o pedido é de simulação. o retrato
-         vai sempre, à parte */
+      /* o contexto: o da tela de onde a pergunta veio, quando veio de alguma.
+         o retrato vai sempre, à parte, e leva o dinheiro: a simulação não
+         precisa mais do resumo do financeiro em separado */
       const from = fromRef.current;
       const seen = await portrait();
       const r = await api("/merlin", { method: "POST", body: JSON.stringify({
@@ -315,7 +313,7 @@ function Assistant() {
         context: {
           message: (said && said.prefix ? said.prefix : "") + message,
           page: (from && from.page) || getCurrentPage(),
-          pageContext: (from && from.pageContext) || (said && said.key === "finance" ? financeBrief() : ""),
+          pageContext: (from && from.pageContext) || "",
           portrait: seen,
           history: turnsOf(messages)
         }

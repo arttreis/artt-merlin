@@ -83,7 +83,9 @@ por hora, contado na tabela `advice` em três cotas separadas (`QUOTA`, no worke
 Quem estourar espera; quem está ao lado não paga por isso.
 
 Toda pergunta ao assistente (a tarefa `assistant`) leva junto o **retrato**: um resumo do
-dia, da agenda dos próximos 7 dias, da rotina, da semana e dos produtos, montado no
+dia, da agenda dos próximos 7 dias, da rotina, da semana, dos produtos, dos leads e dos
+clientes, do conteúdo, dos hábitos, dos títulos das notas e do dinheiro (sem dívidas nem
+investimentos), montado no
 navegador (`src/shared/portrait.js`) e mandado em `context.portrait`. O Worker corta o
 retrato em 6.000 caracteres (o `pageContext` continua com 1.200), descarta-o em qualquer
 outra tarefa e não lê documento nenhum para montá-lo. A resposta traz `sources`, filtrado

@@ -28,6 +28,7 @@ import { focusMinutes, meetingMinutes } from "./focus.js";
 import { pipelineToday } from "./client-doc.js";
 import { contentToday } from "./content-script.js";
 import { normalize as normalizeHabit, isExpected, monthStats, streakOf as habitStreak, weekProgress } from "./habits-data.js";
+import { normalize as normalizeFinance, contextOf, configOf, financeToday, moneyLines } from "./finance-data.js";
 
 export const PORTRAIT_MAX = 6000;
 const BACK = 30;
@@ -261,6 +262,18 @@ export const SECTIONS = [
         });
       return lines.length ? lines : ["nenhuma nota ainda"];
     }
+  },
+  {
+    /* o saldo, o que confirmar, o que vence, as categorias, as maiores saídas
+       e os fixos, com os ids (o "#…" do item). a janela é a do mês (do dia 1)
+       até 7 dias à frente. o corte é por grupo, dentro do moneyLines: o
+       orçamento daqui é o mesmo que ele recebe */
+    id: "money", label: "dinheiro", budget: 900, needs: ["finance"],
+    build({ finance }, now) {
+      const docs = finance.map(normalizeFinance);
+      const col = { all: () => docs, get: (id) => docs.find((x) => x.id === id) || null };
+      return moneyLines(financeToday(contextOf(col), configOf(col), dayOf(now)), 900);
+    }
   }
 ];
 
@@ -281,7 +294,7 @@ export function fit(items, budget, hidden = 0) {
   return text;
 }
 
-const EMPTY = { tasks: [], routine: [], sessions: [], apps: [], closes: [], clients: [], content: [], cadence: [], habits: [], notes: [], profile: null, loading: [] };
+const EMPTY = { tasks: [], routine: [], sessions: [], apps: [], closes: [], clients: [], content: [], cadence: [], habits: [], notes: [], finance: [], profile: null, loading: [] };
 const DEFAULT_WINDOW = { dayStart: 540, dayEnd: 1140 };
 
 export function portraitOf(data, now = new Date()) {
@@ -328,6 +341,7 @@ export function portraitData(cols, { signedIn, prefs } = {}) {
     cadence: list(cols.cadence),
     habits: list(cols.habits),
     notes: list(cols.notes),
+    finance: list(cols.finance),
     profile: cols.profile ? cols.profile.get("me") : null,
     prefs,
     loading: signedIn ? Object.keys(cols).filter((k) => cols[k] && !cols[k].hasDownloaded()) : []

@@ -154,6 +154,74 @@ export function realBalanceUntil(day, ctx) {
     .reduce((s, e) => s + (e.kind === "in" ? e.amount : -e.amount), cfg.amount);
 }
 
+/* ---------- as contas da tela ----------
+   moravam no finance.jsx até 18/10/2026, sem teste. o retrato do Merlin faz
+   as mesmas perguntas que a aba hoje (o que confirmar, onde o mês fecha,
+   quanto saiu por categoria), e duas cópias um dia discordariam */
+
+/* o previsto cujo dia ja passou: a pessoa disse que ia acontecer, e ninguem
+   confirmou se aconteceu */
+export const pendingBefore = (day, ctx) => (ctx.entries || [])
+  .filter((e) => !e.paid && e.day < day)
+  .sort((a, b) => a.day.localeCompare(b.day))
+  .map((e) => ({ day: e.day, it: e }));
+
+/* as sugestoes de um intervalo, dia a dia */
+export function suggestionsBetween(from, to, ctx) {
+  const out = [];
+  for (let d = from; d <= to; d = addDays(d, 1)) projectionsOf(d, ctx).forEach((it) => out.push({ day: d, it }));
+  return out;
+}
+
+/* o mes inteiro, dia a dia: um balanceUntil() so pro dia anterior ao 1,
+   depois anda dia a dia — em vez de chamar balanceUntil() pra cada linha */
+export function buildMonth(yyyymm, ctx, balanceBefore, suggestFrom) {
+  const [year, month] = yyyymm.split("-").map(Number);
+  const nDays = daysInMonth(year, month);
+  let balance = balanceBefore != null ? balanceBefore : balanceUntil(addDays(yyyymm + "-01", -1), ctx, suggestFrom);
+  /* antes do marco (saldo inicial, ou o lancamento mais antigo) nao ha
+     conta: o dia aparece vazio, e o saldo fica parado no valor inicial —
+     a mesma regra do balanceUntil, senao o ano e o mes discordariam */
+  const marker = (ctx.startBalance || {}).day || oldestDay(ctx.entries) || "";
+  const days = [];
+  for (let i = 1; i <= nDays; i++) {
+    const day = yyyymm + "-" + pad(i);
+    if (marker && day < marker) { days.push({ day, inflow: 0, outflow: 0, balance, items: [], suggestions: projectionsOf(day, ctx), before: true }); continue; }
+    const items = ctx.entries.filter((e) => e.day === day);
+    const suggestions = projectionsOf(day, ctx);
+    const counted = suggestFrom && day >= suggestFrom ? items.concat(suggestions) : items;
+    const inflow = counted.filter((x) => x.kind === "in").reduce((s, x) => s + x.amount, 0);
+    const outflow = counted.filter((x) => x.kind === "out").reduce((s, x) => s + x.amount, 0);
+    balance += inflow - outflow;
+    days.push({ day, inflow, outflow, balance, items, suggestions });
+  }
+  return days;
+}
+
+/* quanto saiu e entrou por categoria nos dias dados: o cheio (pago) e o
+   tracejado (previsto). sugestao nao entra, so os lancamentos */
+export function spentByCategory(days) {
+  const moved = {};
+  days.forEach((d) => d.items.forEach((it) => {
+    const k = it.category || "sem categoria";
+    const m = moved[k] || (moved[k] = { outReal: 0, outAll: 0, in: 0 });
+    if (it.kind === "in") m.in += it.amount;
+    else { m.outAll += it.amount; if (it.paid) m.outReal += it.amount; }
+  }));
+  return moved;
+}
+
+/* as categorias na ordem da tela: a lista da config mais as etiquetas órfãs
+   (escondê-las faria as somas não fecharem); com meta vem primeiro, a mais
+   apertada no topo; sem meta, a que mais gastou */
+export function categoryOrder(cfg, moved) {
+  const budgets = cfg.budgets || {};
+  const names = cfg.categories.concat(Object.keys(moved).filter((k) => k !== "sem categoria" && !cfg.categories.includes(k)));
+  const out = (n) => (moved[n] ? moved[n].outAll : 0);
+  const rank = (n) => (budgets[n] ? 1e9 * (out(n) / budgets[n]) : out(n) / 1e3);
+  return names.slice().sort((a, b) => rank(b) - rank(a));
+}
+
 /* ---------- colecao e normalizacao ----------
    uma colecao so, varios tipos — o proprio documento diz o que ele e, e a
    normalizacao decide os campos por tipo. os tipos sao os quatro blocos da
@@ -292,11 +360,13 @@ export function newEntry(spec, cfg, ctx, base) {
   const categories = (cfg && cfg.categories) || DEFAULT_CATEGORIES;
   const category = categories.includes(s.category) ? s.category : "";
   const title = String(s.title || "").trim().slice(0, 140);
-  const planned = s.confirm ? (ctx.entries || []).find((e) => e.id === s.confirm && !e.paid) : null;
+  /* o retrato mostra o id como "#id"; a IA às vezes devolve com o "#" */
+  const ref = (v) => String(v || "").replace(/^#/, "");
+  const planned = s.confirm ? (ctx.entries || []).find((e) => e.id === ref(s.confirm) && !e.paid) : null;
   if (planned) {
     return { doc: { ...planned, name: title || planned.name, amount: amount || planned.amount, paid: true, via: "chat", updatedAt: now } };
   }
-  const fixed = s.fixed ? (ctx.fixed || []).find((f) => f.id === s.fixed && f.active && !alreadyEntered(ctx.entries, "fixed", f.id, date)) : null;
+  const fixed = s.fixed ? (ctx.fixed || []).find((f) => f.id === ref(s.fixed) && f.active && !alreadyEntered(ctx.entries, "fixed", f.id, date)) : null;
   const value = amount || (fixed ? fixed.amount : 0);
   if (!value) return { error: "falta o valor" };
   return { doc: {
@@ -344,21 +414,129 @@ export function captureContext(cfg, ctx, base) {
 }
 const dayGap = (a, b) => (Date.parse(a) - Date.parse(b)) / 864e5;
 
+/* ---------- o dinheiro de hoje ----------
+   o que o Merlin precisa para responder "quanto gastei no mercado?", "o que
+   vence essa semana?" e "posso assumir 3 mil por mês?": as mesmas contas da
+   aba hoje, numa estrutura só. dívida e investimento nunca entram (D8): nada
+   aqui lê `ctx.debts` nem `ctx.invests`. */
+export function financeToday(ctx, cfg, t) {
+  const entries = ctx.entries || [];
+  const empty = !entries.length && !(ctx.fixed || []).length && !ctx.startBalance;
+  const month = t.slice(0, 7);
+  const [y, m] = month.split("-").map(Number);
+  const days = buildMonth(month, { ...ctx, entries }, null, t);
+  const inMonth = days.filter((d) => !d.before);
+  const ahead = inMonth.filter((d) => d.day >= t);
+  const low = ahead.length ? ahead.reduce((a, d) => (d.balance < a.balance ? d : a), ahead[0]) : null;
+
+  const horizon = addDays(t, 7);
+  const open = entries.filter((e) => !e.paid).sort((a, b) => a.day.localeCompare(b.day));
+
+  const moved = spentByCategory(inMonth);
+  const budgets = cfg.budgets || {};
+  const categories = categoryOrder(cfg, moved).map((name) => {
+    const s = moved[name] || { outReal: 0, outAll: 0, in: 0 };
+    const goal = budgets[name] || 0;
+    return { name, outAll: s.outAll, outReal: s.outReal, in: s.in, goal, over: goal > 0 && s.outAll > goal };
+  });
+
+  /* "mercado" lançado três vezes é um gasto só, de 430 */
+  const groups = new Map();
+  entries.filter((e) => e.paid && e.kind === "out" && e.day.slice(0, 7) === month).forEach((e) => {
+    const k = e.name.trim().toLowerCase();
+    const g = groups.get(k) || groups.set(k, { name: e.name.trim(), amount: 0, count: 0 }).get(k);
+    g.amount += e.amount;
+    g.count++;
+  });
+  const top = [...groups.values()].sort((a, b) => b.amount - a.amount).slice(0, 8);
+
+  const fixed = (ctx.fixed || []).filter((f) => f.active)
+    .map((f) => {
+      const day = month + "-" + pad(effectiveDay(y, m, f.dayOfMonth));
+      return { id: f.id, name: f.name, amount: f.amount, kind: f.kind, category: f.category, day, entered: alreadyEntered(entries, "fixed", f.id, day) };
+    })
+    .sort((a, b) => a.day.localeCompare(b.day));
+
+  return {
+    empty,
+    real: realBalanceUntil(t, ctx),
+    monthEnd: days[days.length - 1].balance,
+    low: low ? { day: low.day, balance: low.balance } : null,
+    pending: pendingBefore(t, ctx).map((p) => p.it),
+    soon: open.filter((e) => e.day >= t && e.day <= horizon),
+    later: open.filter((e) => e.day > horizon && e.day.slice(0, 7) === month),
+    categories, top, fixed
+  };
+}
+
+/* ---------- o dinheiro em texto ----------
+   o mesmo texto para o retrato e para o contexto da tela do financeiro: um
+   grupo por linha, item inteiro ou nada, e "e mais N" no lugar do que não
+   coube. o id vai junto (#…) para "paguei o aluguel" na conversa confirmar o
+   previsto que já existe, ou lançar o fixo do mês, em vez de inventar outro. */
+const ddmm = (day) => day.slice(8, 10) + "/" + day.slice(5, 7);
+const money = (it) => (it.kind === "in" ? "+" : "") + brl(it.amount);
+const entryItem = (e) => ddmm(e.day) + " " + e.name + " " + money(e) + " #" + e.id;
+
+/* `items` numa linha só, até `room` caracteres */
+function lineOf(prefix, items, room) {
+  const whole = prefix + items.join("; ");
+  if (whole.length <= room) return whole;
+  let line = prefix, k = 0;
+  for (; k < items.length; k++) {
+    const next = line + (k ? "; " : "") + items[k];
+    const rest = items.length - k - 1;
+    if ((next + (rest ? "; e mais " + rest : "")).length > room) break;
+    line = next;
+  }
+  if (k < items.length) line += (k ? "; " : "") + "e mais " + (items.length - k);
+  return line.length <= room ? line : "";
+}
+
+export function moneyLines(f, budget) {
+  if (f.empty) return ["sem financeiro ainda"];
+  const lines = ["saldo hoje " + brl(f.real, true) + " · fim do mês ≈ " + brl(f.monthEnd, true) +
+    (f.low ? " · menor ≈ " + brl(f.low.balance, true) + " em " + ddmm(f.low.day) : "")];
+  const category = (c) => c.goal
+    ? c.name + " " + brl(c.outAll) + (c.outReal !== c.outAll ? " (" + brl(c.outReal) + " pago)" : "") + " de " + brl(c.goal) + (c.over ? ", passou da meta" : "")
+    : c.outAll ? c.name + " " + brl(c.outAll) : c.name;
+  const groups = [
+    ["a confirmar: ", f.pending.slice().reverse().map(entryItem)],
+    ["vence em 7 dias: ", f.soon.map(entryItem)],
+    ["previsto no mês: ", f.later.map(entryItem)],
+    ["categorias: ", f.categories.map(category)],
+    ["maiores saídas: ", f.top.map((g) => g.name + " · " + brl(g.amount) + (g.count > 1 ? " (" + g.count + "×)" : ""))],
+    /* o que o mês ainda espera vem antes do que já foi lançado: é ele que o
+       "#id" serve para lançar */
+    ["fixos: ", f.fixed.filter((x) => !x.entered).concat(f.fixed.filter((x) => x.entered)).map((x) => x.name + " " + money(x) + " dia " + Number(x.day.slice(8, 10)) + (x.entered ? " lançado" : " #" + x.id))]
+  ].filter(([, items]) => items.length);
+  /* a sobra é dividida igual entre os grupos; o que cabe inteiro na sua parte
+     leva só o que precisa, e o resto volta para os outros. assim trinta fixos
+     não apagam o "a confirmar", nem o contrário */
+  const want = groups.map(([prefix, items]) => (prefix + items.join("; ")).length);
+  const room = want.map(() => 0);
+  let left = budget - lines[0].length - groups.length;
+  let open = groups.map((_, i) => i);
+  while (open.length) {
+    const share = Math.floor(left / open.length);
+    const whole = open.filter((i) => want[i] <= share);
+    if (!whole.length) { open.forEach((i) => { room[i] = share; }); break; }
+    whole.forEach((i) => { room[i] = want[i]; left -= want[i]; });
+    open = open.filter((i) => want[i] > share);
+  }
+  groups.forEach(([prefix, items], i) => {
+    const line = lineOf(prefix, items, room[i]);
+    if (line) lines.push(line);
+  });
+  return lines;
+}
+
 /* ---------- o resumo que o assistente leva ----------
-   a mesma frase que a pagina do financeiro registra como contexto quando
-   esta aberta, montada aqui pra valer de qualquer tela. devolve "" quando
-   ainda nao ha financeiro nenhum: melhor o Merlin dizer que falta dado do
-   que responder sobre um saldo inventado. */
+   o texto que a pagina do financeiro registra como contexto quando esta
+   aberta. devolve "" quando ainda nao ha financeiro nenhum: melhor o Merlin
+   dizer que falta dado do que responder sobre um saldo inventado. */
 export function financeBrief() {
   const finance = collection("finance", { normalize });
-  const ctx = contextOf(finance);
-  if (!ctx.entries.length && !ctx.fixed.length && !ctx.startBalance) return "";
-  const t = today();
-  const [y, m] = t.slice(0, 7).split("-").map(Number);
-  const monthEnd = t.slice(0, 7) + "-" + pad(daysInMonth(y, m));
-  const fixedLines = ctx.fixed.filter((f) => f.active)
-    .map((f) => f.name + " · " + f.category + " · " + (f.kind === "in" ? "+" : "−") + brl(f.amount));
-  return "Financeiro. Saldo hoje: " + brl(realBalanceUntil(t, ctx)) +
-    ". Previsto fim do mês: " + brl(balanceUntil(monthEnd, ctx, t)) + ". " +
-    (fixedLines.length ? "Fixos do mês: " + fixedLines.join("; ") + "." : "sem fixos cadastrados.");
+  const f = financeToday(contextOf(finance), configOf(finance), today());
+  return f.empty ? "" : "Financeiro.\n" + moneyLines(f, 1200).join("\n");
 }

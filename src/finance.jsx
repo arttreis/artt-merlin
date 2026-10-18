@@ -19,6 +19,7 @@ import {
   pad, INVEST_CATEGORIES,
   daysInMonth, effectiveDay, cardInstallment, installmentNumber,
   projectionsOf, oldestDay, balanceUntil, realBalanceUntil,
+  pendingBefore, suggestionsBetween, buildMonth, spentByCategory, categoryOrder,
   normalize, byType, configOf, saveConfig, contextOf, financeBrief
 } from "./shared/finance-data.js";
 
@@ -59,45 +60,6 @@ const brlBalance = (cents) => cents < 0 ? "(" + brl(cents) + ")" : brl(cents);
    somados num numero so, eles faziam o "saldo de hoje" mentir. */
 const isForecast = (it) => !it.paid;
 
-
-/* o previsto cujo dia ja passou: a pessoa disse que ia acontecer, e ninguem
-   confirmou se aconteceu */
-const pendingBefore = (day, ctx) => (ctx.entries || [])
-  .filter((e) => !e.paid && e.day < day)
-  .sort((a, b) => a.day.localeCompare(b.day))
-  .map((e) => ({ day: e.day, it: e }));
-
-/* as sugestoes de um intervalo, dia a dia */
-function suggestionsBetween(from, to, ctx) {
-  const out = [];
-  for (let d = from; d <= to; d = addDays(d, 1)) projectionsOf(d, ctx).forEach((it) => out.push({ day: d, it }));
-  return out;
-}
-
-/* o mes inteiro, dia a dia: um balanceUntil() so pro dia anterior ao 1,
-   depois anda dia a dia — em vez de chamar balanceUntil() pra cada linha */
-function buildMonth(yyyymm, ctx, balanceBefore, suggestFrom) {
-  const [year, month] = yyyymm.split("-").map(Number);
-  const nDays = daysInMonth(year, month);
-  let balance = balanceBefore != null ? balanceBefore : balanceUntil(addDays(yyyymm + "-01", -1), ctx, suggestFrom);
-  /* antes do marco (saldo inicial, ou o lancamento mais antigo) nao ha
-     conta: o dia aparece vazio, e o saldo fica parado no valor inicial —
-     a mesma regra do balanceUntil, senao o ano e o mes discordariam */
-  const marker = (ctx.startBalance || {}).day || oldestDay(ctx.entries) || "";
-  const days = [];
-  for (let i = 1; i <= nDays; i++) {
-    const day = yyyymm + "-" + pad(i);
-    if (marker && day < marker) { days.push({ day, inflow: 0, outflow: 0, balance, items: [], suggestions: projectionsOf(day, ctx), before: true }); continue; }
-    const items = ctx.entries.filter((e) => e.day === day);
-    const suggestions = projectionsOf(day, ctx);
-    const counted = suggestFrom && day >= suggestFrom ? items.concat(suggestions) : items;
-    const inflow = counted.filter((x) => x.kind === "in").reduce((s, x) => s + x.amount, 0);
-    const outflow = counted.filter((x) => x.kind === "out").reduce((s, x) => s + x.amount, 0);
-    balance += inflow - outflow;
-    days.push({ day, inflow, outflow, balance, items, suggestions });
-  }
-  return days;
-}
 function adjacentMonth(yyyymm, delta) {
   const [year, month] = yyyymm.split("-").map(Number);
   let m = month + delta, y = year;
@@ -129,9 +91,9 @@ function Finance() {
 
   /* o que o assistente sabe sem perguntar de novo, quando a pergunta for do
      financeiro ("posso gastar X?") — so o que ja esta na tela, nunca uma
-     simulacao nova por conta propria. a frase e a do financeBrief(), a mesma
-     que o assistente monta sozinho quando a pergunta vem de outra tela; aqui
-     ela so passa a valer sem o card de simulacao. */
+     simulacao nova por conta propria. o texto do financeBrief() e o mesmo
+     da secao dinheiro do retrato (os dois saem do financeToday), so com mais
+     espaco: o contexto da tela leva ate 1.200 caracteres. */
   useEffect(() => {
     setPageContext(financeBrief);
     return () => setPageContext(null);
@@ -417,24 +379,16 @@ function TodayView({ ctx, cfg, month, onOpenMonth, onNewEntry, onEditEntry, onTo
    abre a caixa da categoria — nome e meta —, como todo "editar" do sistema;
    o campo solto de "nova categoria" e o renomear no meio da lista saíram. */
 function Categories({ cfg, days, month, onCategory }) {
-  const moved = {};
-  days.forEach((d) => d.items.forEach((it) => {
-    const k = it.category || "sem categoria";
-    const m = moved[k] || (moved[k] = { outReal: 0, outAll: 0, in: 0 });
-    if (it.kind === "in") m.in += it.amount;
-    else { m.outAll += it.amount; if (!isForecast(it)) m.outReal += it.amount; }
-  }));
-  /* a lista da config mais as etiquetas órfãs: escondê-las faria as somas não fecharem */
-  const names = cfg.categories.concat(Object.keys(moved).filter((k) => k !== "sem categoria" && !cfg.categories.includes(k)));
+  const moved = spentByCategory(days);
+  /* a lista da config mais as etiquetas órfãs, na ordem do categoryOrder:
+     com meta primeiro, a mais apertada no topo; sem meta, a que mais gastou */
+  const sorted = categoryOrder(cfg, moved);
   const budgets = cfg.budgets || {};
   const out = (n) => (moved[n] ? moved[n].outAll : 0);
-  const biggest = Math.max(1, ...names.map((n) => Math.max(out(n), budgets[n] || 0)));
-  const withGoal = names.filter((n) => budgets[n]);
+  const biggest = Math.max(1, ...sorted.map((n) => Math.max(out(n), budgets[n] || 0)));
+  const withGoal = sorted.filter((n) => budgets[n]);
   const totalBudget = withGoal.reduce((s, n) => s + budgets[n], 0);
   const totalUse = withGoal.reduce((s, n) => s + out(n), 0);
-  /* com meta vem primeiro, a mais apertada no topo; sem meta, a que mais gastou */
-  const rank = (n) => (budgets[n] ? 1e9 * (out(n) / budgets[n]) : out(n) / 1e3);
-  const sorted = names.slice().sort((a, b) => rank(b) - rank(a));
 
   return (
     <>
@@ -445,7 +399,7 @@ function Categories({ cfg, days, month, onCategory }) {
       {totalBudget > 0
         ? <p className="note">nas categorias com meta: ≈ {brl(totalUse)} de {brl(totalBudget)}</p>
         : <p className="note">clique numa categoria para dar uma meta de gasto por mês.</p>}
-      {names.length ? (
+      {sorted.length ? (
         <ul className="cats">
           {sorted.map((name) => {
             const m = moved[name] || { outReal: 0, outAll: 0, in: 0 };
