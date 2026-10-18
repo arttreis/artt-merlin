@@ -21,6 +21,30 @@ export const isMeeting = (t) => !!t && !!t.reserved && MEETING_RE.test(String(t.
 
 export const runningOf = (sessions) => sessions.find((s) => s && !s.end) || null;
 
+/* começar e parar moravam duas vezes, no início e no rastreador, e desde
+   18/10/2026 o cartão do "o que falta hoje?" é a terceira porta (a secretária,
+   D6). recebem a coleção (só `all` e `save`), e não a lista, porque gravar é o
+   ponto: começar uma encerra a que estava rodando, e nunca há duas sem `end`.
+   o id não vem do core.js para este arquivo continuar sem navegador. */
+const sessionId = (at) => "s" + at.toString(36) + Math.random().toString(36).slice(2, 7);
+
+export function stopSession(sessions, now) {
+  const cur = runningOf(sessions.all());
+  if (!cur) return null;
+  const at = now || Date.now();
+  const done = { ...cur, end: at, updatedAt: at };
+  sessions.save(done);
+  return done;
+}
+
+export function startSession(sessions, task, now) {
+  const at = now || Date.now();
+  stopSession(sessions, at);
+  const s = { id: sessionId(at), task: task.id, title: task.title, start: at, end: null, planned: task.min || 0, createdAt: at, updatedAt: at };
+  sessions.save(s);
+  return s;
+}
+
 /* minutos de uma sessão; a que está rodando conta até agora */
 export const minutesOf = (s, now) => Math.max(0, Math.round(((s.end || now || Date.now()) - s.start) / 60000));
 
