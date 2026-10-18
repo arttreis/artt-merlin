@@ -988,6 +988,9 @@ Object.assign(TEXT_TASKS, {
    pedido nunca sai maior que um segundo turno pediria. actionType fora
    desta lista e descartado; os campos do payload sao filtrados pelos
    permitidos aqui, o resto do JSON da IA nunca chega perto de um save(). */
+/* o que a resposta do assistente pode pedir para a tela desenhar sozinha */
+const ASSISTANT_SHOW = ["quests"];
+
 const ASSISTANT_ACTIONS = {
   task: { collection: "tasks", fields: ["title", "date", "min", "client"] },
   note: { collection: "notes", fields: ["title", "body", "client"] },
@@ -1026,6 +1029,7 @@ LIST_TASKS.assistant = (c) => ({
     "CONSELHO (pede opinião, \"o que eu faço\", \"vale a pena\"): recomende citando o que viu no retrato (o horário, a sobra, a atrasada), em vez de conselho genérico. " +
     "Em sources, liste de onde tirou a resposta, só dentre exatamente estes valores: " + PORTRAIT_SOURCES.join(", ") + " (dia é a seção hoje do retrato). Sem nada tirado do retrato, sources vazio. " +
     "Se a pessoa pedir para fechar o dia, revisar a semana ou revisar o mês, devolva suggestions vazio e diga em clarify, numa frase, que é só escrever \"fechar o dia\" no campo do início (ou \"revisar a semana\", \"revisar o mês\") — é o próprio início que abre o fechamento e a revisão, e não há ação para isso no catálogo. " +
+    "Se a pessoa perguntar o que falta fazer hoje, o que fazer agora ou qual é a próxima coisa, devolva suggestions vazio, show \"quests\" e em clarify uma frase curta (ex. \"aqui está o que falta\") — a tela monta a lista a partir do que ela sabe; nunca escreva a lista você mesmo. Fora desse pedido, não mande show. " +
     "Se a mensagem não corresponder a nenhuma ação nem a uma pergunta respondível, devolva suggestions vazio e clarify com UMA pergunta curta que ajudaria a decidir — nunca invente uma ação só para responder algo. " +
     "Quando houver turnos anteriores, leia-os antes de decidir: a mensagem nova costuma completar a anterior (\"o segundo\", \"muda pra terça\") em vez de começar um pedido do zero. " +
     "clarify tem até 1200 caracteres e a tela o lê como markdown simples: quando a resposta tiver partes (uma conta, uma lista de fixos, dois caminhos), use lista com \"- \", **negrito** no número que importa e \"## \" no título de cada parte. Uma frase só continua sendo uma frase só, sem enfeite. " +
@@ -1529,9 +1533,12 @@ async function advise(req, env, person) {
       }
     }
     /* 1200 e nao 400 desde 22/09/2026: a resposta virou markdown na tela do
-       assistente, e uma conta com duas ou tres linhas nao cabia em 400 */
+       assistente, e uma conta com duas ou tres linhas nao cabia em 400.
+       `show` pede a tela que a pagina monta sozinha (o cartao do "o que falta
+       hoje?", shared/quests.js): lista fechada, e fora dela a chave nao vem */
     const sources = Array.isArray(data.sources) ? PORTRAIT_SOURCES.filter((x) => data.sources.includes(x)) : [];
-    return json({ suggestions, clarify: String(data.clarify || "").slice(0, 1200), sources });
+    const show = ASSISTANT_SHOW.includes(data.show) ? { show: data.show } : {};
+    return json({ suggestions, clarify: String(data.clarify || "").slice(0, 1200), sources, ...show });
   }
   if (!data || !Array.isArray(data.suggestions)) return fail("o Merlin respondeu fora do formato", 502);
   return json({

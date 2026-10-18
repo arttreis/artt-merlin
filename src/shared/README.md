@@ -22,6 +22,16 @@ Vite; o build sai em `server/site/`. O que é comum vive aqui:
   navegador. Também decide o que conta no dia e o que o calendário lista (`dayTasks`) e o que a
   caixa de entrada vira (`inboxToDocs`, gravada por `collectInbox`, que o calendário e o início
   chamam ao abrir).
+- `quests.js` — o **"o que falta hoje?"**: `questsOf(data, now)` monta os dois grupos (agora:
+  a sessão rodando ou o compromisso que começa em até 30 minutos; para trás: as atrasadas, que
+  viram um item só quando passam de duas), `nextQuest` dá a próxima não pulada, e `moveTask`,
+  `dropTask` e `doneTask` gravam devolvendo o desfazer. Fonte nova é uma linha em `SOURCES`. É a
+  conta do cartão do início, do "agora" do rastreador e do cartão que o Merlin pede.
+- `quest-card.jsx` — o **cartão** dessa lista na conversa do início: um desenho por tipo em
+  `VIEWS` (tipo novo é uma linha ali). "agora não" é estado da página e não grava.
+- `focus.js` — as **sessões de foco**: `startSession`/`stopSession` (a única forma de começar e
+  parar, usada pelo rastreador e pelo cartão), a meta de horas, o teto de reunião, o recibo e o
+  GitHub do dia. Entra lista ou coleção, sai número; sem `localStorage`.
 - `icons.jsx` — os SVGs comuns como elementos React. `icon("plus")` devolve um deles.
 - `ui.jsx` — a **tela**: hooks que ligam a página às coleções, componentes comuns e a
   **casca** (sidebar, busca, tema, nuvem, entrar, aviso). É o que uma página importa para

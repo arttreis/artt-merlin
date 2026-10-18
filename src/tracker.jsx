@@ -21,8 +21,9 @@
    sempre aberta e nao tem bandeja nem botao de esconder. */
 import "./shared/base.css";
 import "./tracker.css";
-import { initPage, today, notify, readPrefs, readDuration, currentBrand, newId } from "./shared/core.js";
-import { runningOf, minutesOf, receipt } from "./shared/focus.js";
+import { initPage, today, notify, readPrefs, readDuration, currentBrand } from "./shared/core.js";
+import { runningOf, minutesOf, receipt, startSession, stopSession } from "./shared/focus.js";
+import { questsOf } from "./shared/quests.js";
 import { useState, useEffect, useLayoutEffect, useRef } from "react";
 import { mount, useCollection } from "./shared/ui.jsx";
 import { LOGO, GL_MARK } from "./shared/icons.jsx";
@@ -125,8 +126,13 @@ function Tracker() {
   const doc = dayDoc(dayTasks(all).count, date, readPrefs());
   const { b, slots, cut } = distribute(doc);
   const m = measureOf(doc, b);
-  const now = b.open[0] || null;
-  const next = b.open.slice(1, 3);
+  /* o que e agora sai da mesma conta do cartao do inicio (shared/quests.js):
+     a sessao rodando ou o compromisso que esta comecando. sem eles, a
+     primeira da fila, como sempre foi */
+  const soon = questsOf({ tasks: all, sessions: sessions.all() }).now.find((q) => q.type === "appointment");
+  const now = (soon && soon.task) || b.open[0] || null;
+  const rest = b.open.filter((t) => !now || t.id !== now.id);
+  const next = rest.slice(0, 2);
   const late = overdue(all, date).length;
 
   /* a bandeja repete o numero grande, para quem nem abriu esta janela */
@@ -148,17 +154,12 @@ function Tracker() {
     });
   };
   const start = (t) => {
-    if (running) stop();
-    const at = Date.now();
-    sessions.save({ id: newId(), task: t.id, title: t.title, start: at, end: null, planned: t.min || 0, createdAt: at, updatedAt: at });
+    startSession(sessions, t);
     setSlip(null);
   };
   const stop = () => {
-    const cur = runningOf(sessions.all());
-    if (!cur) return;
-    const done = { ...cur, end: Date.now(), updatedAt: Date.now() };
-    sessions.save(done);
-    setSlip({ ...receipt(done), task: cur.task, title: cur.title });
+    const done = stopSession(sessions);
+    if (done) setSlip({ ...receipt(done), task: done.task, title: done.title });
   };
   const toDay = (e) => { if (desktop) { e.preventDefault(); openMain(DAY_PATH); } };
 
@@ -236,7 +237,7 @@ function Tracker() {
           <button type="button" className="tk-chip" onClick={stop}>parar</button>
         </div>
       ) : now ? (
-        <div className={"tk-now" + (cut === 0 ? " is-out" : "")} title={range(now)}>
+        <div className={"tk-now" + (cut === 0 && now === b.open[0] ? " is-out" : "")} title={range(now)}>
           <button className="tk-check" type="button" onClick={() => complete(now)} title="concluir" aria-label={"Concluir " + now.title} />
           <span className="tk-title">{now.title}</span>
           <span className="tk-min t-mono">{now.min ? fmt(now.min) : "~" + fmt(guessMin())}</span>
@@ -251,10 +252,10 @@ function Tracker() {
       {(next.length > 0 || late > 0) && (
         <p className="tk-next">
           {next.length > 0 && <>depois: {next.map((t, i) => (
-            <span key={t.id} className={cut >= 0 && i + 1 >= cut ? "is-out" : ""} title={range(t)}>
+            <span key={t.id} className={cut >= 0 && b.open.indexOf(t) >= cut ? "is-out" : ""} title={range(t)}>
               {i ? " · " : ""}{t.title} <i className="t-mono">{fmt(costOf(t))}</i>
             </span>))}
-            {b.open.length > 3 && <span> · +{b.open.length - 3}</span>}
+            {rest.length > 2 && <span> · +{rest.length - 2}</span>}
           </>}
           {late > 0 && <a href={DAY_PATH} onClick={toDay} className="tk-late">{late + (late === 1 ? " aberta" : " abertas") + " de antes de hoje"}</a>}
         </p>

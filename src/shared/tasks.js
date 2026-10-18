@@ -342,12 +342,18 @@ export function routeLine(text) {
    da tela): "fechar o dia" abre o fechamento, "revisar a semana" e "revisar o
    mês" abrem a revisão. a frase precisa ser a frase inteira — "fechar o dia
    30m" continua sendo tarefa, porque a duração manda, e "como fecho o mês no
-   financeiro?" continua sendo pergunta. roda antes da routeLine. */
+   financeiro?" continua sendo pergunta. roda antes da routeLine.
+
+   desde 18/10/2026, "o que falta hoje?", "e agora?" e "próxima" respondem com
+   o cartão da próxima coisa (shared/quests.js), também sem rede. "o que falta
+   fazer no funil?" não é este pedido: vai ao Merlin como pergunta. */
 const CLOSE_RE = /^fechar (?:o |meu |o meu )?dia$/;
 const REVIEW_RE = /^revisar (?:a |minha |a minha |o |meu |o meu )?(semana|m[eê]s)$/;
+const QUESTS_RE = /^(?:o que (?:é que )?(?:me )?falta(?: fazer)?(?: (?:pra |para )?hoje)?|e agora|pr[óo]xima(?: coisa| tarefa)?|qual (?:é )?a pr[óo]xima(?: coisa| tarefa)?)$/;
 export function askIntent(text) {
   const raw = String(text || "").toLowerCase().replace(/\s+/g, " ").replace(/[\s.!]+$/, "").trim();
   if (CLOSE_RE.test(raw)) return { kind: "close" };
+  if (QUESTS_RE.test(raw.replace(/[\s?.!]+$/, ""))) return { kind: "quests" };
   const r = REVIEW_RE.exec(raw);
   return r ? { kind: "review", period: r[1] === "semana" ? "week" : "month" } : null;
 }

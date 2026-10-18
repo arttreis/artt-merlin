@@ -40,6 +40,8 @@ import { Forest, phaseOf } from "./shared/forest.jsx";
 import { githubDay } from "./shared/focus.js";
 import { usePortrait } from "./shared/use-portrait.js";
 import { sourcesLine } from "./shared/portrait.js";
+import { questsOf, questsText } from "./shared/quests.js";
+import { QuestCard } from "./shared/quest-card.jsx";
 
 const door = isNewHere() && !seen("landing");
 initPage("home");
@@ -255,9 +257,12 @@ function Onboarding({ profile, apps, habits, veteran, onDone }) {
    continua mandando — "montar o funil 2h" é tarefa de hoje.
 
    "fechar o dia", "revisar a semana" e "revisar o mês" (askIntent) passam
-   antes de tudo isso: abrem o fechamento e a revisão aqui mesmo, sem rede. */
-const ROUTE_ICON = { task: "check", ask: "spark", note: "pencil", read: "spark", build: "spark", close: "check", review: "pencil" };
+   antes de tudo isso: abrem o fechamento e a revisão aqui mesmo, sem rede.
+   "o que falta hoje?" também: responde com o cartão da próxima coisa
+   (shared/quest-card.jsx) no balão, sem pedido ao Merlin. */
+const ROUTE_ICON = { task: "check", ask: "spark", note: "pencil", read: "spark", build: "spark", close: "check", review: "pencil", quests: "check" };
 const INTENT_HINT = {
+  quests: "o que falta hoje · a próxima coisa aparece aqui em cima",
   close: "fechar o dia · decidir o que ficou aberto e escrever como foi",
   week: "revisar a semana · como foi e o que muda na próxima",
   month: "revisar o mês · o que fica e o que sai no próximo"
@@ -378,7 +383,7 @@ function Composer({ tasks, b, smart, onAsk, onIntent, readContext }) {
   const submit = async () => {
     if (draft) { create(); return; }
     if (!route || reading) return;
-    if (intent) { onIntent(intent); clear(); return; }
+    if (intent) { onIntent(intent, text.trim()); clear(); return; }
     if (build) { askMerlin(text.trim()); clear(); return; }
     if (route.kind === "ask") { onAsk(route.text); clear(); return; }
     if (!willRead) { byRule(route); return; }
@@ -699,8 +704,9 @@ function Today({ c, tasks, habits, journal, closes, reviews, sessions, me, h, ph
   const name = cleanName(me.name || (c.email ? String(c.email).split("@")[0] : ""));
   /* o que o campo resolve sem o Merlin: o fechamento e a revisão do período
      corrente, a qualquer dia */
-  const openIntent = (it) => {
-    if (it.kind === "close") setClosing(true);
+  const openIntent = (it, said) => {
+    if (it.kind === "quests") keepTalk(talk.concat([{ from: "me", text: said }, questsMsg()]));
+    else if (it.kind === "close") setClosing(true);
     else setReviewing(it.period === "week" ? { id: weekKey(date), kind: "week" } : { id: monthKey(date), kind: "month" });
   };
   const readContext = () => ({
@@ -731,6 +737,9 @@ function Today({ c, tasks, habits, journal, closes, reviews, sessions, me, h, ph
     const now = Date.now();
     chats.save({ id: talkId.current, title: chatTitle(list), messages: list.slice(-MAX_TURNS), createdAt: before ? before.createdAt : now, updatedAt: now });
   };
+  /* o cartão do "o que falta hoje?" é desenhado ao vivo a partir das
+     coleções; a linha de texto é o que a conversa guarda e o Merlin lê depois */
+  const questsMsg = () => ({ from: "merlin", show: "quests", text: questsText(questsOf({ tasks: tasks.all(), sessions: sessions.all() })) });
   const ask = async (q) => {
     if (!c.signedIn) { askMerlin(q); return; }
     if (asking) return;
@@ -745,7 +754,7 @@ function Today({ c, tasks, habits, journal, closes, reviews, sessions, me, h, ph
       }) });
       const s = r.ok && (r.body.suggestions || [])[0];
       const said = r.ok ? r.body.clarify : (r.body && r.body.error) || "não consegui pensar nisso agora";
-      reply = [said && { from: "merlin", text: said, sources: r.ok ? r.body.sources : [] }, s && { from: "merlin", proposal: s }].filter(Boolean);
+      reply = [said && { from: "merlin", text: said, sources: r.ok ? r.body.sources : [] }, s && { from: "merlin", proposal: s }, r.ok && r.body.show === "quests" && questsMsg()].filter(Boolean);
       if (!reply.length) reply = [{ from: "merlin", text: "não entendi bem — pode dizer de outro jeito?" }];
     } catch (e) {
       reply = [{ from: "merlin", text: "não consegui falar com o Merlin" }];
@@ -770,7 +779,9 @@ function Today({ c, tasks, habits, journal, closes, reviews, sessions, me, h, ph
                 {lastQ >= 0 && <p className="hm-talk__q">{talk[lastQ].text}</p>}
                 {asking
                   ? <p className="hm-talk__wait">pensando…</p>
-                  : talk.slice(lastQ + 1).map((m, i) => m.proposal
+                  : talk.slice(lastQ + 1).map((m, i) => m.show === "quests"
+                    ? <QuestCard key={i} tasks={tasks} sessions={sessions} />
+                    : m.proposal
                       ? m.proposal.done
                         ? <p key={i} className="hm-talk__done t-mono">✓ {m.proposal.done.line}</p>
                         : <button key={i} type="button" className="pill pill--accent hm-talk__do" onClick={() => setProposal({ p: m.proposal, at: lastQ + 1 + i, chat: talkId.current })}>{icon("spark")}{m.proposal.title}</button>

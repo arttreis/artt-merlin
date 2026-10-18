@@ -581,6 +581,25 @@ check("assistente responde ao pedido de fechar o dia", r.status === 200 && body.
 check("a instrução manda escrever \"fechar o dia\" no campo do início", claudeMessages.at(-1).content.includes('é só escrever "fechar o dia" no campo do início'));
 check("a instrução também aponta \"revisar a semana\"", claudeMessages.at(-1).content.includes("revisar a semana"));
 
+/* o assistente pode pedir o cartão do "o que falta hoje?": `show` passa só se
+   for um valor da lista fechada (["quests"]). a tela monta o cartão sozinha, e
+   o modelo não escreve a lista. */
+claudeAnswer = { stop_reason: "end_turn", content: [{ type: "text", text: '{"show":"quests","clarify":""}' }] };
+r = await call("POST", "/merlin", { task: "assistant", context: { message: "o que eu faço agora?" } }, cookie);
+body = await r.json();
+check("assistente pede o cartão: show passa", r.status === 200 && body.show === "quests", JSON.stringify(body));
+check("assistente pede o cartão: sem sugestões inventadas", r.status === 200 && Array.isArray(body.suggestions) && body.suggestions.length === 0, JSON.stringify(body));
+
+claudeAnswer = { stop_reason: "end_turn", content: [{ type: "text", text: '{"show":"tudo","clarify":""}' }] };
+r = await call("POST", "/merlin", { task: "assistant", context: { message: "me mostra tudo" } }, cookie);
+body = await r.json();
+check("show fora da lista fechada não passa", r.status === 200 && !("show" in body), JSON.stringify(body));
+
+claudeAnswer = { stop_reason: "end_turn", content: [{ type: "text", text: '{"suggestions":[],"clarify":"e pra qual etapa?"}' }] };
+r = await call("POST", "/merlin", { task: "assistant", context: { message: "e essa etapa" } }, cookie);
+body = await r.json();
+check("sem show na resposta do modelo, a chave não vem", r.status === 200 && !("show" in body), JSON.stringify(body));
+
 /* ---- 13e-ter. o registro de dinheiro ----
    a leitura do inicio e a conversa passam a aceitar lancamento. o que o Worker
    garante aqui e o que a IA nao pode decidir sozinha: a categoria so existe se
