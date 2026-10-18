@@ -1,13 +1,15 @@
 /* o cartão do "o que falta hoje?": mora dentro do balão do Merlin no início,
-   que é escuro sobre a floresta, então herda a cor dele */
-.qc{display:flex;flex-direction:column;gap:6px;padding:10px 12px;border-radius:12px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.14)}
+   que é escuro sobre a floresta, então herda a cor dele. o fundo escurece um
+   pouco mais que o balão: no tema claro a névoa da floresta é cinza, e o
+   rodapé pequeno sumia nela */
+.qc{display:flex;flex-direction:column;gap:6px;padding:10px 12px;border-radius:12px;background:rgba(6,8,14,.32);border:1px solid rgba(255,255,255,.14)}
 .qc p{margin:0}
-.qc__from{font-size:11px;letter-spacing:.02em;color:rgba(255,255,255,.6)}
+.qc__from{font-size:11px;letter-spacing:.02em;color:rgba(255,255,255,.78)}
 .qc__title{font-size:14.5px;font-weight:600;line-height:1.35;overflow-wrap:anywhere}
-.qc__title small{font-size:12px;font-weight:400;color:rgba(255,255,255,.7)}
+.qc__title small{font-size:12px;font-weight:400;color:rgba(255,255,255,.82)}
 .qc--empty .qc__title{font-weight:400;font-size:13.5px}
 .qc__title a,.qc__foot button{color:inherit;text-decoration:underline;text-decoration-color:rgba(255,255,255,.35)}
-.qc__why{font-size:12.5px;color:rgba(255,255,255,.75)}
+.qc__why{font-size:12.5px;color:rgba(255,255,255,.86)}
 .qc__acts{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:2px}
 .qc__act{display:inline-flex;align-items:center;min-height:30px;padding:0 12px;border-radius:999px;font-size:12.5px;color:#fff;background:transparent;border:1px solid rgba(255,255,255,.28);text-decoration:none;cursor:pointer}
 .qc__act:hover{background:rgba(255,255,255,.1)}
@@ -16,5 +18,5 @@
 .qc__act:focus-visible,.qc__date:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .qc__ask{font-size:12.5px;color:rgba(255,255,255,.8);margin-right:2px}
 .qc__date{min-height:30px;padding:0 10px;border-radius:8px;font:inherit;font-size:12.5px;color:#fff;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.28);color-scheme:dark}
-.qc__foot{display:flex;flex-wrap:wrap;justify-content:space-between;gap:4px 12px;margin-top:2px;padding-top:6px;border-top:1px solid rgba(255,255,255,.12);font-size:11.5px;color:rgba(255,255,255,.65)}
+.qc__foot{display:flex;flex-wrap:wrap;justify-content:space-between;gap:4px 12px;margin-top:2px;padding-top:6px;border-top:1px solid rgba(255,255,255,.12);font-size:11.5px;color:rgba(255,255,255,.82)}
 .qc__foot span:last-child{margin-left:auto}
