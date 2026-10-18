@@ -10,6 +10,7 @@ import { journalEntry } from "./client-doc.js";
 import { layoutNodes } from "./funnel-layout.js";
 import { newEntry, entryLine, paidOf, configOf, contextOf } from "./finance-data.js";
 import { SOURCES } from "./portrait.js";
+import { normalize as normalizeHabit, habitStatus, markOn } from "./habits-data.js";
 
 export const ACTION_COLLECTIONS = {
   task: "tasks",
@@ -20,7 +21,8 @@ export const ACTION_COLLECTIONS = {
   "onboarding-funnel": "funnels",
   script: "content",
   "wishlist-item": "wishlist",
-  "finance-entry": "finance"
+  "finance-entry": "finance",
+  "habit-mark": "habits"
 };
 
 export const ACTION_LABELS = {
@@ -32,11 +34,12 @@ export const ACTION_LABELS = {
   "onboarding-funnel": "novo funil de onboarding",
   script: "roteiro",
   "wishlist-item": "novo item na vitrine",
-  "finance-entry": "novo lançamento"
+  "finance-entry": "novo lançamento",
+  "habit-mark": "marcar hábito"
 };
 
 /* o que a pílula confirmada diz no lugar do título: "✓ lançado · …" */
-export const ACTION_DONE = { "finance-entry": "lançado", task: "criada", note: "criada", "lead-update": "aplicado", script: "aplicado" };
+export const ACTION_DONE = { "finance-entry": "lançado", "habit-mark": "marcado", task: "criada", note: "criada", "lead-update": "aplicado", script: "aplicado" };
 
 /* so os campos que fazem sentido editar antes de confirmar — o resto do
    payload (arvore do mapa, etapas do funil, id do cliente/conteudo) segue
@@ -103,6 +106,7 @@ export function previewOf(actionType, payload, ctx) {
     case "script": return "entra no roteiro da peça de conteúdo";
     case "wishlist-item": return [p.qty, p.bucket].filter(Boolean).join(" · ");
     case "finance-entry": return entryLine({ ...p, flow: p.kind, date: p.day }, today(), ctx);
+    case "habit-mark": return [p.habit || p.name, p.date && p.date !== today() ? p.date.slice(8, 10) + "/" + p.date.slice(5, 7) : ""].filter(Boolean).join(" · ");
     default: return "";
   }
 }
@@ -156,6 +160,16 @@ export function buildDoc(actionType, payload, v, store, opts) {
         title: v.name, amount: v.amount, flow: v.kind, category: v.category, date: v.day, paid: v.paid,
         confirm: p.confirm, fixed: p.fixed, chat: opts && opts.chat
       }, configOf(store), contextOf(store), today());
+    /* a pílula marca sem caixa: `v` é o próprio payload. a coleção chega sem
+       normalize na tela da conversa, então cada hábito é normalizado aqui.
+       hábito que não existe não se cria por aqui: é a caixa de novo hábito */
+    case "habit-mark": {
+      const e = v || {};
+      const { habit, day, error } = habitStatus(store.all().map(normalizeHabit), { name: e.habit || e.name || p.habit || p.name, date: e.date || p.date }, today());
+      if (error) return { error };
+      if (!habit) return { error: "não achei esse hábito" };
+      return markOn(habit, day, today());
+    }
     case "wishlist-item":
       return { doc: { id: newId(), type: "item", list: p.list || "", name: v.name.trim(), price: Math.round(Math.abs(+p.price)) || 0, url: "", photo: null, note: "", bought: null, bucket: v.bucket || "", qty: v.qty || "", order: now, createdAt: now, updatedAt: now } };
     default:

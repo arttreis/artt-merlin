@@ -4,15 +4,15 @@
 import "./shared/base.css";
 import "./habits.css";
 import {
-  initPage, newId, today, dayOf, dateOf, addDays, mondayOf, monthLabel, notify, sendToDay, api, formatMin, parseDuration, foldKey
+  initPage, newId, today, dayOf, dateOf, addDays, mondayOf, monthLabel, notify, sendToDay, api, formatMin, foldKey
 } from "./shared/core.js";
 import { useState } from "react";
 import {
   mount, useCollection, useKeydown, isTyping,
-  useFields, Form, Field, Dialog, Markdown, EmptyStart, PeriodNav, icon
+  Dialog, Markdown, EmptyStart, PeriodNav, HabitForm, icon
 } from "./shared/ui.jsx";
 import { HABIT_SUGGESTIONS, habitGroups } from "./shared/templates.js";
-import { SCHEDULES, COLORS, normalize, isExpected, toggleMark } from "./shared/habits-data.js";
+import { WEEKDAY_NAMES, normalize, isExpected, toggleMark } from "./shared/habits-data.js";
 
 initPage("habits");
 
@@ -21,8 +21,8 @@ initPage("habits");
    registro por dia. as marcas moram dentro do documento porque um mes cabe em
    poucos bytes e um habito e editado por uma pessoa so.
    normalize/SCHEDULES/COLORS/isExpected/toggleMark moram em
-   shared/habits-data.js — a home usa as mesmas para marcar direto no bento. */
-const WEEKDAY_NAMES = ["dom", "seg", "ter", "qua", "qui", "sex", "sáb"];
+   shared/habits-data.js — a home usa as mesmas para marcar direto no bento,
+   e a caixa do habito (HabitForm) mora em shared/ui.jsx. */
 
 /* ---------- meses e dias ---------- */
 const monthOf = (day) => day.slice(0, 7);
@@ -298,54 +298,8 @@ function HabitRow({ h, days, today: t, onToggle, onEdit, onArchive, onPull }) {
   );
 }
 
-/* ---------- a caixa do habito: criar e editar sao a mesma ---------- */
-function HabitForm({ habits, id, onClose, onArchive, onSuggest }) {
-  const h = id ? habits.get(id) : null;
-  const [v, bind, set] = useFields({
-    name: h ? h.name : "",
-    type: h ? h.schedule.type : "daily",
-    times: h ? h.schedule.times : 3,
-    weekdays: h ? h.schedule.weekdays : [1, 2, 3, 4, 5],
-    duration: h && h.min ? formatMin(h.min) : "",
-    color: h ? h.color : 5
-  });
-  if (id && !h) return null;
-  const toggleWeekday = (n) => set("weekdays", v.weekdays.includes(n) ? v.weekdays.filter((x) => x !== n) : [...v.weekdays, n]);
-  const submit = () => {
-    const name = v.name.trim().slice(0, 80);
-    if (!name) { notify("o hábito precisa de um nome"); return false; }
-    if (v.type === "weekdays" && !v.weekdays.length) { notify("escolha pelo menos um dia"); return false; }
-    const now = Date.now();
-    const schedule = { type: v.type, times: Math.min(7, Math.max(1, Math.round(+v.times || 1))), weekdays: v.weekdays.slice().sort() };
-    const min = parseDuration(v.duration).min;
-    if (h) habits.save({ ...h, name, schedule, min, color: +v.color, updatedAt: now });
-    else habits.save({ id: newId(), name, schedule, min, color: +v.color, order: now, archived: false, marks: {}, createdAt: now, updatedAt: now });
-  };
-  return (
-    <Form title={h ? "hábito" : "novo hábito"} submit={h ? "salvar" : "criar"} remove={h ? "arquivar" : ""} removeIcon="archive"
-        aside={!h && onSuggest ? <button className="dialog__remove" type="button" title="ver sugestões" aria-label="Ver sugestões" onClick={onSuggest}>{icon("spark")}</button> : null}
-        onRemove={() => onArchive(h)} onClose={onClose} onSubmit={submit}>
-      <Field label="nome" full><input className="input" maxLength="80" required placeholder="treino, leitura, água…" {...bind("name")} /></Field>
-      <Field label="frequência">
-        <select className="select" {...bind("type")}>{SCHEDULES.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}</select>
-      </Field>
-      {v.type === "perWeek" && <Field label="quantas vezes"><input className="input input--num" type="number" min="1" max="7" {...bind("times")} /></Field>}
-      {v.type === "weekdays" && (
-        <Field label="quais dias" full>
-          <div className="weekday-picker">
-            {[1, 2, 3, 4, 5, 6, 0].map((n) => (
-              <label key={n} className={v.weekdays.includes(n) ? "is-on" : ""}>
-                <input type="checkbox" checked={v.weekdays.includes(n)} onChange={() => toggleWeekday(n)} />{WEEKDAY_NAMES[n]}
-              </label>))}
-          </div>
-        </Field>)}
-      <Field label="duração sugerida"><input className="input input--mono" placeholder="30m, 1h" {...bind("duration")} /></Field>
-      <Field label="cor">
-        <select className="select" {...bind("color")}>{COLORS.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}</select>
-      </Field>
-    </Form>
-  );
-}
+/* a caixa do habito (criar e editar) mora em shared/ui.jsx desde 18/10/2026:
+   o inicio e a conversa abrem a mesma no "criar e marcar" */
 
 /* ---------- a leitura do merlin ---------- */
 function MerlinDialog({ text, onClose }) {

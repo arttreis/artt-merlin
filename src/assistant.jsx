@@ -17,7 +17,7 @@ import "./shared/base.css";
 import "./assistant.css";
 import { initPage, newId, notify, api, takeAsk, getCurrentPage, collection } from "./shared/core.js";
 import { useState, useEffect, useRef } from "react";
-import { mount, useCollection, useHash, setHash, Markdown, ProposalDialog, Hat, icon } from "./shared/ui.jsx";
+import { mount, useCollection, useHash, setHash, Markdown, ProposalDialog, HabitProposal, Hat, icon } from "./shared/ui.jsx";
 import { chatMood } from "./shared/hat.js";
 import { NAV_ICONS } from "./shared/icons.jsx";
 import { MAX_TURNS, normalizeChat, chatTitle, turnsOf, markProposal } from "./shared/assistant-actions.js";
@@ -400,6 +400,8 @@ function Assistant() {
   }, [hash]);
   useEffect(() => { if (listRef.current) listRef.current.scrollTop = listRef.current.scrollHeight; }, [messages, thinking]);
 
+  /* a conversa desta pintura: o desfazer da marca chega depois, e pode já ser outra */
+  const chatNow = idRef.current;
   return (
     <>
       <div className={"chat" + (historyOpen ? " is-history" : "")}>
@@ -432,6 +434,10 @@ function Assistant() {
                       : m.proposal
                       ? m.proposal.done
                         ? <p className="chat__done">✓ {m.proposal.done.line}</p>
+                        /* o hábito se marca no clique, sem caixa (shared/ui.jsx) */
+                        : m.proposal.actionType === "habit-mark"
+                        ? <HabitProposal proposal={m.proposal} className="pill pill--accent" doneClassName="chat__done"
+                                         onDone={(line) => markDone(i, chatNow, line)} />
                         : <button className="pill pill--accent" type="button" onClick={() => setProposal({ p: m.proposal, at: i, chat: idRef.current })}>{icon("spark")}{m.proposal.title}</button>
                       : m.from === "me"
                         /* o que a pessoa escreveu sai como ela escreveu; o que o
