@@ -607,6 +607,13 @@ Decidido em 07/09/2026:
 13. **Stack**: HTML/JS/CSS sem build e sem CDN continua; em 07/09/2026 entrou o Preact local
     como única dependência de tela (ver `MIGRATION.md`). (A página "o que é isso" foi apagada
     em 07/09/2026; a leitura fica neste documento e nos READMEs.)
+    **Hospedagem** (revista em 18/10/2026): fica na Cloudflare (Worker + D1 + R2). Site e API
+    no mesmo domínio é o que segura o cookie `SameSite=Lax`; o servidor só guarda documentos
+    por `person`; custo e operação ficam perto de zero. Vercel + Neon, Supabase, Firebase,
+    Fly.io/VPS e Deno Deploy foram comparados e nenhum resolve um problema que o Merlin tem.
+    Se um dia precisar de sync em tempo real, a resposta são Durable Objects, sem migrar.
+    Só reabrir se o Merlin virar produto para muitos clientes com consultas relacionais
+    (aí Postgres) ou se offline com merge de conflitos virar requisito central.
 
 14. **Inglês em tudo**: identificadores, chaves, campos dos documentos, rotas, tabelas e
     classes de CSS. Só o texto de tela e os comentários seguem em português. Sem migração
