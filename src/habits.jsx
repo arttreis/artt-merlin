@@ -4,7 +4,7 @@
 import "./shared/base.css";
 import "./habits.css";
 import {
-  initPage, newId, today, dayOf, dateOf, addDays, mondayOf, monthLabel, notify, sendToDay, api, formatMin, foldKey
+  initPage, newId, today, dayOf, dateOf, monthLabel, notify, sendToDay, api, formatMin, foldKey
 } from "./shared/core.js";
 import { useState } from "react";
 import {
@@ -12,7 +12,7 @@ import {
   Dialog, Markdown, EmptyStart, PeriodNav, HabitForm, icon
 } from "./shared/ui.jsx";
 import { HABIT_SUGGESTIONS, habitGroups } from "./shared/templates.js";
-import { WEEKDAY_NAMES, normalize, isExpected, toggleMark } from "./shared/habits-data.js";
+import { WEEKDAY_NAMES, normalize, isExpected, toggleMark, monthDays, monthStats, streakOf } from "./shared/habits-data.js";
 
 initPage("habits");
 
@@ -20,17 +20,12 @@ initPage("habits");
    nao e tarefa: nao tem hora nem duracao obrigatoria, tem frequencia e um
    registro por dia. as marcas moram dentro do documento porque um mes cabe em
    poucos bytes e um habito e editado por uma pessoa so.
-   normalize/SCHEDULES/COLORS/isExpected/toggleMark moram em
-   shared/habits-data.js — a home usa as mesmas para marcar direto no bento,
+   normalize/SCHEDULES/COLORS/isExpected/toggleMark e as contas do mes
+   (monthStats, streakOf) moram em shared/habits-data.js — a home usa as mesmas para marcar direto no bento,
    e a caixa do habito (HabitForm) mora em shared/ui.jsx. */
 
 /* ---------- meses e dias ---------- */
 const monthOf = (day) => day.slice(0, 7);
-function monthDays(ym) {
-  const [y, m] = ym.split("-").map(Number);
-  const n = new Date(y, m, 0).getDate();
-  return Array.from({ length: n }, (_, i) => ym + "-" + String(i + 1).padStart(2, "0"));
-}
 function shiftMonth(ym, n) {
   const [y, m] = ym.split("-").map(Number);
   return monthOf(dayOf(new Date(y, m - 1 + n, 1)));
@@ -66,65 +61,6 @@ function suggestionGroups(existing) {
     .filter((g) => g.items.length);
 }
 
-/* feitos e esperados no mes, do dia 1 ate hoje (ou o mes inteiro, se ja
-   passou). para N por semana, o esperado de cada semana e min(N, dias da
-   semana que ja passaram dentro do mes).
-
-   corrigido em 13/09/2026, por dois erros que davam 60% para 3 marcas em
-   13 dias e 133% num habito de dias uteis:
-   - o esperado comecava na data de criacao do habito, e nao no dia 1: quem
-     cria no dia 9 tinha um "mes" de cinco dias;
-   - o feito contava marca em dia que nao era esperado (o sabado de um habito
-     de seg a sex), e passava do esperado.
-   agora so conta como feito a marca em dia esperado — e, no N por semana,
-   no maximo N por semana. o numero nunca passa de 100%. */
-function monthStats(h, ym) {
-  const t = today();
-  const days = monthDays(ym).filter((d) => d <= t);
-  let done = 0, expected = 0;
-  if (h.schedule.type === "perWeek") {
-    const weeks = new Map();
-    days.forEach((d) => {
-      const k = mondayOf(d);
-      const w = weeks.get(k) || { n: 0, marks: 0 };
-      w.n++; if (h.marks[d]) w.marks++;
-      weeks.set(k, w);
-    });
-    weeks.forEach((w) => {
-      const goal = Math.min(h.schedule.times, w.n);
-      expected += goal;
-      done += Math.min(goal, w.marks);
-    });
-  } else {
-    const due = days.filter((d) => isExpected(h, d));
-    expected = due.length;
-    done = due.filter((d) => h.marks[d]).length;
-  }
-  return { done, expected, rate: expected ? Math.round((done / expected) * 100) : 0 };
-}
-
-/* a sequencia: dias esperados seguidos com marca, contando para tras a partir
-   de hoje (hoje sem marca ainda nao quebra). para N por semana, semanas
-   seguidas que bateram a meta, contando a atual so se ja bateu. */
-function streakOf(h) {
-  const t = today();
-  if (h.schedule.type === "perWeek") {
-    const weekCount = (mon) => { let c = 0; for (let i = 0; i < 7; i++) if (h.marks[addDays(mon, i)]) c++; return c; };
-    let n = 0, monday = mondayOf(t);
-    if (weekCount(monday) >= h.schedule.times) n++;
-    monday = addDays(monday, -7);
-    while (n < 520 && weekCount(monday) >= h.schedule.times) { n++; monday = addDays(monday, -7); }
-    return n;
-  }
-  let n = 0, day = h.marks[t] ? t : addDays(t, -1);
-  for (let guard = 0; guard < 3000; guard++) {
-    if (!isExpected(h, day)) { day = addDays(day, -1); continue; }
-    if (!h.marks[day]) break;
-    n++; day = addDays(day, -1);
-  }
-  return n;
-}
-
 /* ---------- a pagina ---------- */
 function Habits() {
   const habits = useCollection("habits", { normalize });
@@ -137,7 +73,7 @@ function Habits() {
   const t = today();
   const days = monthDays(month);
   const list = habits.all().filter((h) => !h.archived).sort((a, b) => a.order - b.order || a.createdAt - b.createdAt);
-  const totals = list.reduce((acc, h) => { const s = monthStats(h, month); acc.done += s.done; acc.expected += s.expected; return acc; }, { done: 0, expected: 0 });
+  const totals = list.reduce((acc, h) => { const s = monthStats(h, month, today()); acc.done += s.done; acc.expected += s.expected; return acc; }, { done: 0, expected: 0 });
 
   /* ---------- acoes ---------- */
   const toggle = (h, day) => toggleMark(habits, h, day, t);
@@ -167,7 +103,7 @@ function Habits() {
     if (thinking) return;
     setThinking(true);
     try {
-      const lines = list.map((h) => { const s = monthStats(h, month); return h.name + " · " + scheduleLabel(h) + " · " + s.done + "/" + s.expected + " · sequência " + streakOf(h); });
+      const lines = list.map((h) => { const s = monthStats(h, month, today()); return h.name + " · " + scheduleLabel(h) + " · " + s.done + "/" + s.expected + " · sequência " + streakOf(h, today()); });
       const r = await api("/merlin", { method: "POST", body: JSON.stringify({ task: "habits", context: { month: monthLabel(month), habits: lines } }) });
       if (r.ok) setSummary(r.body.text || "");
       else if (r.status === 401) notify("entre para usar o Merlin");
@@ -264,8 +200,8 @@ function Habits() {
 
 /* ---------- uma linha da grade ---------- */
 function HabitRow({ h, days, today: t, onToggle, onEdit, onArchive, onPull }) {
-  const stats = monthStats(h, days[0].slice(0, 7));
-  const streak = streakOf(h);
+  const stats = monthStats(h, days[0].slice(0, 7), today());
+  const streak = streakOf(h, today());
   return (
     <tr>
       <td className="habit-name">
