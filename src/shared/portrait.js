@@ -12,11 +12,12 @@
  * o texto todo não passa de PORTRAIT_MAX, que é o mesmo teto do Worker.
  *
  * o que NUNCA entra: contatos, cofre, arquivos, contratos, diário do cliente,
- * corpo das notas, roteiros, dívidas e investimentos. do cliente, só o nome
+ * corpo das notas, roteiros, dívidas e investimentos (das notas, só o título, o
+ * estágio e a data). do cliente, só o nome
  * (e do lead, a etapa, os dias e o próximo passo).
  *
  * a lista SECTIONS é o ponto de composição: uma seção nova (o dinheiro, os
- * clientes, o conteúdo, os hábitos) é uma linha a mais nela.
+ * clientes, o conteúdo) é uma linha a mais nela.
  *
  * sem React e sem coleção aberta aqui: entra lista, sai texto. quem abre as
  * coleções é a tela (useCollection), e `portraitData` só lê o que ela abriu.
@@ -26,11 +27,14 @@ import { budget as budgetOf, doneOf, reservesOf, fmt, clock } from "./day.js";
 import { focusMinutes, meetingMinutes } from "./focus.js";
 import { pipelineToday } from "./client-doc.js";
 import { contentToday } from "./content-script.js";
+import { normalize as normalizeHabit, isExpected, monthStats, streakOf as habitStreak, weekProgress } from "./habits-data.js";
 
 export const PORTRAIT_MAX = 6000;
 const BACK = 30;
 const AHEAD = 7;
 const LOADING = "ainda carregando";
+/* os estágios da nota, como a tela das notas os chama (arquivada não entra) */
+const NOTE_STAGE = { seed: "semente", exploring: "explorando", defined: "definida", executing: "executando" };
 
 /* as fontes que a resposta pode citar: a lista fechada que o Worker filtra */
 export const SOURCES = ["dia", "agenda", "rotina", "semana", "dinheiro", "clientes", "leads", "conteúdo", "hábitos", "notas", "produtos"];
@@ -223,6 +227,40 @@ export const SECTIONS = [
       if (!lines.length) return [content.length ? "nada marcado nos próximos 7 dias" : "sem conteúdo ainda"];
       return lines;
     }
+  },
+  {
+    /* uma linha por hábito: hoje, o mês e a sequência. as contas são as da
+       tela dos hábitos (habits-data.js), com a taxa que nunca passa de 100% */
+    id: "habits", label: "hábitos", budget: 170, needs: ["habits"],
+    build({ habits }, now) {
+      const day = dayOf(now);
+      const list = habits.filter((h) => h && h.id).map(normalizeHabit).filter((h) => !h.archived)
+        .sort((a, b) => a.order - b.order || a.createdAt - b.createdAt);
+      if (!list.length) return ["nenhum hábito ainda (criar: o botão + em hábitos)"];
+      return list.map((h) => {
+        const perWeek = h.schedule.type === "perWeek";
+        const w = perWeek ? weekProgress(h, day) : null;
+        const hoje = perWeek
+          ? (w.done >= w.goal ? "semana completa" : "falta " + (w.goal - w.done) + " de " + w.goal + " nesta semana")
+          : isExpected(h, day) ? (h.marks[day] ? "hoje feito" : "hoje falta") : "";
+        const m = monthStats(h, day.slice(0, 7), day);
+        return [h.name, hoje, "mês " + m.done + "/" + m.expected + " " + m.rate + "%", "seq " + habitStreak(h, day) + (perWeek ? "sem" : "d")].filter(Boolean).join(" · ");
+      });
+    }
+  },
+  {
+    /* só o título, o estágio e a data da última mudança: o corpo, os passos e
+       os anexos nunca entram. as 8 mais recentes, sem as arquivadas */
+    id: "notes", label: "notas", budget: 130, max: 8, needs: ["notes"],
+    build({ notes }) {
+      const stamp = (n) => +n.updatedAt || +n.createdAt || 0;
+      const lines = notes.filter((n) => n && n.stage !== "archived").sort((a, b) => stamp(b) - stamp(a))
+        .map((n) => {
+          const title = String(n.title || "").replace(/\s+/g, " ").trim() || "sem título";
+          return title + " · " + (NOTE_STAGE[n.stage] || NOTE_STAGE.seed) + (stamp(n) ? " · " + shortDate(dayOf(new Date(stamp(n)))) : "");
+        });
+      return lines.length ? lines : ["nenhuma nota ainda"];
+    }
   }
 ];
 
@@ -243,7 +281,7 @@ export function fit(items, budget, hidden = 0) {
   return text;
 }
 
-const EMPTY = { tasks: [], routine: [], sessions: [], apps: [], closes: [], clients: [], content: [], cadence: [], profile: null, loading: [] };
+const EMPTY = { tasks: [], routine: [], sessions: [], apps: [], closes: [], clients: [], content: [], cadence: [], habits: [], notes: [], profile: null, loading: [] };
 const DEFAULT_WINDOW = { dayStart: 540, dayEnd: 1140 };
 
 export function portraitOf(data, now = new Date()) {
@@ -288,6 +326,8 @@ export function portraitData(cols, { signedIn, prefs } = {}) {
     clients: list(cols.clients),
     content: list(cols.content),
     cadence: list(cols.cadence),
+    habits: list(cols.habits),
+    notes: list(cols.notes),
     profile: cols.profile ? cols.profile.get("me") : null,
     prefs,
     loading: signedIn ? Object.keys(cols).filter((k) => cols[k] && !cols[k].hasDownloaded()) : []

@@ -6,7 +6,7 @@
    precisa saber ou gravar.
    desde 18/10/2026 também é daqui que a secretária marca e acha o hábito
    (markOn, findHabit, habitStatus): o início e a conversa. */
-import { dateOf, addDays, foldKey } from "./core.js";
+import { dateOf, addDays, mondayOf, foldKey } from "./core.js";
 
 export const WEEKDAY_NAMES = ["dom", "seg", "ter", "qua", "qui", "sex", "sáb"];
 export const SCHEDULES = [
@@ -98,4 +98,81 @@ export function habitStatus(list, spec, today) {
   const day = isDay(s.date) ? s.date : today;
   const habit = findHabit(list, s.habit || s.name);
   return { habit, day, already: !!(habit && habit.marks[day]), error: day > today ? "esse dia ainda não chegou" : "" };
+}
+
+/* ---------- as contas do mes ----------
+   moravam em habits.jsx; o retrato (portrait.js) faz as mesmas contas para o
+   Merlin, e a tela e o chat nao podem discordar da taxa nem da sequencia.
+   `today` entra por parametro: a conta e pura e o teste escolhe o dia. */
+
+export function monthDays(ym) {
+  const [y, m] = ym.split("-").map(Number);
+  const n = new Date(y, m, 0).getDate();
+  return Array.from({ length: n }, (_, i) => ym + "-" + String(i + 1).padStart(2, "0"));
+}
+
+/* feitos e esperados no mes, do dia 1 ate hoje (ou o mes inteiro, se ja
+   passou). para N por semana, o esperado de cada semana e min(N, dias da
+   semana que ja passaram dentro do mes).
+
+   corrigido em 13/09/2026, por dois erros que davam 60% para 3 marcas em
+   13 dias e 133% num habito de dias uteis:
+   - o esperado comecava na data de criacao do habito, e nao no dia 1: quem
+     cria no dia 9 tinha um "mes" de cinco dias;
+   - o feito contava marca em dia que nao era esperado (o sabado de um habito
+     de seg a sex), e passava do esperado.
+   agora so conta como feito a marca em dia esperado — e, no N por semana,
+   no maximo N por semana. o numero nunca passa de 100%. */
+export function monthStats(h, ym, today) {
+  const days = monthDays(ym).filter((d) => d <= today);
+  let done = 0, expected = 0;
+  if (h.schedule.type === "perWeek") {
+    const weeks = new Map();
+    days.forEach((d) => {
+      const k = mondayOf(d);
+      const w = weeks.get(k) || { n: 0, marks: 0 };
+      w.n++; if (h.marks[d]) w.marks++;
+      weeks.set(k, w);
+    });
+    weeks.forEach((w) => {
+      const goal = Math.min(h.schedule.times, w.n);
+      expected += goal;
+      done += Math.min(goal, w.marks);
+    });
+  } else {
+    const due = days.filter((d) => isExpected(h, d));
+    expected = due.length;
+    done = due.filter((d) => h.marks[d]).length;
+  }
+  return { done, expected, rate: expected ? Math.round((done / expected) * 100) : 0 };
+}
+
+/* a sequencia: dias esperados seguidos com marca, contando para tras a partir
+   de hoje (hoje sem marca ainda nao quebra). para N por semana, semanas
+   seguidas que bateram a meta, contando a atual so se ja bateu. */
+export function streakOf(h, today) {
+  if (h.schedule.type === "perWeek") {
+    const weekCount = (mon) => { let c = 0; for (let i = 0; i < 7; i++) if (h.marks[addDays(mon, i)]) c++; return c; };
+    let n = 0, monday = mondayOf(today);
+    if (weekCount(monday) >= h.schedule.times) n++;
+    monday = addDays(monday, -7);
+    while (n < 520 && weekCount(monday) >= h.schedule.times) { n++; monday = addDays(monday, -7); }
+    return n;
+  }
+  let n = 0, day = h.marks[today] ? today : addDays(today, -1);
+  for (let guard = 0; guard < 3000; guard++) {
+    if (!isExpected(h, day)) { day = addDays(day, -1); continue; }
+    if (!h.marks[day]) break;
+    n++; day = addDays(day, -1);
+  }
+  return n;
+}
+
+/* N por semana: quantas marcas a semana de `today` ja tem, ate a meta */
+export function weekProgress(h, today) {
+  const monday = mondayOf(today);
+  let marks = 0;
+  for (let i = 0; i < 7; i++) if (h.marks[addDays(monday, i)]) marks++;
+  const goal = h.schedule.times;
+  return { done: Math.min(marks, goal), goal };
 }

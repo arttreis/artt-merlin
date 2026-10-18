@@ -347,6 +347,157 @@ const ler = habit("h-ler", "ler 20 páginas");
   check("o aviso diz o dia, antes de ontem", markWhen("2026-10-05", TODAY) === "05/10");
 }
 
+/* ---- as contas do mês (ticket #14) ----
+   a taxa do mês, a sequência e o "N por semana": as contas que a grade dos
+   hábitos mostra e que o retrato do Merlin repete (portrait.js). se uma muda,
+   as duas telas passam a discordar. o bloco tem escopo próprio: as constantes
+   de dia (TODAY, YM) e de hábito (habit, marks) são só dele. */
+{
+  const { normalize, isExpected, monthStats, streakOf, weekProgress, monthDays } = await import("./habits-data.js");
+  const { mondayOf, addDays } = await import("./core.js");
+
+  /* sexta, 16/10/2026: o mês até hoje tem 16 dias (1 de outubro foi quinta) */
+  const TODAY = "2026-10-16";
+  const YM = "2026-10";
+  const day = (n) => YM + "-" + String(n).padStart(2, "0");
+  const marks = (days) => Object.fromEntries(days.map((d) => [d, true]));
+  const habit = (o) => normalize({ id: "h", name: "x", ...o });
+  const daily = (days) => habit({ schedule: { type: "daily" }, marks: marks(days) });
+
+  /* ---- "como estão meus hábitos?": a taxa do mês ---- */
+  {
+    const h = daily([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map(day));
+    const s = monthStats(h, YM, TODAY);
+    check("mês: 12 marcas em 16 dias dão 12/16 e 75%", s.done === 12 && s.expected === 16 && s.rate === 75, JSON.stringify(s));
+    check("mês: o mês tem todos os seus dias", monthDays(YM).length === 31 && monthDays(YM)[0] === "2026-10-01" && monthDays("2026-02").length === 28);
+    const empty = monthStats(daily([]), YM, TODAY);
+    check("mês: sem marca, 0 de 16 e 0%", empty.done === 0 && empty.expected === 16 && empty.rate === 0, JSON.stringify(empty));
+    const first = monthStats(daily([]), YM, "2026-10-01");
+    check("mês: no dia 1 só esse dia é esperado", first.expected === 1, JSON.stringify(first));
+    const before = monthStats(daily([]), "2026-11", TODAY);
+    check("mês: mês que ainda não começou não espera nada, e a taxa é 0", before.expected === 0 && before.rate === 0, JSON.stringify(before));
+    const past = monthStats(daily([]), "2026-09", TODAY);
+    check("mês: mês que já passou conta inteiro", past.expected === 30, JSON.stringify(past));
+  }
+
+  /* ---- dias da semana: o sábado não conta, e a taxa não passa de 100% ---- */
+  {
+    /* seg a sex de 1 a 16/10: 12 dias esperados; mais uma marca no sábado 3 */
+    const weekdays = [1, 2, 5, 6, 7, 8, 9, 12, 13, 14, 15, 16].map(day);
+    const h = habit({ schedule: { type: "weekdays", weekdays: [1, 2, 3, 4, 5] }, marks: marks([...weekdays, day(3)]) });
+    const s = monthStats(h, YM, TODAY);
+    check("dias da semana: o sábado não conta", s.done === 12 && s.expected === 12, JSON.stringify(s));
+    check("dias da semana: a taxa não passa de 100%", s.rate === 100, JSON.stringify(s));
+    check("dias da semana: sábado não é esperado, sexta é", !isExpected(h, day(3)) && isExpected(h, day(2)));
+    const onlySat = habit({ schedule: { type: "weekdays", weekdays: [1, 2, 3, 4, 5] }, marks: marks([day(3), day(4), day(10), day(11)]) });
+    check("dias da semana: só marca de fim de semana não vira feito", monthStats(onlySat, YM, TODAY).done === 0);
+  }
+
+  /* ---- N por semana ---- */
+  {
+    const h = habit({ schedule: { type: "perWeek", times: 3 }, marks: marks([day(12), day(14)]) });
+    const w = weekProgress(h, TODAY);
+    check("N por semana: 2 marcas na semana de 3 dão 2 de 3", w.done === 2 && w.goal === 3, JSON.stringify(w));
+    check("N por semana: nenhum dia é esperado", monthDays(YM).every((d) => !isExpected(h, d)));
+    const over = habit({ schedule: { type: "perWeek", times: 2 }, marks: marks([day(12), day(13), day(14), day(15)]) });
+    check("N por semana: passar da meta fica na meta", weekProgress(over, TODAY).done === 2);
+    const s = monthStats(over, YM, TODAY);
+    check("N por semana: o feito é no máximo N por semana", s.done === 2 && s.rate <= 100, JSON.stringify(s));
+    const lastWeek = habit({ schedule: { type: "perWeek", times: 3 }, marks: marks([day(9), day(11)]) });
+    check("N por semana: a semana anterior não entra na conta", weekProgress(lastWeek, TODAY).done === 0);
+    /* 1 a 4/10 é uma semana de 4 dias dentro do mês: a meta dela é min(3, 4) */
+    const cut = monthStats(habit({ schedule: { type: "perWeek", times: 3 }, marks: marks([day(1), day(2), day(3)]) }), YM, "2026-10-04");
+    check("N por semana: a meta da semana cortada é a dos dias que existem", cut.expected === 3 && cut.done === 3 && cut.rate === 100, JSON.stringify(cut));
+    const short = monthStats(habit({ schedule: { type: "perWeek", times: 5 }, marks: marks([day(1)]) }), YM, "2026-10-02");
+    check("N por semana: com 2 dias passados, a meta é 2", short.expected === 2 && short.done === 1, JSON.stringify(short));
+  }
+
+  /* ---- sequência ---- */
+  {
+    const four = daily([12, 13, 14, 15].map(day));
+    check("sequência: 4 dias esperados seguidos e hoje ainda não dão 4", streakOf(four, TODAY) === 4, String(streakOf(four, TODAY)));
+    check("sequência: hoje marcado entra na conta", streakOf(daily([12, 13, 14, 15, 16].map(day)), TODAY) === 5);
+    check("sequência: um dia sem marca quebra", streakOf(daily([12, 14, 15].map(day)), TODAY) === 2);
+    check("sequência: ontem sem marca zera", streakOf(daily([13, 14].map(day)), TODAY) === 0);
+    /* a segunda 12/10 segue a sexta 9/10: o fim de semana não é esperado e não quebra */
+    const wk = habit({ schedule: { type: "weekdays", weekdays: [1, 2, 3, 4, 5] }, marks: marks([8, 9, 12, 13].map(day)) });
+    check("sequência: dia não esperado não quebra a conta", streakOf(wk, "2026-10-14") === 4, String(streakOf(wk, "2026-10-14")));
+    /* N por semana: semanas seguidas que bateram a meta; a atual só se já bateu */
+    const pw = habit({ schedule: { type: "perWeek", times: 2 }, marks: marks([day(5), day(7), day(12)]) });
+    check("sequência: N por semana conta semanas, e a atual só se já bateu", streakOf(pw, TODAY) === 1, String(streakOf(pw, TODAY)));
+    const pw2 = habit({ schedule: { type: "perWeek", times: 2 }, marks: marks([day(5), day(7), day(12), day(14)]) });
+    check("sequência: N por semana com a atual batida soma a atual", streakOf(pw2, TODAY) === 2, String(streakOf(pw2, TODAY)));
+  }
+
+  /* ---- funções movidas: as mesmas marcas de antes dão os mesmos números ----
+     as cópias abaixo são a conta que morava em habits.jsx (src/habits.jsx:81-126),
+     palavra por palavra, só com `t` no lugar do today() */
+  {
+    const t = TODAY;
+    const legacyStats = (h, ym) => {
+      const days = monthDays(ym).filter((d) => d <= t);
+      let done = 0, expected = 0;
+      if (h.schedule.type === "perWeek") {
+        const weeks = new Map();
+        days.forEach((d) => {
+          const k = mondayOf(d);
+          const w = weeks.get(k) || { n: 0, marks: 0 };
+          w.n++; if (h.marks[d]) w.marks++;
+          weeks.set(k, w);
+        });
+        weeks.forEach((w) => {
+          const goal = Math.min(h.schedule.times, w.n);
+          expected += goal;
+          done += Math.min(goal, w.marks);
+        });
+      } else {
+        const due = days.filter((d) => isExpected(h, d));
+        expected = due.length;
+        done = due.filter((d) => h.marks[d]).length;
+      }
+      return { done, expected, rate: expected ? Math.round((done / expected) * 100) : 0 };
+    };
+    const legacyStreak = (h) => {
+      if (h.schedule.type === "perWeek") {
+        const weekCount = (mon) => { let c = 0; for (let i = 0; i < 7; i++) if (h.marks[addDays(mon, i)]) c++; return c; };
+        let n = 0, monday = mondayOf(t);
+        if (weekCount(monday) >= h.schedule.times) n++;
+        monday = addDays(monday, -7);
+        while (n < 520 && weekCount(monday) >= h.schedule.times) { n++; monday = addDays(monday, -7); }
+        return n;
+      }
+      let n = 0, d = h.marks[t] ? t : addDays(t, -1);
+      for (let guard = 0; guard < 3000; guard++) {
+        if (!isExpected(h, d)) { d = addDays(d, -1); continue; }
+        if (!h.marks[d]) break;
+        n++; d = addDays(d, -1);
+      }
+      return n;
+    };
+    /* uma semente fixa: o mesmo teste dá o mesmo resultado em toda máquina */
+    let seed = 7;
+    const rnd = () => { seed = (seed * 1103515245 + 12345) % 2147483648; return seed / 2147483648; };
+    const days = Array.from({ length: 16 }, (_, i) => day(i + 1));
+    const schedules = [
+      { type: "daily" }, { type: "weekdays", weekdays: [1, 3, 5] }, { type: "weekdays", weekdays: [1, 2, 3, 4, 5] },
+      { type: "perWeek", times: 3 }, { type: "perWeek", times: 1 }, { type: "perWeek", times: 7 }
+    ];
+    let same = 0, total = 0, diff = "";
+    for (const schedule of schedules) {
+      for (let k = 0; k < 40; k++) {
+        const h = habit({ schedule, marks: marks(days.filter(() => rnd() < 0.2 + 0.7 * (k / 40))) });
+        total++;
+        const a = legacyStats(h, YM), b = monthStats(h, YM, t);
+        if (JSON.stringify(a) === JSON.stringify(b) && legacyStreak(h) === streakOf(h, t)) same++;
+        else if (!diff) diff = JSON.stringify({ schedule, marks: h.marks, a, b, sa: legacyStreak(h), sb: streakOf(h, t) });
+      }
+    }
+    check("funções movidas: " + total + " hábitos com marcas sorteadas dão os mesmos números de antes", same === total, diff);
+    const full = monthStats(habit({ schedule: { type: "daily" }, marks: marks(days) }), YM, t);
+    check("funções movidas: a taxa nunca passa de 100%", full.rate === 100 && full.done === full.expected);
+  }
+}
+
 console.log("\n" + passed + " passaram, " + failures.length + " falharam");
 if (failures.length) { console.log("\nFALHAS:"); failures.forEach((f) => console.log("  - " + f)); process.exit(1); }
 process.exit(0);

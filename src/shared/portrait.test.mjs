@@ -72,7 +72,7 @@ const block = (o) => {
 };
 const ANA = { id: "c-ana", name: "Ana", email: "ana@segredo.example", whatsapp: "5511999998888", status: "active" };
 
-const build = (o) => ({ tasks: [], routine: [], sessions: [], apps: [], closes: [], clients: [], content: [], cadence: [], profile: null, prefs: PREFS, loading: [], ...o });
+const build = (o) => ({ tasks: [], routine: [], sessions: [], apps: [], closes: [], clients: [], content: [], cadence: [], habits: [], notes: [], profile: null, prefs: PREFS, loading: [], ...o });
 const run = (o, now) => portraitOf(build(o), now || NOW);
 const sec = (p, id) => p.sections.find((s) => s.id === id);
 const lines = (p, id) => sec(p, id).text.split("\n");
@@ -292,6 +292,111 @@ const lines = (p, id) => sec(p, id).text.split("\n");
   check("semana: um dia aberto no meio quebra a sequência", !/2 dias fechados/.test(sec(gap, "week").text), sec(gap, "week").text);
 }
 
+/* ---- hábitos: "como estão meus hábitos?" ---- */
+const habit = (o) => ({ id: "h" + (++n), name: "hábito", schedule: { type: "daily" }, marks: {}, order: n, archived: false, createdAt: 1, updatedAt: 1, ...o });
+const markDays = (...ds) => Object.fromEntries(ds.map((d) => ["2026-10-" + String(d).padStart(2, "0"), true]));
+const range = (a, b) => Array.from({ length: b - a + 1 }, (_, i) => a + i);
+{
+  /* hoje é segunda 19/10: 19 dias no mês */
+  const p = run({
+    habits: [
+      habit({ name: "Treinar Aa", order: 1, marks: markDays(...range(8, 18)) }),
+      habit({ name: "Ler Bb", order: 2, schedule: { type: "weekdays", weekdays: [1, 2, 3, 4, 5] }, marks: markDays(17, 19) })
+    ]
+  });
+  const h = lines(p, "habits");
+  check("hábitos: hoje ainda não feito, o mês com a taxa e a sequência", h[0] === "Treinar Aa · hoje falta · mês 11/19 58% · seq 11d", JSON.stringify(h));
+  check("hábitos: hoje feito; o sábado marcado não conta no mês nem na sequência", h[1] === "Ler Bb · hoje feito · mês 1/13 8% · seq 1d", JSON.stringify(h));
+  check("hábitos: a seção carrega o rótulo que a resposta cita", sec(p, "habits").label === "hábitos" && SOURCES.includes(sec(p, "habits").label));
+}
+{
+  /* quarta 21/10: duas marcas nesta semana, de 3 */
+  const wed = new Date(2026, 9, 21, 10, 0);
+  const p = run({ habits: [habit({ name: "Yoga Cc", schedule: { type: "perWeek", times: 3 }, marks: markDays(19, 20) })] }, wed);
+  check("hábitos: N por semana diz o que falta nesta semana", lines(p, "habits")[0].startsWith("Yoga Cc · falta 1 de 3 nesta semana · mês "), lines(p, "habits")[0]);
+  const done = run({ habits: [habit({ name: "Yoga Cc", schedule: { type: "perWeek", times: 2 }, marks: markDays(19, 20) })] }, wed);
+  check("hábitos: N por semana batido diz que a semana está completa", /^Yoga Cc · semana completa · /.test(lines(done, "habits")[0]), lines(done, "habits")[0]);
+  check("hábitos: N por semana conta a sequência em semanas", /· seq 1sem$/.test(lines(done, "habits")[0]), lines(done, "habits")[0]);
+}
+{
+  const sat = new Date(2026, 9, 17, 10, 0);
+  const p = run({ habits: [habit({ name: "Ler Dd", schedule: { type: "weekdays", weekdays: [1, 2, 3, 4, 5] } })] }, sat);
+  check("hábitos: dia que não é esperado não diz 'hoje'", !/hoje/.test(lines(p, "habits")[0]), lines(p, "habits")[0]);
+}
+{
+  const p = run({ habits: [habit({ name: "Arquivado Ee", archived: true }), habit({ name: "Ativo Ff" })] });
+  check("hábitos: o arquivado fica fora", !p.text.includes("Arquivado Ee") && p.text.includes("Ativo Ff"), sec(p, "habits").text);
+  const raw = run({ habits: [{ id: "x", name: "Sem esquema Gg" }] });
+  check("hábitos: documento sem frequência vale todo dia", /^Sem esquema Gg · hoje falta · mês 0\/19 0% · seq 0d$/.test(lines(raw, "habits")[0]), lines(raw, "habits")[0]);
+  const none = run({ habits: [] });
+  check("hábitos: sem nenhum, diz 'nenhum hábito ainda' e como criar", /^nenhum hábito ainda \(criar: /.test(sec(none, "habits").text), sec(none, "habits").text);
+  const onlyOld = run({ habits: [habit({ archived: true })] });
+  check("hábitos: só arquivados é o mesmo que nenhum", /^nenhum hábito ainda/.test(sec(onlyOld, "habits").text));
+}
+
+/* ---- notas ---- */
+const note = (o) => ({ id: "n" + (++n), title: "nota", stage: "seed", body: "", steps: [], files: [], createdAt: 1, updatedAt: 1, ...o });
+const stamp = (d, h = 10) => new Date(2026, 9, d, h, 0).getTime();
+{
+  /* 12 notas, 2 arquivadas: N12 é a mais nova, N05 e N09 estão arquivadas */
+  const notes = range(1, 12).map((i) => note({ title: "N" + String(i).padStart(2, "0"), updatedAt: stamp(i), stage: i === 5 || i === 9 ? "archived" : i % 2 ? "seed" : "exploring" }));
+  const s = SECTIONS.find((x) => x.id === "notes");
+  const built = s.build(build({ notes }), NOW);
+  check("notas: o construtor devolve as não arquivadas, da mais nova para a mais velha", built.length === 10 && built[0] === "N12 · explorando · 12/10" && built[1] === "N11 · semente · 11/10" && built[2] === "N10 · explorando · 10/10", JSON.stringify(built));
+  check("notas: as arquivadas não entram", !built.some((l) => l.startsWith("N05") || l.startsWith("N09")), JSON.stringify(built));
+  check("notas: o teto de itens é 8", s.max === 8);
+  /* o orçamento da seção é apertado (os 300 caracteres de hábitos e notas
+     juntos): para ver os 8 inteiros, o teste alarga o orçamento e o devolve */
+  const was = s.budget;
+  s.budget = 2000;
+  try {
+    const wide = lines(run({ notes }), "notes");
+    check("notas: com folga, entram as 8 mais recentes e o resto vira 'e mais 2'", wide.length === 9 && wide[0].startsWith("N12 ") && wide[7].startsWith("N03 ") && wide[8] === "e mais 2", JSON.stringify(wide));
+  } finally { s.budget = was; }
+  const tight = run({ notes });
+  const tl = lines(tight, "notes");
+  const shown = tl.filter((l) => !/^e mais \d+$/.test(l));
+  check("notas: no orçamento de verdade o corte é por nota inteira e termina em 'e mais N'", sec(tight, "notes").text.length <= was && shown.length > 0 && shown.every((l) => built.includes(l)) && /^e mais \d+$/.test(tl.at(-1)) && shown.length + +tl.at(-1).match(/\d+/)[0] === 10, JSON.stringify(tl));
+}
+{
+  const p = run({ notes: [note({ title: "Ideia de produto Hh", stage: "defined", updatedAt: stamp(15), body: "CORPO-DA-NOTA-ZQ\nsegunda linha", steps: [{ id: "s1", text: "PASSO-DA-NOTA-ZQ", done: false }], files: [{ id: "f1", name: "ANEXO-ZQ.png", type: "image/png", size: 10, at: 1 }], client: "c-ana", history: [{ type: "stage", text: "HISTORICO-ZQ" }], outputs: ["SAIDA-ZQ"] })] });
+  check("nunca entra: só o título, o estágio e a data da nota", sec(p, "notes").text === "Ideia de produto Hh · definida · 15/10", sec(p, "notes").text);
+  for (const x of ["CORPO-DA-NOTA-ZQ", "PASSO-DA-NOTA-ZQ", "ANEXO-ZQ", "HISTORICO-ZQ", "SAIDA-ZQ", "c-ana"]) check("nunca entra: " + x, !p.text.includes(x), p.text);
+  const raw = run({ notes: [note({ title: "  duas\nlinhas  ", stage: undefined, updatedAt: 0, createdAt: 0 }), note({ title: "", stage: "executing", updatedAt: stamp(14) })] });
+  const r = lines(raw, "notes");
+  check("notas: a mais nova primeiro; título em uma linha, sem estágio vira semente, sem data some", r[0] === "sem título · executando · 14/10" && r[1] === "duas linhas · semente", JSON.stringify(r));
+}
+
+/* ---- corte por seção: 30 hábitos ---- */
+{
+  const budget = SECTIONS.find((s) => s.id === "habits").budget;
+  const habits = range(1, 30).map((i) => habit({ name: "Hábito " + String(i).padStart(2, "0") + " de teste", order: i, marks: markDays(18) }));
+  const full = new Set(SECTIONS.find((s) => s.id === "habits").build(build({ habits }), NOW));
+  const p = run({ habits });
+  const l = lines(p, "habits");
+  check("corte por seção: 30 hábitos ficam no orçamento", sec(p, "habits").text.length <= budget, sec(p, "habits").text.length + " > " + budget);
+  check("corte por seção: hábitos termina em 'e mais N'", /^e mais \d+$/.test(l.at(-1)), l.at(-1));
+  const shown = l.slice(0, -1);
+  check("corte por seção: nenhum hábito sai cortado no meio", shown.length > 0 && shown.every((x) => full.has(x)), shown.find((x) => !full.has(x)));
+  check("corte por seção: o N é o que ficou de fora", shown.length + +l.at(-1).match(/\d+/)[0] === 30, shown.length + " + " + l.at(-1));
+}
+{
+  check("o orçamento: hábitos e notas juntos cabem em 300 caracteres", SECTIONS.filter((s) => s.id === "habits" || s.id === "notes").reduce((t, s) => t + s.budget, 0) <= 300);
+}
+
+/* ---- ainda carregando: hábitos e notas ---- */
+{
+  const h = run({ loading: ["habits"] });
+  check("carregando: hábitos diz 'ainda carregando', e não 'nenhum hábito'", sec(h, "habits").text === "ainda carregando" && sec(h, "habits").loading === true && !/nenhum hábito/.test(h.text), sec(h, "habits").text);
+  check("carregando: notas não esperam pelos hábitos", sec(h, "notes").loading === false && sec(h, "notes").text === "nenhuma nota ainda");
+  const m = run({ loading: ["notes"] });
+  check("carregando: notas dizem 'ainda carregando', e não 'nenhuma nota'", sec(m, "notes").text === "ainda carregando" && sec(m, "notes").loading === true && !/nenhuma nota/.test(m.text), sec(m, "notes").text);
+  check("carregando: hábitos não esperam pelas notas", sec(m, "habits").loading === false);
+  const col = (items, down) => ({ all: () => items, get: () => null, hasDownloaded: () => down });
+  const d = portraitData({ tasks: col([], true), habits: col([habit({ name: "Zeta" })], false), notes: col([note({ title: "Teta" })], false) }, { signedIn: true, prefs: PREFS });
+  check("dados: habits e notes entram em portraitData, e carregando quando não desceram", d.habits.length === 1 && d.notes.length === 1 && d.loading.includes("habits") && d.loading.includes("notes"), JSON.stringify(d.loading));
+}
+
 /* ---- nunca entra ---- */
 {
   const client = { ...ANA, vault: [{ label: "Painel", secret: "SENHA-DO-COFRE-XYZ" }], contract: "CLAUSULA-DO-CONTRATO-XYZ", note: "NOTA-INTERNA-DO-CLIENTE-XYZ" };
@@ -368,11 +473,12 @@ const lines = (p, id) => sec(p, id).text.split("\n");
   core.cloud.signedIn = true;
   const cols = {
     tasks: core.collection("tasks"), routine: core.collection("routine"), sessions: core.collection("sessions"),
-    apps: core.collection("apps"), closes: core.collection("closes"), clients: core.collection("clients"), profile: core.collection("profile")
+    apps: core.collection("apps"), closes: core.collection("closes"), clients: core.collection("clients"),
+    habits: core.collection("habits"), notes: core.collection("notes"), profile: core.collection("profile")
   };
   check("carregando: a coleção de verdade ainda não desceu", cols.tasks.hasDownloaded() === false);
   const data = portraitData(cols, { signedIn: true, prefs: PREFS });
-  check("carregando: com sessão, loading lista as que não desceram", ["tasks", "routine", "sessions", "apps", "closes", "clients", "profile"].every((k) => data.loading.includes(k)), JSON.stringify(data.loading));
+  check("carregando: com sessão, loading lista as que não desceram", ["tasks", "routine", "sessions", "apps", "closes", "clients", "habits", "notes", "profile"].every((k) => data.loading.includes(k)), JSON.stringify(data.loading));
   const p = portraitOf(data, NOW);
   check("carregando: hoje e agenda dizem 'ainda carregando', e não 'nada'", sec(p, "today").text === "ainda carregando" && sec(p, "agenda").text === "ainda carregando" && !/nada/.test(sec(p, "agenda").text));
   const offline = portraitData(cols, { signedIn: false, prefs: PREFS });
@@ -385,12 +491,13 @@ const lines = (p, id) => sec(p, id).text.split("\n");
 /* ---- vazio de verdade: desceu e está vazio ---- */
 {
   const empty = () => ({ all: () => [], get: () => null, hasDownloaded: () => true });
-  const cols = { tasks: empty(), routine: empty(), sessions: empty(), apps: empty(), closes: empty(), clients: empty(), profile: empty() };
+  const cols = { tasks: empty(), routine: empty(), sessions: empty(), apps: empty(), closes: empty(), clients: empty(), habits: empty(), notes: empty(), profile: empty() };
   const data = portraitData(cols, { signedIn: true, prefs: PREFS });
   check("vazio de verdade: nada carregando", data.loading.length === 0, JSON.stringify(data.loading));
   const p = portraitOf(data, NOW);
   check("vazio de verdade: a agenda diz 'nada nos próximos 7 dias'", sec(p, "agenda").text === "nada nos próximos 7 dias" && sec(p, "agenda").loading === false, sec(p, "agenda").text);
   check("vazio de verdade: hoje diz 'fila aberta: nada'", lines(p, "today").includes("fila aberta: nada"), sec(p, "today").text);
+  check("vazio de verdade: hábitos e notas dizem que não há", /^nenhum hábito ainda/.test(sec(p, "habits").text) && sec(p, "notes").text === "nenhuma nota ainda" && !sec(p, "habits").loading && !sec(p, "notes").loading, sec(p, "habits").text + " | " + sec(p, "notes").text);
 }
 
 /* ---- portraitData: o que sai das coleções ---- */
