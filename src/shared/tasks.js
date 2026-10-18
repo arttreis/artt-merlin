@@ -23,7 +23,7 @@
  *
  * sem React e sem pixel aqui: entra documento, sai documento.
  */
-import { collection, newId, today, isDay, api, cloud, parseMentions, readDuration } from "./core.js";
+import { collection, newId, today, isDay, api, cloud, parseMentions, readDuration, readInbox, writeInbox, newNote } from "./core.js";
 
 export const MINUTES = 1440;
 const CLICKUP_ID = /^[A-Za-z0-9]{1,32}$/;
@@ -106,6 +106,61 @@ export const dayDoc = (all, date, prefs) =>
 /* uma ordem nova para o topo: quem entra fica na frente do que ja estava */
 export const topOrder = (all, date) =>
   Math.min(0, ...all.filter((t) => t.date === date).map((t) => t.order)) - 1;
+
+/* ---------- o que conta no dia e o que aparece ----------
+   a copia de um bloco "routine" nao aparece no calendario (o Arthur,
+   14/09/2026: "no calendario nao pode estar as coisas das rotinas"), mas o
+   almoco continua ocupando o dia. ate 17/10/2026 o calendario tirava a copia
+   da CONTA junto com a lista, e a sobra dele era maior que a do inicio e a do
+   rastreador para o mesmo dia. agora as tres contam `count`; so a lista do
+   calendario usa `shown`. a copia de "event" (o que se repete e e compromisso)
+   aparece, e a de bloco apagado tambem — sem bloco, nao ha rotina a esconder.
+   o `kind` e lido cru: o routine.js importa daqui, e nao o contrario. */
+export function dayTasks(all, blocks) {
+  const hide = new Set((blocks || []).filter((b) => b && b.kind === "routine").map((b) => b.id));
+  const shown = hide.size ? all.filter((t) => !(t.origin && t.origin.type === "routine" && hide.has(t.origin.id))) : all;
+  return { count: all, shown };
+}
+
+/* ---------- a caixa de entrada vira documento ----------
+   os outros modulos nao escrevem na colecao: deixam um bilhete em
+   `merlin:inbox` (core.js), e quem abre o dia recolhe — o calendario e o
+   inicio, com esta mesma funcao. com duracao vira tarefa de hoje, na frente
+   da fila e na ordem em que entrou; sem duracao vira nota, onde paga o pedagio
+   como qualquer outra. so decide: gravar, e zerar a caixa antes, e de quem
+   chama. */
+export function inboxToDocs(list, all, date) {
+  const top = topOrder(all, date);
+  const out = { tasks: [], notes: [] };
+  (list || []).forEach((it) => {
+    const title = it && it.title ? String(it.title).trim() : "";
+    if (!title) return;
+    if (it.min) {
+      out.tasks.push(newTask({
+        title, min: it.min, reserved: isReserve(title), client: it.client,
+        origin: it.origin, date, order: top - list.length + out.tasks.length
+      }));
+      return;
+    }
+    const clean = title.replace(/\s+/g, " ").trim().slice(0, 300);
+    if (clean) out.notes.push({ title: clean, client: String(it.client || "") });
+  });
+  return out;
+}
+
+/* o lado que grava. a caixa e lida e ZERADA antes de qualquer gravacao: o
+   calendario e o inicio abertos juntos recebem o mesmo evento de storage, e
+   quem chega segundo encontra a caixa vazia em vez de criar a tarefa de novo.
+   devolve quantas de cada para quem chama dizer em voz alta. */
+export function collectInbox(store) {
+  const list = readInbox();
+  if (!list.length) return { tasks: 0, notes: 0 };
+  writeInbox([]);
+  const docs = inboxToDocs(list, store.all(), today());
+  if (docs.tasks.length) store.saveMany(docs.tasks);
+  const notes = docs.notes.filter((n) => newNote(n)).length;
+  return { tasks: docs.tasks.length, notes };
+}
 
 export function newTask(spec) {
   const now = Date.now();

@@ -20,7 +20,7 @@
 import "./shared/base.css";
 import "./index.css";
 import {
-  initPage, seen, markSeen, isNewHere, today, addDays, dateOf, notify, newId,
+  initPage, seen, markSeen, isNewHere, today, addDays, sundayOf, dateOf, notify, newId, cloud,
   newNote, askMerlin, readPrefs, savePrefs, prefsStore, formatMin, collection, api, listClients, foldKey,
   onboardingState, onboardingSettled
 } from "./shared/core.js";
@@ -28,8 +28,9 @@ import { useState, useEffect, useLayoutEffect, useRef } from "react";
 import { mount, useCloud, useCollection, icon, Markdown, ProposalDialog } from "./shared/ui.jsx";
 import {
   normalize as normalizeTask, dayDoc, overdue, topOrder, newTask, routeLine, readClock,
-  needsReading, isReserve, stripPrefix, askIntent
+  needsReading, isReserve, stripPrefix, askIntent, dayTasks, collectInbox
 } from "./shared/tasks.js";
+import { normalize as normalizeBlock, copyRoutine } from "./shared/routine.js";
 import { MAX_TURNS, normalizeChat, chatTitle, turnsOf } from "./shared/assistant-actions.js";
 import { BUILD, buildIntent } from "./shared/build-intent.js";
 import { normalize as normalizeHabit, isExpected } from "./shared/habits-data.js";
@@ -558,6 +559,7 @@ function Home() {
   const reviews = useCollection("reviews");
   const apps = useCollection("apps");
   const sessions = useCollection("sessions");
+  const routine = useCollection("routine", { normalize: normalizeBlock });
   useCollection("prefs");
   const [, tick] = useState(0);
   useEffect(() => { const t = setInterval(() => tick((n) => n + 1), 30000); return () => clearInterval(t); }, []);
@@ -572,6 +574,35 @@ function Home() {
   const h = hourNow();
   const phase = phaseOf(h);
   const date = today();
+  const weekStart = sundayOf(date);
+
+  /* o início também abre o dia, como o calendário (VISAO, 4.11): quem só usa
+     o celular e nunca abre o calendário tem que ver aqui o que mandou para
+     hoje e a rotina da semana. a caixa é recolhida ao abrir e a cada evento
+     de storage; a rotina de novo a cada mudança das coleções e da nuvem, que
+     é o que destrava a primeira cópia com sessão. os dois se protegem de
+     rodar junto com o calendário: a caixa é zerada antes de gravar, e o bloco
+     guarda a semana em que já se copiou. ficam aqui na raiz, e não no Today,
+     para valer em qualquer coisa que o início mostrar. */
+  useEffect(() => {
+    const collect = () => {
+      const got = collectInbox(tasks);
+      const parts = [];
+      if (got.tasks) parts.push(got.tasks + (got.tasks === 1 ? " tarefa" : " tarefas") + " na fila");
+      if (got.notes) parts.push(got.notes + (got.notes === 1 ? " nota" : " notas") + " em ideias");
+      if (parts.length) notify("chegou de outro módulo: " + parts.join(" e "));
+    };
+    collect();
+    const f = (e) => { if (e.key === "merlin:inbox") collect(); };
+    window.addEventListener("storage", f);
+    return () => window.removeEventListener("storage", f);
+  }, []);
+  useEffect(() => {
+    const run = () => copyRoutine(routine, tasks, weekStart);
+    run();
+    const offs = [tasks.onChange(run), routine.onChange(run), cloud.onStatus(run)];
+    return () => offs.forEach((off) => off());
+  }, [weekStart]);
 
   /* o onboarding é um estado (core.js, onboardingState), e não só a falta do
      perfil: com sessão, num aparelho novo, o perfil ainda está a caminho, e
@@ -617,7 +648,9 @@ const briefOf = (x) => [
 function Today({ c, tasks, habits, journal, closes, reviews, sessions, me, h, phase, date }) {
   const [closing, setClosing] = useState(false);
   const [reviewing, setReviewing] = useState(null); // { id, kind }: a revisão aberta
-  const doc = dayDoc(tasks.all(), date, readPrefs());
+  /* a mesma conta do calendário e do rastreador (shared/tasks.js, dayTasks):
+     é a sobra que vai junto da pergunta ao Merlin */
+  const doc = dayDoc(dayTasks(tasks.all()).count, date, readPrefs());
   const { b } = distribute(doc);
   const late = overdue(tasks.all(), date).length;
   const name = cleanName(me.name || (c.email ? String(c.email).split("@")[0] : ""));

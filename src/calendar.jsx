@@ -21,7 +21,7 @@ import "./shared/week-grid.css";
 import {
   initPage, newId, today, isDay, dateOf, dayOf, addDays, sundayOf, dateLabel, monthLabel,
   api, cloud, notify, readDuration, formatMin, parseDuration, readPrefs, savePrefs,
-  readInbox, writeInbox, parseMentions, clientName, clients, seen, markSeen
+  parseMentions, clientName, clients, seen, markSeen
 } from "./shared/core.js";
 import { useState, useEffect, useLayoutEffect, useRef } from "react";
 import { createPortal } from "react-dom";
@@ -32,7 +32,7 @@ import {
 } from "./shared/ui.jsx";
 import {
   normalize, onDate, inRange, overdue, dayDoc, topOrder, newTask, migrateTasks, layoutDay, readClock,
-  readLine, isReserve, stripPrefix
+  readLine, isReserve, stripPrefix, dayTasks, collectInbox
 } from "./shared/tasks.js";
 import { useHourScale } from "./shared/hour-scale.js";
 import { normalize as normalizeBlock, copyRoutine, endFrom, allCopiesOf } from "./shared/routine.js";
@@ -227,9 +227,10 @@ function Calendar() {
   /* as copias da ROTINA nao aparecem no calendario (o Arthur, 14/09/2026:
      "no calendario nao pode estar as coisas das rotinas"); as de EVENTO QUE
      SE REPETE (daily, weekly) aparecem. quem decide e o `kind` do bloco — ver
-     shared/routine.js. copia sem bloco (apagado) continua aparecendo. */
-  const routineIds = new Set(routineCol.all().filter((b) => b.kind === "routine").map((b) => b.id));
-  const all = store.all().filter((t) => !(t.origin && t.origin.type === "routine" && routineIds.has(t.origin.id)));
+     shared/routine.js. copia sem bloco (apagado) continua aparecendo. desde
+     17/10/2026 ela so sai da LISTA: a conta do dia (`count`) a inclui, para a
+     sobra daqui ser a mesma do inicio e do rastreador (shared/tasks.js). */
+  const { count, shown: all } = dayTasks(store.all(), routineCol.all());
 
   /* ---------- as agendas ----------
      so vale esconder o que ainda tem botao para voltar: cliente encerrado
@@ -621,30 +622,14 @@ function Calendar() {
 
   /* ---------- caixa de entrada ----------
      os outros modulos nao escrevem na colecao: eles deixam um bilhete em
-     merlin:inbox e o calendario recolhe. com duracao vira tarefa de hoje; sem
-     duracao cai na caixa de notas, onde paga o pedagio como qualquer outra. */
+     merlin:inbox e quem abre o dia recolhe (o calendario e o inicio, pelo
+     mesmo collectInbox do shared/tasks.js). com duracao vira tarefa de hoje;
+     sem duracao cai na caixa de notas, onde paga o pedagio como qualquer outra. */
   const emptyInbox = () => {
-    const list = readInbox();
-    if (!list.length) return;
-    writeInbox([]);
-    let made = 0, newNotes = 0;
-    const t = today();
-    const fresh = [];
-    list.forEach((it) => {
-      if (!it || !it.title) return;
-      const title = String(it.title);
-      if (it.min) {
-        fresh.push(newTask({
-          title, min: it.min, reserved: isReserve(title), client: it.client,
-          origin: it.origin, date: t, order: topOrder(store.all(), t) - list.length + made
-        }));
-        made++;
-      } else if (createNote(title, it)) newNotes++;
-    });
-    if (fresh.length) store.saveMany(fresh);
+    const got = collectInbox(store);
     const parts = [];
-    if (made) parts.push(made + (made === 1 ? " tarefa" : " tarefas") + " na fila");
-    if (newNotes) parts.push(newNotes + (newNotes === 1 ? " nota" : " notas") + " na caixa");
+    if (got.tasks) parts.push(got.tasks + (got.tasks === 1 ? " tarefa" : " tarefas") + " na fila");
+    if (got.notes) parts.push(got.notes + (got.notes === 1 ? " nota" : " notas") + " na caixa");
     if (parts.length) showToast("chegou de outro módulo: " + parts.join(" e "));
   };
 
@@ -889,7 +874,7 @@ function Calendar() {
 
       {view === "day" && (
         <DayView
-          all={all} date={anchor} prefs={prefs} notes={notes} actions={actions}
+          all={all} count={count} date={anchor} prefs={prefs} notes={notes} actions={actions}
           dragOrder={dragOrder} dragging={dragging} leaving={leaving}
           doneOpen={doneOpen} onToggleDone={() => setDoneOpen((v) => !v)} onClearDone={clearDone}
           windowOpen={windowOpen} onOpenWindow={() => setWindowOpen(true)} onSaveWindow={saveWindow} onCloseWindow={closeWindow}
@@ -957,7 +942,7 @@ const cssEscape = (id) => (window.CSS && CSS.escape ? CSS.escape(id) : id);
    e a unica das tres que faz conta com minutos, e por isso e a unica com
    barra, com linha de corte e com pedagio de duracao. */
 function DayView({
-  all, date, prefs, notes, actions, dragOrder, dragging, leaving,
+  all, count, date, prefs, notes, actions, dragOrder, dragging, leaving,
   doneOpen, onToggleDone, onClearDone, windowOpen, onOpenWindow, onSaveWindow, onCloseWindow,
   text, setText, pending, fieldRef, listRef, trackRef, onSubmit, onPick, onOther, onEscape,
   onCreateNote, onPullNote, onRemoveNote
@@ -965,7 +950,12 @@ function DayView({
   const doc = dayDoc(all, date, prefs);
   const byId = new Map(doc.tasks.map((t) => [t.id, t]));
   const open = dragOrder ? dragOrder.map((id) => byId.get(id)).filter(Boolean) : pendingOf(doc);
-  const { b, slots, cut } = distribute(doc, open);
+  /* a conta e sobre o dia inteiro, com a copia da rotina que nao se lista:
+     ela entra no fim da fila, como na grade (layoutDay), e a reserva dela
+     encolhe o dia pelo `full`. a lista continua sendo so o `open`. */
+  const full = dayDoc(count, date, prefs);
+  const unlisted = pendingOf(full).filter((t) => !byId.has(t.id));
+  const { b, slots, cut } = distribute(full, open.concat(unlisted));
   const done = doneOf(doc);
   const reserves = reservesOf(doc);
 
@@ -1006,7 +996,7 @@ function DayView({
         <NotesBox notes={notes} onCreate={onCreateNote} onPull={onPullNote} onRemove={onRemoveNote} />
       </div>
       <div className="side" id="side-right">
-        <Matrix doc={doc} open={pendingOf(doc)} onApply={actions.applyOrder} />
+        <Matrix doc={full} open={pendingOf(doc)} rest={unlisted} onApply={actions.applyOrder} />
       </div>
     </div>
   );
@@ -1793,7 +1783,7 @@ const ZONE_INFO = {
 };
 const ZONE_KEYS = { "1": "q1", "2": "q2", "3": "q3", "4": "q4", "0": "pool" };
 
-function Matrix({ doc, open, onApply }) {
+function Matrix({ doc, open, rest = [], onApply }) {
   const [zones, setZones] = useState(null);   /* null = fechada; {pool, q1..q4: [ids]} */
   const [dragId, setDragId] = useState(null);
   const [target, setTarget] = useState(null);
@@ -1911,7 +1901,7 @@ function Matrix({ doc, open, onApply }) {
   );
 
   /* a MESMA conta da tela principal, so que sobre a ordem hipotetica */
-  const tasks = zones ? orderOf(zones).map((id) => byId.get(id)).filter(Boolean) : [];
+  const tasks = zones ? orderOf(zones).map((id) => byId.get(id)).filter(Boolean).concat(rest) : [];
   const { slots, cut } = zones ? distribute(doc, tasks) : { slots: new Map(), cut: -1 };
   const delegable = open.filter((t) => t.delegable);
 
