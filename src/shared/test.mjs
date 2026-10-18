@@ -811,6 +811,17 @@ const dataLeft = () => globalThis.localStorage.keys().filter((k) => k in DATA);
   check("regra: o nome do Merlin sai da pergunta", T.routeLine("merlin, vale lançar sexta").text === "vale lançar sexta", JSON.stringify(T.routeLine("merlin, vale lançar sexta")));
   check("regra: duração vence a palavra de pergunta", T.routeLine("como fazer o deck 45m").kind === "task");
   check("regra: sem pergunta e sem duração continua ideia", T.routeLine("comprar domínio do app").kind === "note");
+  /* os pedidos locais do campo do início (fechar o dia, revisar): reconhecidos sem crédito */
+  const ai = (s) => JSON.stringify(T.askIntent(s));
+  check("pedido: \"fechar o dia\" fecha o dia", ai("fechar o dia") === JSON.stringify({ kind: "close" }), ai("fechar o dia"));
+  check("pedido: ignora caixa, espaços e pontuação final", ai("Fechar meu dia") === JSON.stringify({ kind: "close" }) && ai("  FECHAR   O  DIA!  ") === JSON.stringify({ kind: "close" }) && ai("fechar o meu dia.") === JSON.stringify({ kind: "close" }));
+  check("pedido: revisar a semana", ai("revisar a semana") === JSON.stringify({ kind: "review", period: "week" }) && ai("revisar minha semana") === JSON.stringify({ kind: "review", period: "week" }), ai("revisar a semana"));
+  check("pedido: revisar o mês, com ou sem acento", ai("revisar o mês") === JSON.stringify({ kind: "review", period: "month" }) && ai("revisar o mes") === JSON.stringify({ kind: "review", period: "month" }) && ai("revisar meu mês") === JSON.stringify({ kind: "review", period: "month" }), ai("revisar o mês"));
+  const rd = T.routeLine("fechar o dia 30m");
+  check("pedido: com duração a tarefa manda, não é pedido", T.askIntent("fechar o dia 30m") === null && rd.kind === "task" && rd.min === 30, ai("fechar o dia 30m") + " " + JSON.stringify(rd));
+  check("pedido: pergunta não é pedido", T.askIntent("como fecho o mês no financeiro?") === null);
+  check("pedido: texto maior que o pedido não é pedido", T.askIntent("fechar o dia do cliente") === null);
+  check("pedido: vazio e nulo dão null", T.askIntent("") === null && T.askIntent("   ") === null && T.askIntent(null) === null && T.askIntent(undefined) === null);
   const reads = (s) => T.needsReading(s, T.routeLine(s));
   check("leitura: o que viraria ideia passa pelo Merlin", reads("comprar domínio do app"));
   check("leitura: tarefa com duração e sem data segue direto", !reads("revisar proposta 45m") && !reads("almoço 1h"));

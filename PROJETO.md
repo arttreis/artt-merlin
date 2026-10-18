@@ -60,6 +60,7 @@ os pares sozinho; não há lista de rotas. Nunca escreva no `localStorage` diret
 | página | arquivo | observação |
 | --- | --- | --- |
 | porta | `index.html` + `landing.jsx` | a landing é HTML estático no `index.html`, com o CSS em `landing.css`, e um script no `<head>` decide antes da primeira pintura quem a vê. `landing.jsx` só acorda o que se mexe (a floresta, a janela de demonstração, a lista de espera) para quem está na porta. Ver `docs/prd/landing.md` |
+| início | `index.jsx` | quem já entrou: o onboarding em conversa e depois só "Bom dia, {nome}. Como posso te ajudar hoje?" e o campo, sobre a floresta. O campo segue a regra única (`routeLine`), lê com o Merlin o que ela não resolve (`capture`) e responde a pergunta no balão; "fechar o dia" e "revisar a semana/o mês" (`askIntent`) abrem o fechamento (`closes`, `journal`) e a revisão (`reviews`) sem crédito. Ver `docs/prd/a-secretaria.md` |
 | hoje (calendário) | `calendar.jsx` | a primeira tela: dia / semana / mês sobre **uma** coleção `tasks`, com hábitos e "como foi o dia" ao lado (`today-block.jsx`) e a apresentação (`tour.jsx`); `day.html`, `week.html`, `journal.html` e `plans.html` só redirecionam |
 | rotina | `routine.jsx` | semana-modelo sem datas; vira tarefas (`shared/routine.js`) |
 | assistente | `assistant.jsx` | conversa com o Merlin, fora da barra (chega-se pelo `Ctrl+K`); respostas viram **propostas** confirmadas (`assistant-actions.js`) |

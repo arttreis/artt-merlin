@@ -9,7 +9,8 @@
    ================================================================
    a floresta ocupa o alto da tela de ponta a ponta, por trás da faixa do
    topo, e se dissolve no fundo; a pergunta fica sobre ela, e o campo nasce
-   na linha onde a cena acaba. os blocos do hoje vêm embaixo. */
+   na linha onde a cena acaba. embaixo não vem mais nada (a secretária, 17/10):
+   o dia inteiro e os hábitos moram no calendário. */
 .hm{position:relative;max-width:1080px;margin:0 auto}
 .hm-scene{
   position:absolute;top:-200px;left:50%;width:100vw;transform:translateX(-50%);
@@ -23,8 +24,6 @@
   margin:0;font-size:clamp(24px,3.2vw,34px);font-weight:600;letter-spacing:-.03em;color:#fff;
   text-shadow:0 2px 18px rgba(0,0,0,.45);
 }
-.hm-hero__sub{margin:10px 0 0;font-size:13px;color:rgba(255,255,255,.8);text-shadow:0 1px 10px rgba(0,0,0,.5)}
-.hm-hero__sub a{color:#fff;text-decoration:underline;text-decoration-color:rgba(255,255,255,.4)}
 
 /* o campo do meio, com os três modos */
 .hm-center{max-width:620px;margin:0 auto;display:flex;flex-direction:column;align-items:center;gap:12px}
@@ -38,49 +37,6 @@
 .hm-field__send{width:32px;height:32px;border-radius:50%;display:grid;place-items:center;background:var(--accent);color:var(--on-accent)}
 .hm-field__send:disabled{opacity:.4}
 .hm-field__send svg{width:15px;height:15px}
-.hm-close{display:inline-flex;align-items:center;gap:8px;height:38px;padding:0 18px;border-radius:var(--br-pill);background:var(--accent);color:var(--on-accent);font-weight:600;font-size:13.5px}
-.hm-close svg{width:14px;height:14px}
-.hm-closed{margin:0;font-size:11.5px;color:var(--ink-50)}
-
-/* os blocos do hoje */
-.hm-label{margin:clamp(28px,5vh,48px) 0 10px;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-30)}
-.hm-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:var(--pd);align-items:start}
-.hm-col{display:flex;flex-direction:column;gap:var(--pd);min-width:0}
-.hm-cell>*{width:100%}
-@media (max-width:900px){.hm-grid{grid-template-columns:minmax(0,1fr)}.hm-col{display:contents}}
-.hm-card{background:var(--surface);border:1px solid var(--line);border-radius:var(--br);padding:14px 16px;min-width:0}
-.hm-card__head{display:flex;align-items:center;gap:8px;margin:0 0 10px;font-size:13px;font-weight:600;color:var(--ink)}
-.hm-card__head svg{width:15px;height:15px;color:var(--accent-ink)}
-.hm-card__aside{font-weight:400;font-size:11px;color:var(--ink-30)}
-.hm-card__go{margin-left:auto;color:var(--ink-30)}
-.hm-card__go:hover{color:var(--ink)}
-.hm-card__go svg{width:14px;height:14px;color:inherit}
-.hm-day__n{display:flex;align-items:baseline;gap:8px;margin:0 0 10px}
-.hm-day__n b{font-size:28px;font-weight:500;letter-spacing:-.04em;color:var(--accent)}
-.hm-day__n[data-tone="over"] b{color:var(--ink)}
-.hm-day__n span{font-size:12.5px;color:var(--ink-50)}
-.hm-track{display:flex;height:8px;border-radius:var(--br2);overflow:hidden;background:var(--bg);border:1px solid var(--line-soft);margin-bottom:10px}
-.hm-track i{min-width:0}
-.hm-track i+i{box-shadow:inset 1px 0 0 var(--bg)}
-.hm-track .is-reserved{background:repeating-linear-gradient(90deg,var(--fill) 0 2px,var(--bg) 2px 5px)}
-.hm-track .is-slot{background:var(--fill-hover)}
-.hm-track .is-guess{background:repeating-linear-gradient(45deg,var(--fill-hover) 0 4px,transparent 4px 8px)}
-.hm-track .is-free{background:var(--accent);flex:1 1 auto}
-.hm-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:2px}
-.hm-list li{display:flex;align-items:center;gap:10px;min-height:30px;min-width:0}
-.hm-list li.is-out .hm-list__title{color:var(--ink-30)}
-.hm-list__title{flex:1 1 auto;min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-size:13px;color:var(--ink-70)}
-.hm-list__min,.hm-list__at{flex:none;font-size:11px;color:var(--ink-30)}
-.hm-list__at{color:var(--ink-50)}
-.hm-check{flex:none;width:18px;height:18px;border-radius:6px;display:grid;place-items:center;border:1px solid var(--line);color:transparent}
-.hm-check:hover{border-color:var(--ink-30)}
-.hm-check.is-done{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
-.hm-check svg{width:11px;height:11px}
-.hm-empty{font-size:12.5px;color:var(--ink-30)}
-.hm-empty a{color:var(--ink-50);text-decoration:underline}
-.hm-review__q{margin:0 0 8px;font-size:13.5px;color:var(--ink)}
-.hm-review textarea{width:100%;resize:vertical;border:1px solid var(--line-soft);border-radius:var(--br2);background:var(--surface-2);padding:8px 9px;font:inherit;font-size:12.5px;color:var(--ink)}
-.hm-review__actions{display:flex;justify-content:flex-end;gap:8px;margin-top:8px}
 
 /* o onboarding: a conversa sobre a cena, no meio da tela. sem o dock, o
    rodapé da página fica do tamanho do topo, e a caixa centra entre os dois */
@@ -104,7 +60,7 @@ html.onboarding .page{padding-bottom:calc(var(--nav-h) + var(--pd) * 1.5)}
 .ob__send:disabled{opacity:.4}
 .ob__send svg{width:15px;height:15px}
 
-/* fechar o dia */
+/* fechar o dia, e a revisão da semana e do mês na mesma caixa */
 .cl{position:fixed;inset:0;z-index:90;display:grid;place-items:center;padding:16px;background:var(--scrim)}
 .cl__box{width:min(560px,100%);max-height:calc(100dvh - 32px);overflow:auto;background:var(--surface-2);border:1px solid var(--line);border-radius:var(--br);box-shadow:var(--sombra-2);padding:22px}
 .cl__eyebrow{margin:0 0 6px;font-size:11px;color:var(--ink-30)}
@@ -159,27 +115,6 @@ html:has(.hm) body{overflow-x:clip}
 .hm-draft__drop svg{width:12px;height:12px}
 .hm-draft__actions{display:flex;justify-content:flex-end;flex-wrap:wrap;gap:6px;margin-top:8px}
 
-/* ---------- a sessão de foco, a semana e o GitHub (VISAO, 11) ---------- */
-.hm-play{flex:none;width:22px;height:22px;border-radius:50%;display:grid;place-items:center;color:var(--ink-30);opacity:0;transition:opacity var(--t),background var(--t),color var(--t)}
-.hm-list li:hover .hm-play,.hm-play:focus-visible{opacity:1}
-.hm-play:hover{background:var(--accent);color:var(--on-accent)}
-.hm-play svg{width:10px;height:10px;margin-left:1px}
-@media (hover:none){.hm-play{opacity:1}}
-.hm-focus{display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin:0 0 10px;padding:8px 10px;border-radius:var(--br2);border:1px solid var(--accent);font-size:12.5px;color:var(--ink-50)}
-.hm-focus b{color:var(--ink);font-weight:500}
-.hm-focus .pill{margin-left:auto;height:26px}
-.hm-focus__dot{width:8px;height:8px;border-radius:50%;background:var(--accent);animation:hm-pulse 1.6s ease-in-out infinite}
 @keyframes hm-pulse{0%,100%{opacity:1}50%{opacity:.35}}
-@media (prefers-reduced-motion:reduce){.hm-focus__dot{animation:none}}
-.hm-slip{margin:0 0 10px;padding:8px 10px;border-radius:var(--br2);background:var(--fill);font-size:12.5px;color:var(--ink-50)}
-.hm-slip b{color:var(--ink);font-weight:500}
-.hm-slip button{margin-left:6px;font-size:12px;color:var(--ink-70);text-decoration:underline}
-.hm-meter{display:grid;grid-template-columns:auto 1fr;gap:4px 10px;align-items:baseline;margin-bottom:12px;font-size:12.5px;color:var(--ink-50)}
-.hm-meter b{justify-self:end;font-weight:500;font-size:12px;color:var(--ink)}
-.hm-meter a{grid-column:1 / -1;font-size:12px;color:var(--ink-50);text-decoration:underline}
-.hm-meter__bar{grid-column:1 / -1;display:block;height:6px;border-radius:100px;background:var(--fill-hover);overflow:hidden}
-.hm-meter__bar i{display:block;height:100%;background:var(--accent);border-radius:100px}
-/* o teto que estoura: o destaque some, como no dia — não há vermelho */
-.hm-meter[data-over="yes"] .hm-meter__bar i{background:repeating-linear-gradient(45deg,var(--ink-30) 0 3px,transparent 3px 6px)}
 .cl__shipped{margin:0 0 14px;font-size:13px;color:var(--ink-50)}
 .cl__shipped b{color:var(--ink);font-weight:500}

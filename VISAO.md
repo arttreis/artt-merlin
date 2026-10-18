@@ -869,6 +869,18 @@ O Arthur, depois da seção 9: ainda não era um assistente pessoal. Agora o **i
 - **a floresta** (`shared/forest.jsx`), escolhida entre quatro temas, acompanha a hora;
 - **dock embaixo no lugar da barra lateral**, com o início, as seis seções e o "+".
 
+**Atualização de 17/10/2026 (a secretária, `docs/prd/a-secretaria.md`, D2 e D5):** o início ficou
+só com a conversa. Abre com uma frase só, "Bom dia, Arthur. Como posso te ajudar hoje?" (boa tarde
+e boa noite pela hora), e o campo, sobre a floresta. Saíram a pergunta que mudava com a hora, a
+fala do Merlin (a tarefa `checkin`, que continua no Worker mas não é mais chamada), a linha de dias
+seguidos, o botão da noite e os blocos de baixo (o dia, hábitos, agenda, a semana, entregue hoje,
+revisões). O dia inteiro e os hábitos continuam no calendário. Fechar o dia e revisar passaram a
+ser **pedidos**: escrever "fechar o dia" no campo abre o fechamento, e "revisar a semana" ou
+"revisar o mês" abre a revisão do período corrente, a qualquer dia. É regra local (`askIntent`, em
+`shared/tasks.js`), sem crédito; com duração ("fechar o dia 30m") continua sendo tarefa. A
+sequência de dias fechados continua gravando em `closes`. Quem pede isso ao Merlin na conversa
+ouve que é só escrever "fechar o dia" no início.
+
 ---
 
 ## 11. O que veio do Promethee (10/10/2026)
@@ -881,8 +893,8 @@ um ambiente com som e paisagem.
 
 **Entrou:**
 
-- **A sessão de foco** (`shared/focus.js`). Começa na tarefa da vez — no rastreador ou no
-  início — e termina com um **recibo**: quanto levou contra o que você estimou. É o que o
+- **A sessão de foco** (`shared/focus.js`). Começa na tarefa da vez — no rastreador (o início
+  também começava, até 17/10/2026) — e termina com um **recibo**: quanto levou contra o que você estimou. É o que o
   Merlin tem e o Promethee não: a estimativa é o que faz a sobra do dia ser honesta, e a
   sessão diz se ela estava certa. Uma sessão por vez; a coleção é `sessions`.
 - **A meta de horas e o teto de reunião** (perfil, "o seu ritmo"). O foco da semana é a soma
@@ -891,7 +903,8 @@ um ambiente com som e paisagem.
   que estoura — não há vermelho.
 - **O GitHub**, só o público e só leitura. O navegador lê os eventos do usuário direto da
   `api.github.com` — nada passa pelo servidor e nenhum token é guardado. Os commits e PRs do
-  dia aparecem no início ("entregue hoje"), no fechamento do dia e na fala do Merlin.
+  dia aparecem no fechamento do dia (no início, o "entregue hoje" e a fala do Merlin saíram em
+  17/10/2026, com a secretária).
   Repositório privado fica de fora até existir um token opcional.
 
 **Ficou de fora, de propósito:**
