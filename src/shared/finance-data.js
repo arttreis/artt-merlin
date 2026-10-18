@@ -9,7 +9,7 @@
    e tudo puro — recebe `ctx` e devolve numero. nada aqui le o DOM, e so o
    financeBrief() do fim abre a colecao.
    --------------------------------------------------------------- */
-import { collection, today, isDay, addDays, brl } from "./core.js";
+import { collection, today, isDay, addDays, brl, newId } from "./core.js";
 
 export const pad = (n) => String(n).padStart(2, "0");
 
@@ -183,7 +183,10 @@ export function normalize(d) {
         kind: d.kind === "in" ? "in" : "out",
         category: String(d.category || ""),
         paid: !!d.paid,
-        origin: normalizeOrigin(d.origin)
+        origin: normalizeOrigin(d.origin),
+        /* "chat" quando nasceu da conversa ou do campo do início: é o que
+           conta, no D1, quantos lançamentos a secretária fez */
+        via: d.via ? String(d.via).slice(0, 20) : ""
       };
     case "fixed":
       return {
@@ -265,6 +268,81 @@ export function contextOf(finance) {
     startBalance: configOf(finance).startBalance
   };
 }
+
+/* ---------- o lançamento pedido em palavras ----------
+   desde 17/10/2026 o gasto e a entrada nascem também do campo do início ("gastei
+   45 no almoço") e da conversa. os dois caminhos passam por aqui, para o
+   documento sair igual dos dois lados. nada grava: devolve o documento, e quem
+   chamou grava e oferece o desfazer. */
+
+/* hoje ou antes já aconteceu; depois de hoje é previsto. a pessoa pode dizer
+   que uma conta passada ainda não foi paga, mas não que uma futura já foi */
+export const paidOf = (date, paid, base) => (date > base ? false : paid !== false);
+
+/* `spec`: { title, amount (centavos), flow, category, date, paid, confirm, fixed, chat }.
+   `confirm` é o id de um previsto aberto: "paguei o aluguel" confirma o que já
+   estava lá, em vez de lançar outro. `fixed` é o id de um fixo ainda não
+   lançado no mês: lança com a origem nele, e a sugestão do mês some. id que não
+   bate com nada vale como vazio, a mesma regra do Worker (cleanCapture). */
+export function newEntry(spec, cfg, ctx, base) {
+  const s = spec || {};
+  const now = Date.now();
+  const amount = Math.max(0, Math.round(+s.amount) || 0);
+  const date = isDay(s.date) ? s.date : base;
+  const categories = (cfg && cfg.categories) || DEFAULT_CATEGORIES;
+  const category = categories.includes(s.category) ? s.category : "";
+  const title = String(s.title || "").trim().slice(0, 140);
+  const planned = s.confirm ? (ctx.entries || []).find((e) => e.id === s.confirm && !e.paid) : null;
+  if (planned) {
+    return { doc: { ...planned, name: title || planned.name, amount: amount || planned.amount, paid: true, via: "chat", updatedAt: now } };
+  }
+  const fixed = s.fixed ? (ctx.fixed || []).find((f) => f.id === s.fixed && f.active && !alreadyEntered(ctx.entries, "fixed", f.id, date)) : null;
+  const value = amount || (fixed ? fixed.amount : 0);
+  if (!value) return { error: "falta o valor" };
+  return { doc: {
+    id: newId(), type: "entry", day: date,
+    name: title || (fixed ? fixed.name : ""),
+    amount: value,
+    kind: fixed ? fixed.kind : s.flow === "in" ? "in" : "out",
+    category: category || (fixed ? fixed.category : ""),
+    paid: paidOf(date, s.paid, base),
+    origin: fixed ? { type: "fixed", id: fixed.id } : { type: "chat", id: String(s.chat || "home") },
+    via: "chat", createdAt: now, updatedAt: now
+  } };
+}
+
+/* o que gravar para voltar: o que não existia sai; o previsto confirmado volta
+   a ser como era. serve a qualquer gravação de um documento só — a caixa de
+   proposta usa para todos os tipos */
+export const undoEntry = (before, after) => (before ? { save: before } : { remove: after.id });
+
+/* a linha que confere o lançamento de relance, no cartão do início e na caixa:
+   "R$ 45,00 · Básicas/PF · saída · pago". com o `ctx` do financeiro, a linha
+   acha o previsto confirmado e o fixo; sem ele, só diz que confirma um */
+export function entryLine(s, base, ctx) {
+  const c = ctx || {};
+  const planned = s.confirm ? (c.entries || []).find((e) => e.id === s.confirm) : null;
+  const fixed = s.fixed ? (c.fixed || []).find((f) => f.id === s.fixed) : null;
+  const when = planned ? "confirma o previsto de " + planned.day.slice(8, 10) + "/" + planned.day.slice(5, 7)
+    : s.confirm ? "confirma um previsto"
+    : paidOf(isDay(s.date) ? s.date : base, s.paid, base) ? "pago" : "previsto";
+  const amount = Math.round(+s.amount) || (planned ? planned.amount : fixed ? fixed.amount : 0);
+  return [amount > 0 ? brl(amount) : "falta o valor", s.category, s.flow === "in" ? "entrada" : "saída", when].filter(Boolean).join(" · ");
+}
+
+/* o que a leitura do início precisa saber para não inventar: as categorias, os
+   previstos abertos (para "paguei o aluguel" confirmar) e os fixos que o mês
+   ainda espera. cortado, porque vai junto de cada linha lida */
+export function captureContext(cfg, ctx, base) {
+  const [y, m] = base.split("-").map(Number);
+  const planned = (ctx.entries || []).filter((e) => !e.paid)
+    .sort((a, b) => Math.abs(dayGap(a.day, base)) - Math.abs(dayGap(b.day, base))).slice(0, 30)
+    .map((e) => ({ id: e.id, name: e.name, amount: e.amount, day: e.day }));
+  const fixed = (ctx.fixed || []).filter((f) => f.active && !alreadyEntered(ctx.entries, "fixed", f.id, base)).slice(0, 30)
+    .map((f) => ({ id: f.id, name: f.name, amount: f.amount, day: base.slice(0, 8) + pad(effectiveDay(y, m, f.dayOfMonth)) }));
+  return { categories: ((cfg && cfg.categories) || DEFAULT_CATEGORIES).slice(0, 30), planned, fixed };
+}
+const dayGap = (a, b) => (Date.parse(a) - Date.parse(b)) / 864e5;
 
 /* ---------- o resumo que o assistente leva ----------
    a mesma frase que a pagina do financeiro registra como contexto quando

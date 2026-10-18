@@ -31,7 +31,8 @@ import {
   needsReading, isReserve, stripPrefix, askIntent, dayTasks, collectInbox
 } from "./shared/tasks.js";
 import { normalize as normalizeBlock, copyRoutine } from "./shared/routine.js";
-import { MAX_TURNS, normalizeChat, chatTitle, turnsOf } from "./shared/assistant-actions.js";
+import { MAX_TURNS, normalizeChat, chatTitle, turnsOf, markProposal } from "./shared/assistant-actions.js";
+import { normalize as normalizeFinance, configOf, contextOf as financeContext, newEntry, undoEntry, entryLine, captureContext } from "./shared/finance-data.js";
 import { BUILD, buildIntent } from "./shared/build-intent.js";
 import { normalize as normalizeHabit, isExpected } from "./shared/habits-data.js";
 import { distribute, fmt, clock, costOf } from "./shared/day.js";
@@ -241,6 +242,11 @@ function Onboarding({ profile, apps, habits, veteran, onDone }) {
    mais da tela: a resposta aparece no balão do Merlin, lá em cima. sem
    sessão, sem rede ou se a leitura falhar, vale a regra de antes.
 
+   desde 17/10/2026 a leitura também devolve dinheiro ("gastei 45 no almoço",
+   "paguei o aluguel"): o cartão mostra o lançamento, e o Enter o grava no
+   financeiro junto com as tarefas e as notas, com um desfazer só. o que veio
+   sem valor fica no cartão e se lança pela caixa de proposta.
+
    o pedido de montar ("monta um funil pra consultoria", "quero um app de
    agenda") não é tarefa nem pergunta: vai para a conversa do assistente, que
    pergunta o que falta e mostra o rascunho (shared/build.js). a duração
@@ -263,8 +269,17 @@ function dayLabel(date, base) {
   const d = dateOf(date);
   return WEEKDAY[d.getDay()] + " " + String(d.getDate()).padStart(2, "0") + "/" + String(d.getMonth() + 1).padStart(2, "0");
 }
-const draftMeta = (it, base) => it.kind === "note" ? "ideia"
+const draftMeta = (it, base, money) => it.kind === "note" ? "ideia"
+  : it.kind === "money" ? entryLine(it, base, money)
   : [dayLabel(it.date, base), it.at, it.min ? (it.guess ? "~" : "") + fmt(it.min) : "", it.client].filter(Boolean).join(" · ");
+const DRAFT_ICON = { task: "check", note: "pencil", money: "finance" };
+
+/* o gasto ou a entrada lidos na linha, como a caixa de proposta os recebe: é
+   por ela que se lança o que veio sem valor */
+const moneyProposal = (it) => ({
+  actionType: "finance-entry", title: it.title, note: "",
+  payload: { name: it.title, amount: it.amount, kind: it.flow, day: it.date, category: it.category, paid: it.paid, confirm: it.confirm, fixed: it.fixed }
+});
 
 /* o cliente volta da IA pelo nome; a tarefa guarda o id, como a @menção */
 function clientId(name) {
@@ -286,9 +301,16 @@ function Composer({ tasks, b, smart, onAsk, onIntent, readContext }) {
   const [text, setText] = useState("");
   const [reading, setReading] = useState(false);
   const [draft, setDraft] = useState(null); // { text, items }: o que o Merlin entendeu, esperando o ok
+  const [boxed, setBoxed] = useState(-1); // o item do cartão aberto na caixa de proposta
   const field = useRef(null);
   const date = today();
   const intent = askIntent(text);
+  /* o financeiro aberto aqui para descer da nuvem (core.js, ensureSynced): a
+     leitura precisa das categorias, dos previstos e dos fixos de verdade */
+  const finance = useCollection("finance", { normalize: normalizeFinance });
+  const money = financeContext(finance);
+  /* o que ainda não pode ser criado: o gasto sem valor só se lança pela caixa */
+  const missing = (it) => it.kind === "money" && !!newEntry(it, configOf(finance), money, date).error;
   const route = routeLine(text);
   const build = !intent && route && route.kind !== "task" ? buildIntent(text) : null;
   const willRead = smart && !intent && !build && needsReading(text, route);
@@ -313,11 +335,23 @@ function Composer({ tasks, b, smart, onAsk, onIntent, readContext }) {
   };
 
   const create = () => {
+    /* o que veio sem valor fica no cartão, esperando a caixa; sem nada pronto,
+       o Enter abre a caixa do primeiro */
+    const ready = draft.items.filter((it) => !missing(it));
+    const waiting = draft.items.filter(missing);
+    if (!ready.length) { setBoxed(draft.items.indexOf(waiting[0])); return; }
     const undo = [];
-    let nTasks = 0, nNotes = 0;
-    draft.items.forEach((it) => {
+    let nTasks = 0, nNotes = 0, nMoney = 0;
+    ready.forEach((it) => {
       const client = clientId(it.client);
-      if (it.kind === "task") {
+      if (it.kind === "money") {
+        const { doc } = newEntry({ ...it, chat: "home" }, configOf(finance), financeContext(finance), date);
+        const before = finance.get(doc.id);
+        finance.save(doc);
+        const back = undoEntry(before, doc);
+        undo.push(() => { if (back.remove) finance.remove(back.remove); else finance.save(back.save); });
+        nMoney++;
+      } else if (it.kind === "task") {
         const day = it.date || date;
         const at = it.at ? readClock(it.at) : null;
         const t = newTask({ title: stripPrefix(it.title), min: it.min, reserved: isReserve(it.title), client, date: day, at: at == null ? null : at, order: topOrder(tasks.all(), day) });
@@ -330,8 +364,13 @@ function Composer({ tasks, b, smart, onAsk, onIntent, readContext }) {
       }
     });
     const parts = [nTasks && nTasks + (nTasks === 1 ? " tarefa" : " tarefas"), nNotes && nNotes + (nNotes === 1 ? " ideia" : " ideias")].filter(Boolean);
-    if (parts.length) notify(parts.join(" e ") + (nTasks + nNotes === 1 ? " criada" : " criadas"), () => undo.forEach((f) => f()));
-    clear();
+    const said = [
+      parts.length && parts.join(" e ") + (nTasks + nNotes === 1 ? " criada" : " criadas"),
+      nMoney && (nMoney === 1 ? "lançado no financeiro" : nMoney + " lançados no financeiro")
+    ].filter(Boolean);
+    if (said.length) notify(said.join(" · "), () => undo.forEach((f) => f()));
+    if (waiting.length) setDraft({ ...draft, items: waiting });
+    else clear();
   };
 
   const submit = async () => {
@@ -343,7 +382,7 @@ function Composer({ tasks, b, smart, onAsk, onIntent, readContext }) {
     if (!willRead) { byRule(route); return; }
     const said = text;
     setReading(true);
-    const items = await readWithMerlin(said, readContext());
+    const items = await readWithMerlin(said, { ...readContext(), ...captureContext(configOf(finance), financeContext(finance), date) });
     setReading(false);
     /* lista vazia é o Merlin dizendo que a linha inteira é uma pergunta */
     if (items && !items.length) { onAsk(said.trim()); clear(); return; }
@@ -364,7 +403,10 @@ function Composer({ tasks, b, smart, onAsk, onIntent, readContext }) {
   };
 
   const kind = intent ? intent.kind : build ? "build" : reading || willRead ? "read" : route ? route.kind : "";
+  const lacking = draft ? draft.items.filter(missing).length : 0;
   const hint = reading ? "o Merlin está lendo…"
+    : draft && lacking === draft.items.length ? "Enter abre a caixa para pôr o valor · Esc volta ao texto"
+    : draft && lacking ? "Enter cria o que está pronto · o que falta o valor fica · Esc volta ao texto"
     : draft ? "Enter cria · Esc volta ao texto"
     : intent ? INTENT_HINT[intent.period || intent.kind]
     : !route ? (smart ? "escreva do seu jeito: o Merlin separa tarefa, data, hora e ideia · a pergunta ele responde aqui em cima"
@@ -376,6 +418,7 @@ function Composer({ tasks, b, smart, onAsk, onIntent, readContext }) {
     : "guardar em ideias · com a duração no fim, entra em hoje";
 
   return (
+    <>
     <form className="hm-field" aria-busy={reading} onSubmit={(e) => { e.preventDefault(); submit(); }}>
       <textarea ref={field} rows={2} maxLength="300" value={text} autoFocus
                 placeholder={smart ? "ligar pro João amanhã às 15h, uma pergunta, uma ideia — do seu jeito" : "uma tarefa (revisar a landing 45m), uma pergunta ou uma ideia"}
@@ -396,9 +439,10 @@ function Composer({ tasks, b, smart, onAsk, onIntent, readContext }) {
           <ul className="hm-draft__list">
             {draft.items.map((it, i) => (
               <li key={i}>
-                {icon(it.kind === "task" ? "check" : "pencil")}
+                {icon(DRAFT_ICON[it.kind] || "pencil")}
                 <span className="hm-draft__title">{it.title}</span>
-                <span className="hm-draft__meta t-mono">{draftMeta(it, date)}</span>
+                <span className="hm-draft__meta t-mono">{draftMeta(it, date, money)}</span>
+                {missing(it) && <button type="button" className="pill pill--mini" onClick={() => setBoxed(i)}>abrir a caixa</button>}
                 <button type="button" className="hm-draft__drop" aria-label={"Tirar " + it.title} title="tirar" onClick={() => drop(i)}>{icon("x")}</button>
               </li>
             ))}
@@ -406,11 +450,19 @@ function Composer({ tasks, b, smart, onAsk, onIntent, readContext }) {
           <div className="hm-draft__actions">
             <button type="button" className="pill" onClick={() => { setDraft(null); if (field.current) field.current.focus(); }}>voltar ao texto</button>
             <button type="button" className="pill" onClick={asIdea}>guardar como ideia</button>
-            <button type="submit" className="pill pill--accent">{draft.items.length === 1 ? "criar" : "criar as " + draft.items.length}</button>
+            <button type="submit" className="pill pill--accent">
+              {lacking === draft.items.length ? "abrir a caixa" : draft.items.length - lacking === 1 ? "criar" : "criar as " + (draft.items.length - lacking)}
+            </button>
           </div>
         </div>
       )}
     </form>
+    {/* fora do <form> do campo: a caixa é outro formulário */}
+    {draft && boxed >= 0 && draft.items[boxed] && (
+      <ProposalDialog proposal={moneyProposal(draft.items[boxed])} onClose={() => setBoxed(-1)}
+                      onDone={(line) => { if (line) drop(boxed); }} />
+    )}
+    </>
   );
 }
 
@@ -684,8 +736,10 @@ function Today({ c, tasks, habits, journal, closes, reviews, sessions, me, h, ph
   const chats = useCollection("chats", { normalize: normalizeChat });
   const [talk, setTalk] = useState([]);
   const [asking, setAsking] = useState(false);
-  const [proposal, setProposal] = useState(null);
+  const [proposal, setProposal] = useState(null); // { p, at, chat }: a pílula aberta na caixa
   const talkId = useRef("");
+  const talkNow = useRef(talk);
+  talkNow.current = talk;
   const keepTalk = (list) => {
     setTalk(list);
     if (!talkId.current) talkId.current = newId();
@@ -716,6 +770,9 @@ function Today({ c, tasks, habits, journal, closes, reviews, sessions, me, h, ph
     keepTalk(mine.concat(reply));
   };
   const lastQ = talk.map((m) => m.from).lastIndexOf("me");
+  /* a pílula confirmada vira a linha "✓ lançado · …" e não abre de novo; o
+     desfazer a devolve, se a conversa ainda for a mesma */
+  const markDone = (at, chat, line) => { if (talkId.current === chat) keepTalk(markProposal(talkNow.current, at, line)); };
 
   return (
     <div className="hm">
@@ -730,7 +787,9 @@ function Today({ c, tasks, habits, journal, closes, reviews, sessions, me, h, ph
                 {asking
                   ? <p className="hm-talk__wait">pensando…</p>
                   : talk.slice(lastQ + 1).map((m, i) => m.proposal
-                      ? <button key={i} type="button" className="pill pill--accent hm-talk__do" onClick={() => setProposal(m.proposal)}>{icon("spark")}{m.proposal.title}</button>
+                      ? m.proposal.done
+                        ? <p key={i} className="hm-talk__done t-mono">✓ {m.proposal.done.line}</p>
+                        : <button key={i} type="button" className="pill pill--accent hm-talk__do" onClick={() => setProposal({ p: m.proposal, at: lastQ + 1 + i, chat: talkId.current })}>{icon("spark")}{m.proposal.title}</button>
                       : <Markdown key={i} className="hm-talk__a" text={m.text} />)}
                 {!asking && (
                   <p className="hm-talk__foot">
@@ -748,7 +807,8 @@ function Today({ c, tasks, habits, journal, closes, reviews, sessions, me, h, ph
 
       {closing && <Closing tasks={tasks} journal={journal} closes={closes} date={date} login={me.github} onClose={() => setClosing(false)} />}
       {reviewing && <Review key={reviewing.id} reviews={reviews} due={reviewing} onClose={() => setReviewing(null)} />}
-      {proposal && <ProposalDialog proposal={proposal} onClose={() => setProposal(null)} />}
+      {proposal && <ProposalDialog proposal={proposal.p} chat={proposal.chat} onClose={() => setProposal(null)}
+                                   onDone={(line) => markDone(proposal.at, proposal.chat, line)} />}
     </div>
   );
 }

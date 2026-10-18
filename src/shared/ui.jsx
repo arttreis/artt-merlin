@@ -27,7 +27,8 @@ import { LOGO, GL_LOGO, GL_MARK, ICONS, NAV_ICONS, icon } from "./icons.jsx";
 /* o ProposalDialog mora aqui, e nao na tela do assistente, porque ele e um
    Form como qualquer outro do sistema — e porque qualquer tela que um dia
    receba uma proposta usa o mesmo. */
-import { ACTION_COLLECTIONS, ACTION_LABELS, ACTION_FIELDS, buildDoc, previewOf } from "./assistant-actions.js";
+import { ACTION_COLLECTIONS, ACTION_LABELS, ACTION_FIELDS, ACTION_DONE, buildDoc, previewOf } from "./assistant-actions.js";
+import { normalize as normalizeFinance, contextOf as financeContext, undoEntry } from "./finance-data.js";
 /* o Ctrl+K cria tarefa de hoje com a mesma regra e a mesma forma do dia */
 import { tasks, newTask, topOrder, routeLine } from "./tasks.js";
 import { BUILD, buildIntent } from "./build-intent.js";
@@ -935,40 +936,70 @@ function useRootClass(name, on) {
    confirmar chama collection.save() local-first, igual a criar à mão: some
    quando a rede volta, sincroniza sozinho, pode ser desfeito como qualquer
    outra gravação. exportado porque a tela do assistente (assistant.jsx) é
-   quem monta este diálogo agora — o painel embutido na busca saiu. */
-const CREATE_LABELS = { "onboarding-map": "gerar mapa", "onboarding-funnel": "gerar funil" };
+   quem monta este diálogo agora — o painel embutido na busca saiu.
+
+   desde 17/10/2026 todo tipo que cria ou altera avisa com desfazer, e quem
+   abriu a caixa fica sabendo pelo `onDone(linha)`: a pílula da conversa vira
+   "✓ lançado · …" e não abre de novo. o desfazer chama `onDone(null)`, e a
+   pílula volta. `chat` é o id da conversa, que vai na origem do lançamento. */
+const CREATE_LABELS = { "onboarding-map": "gerar mapa", "onboarding-funnel": "gerar funil", "finance-entry": "lançar" };
 const CREATE_HREF = { "onboarding-map": "maps.html#", "onboarding-funnel": "funnels.html#" };
-export function ProposalDialog({ proposal, onClose }) {
-  const { actionType, payload, note } = proposal;
+const DONE_NOTICE = { "finance-entry": "lançado no financeiro", "lead-update": "cliente atualizado", script: "roteiro aplicado" };
+const ACTION_OPTIONS = { finance: { normalize: normalizeFinance } };
+const optionPair = (o) => (Array.isArray(o) ? o : [o, o]);
+export function ProposalDialog({ proposal, chat, onClose, onDone }) {
+  const { actionType, note } = proposal;
+  const payload = proposal.payload || {};
   const collectionName = ACTION_COLLECTIONS[actionType];
-  const store = useCollection(collectionName || "tasks");
+  const store = useCollection(collectionName || "tasks", ACTION_OPTIONS[collectionName]);
   const fields = ACTION_FIELDS[actionType] || [];
   const initial = {};
-  fields.forEach((f) => { const v = (payload || {})[f.key]; initial[f.key] = v == null ? "" : v; });
-  const [v, bind] = useFields(initial);
+  fields.forEach((f) => {
+    const v = payload[f.key];
+    initial[f.key] = f.initial && (v == null || v === "") ? f.initial(payload, store) : v == null ? "" : v;
+  });
+  const [v, bind, set] = useFields(initial);
   if (!collectionName) return null;
+  const ctx = collectionName === "finance" ? financeContext(store) : null;
   const submit = () => {
-    const { doc, error } = buildDoc(actionType, payload, v, store);
+    const { doc, error } = buildDoc(actionType, payload, v, store, { chat });
     if (error) { notify(error); return false; }
+    const before = store.get(doc.id);
     store.save(doc);
     /* mapa e funil de onboarding entregam um documento pronto pra olhar — o
        gesto certo é já estar nele, não voltar pra conversa e ter que ir
        buscar. os outros tipos são leves o bastante pra fazer sentido ficar. */
     const goTo = CREATE_HREF[actionType];
-    if (goTo) { location.href = goTo + doc.id; return; }
-    notify("feito");
+    if (goTo) { if (onDone) onDone(ACTION_LABELS[actionType]); location.href = goTo + doc.id; return; }
+    /* a linha da pílula confirmada sai do que foi gravado, com o que a pessoa
+       editou na caixa, e não do que a IA propôs */
+    const line = (ACTION_DONE[actionType] || "criado") + " · " + (previewOf(actionType, { ...payload, ...v }, ctx) || v.title || v.name || proposal.title);
+    if (onDone) onDone(line);
+    const undo = undoEntry(before, doc);
+    notify(DONE_NOTICE[actionType] || "feito", () => {
+      if (undo.remove) store.remove(undo.remove); else store.save(undo.save);
+      if (onDone) onDone(null);
+    });
   };
   return (
-    <Form title={ACTION_LABELS[actionType] || "proposta"} sub={previewOf(actionType, payload) || note}
+    <Form title={ACTION_LABELS[actionType] || "proposta"} sub={previewOf(actionType, payload, ctx) || note}
         submit={CREATE_LABELS[actionType] || (actionType === "lead-update" || actionType === "script" ? "aplicar" : "criar")}
         onSubmit={submit} onClose={onClose}>
-      {fields.map((f) => (
-        <Field key={f.key} label={f.label} full={f.type === "textarea"}>
-          {f.type === "textarea"
-            ? <textarea className="textarea" rows="4" {...bind(f.key)} />
-            : <input className="input" type={f.type === "number" ? "number" : f.type === "date" ? "date" : "text"} {...bind(f.key)} />}
-        </Field>
-      ))}
+      {fields.map((f) => f.type === "check"
+        ? <label key={f.key} className="row full"><input type="checkbox" {...bind(f.key, "check")} /> {f.label}</label>
+        : (
+          <Field key={f.key} label={f.label} full={f.type === "textarea"}>
+            {f.type === "textarea"
+              ? <textarea className="textarea" rows="4" {...bind(f.key)} />
+              : f.type === "money"
+              ? <MoneyInput value={+v[f.key] || 0} onChange={(c) => set(f.key, c)} />
+              : f.type === "select"
+              ? <select className="select" {...bind(f.key)}>
+                  {f.options(store).map(optionPair).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+                </select>
+              : <input className="input" type={f.type === "number" ? "number" : f.type === "date" ? "date" : "text"} {...bind(f.key)} />}
+          </Field>
+        ))}
     </Form>
   );
 }

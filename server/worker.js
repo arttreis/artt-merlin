@@ -996,7 +996,8 @@ const ASSISTANT_ACTIONS = {
   "onboarding-map": { collection: "maps", fields: ["name", "tree"] },
   "onboarding-funnel": { collection: "funnels", fields: ["name", "stages"] },
   script: { collection: "content", fields: ["contentId", "script"] },
-  "wishlist-item": { collection: "wishlist", fields: ["list", "name", "price", "bucket", "qty"] }
+  "wishlist-item": { collection: "wishlist", fields: ["list", "name", "price", "bucket", "qty"] },
+  "finance-entry": { collection: "finance", fields: ["name", "amount", "kind", "day", "category", "paid", "confirm", "fixed"] }
 };
 const ASSISTANT_ACTION_TYPES = Object.keys(ASSISTANT_ACTIONS).join(", ");
 
@@ -1012,7 +1013,8 @@ LIST_TASKS.assistant = (c) => ({
     "onboarding-map {name, tree: {title, note, children:[{title, note, children:[...]}]} — no máximo 3 níveis, 6 filhos por nó}; " +
     "onboarding-funnel {name, stages: lista de {nodeType (um de " + NODE_TYPES + "), title}}; " +
     "script {contentId (o id da peça de conteúdo do contexto — NUNCA invente um; sem id no contexto, não proponha este tipo), script (roteiro em markdown: # título e depois as seções \"## \" do molde do formato que vier no contexto da tela, na mesma ordem e sem as linhas de dica em itálico — sem molde no contexto, ## gancho, ## desenvolvimento, ## fechamento —, com bullets para falar, não texto corrido; gancho com número, contraste ou case, nunca pergunta nem saudação; virada antes do fim e CTA amarrado nela; NUNCA invente número, resultado ou case — o dado que faltar entra marcado com [conferir])}; " +
-    "wishlist-item {list (id da coletânea do contexto, ou vazio), name, price (centavos, número, ou 0), bucket (um de asap, longterm, online, presencial, mercado, ou vazio), qty (ex. \"2x\", \"~1\", ou vazio)}. " +
+    "wishlist-item {list (id da coletânea do contexto, ou vazio), name, price (centavos, número, ou 0), bucket (um de asap, longterm, online, presencial, mercado, ou vazio), qty (ex. \"2x\", \"~1\", ou vazio)}; " +
+    "finance-entry {name (o que foi, curto), amount (centavos, número inteiro; 0 se a pessoa não disse o valor — nunca estime), kind (out para gasto, in para entrada), day (AAAA-MM-DD; sem data, hoje), category (uma das categorias do contexto, ou vazio), paid (true se já aconteceu, false se é para depois), confirm (o id de um previsto do contexto quando a pessoa diz que pagou ou recebeu algo que já estava previsto — NUNCA invente; sem id no contexto, vazio), fixed (o id de um fixo do contexto quando é a conta fixa do mês — NUNCA invente; sem id no contexto, vazio)} — use quando a pessoa contar um gasto ou uma entrada (\"gastei 45 no almoço\", \"recebi 3 mil da Ana\"); fixo, parcela, dívida, investimento e transferência novos não entram por aqui. " +
     "Se a mensagem for uma PERGUNTA (inclusive financeira — \"posso gastar X\", \"dá pra fazer Y\") em vez de um pedido de ação, devolva suggestions vazio e responda a pergunta direto em clarify, usando só o que está no contexto da tela (ex. saldo e fixos, quando a tela for o financeiro); se faltar dado pra responder com segurança, diga o que falta em vez de estimar. " +
     "Se a pessoa pedir para fechar o dia, revisar a semana ou revisar o mês, devolva suggestions vazio e diga em clarify, numa frase, que é só escrever \"fechar o dia\" no campo do início (ou \"revisar a semana\", \"revisar o mês\") — é o próprio início que abre o fechamento e a revisão, e não há ação para isso no catálogo. " +
     "Se a mensagem não corresponder a nenhuma ação nem a uma pergunta respondível, devolva suggestions vazio e clarify com UMA pergunta curta que ajudaria a decidir — nunca invente uma ação só para responder algo. " +
@@ -1135,25 +1137,62 @@ const CAPTURE_TASKS = {
   capture: (c) => ({
     instruction:
       "Leia a linha que a pessoa escreveu no campo do início e diga o que ela vira. Pode ser mais de uma coisa: \"revisar a landing, responder os e-mails e call com a Ana\" são três tarefas. " +
-      "Cada item: kind = task (uma ação concreta que a pessoa vai fazer — verbo de fazer, data, hora ou duração) ou note (uma ideia, possibilidade ou pensamento para explorar depois); " +
+      "Cada item: kind = task (uma ação concreta que a pessoa vai fazer — verbo de fazer, data, hora ou duração), note (uma ideia, possibilidade ou pensamento para explorar depois) ou money (um gasto ou uma entrada de dinheiro que aconteceu ou vai acontecer: \"gastei 45 no almoço\", \"recebi 3 mil da Ana\", \"paguei o aluguel\"; \"comprar pão\" sem dizer que gastou é task); " +
       "title = o que fazer, curto e na grafia da pessoa, SEM a data, a hora, a duração e o cliente (até 80 caracteres); " +
       "min = a duração em minutos — a que foi escrita, ou, se não houver, uma estimativa realista (múltiplos de 15) com guess true; para note, 0; " +
       "date = AAAA-MM-DD contada a partir de hoje (\"amanhã\", \"sexta\", \"dia 14\"; \"semana que vem\" é a próxima segunda); sem data, hoje; para note, vazio; " +
       "at = HH:MM quando houver hora (\"às 15h\", \"15:30\"), senão vazio; " +
       "client = o nome exato de um dos clientes listados quando a linha citar um deles, senão vazio. " +
+      "Para money, além de title e date: amount = o valor em centavos (\"45\" é 4500, \"3 mil\" é 300000; 0 se a linha não diz o valor — nunca estime); flow = out para gasto, in para entrada; " +
+      "category = o nome exato de uma das categorias listadas que caiba, senão vazio; paid = true se já aconteceu, false se é para depois; " +
+      "confirm = o id de um dos previstos listados quando a linha diz que pagou ou recebeu justamente aquele (\"paguei o aluguel\" e há um previsto \"aluguel\"), senão vazio; " +
+      "fixed = o id de um dos fixos listados quando a linha é a conta fixa do mês e não há previsto para ela, senão vazio. NUNCA invente id. " +
       "Nunca invente item que a linha não diz. Se a linha inteira for uma pergunta, devolva items vazio. " +
-      'Formato: {"items":[{"kind":"task","title":"…","min":45,"guess":false,"date":"AAAA-MM-DD","at":"","client":""}]}',
+      'Formato: {"items":[{"kind":"task","title":"…","min":45,"guess":false,"date":"AAAA-MM-DD","at":"","client":""},{"kind":"money","title":"almoço","amount":4500,"flow":"out","category":"","date":"AAAA-MM-DD","paid":true,"confirm":"","fixed":""}]}',
     context:
       "Linha: " + String(c.text || "").slice(0, 600) + "\n" +
       "Hoje: " + String(c.today || "").slice(0, 40) + " · agora " + String(c.hour || "").slice(0, 5) + "\n" +
       (c.window ? "Janela do dia: " + String(c.window).slice(0, 20) + "\n" : "") +
-      (Array.isArray(c.clients) && c.clients.length ? "Clientes: " + listOf(c.clients.slice(0, 40)) + "\n" : "")
+      (Array.isArray(c.clients) && c.clients.length ? "Clientes: " + listOf(c.clients.slice(0, 40)) + "\n" : "") +
+      (Array.isArray(c.categories) && c.categories.length ? "Categorias: " + listOf(c.categories.slice(0, 30)) + "\n" : "") +
+      moneyRefs("Previstos em aberto", c.planned) +
+      moneyRefs("Fixos ainda não lançados no mês", c.fixed)
   })
 };
-function cleanCapture(d) {
+/* os previstos e os fixos que o navegador mandou, um por linha, com o id que a
+   IA devolve em confirm/fixed. o valor vai em centavos, como ela devolve */
+const refsOf = (list) => arr(list, 30).filter((x) => x && x.id);
+const moneyRefs = (label, list) => {
+  const refs = refsOf(list);
+  return refs.length ? label + " (id · nome · centavos · dia): " + refs.map((x) => [cut(x.id, 60), cut(x.name, 80), Math.round(+x.amount) || 0, cut(x.day, 10)].join(" · ")).join("; ") + "\n" : "";
+};
+/* o dinheiro lido: nada do que a IA devolve vira referencia sem bater com o
+   que o navegador mandou. o pago sai da data, e nao da IA: hoje ou antes e
+   pago, depois de hoje e previsto — a mesma regra do paidOf (finance-data.js) */
+const MAX_AMOUNT = 100000000;
+function cleanMoney(x, c) {
+  const base = /^\d{4}-\d{2}-\d{2}/.test(String(c.today || "")) ? String(c.today).slice(0, 10) : new Date().toISOString().slice(0, 10);
+  const date = /^\d{4}-\d{2}-\d{2}$/.test(String(x.date || "")) ? String(x.date) : base;
+  const amount = Math.round(+x.amount);
+  const ids = (list) => refsOf(list).map((r) => String(r.id));
+  const categories = arr(c.categories, 30).map(String);
+  return {
+    kind: "money",
+    title: cut(x.title, 120).trim(),
+    amount: Number.isFinite(amount) ? Math.max(0, Math.min(MAX_AMOUNT, amount)) : 0,
+    flow: x.flow === "in" ? "in" : "out",
+    category: categories.includes(String(x.category)) ? String(x.category) : "",
+    date,
+    paid: date <= base,
+    confirm: x.confirm && ids(c.planned).includes(String(x.confirm)) ? String(x.confirm) : "",
+    fixed: x.fixed && ids(c.fixed).includes(String(x.fixed)) ? String(x.fixed) : ""
+  };
+}
+function cleanCapture(d, c) {
   return arr(d && d.items, MAX_CAPTURE_ITEMS)
-    .filter((x) => x && (x.kind === "task" || x.kind === "note") && String(x.title || "").trim())
+    .filter((x) => x && (x.kind === "task" || x.kind === "note" || x.kind === "money") && String(x.title || "").trim())
     .map((x) => {
+      if (x.kind === "money") return cleanMoney(x, c || {});
       const task = x.kind === "task";
       const min = Math.round(+x.min || 0);
       return {
@@ -1443,7 +1482,7 @@ async function advise(req, env, person) {
   }
   if (isCapture) {
     if (!data || !Array.isArray(data.items)) return fail("o Merlin respondeu fora do formato", 502);
-    return json({ items: cleanCapture(data) });
+    return json({ items: cleanCapture(data, body.context) });
   }
   if (isText) {
     if (!data || typeof data.text !== "string" || !data.text.trim()) return fail("o Merlin respondeu fora do formato", 502);

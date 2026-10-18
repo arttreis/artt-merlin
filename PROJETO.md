@@ -34,7 +34,7 @@ por documento num **Cloudflare Worker + D1**, com login por código de 6 dígito
   o rastreador (`tracker.html`) sempre por cima, a bandeja e `Alt+Shift+M`. Ver
   [desktop/README.md](desktop/README.md).
 - **Testes:** scripts Node puros, sem framework (`src/shared/test.mjs`, `board.test.mjs`,
-  `hat.test.mjs`, `server/test.mjs`).
+  `content.test.mjs`, `finance.test.mjs`, `app-spec.test.mjs`, `hat.test.mjs`, `server/test.mjs`).
 
 ## Arquitetura em camadas
 

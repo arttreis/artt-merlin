@@ -5,9 +5,10 @@
    o proprio normalize() dela, chamado na proxima leitura daquela pagina, e
    quem faz a validacao funda (arvore de mapa, no de funil etc.); aqui so
    se monta o documento minimo e se filtra o que o campo aceita. */
-import { newId } from "./core.js";
+import { newId, today } from "./core.js";
 import { journalEntry } from "./client-doc.js";
 import { layoutNodes } from "./funnel-layout.js";
+import { newEntry, entryLine, paidOf, configOf, contextOf } from "./finance-data.js";
 
 export const ACTION_COLLECTIONS = {
   task: "tasks",
@@ -17,7 +18,8 @@ export const ACTION_COLLECTIONS = {
   "onboarding-map": "maps",
   "onboarding-funnel": "funnels",
   script: "content",
-  "wishlist-item": "wishlist"
+  "wishlist-item": "wishlist",
+  "finance-entry": "finance"
 };
 
 export const ACTION_LABELS = {
@@ -28,12 +30,19 @@ export const ACTION_LABELS = {
   "onboarding-map": "novo mapa de onboarding",
   "onboarding-funnel": "novo funil de onboarding",
   script: "roteiro",
-  "wishlist-item": "novo item na vitrine"
+  "wishlist-item": "novo item na vitrine",
+  "finance-entry": "novo lançamento"
 };
+
+/* o que a pílula confirmada diz no lugar do título: "✓ lançado · …" */
+export const ACTION_DONE = { "finance-entry": "lançado", "lead-update": "aplicado", script: "aplicado" };
 
 /* so os campos que fazem sentido editar antes de confirmar — o resto do
    payload (arvore do mapa, etapas do funil, id do cliente/conteudo) segue
-   como a IA propos, sem virar campo de formulario */
+   como a IA propos, sem virar campo de formulario.
+   alem de texto, numero, data e textarea, o campo pode ser `money` (centavos),
+   `select` (as opcoes vem de `options(store)`, a colecao alvo) e `check`.
+   `initial(payload, store)` preenche o que a IA deixou em branco. */
 export const ACTION_FIELDS = {
   task: [
     { key: "title", label: "título" },
@@ -63,12 +72,25 @@ export const ACTION_FIELDS = {
     { key: "name", label: "nome" },
     { key: "qty", label: "quantidade" },
     { key: "bucket", label: "categoria" }
+  ],
+  /* o previsto confirmado e o fixo (confirm, fixed) seguem como a IA propos:
+     sao ids, nao campo de formulario */
+  "finance-entry": [
+    { key: "name", label: "o quê" },
+    { key: "amount", label: "valor", type: "money" },
+    { key: "day", label: "data", type: "date", initial: () => today() },
+    { key: "kind", label: "entrada ou saída", type: "select", initial: () => "out", options: () => [["out", "saída"], ["in", "entrada"]] },
+    { key: "category", label: "categoria", type: "select",
+      initial: (p, store) => (configOf(store).categories.includes(p.category) ? p.category : ""),
+      options: (store) => [["", "sem categoria"], ...configOf(store).categories] },
+    { key: "paid", label: "já aconteceu", type: "check", initial: (p) => paidOf(p.day || today(), p.paid, today()) }
   ]
 };
 
 /* a linha extra debaixo do titulo do dialogo — o que da pra ver do payload
-   sem abrir os campos, tipo "12/09/2026 · 30 min · cliente x" */
-export function previewOf(actionType, payload) {
+   sem abrir os campos, tipo "12/09/2026 · 30 min · cliente x". `ctx` (o do
+   financeiro, opcional) deixa o lancamento dizer de que previsto se trata */
+export function previewOf(actionType, payload, ctx) {
   const p = payload || {};
   switch (actionType) {
     case "task": return [p.date, p.min ? p.min + " min" : "", p.client].filter(Boolean).join(" · ");
@@ -79,6 +101,7 @@ export function previewOf(actionType, payload) {
     case "onboarding-funnel": return (p.stages || []).length + " etapas";
     case "script": return "entra no roteiro da peça de conteúdo";
     case "wishlist-item": return [p.qty, p.bucket].filter(Boolean).join(" · ");
+    case "finance-entry": return entryLine({ ...p, flow: p.kind, date: p.day }, today(), ctx);
     default: return "";
   }
 }
@@ -95,8 +118,9 @@ export const hhmmToMin = (s) => {
    a colecao alvo, ja aberta pelo chamador — so entra em uso para os dois
    tipos que EDITAM um documento existente em vez de criar um novo.
    devolve { doc } pra gravar, ou { error } quando falta uma referencia que
-   a IA nao podia ter inventado (id de cliente, id de conteudo). */
-export function buildDoc(actionType, payload, v, store) {
+   a IA nao podia ter inventado (id de cliente, id de conteudo). `opts.chat`
+   e o id da conversa, que vai na origem do lancamento. */
+export function buildDoc(actionType, payload, v, store, opts) {
   const now = Date.now();
   const p = payload || {};
   switch (actionType) {
@@ -126,6 +150,11 @@ export function buildDoc(actionType, payload, v, store) {
       if (!existing) return { error: "não achei essa peça de conteúdo" };
       return { doc: { ...existing, script: v.script, updatedAt: now } };
     }
+    case "finance-entry":
+      return newEntry({
+        title: v.name, amount: v.amount, flow: v.kind, category: v.category, date: v.day, paid: v.paid,
+        confirm: p.confirm, fixed: p.fixed, chat: opts && opts.chat
+      }, configOf(store), contextOf(store), today());
     case "wishlist-item":
       return { doc: { id: newId(), type: "item", list: p.list || "", name: v.name.trim(), price: Math.round(Math.abs(+p.price)) || 0, url: "", photo: null, note: "", bought: null, bucket: v.bucket || "", qty: v.qty || "", order: now, createdAt: now, updatedAt: now } };
     default:
@@ -146,8 +175,17 @@ function normalizeProposal(p) {
     actionType: String(p.actionType),
     title: String(p.title || "").slice(0, 120),
     note: String(p.note || "").slice(0, 300),
-    payload: p.payload && typeof p.payload === "object" ? p.payload : {}
+    payload: p.payload && typeof p.payload === "object" ? p.payload : {},
+    /* confirmada: a pilula vira a linha "✓ lancado · …" e nao abre de novo,
+       nem depois de recarregar a conversa */
+    done: p.done && typeof p.done === "object" ? { line: String(p.done.line || "").slice(0, 200) } : null
   };
+}
+
+/* marca a proposta da mensagem `i` como confirmada, com a linha que ela vira;
+   `line` vazio desmarca (o desfazer do aviso) */
+export function markProposal(list, i, line) {
+  return list.map((m, j) => (j === i && m.proposal ? { ...m, proposal: { ...m.proposal, done: line ? { line: String(line) } : null } } : m));
 }
 
 /* as falas de montar com o Merlin (shared/build.js): as perguntas antes de
@@ -215,7 +253,7 @@ export function turnsOf(list) {
   return list.map((m) => ({
     role: m.from === "me" ? "user" : "assistant",
     content: m.proposal
-      ? "[propôs " + m.proposal.actionType + ": '" + m.proposal.title + "']"
+      ? "[propôs " + m.proposal.actionType + ": '" + m.proposal.title + "'" + (m.proposal.done ? ", e a pessoa confirmou" : "") + "]"
       : m.brief ? "[perguntou antes de montar: " + m.brief.questions.map((q) => q.q).join(" ") + "]"
       : m.draft ? "[mostrou o rascunho: " + m.draft.title + "]"
       : m.built ? "[criou: " + m.built.name + "]"
