@@ -445,5 +445,21 @@ const lines = (p, id) => sec(p, id).text.split("\n");
   check("fontes: três citam as três", /^vi /.test(tres) && tres.includes("o dia") && tres.includes("a agenda") && tres.includes("a rotina") && tres.includes(" e "), tres);
 }
 
+/* ---- as fontes ficam guardadas com a conversa ----
+   a linha "vi a agenda" sumia ao recarregar e ao continuar no assistente,
+   porque o normalizeChat jogava o `sources` fora */
+{
+  const { normalizeChat } = await import("./assistant-actions.js");
+  const saved = normalizeChat({ id: "c1", messages: [
+    { from: "me", text: "o que tenho quinta?", sources: ["agenda"] },
+    { from: "merlin", text: "quinta às 10h, a call com a Ana", sources: ["agenda", "inventado", "dia"] },
+    { from: "merlin", text: "sem fonte" }
+  ] });
+  check("conversa: a resposta guarda as fontes da lista fechada, na ordem dela", JSON.stringify(saved.messages[1].sources) === '["dia","agenda"]', JSON.stringify(saved.messages[1]));
+  check("conversa: a fala da pessoa não ganha fontes", !("sources" in saved.messages[0]), JSON.stringify(saved.messages[0]));
+  check("conversa: resposta sem fonte continua sem o campo", !("sources" in saved.messages[2]), JSON.stringify(saved.messages[2]));
+  check("conversa: a linha volta depois de recarregar", sourcesLine(normalizeChat(saved).messages[1].sources) === "vi o dia e a agenda");
+}
+
 console.log("\n" + passed + " passaram, " + failures.length + " falharam");
 if (failures.length) { console.log("\nFALHAS:"); failures.forEach((f) => console.log("  - " + f)); process.exit(1); }
