@@ -24,20 +24,22 @@ import {
   newNote, askMerlin, readPrefs, savePrefs, prefsStore, formatMin, collection, api, listClients, foldKey,
   onboardingState, onboardingSettled
 } from "./shared/core.js";
-import { useState, useEffect, useLayoutEffect, useRef } from "react";
+import { Fragment, useState, useEffect, useLayoutEffect, useRef } from "react";
 import { mount, useCloud, useCollection, icon, Markdown, ProposalDialog } from "./shared/ui.jsx";
 import {
-  normalize as normalizeTask, dayDoc, overdue, topOrder, newTask, routeLine, readClock,
+  normalize as normalizeTask, dayDoc, topOrder, newTask, routeLine, readClock,
   needsReading, isReserve, stripPrefix, askIntent, dayTasks, collectInbox
 } from "./shared/tasks.js";
 import { normalize as normalizeBlock, copyRoutine } from "./shared/routine.js";
 import { MAX_TURNS, normalizeChat, chatTitle, turnsOf, markProposal } from "./shared/assistant-actions.js";
 import { normalize as normalizeFinance, configOf, contextOf as financeContext, newEntry, undoEntry, entryLine, captureContext } from "./shared/finance-data.js";
 import { BUILD, buildIntent } from "./shared/build-intent.js";
-import { normalize as normalizeHabit, isExpected } from "./shared/habits-data.js";
+import { normalize as normalizeHabit } from "./shared/habits-data.js";
 import { distribute, fmt, clock, costOf } from "./shared/day.js";
 import { Forest, phaseOf } from "./shared/forest.jsx";
-import { focusMinutes, meetingMinutes, githubDay } from "./shared/focus.js";
+import { githubDay } from "./shared/focus.js";
+import { usePortrait } from "./shared/use-portrait.js";
+import { sourcesLine } from "./shared/portrait.js";
 
 const door = isNewHere() && !seen("landing");
 initPage("home");
@@ -683,17 +685,6 @@ function Home() {
                 sessions={sessions} me={me} h={h} phase={phase} date={date} />;
 }
 
-/* o dia em poucas linhas, para a pergunta feita no início chegar ao Merlin
-   sabendo da fila, da sobra e dos hábitos que a tela não mostra mais */
-const briefOf = (x) => [
-  "Agora " + x.hour + " · janela " + x.window + " · " + x.slack,
-  "Fila aberta: " + (x.open.join("; ") || "nada"),
-  "Feitas hoje: " + (x.done.join("; ") || "nada"),
-  x.late ? "Abertas de dias anteriores: " + x.late : "",
-  "Hábitos de hoje: " + (x.habits.join("; ") || "nenhum"),
-  "Foco na semana: " + x.focusWeek + " · reunião na semana: " + x.meetingWeek
-].filter(Boolean).join("\n");
-
 /* o dia de quem já passou pelo onboarding. é um componente à parte porque o
    onboarding volta antes: os hooks daqui (a conversa) não podem aparecer de
    repente no meio do mesmo componente quando ele termina */
@@ -701,10 +692,10 @@ function Today({ c, tasks, habits, journal, closes, reviews, sessions, me, h, ph
   const [closing, setClosing] = useState(false);
   const [reviewing, setReviewing] = useState(null); // { id, kind }: a revisão aberta
   /* a mesma conta do calendário e do rastreador (shared/tasks.js, dayTasks):
-     é a sobra que vai junto da pergunta ao Merlin */
+     é a sobra que o campo usa para dizer se cabe; a que vai ao Merlin sai da
+     mesma função, no retrato (shared/portrait.js) */
   const doc = dayDoc(dayTasks(tasks.all()).count, date, readPrefs());
   const { b } = distribute(doc);
-  const late = overdue(tasks.all(), date).length;
   const name = cleanName(me.name || (c.email ? String(c.email).split("@")[0] : ""));
   /* o que o campo resolve sem o Merlin: o fechamento e a revisão do período
      corrente, a qualquer dia */
@@ -712,17 +703,6 @@ function Today({ c, tasks, habits, journal, closes, reviews, sessions, me, h, ph
     if (it.kind === "close") setClosing(true);
     else setReviewing(it.period === "week" ? { id: weekKey(date), kind: "week" } : { id: monthKey(date), kind: "month" });
   };
-  const dayContext = () => ({
-    hour: clock(h * 60 + new Date().getMinutes()),
-    window: clock(doc.start) + "–" + clock(doc.end),
-    slack: b.overtime ? "o dia já acabou" : b.slack >= 0 ? "cabem " + fmt(b.slack) : "passa " + fmt(b.overflow) + " do que cabe",
-    open: b.open.map((t) => t.title + " · " + fmt(costOf(t))),
-    done: doc.tasks.filter((t) => t.done && !t.reserved).map((t) => t.title),
-    late,
-    habits: habits.all().filter((x) => !x.archived && isExpected(x, date)).map((x) => x.name + (x.marks[date] ? " (feito)" : "")),
-    focusWeek: fmt(focusMinutes(sessions.all(), date)) + (me.focusGoal ? " de " + me.focusGoal + "h" : ""),
-    meetingWeek: fmt(meetingMinutes(tasks.all(), date)) + (me.meetingCap ? " (teto " + me.meetingCap + "h)" : "")
-  });
   const readContext = () => ({
     today: date + " (" + new Date().toLocaleDateString("pt-BR", { weekday: "long" }) + ")",
     hour: clock(h * 60 + new Date().getMinutes()),
@@ -734,6 +714,10 @@ function Today({ c, tasks, habits, journal, closes, reviews, sessions, me, h, ph
      conversa de verdade (a coleção `chats`, a mesma da tela do assistente):
      dá para continuar lá, e a próxima pergunta daqui segue o fio desta. */
   const chats = useCollection("chats", { normalize: normalizeChat });
+  /* a pergunta leva o retrato (shared/portrait.js): o dia, a agenda da
+     semana, a rotina. era só o dia de hoje, e "o que tenho quinta?" ficava
+     sem resposta */
+  const portrait = usePortrait();
   const [talk, setTalk] = useState([]);
   const [asking, setAsking] = useState(false);
   const [proposal, setProposal] = useState(null); // { p, at, chat }: a pílula aberta na caixa
@@ -757,11 +741,11 @@ function Today({ c, tasks, habits, journal, closes, reviews, sessions, me, h, ph
     try {
       const r = await api("/merlin", { method: "POST", body: JSON.stringify({
         task: "assistant",
-        context: { message: q, page: "home", pageContext: briefOf(dayContext()), history: turnsOf(talk) }
+        context: { message: q, page: "home", portrait: await portrait(), history: turnsOf(talk) }
       }) });
       const s = r.ok && (r.body.suggestions || [])[0];
       const said = r.ok ? r.body.clarify : (r.body && r.body.error) || "não consegui pensar nisso agora";
-      reply = [said && { from: "merlin", text: said }, s && { from: "merlin", proposal: s }].filter(Boolean);
+      reply = [said && { from: "merlin", text: said, sources: r.ok ? r.body.sources : [] }, s && { from: "merlin", proposal: s }].filter(Boolean);
       if (!reply.length) reply = [{ from: "merlin", text: "não entendi bem — pode dizer de outro jeito?" }];
     } catch (e) {
       reply = [{ from: "merlin", text: "não consegui falar com o Merlin" }];
@@ -790,7 +774,10 @@ function Today({ c, tasks, habits, journal, closes, reviews, sessions, me, h, ph
                       ? m.proposal.done
                         ? <p key={i} className="hm-talk__done t-mono">✓ {m.proposal.done.line}</p>
                         : <button key={i} type="button" className="pill pill--accent hm-talk__do" onClick={() => setProposal({ p: m.proposal, at: lastQ + 1 + i, chat: talkId.current })}>{icon("spark")}{m.proposal.title}</button>
-                      : <Markdown key={i} className="hm-talk__a" text={m.text} />)}
+                      : <Fragment key={i}>
+                          <Markdown className="hm-talk__a" text={m.text} />
+                          {sourcesLine(m.sources) && <p className="hm-talk__seen">{sourcesLine(m.sources)}</p>}
+                        </Fragment>)}
                 {!asking && (
                   <p className="hm-talk__foot">
                     <a href={"assistant.html#" + talkId.current}>continuar na conversa</a>

@@ -1001,6 +1001,12 @@ const ASSISTANT_ACTIONS = {
 };
 const ASSISTANT_ACTION_TYPES = Object.keys(ASSISTANT_ACTIONS).join(", ");
 
+/* o retrato vai em `context.portrait`, com teto próprio: o `pageContext`
+   continua com 1.200. as fontes são uma lista fechada, como o catálogo: o que
+   a IA citar fora dela não chega à tela. é a mesma lista do portrait.js */
+const PORTRAIT_MAX = 6000;
+const PORTRAIT_SOURCES = ["dia", "agenda", "rotina", "semana", "dinheiro", "clientes", "leads", "conteúdo", "hábitos", "notas", "produtos"];
+
 LIST_TASKS.assistant = (c) => ({
   instruction:
     "Você é o assistente do Merlin, acionado pela busca. A pessoa mandou uma mensagem livre; proponha NO MÁXIMO UMA ação que ajude — você nunca executa nada, só descreve uma proposta que a pessoa confirma ou descarta. " +
@@ -1015,17 +1021,24 @@ LIST_TASKS.assistant = (c) => ({
     "script {contentId (o id da peça de conteúdo do contexto — NUNCA invente um; sem id no contexto, não proponha este tipo), script (roteiro em markdown: # título e depois as seções \"## \" do molde do formato que vier no contexto da tela, na mesma ordem e sem as linhas de dica em itálico — sem molde no contexto, ## gancho, ## desenvolvimento, ## fechamento —, com bullets para falar, não texto corrido; gancho com número, contraste ou case, nunca pergunta nem saudação; virada antes do fim e CTA amarrado nela; NUNCA invente número, resultado ou case — o dado que faltar entra marcado com [conferir])}; " +
     "wishlist-item {list (id da coletânea do contexto, ou vazio), name, price (centavos, número, ou 0), bucket (um de asap, longterm, online, presencial, mercado, ou vazio), qty (ex. \"2x\", \"~1\", ou vazio)}; " +
     "finance-entry {name (o que foi, curto), amount (centavos, número inteiro; 0 se a pessoa não disse o valor — nunca estime), kind (out para gasto, in para entrada), day (AAAA-MM-DD; sem data, hoje), category (uma das categorias do contexto, ou vazio), paid (true se já aconteceu, false se é para depois), confirm (o id de um previsto do contexto quando a pessoa diz que pagou ou recebeu algo que já estava previsto — NUNCA invente; sem id no contexto, vazio), fixed (o id de um fixo do contexto quando é a conta fixa do mês — NUNCA invente; sem id no contexto, vazio)} — use quando a pessoa contar um gasto ou uma entrada (\"gastei 45 no almoço\", \"recebi 3 mil da Ana\"); fixo, parcela, dívida, investimento e transferência novos não entram por aqui. " +
-    "Se a mensagem for uma PERGUNTA (inclusive financeira — \"posso gastar X\", \"dá pra fazer Y\") em vez de um pedido de ação, devolva suggestions vazio e responda a pergunta direto em clarify, usando só o que está no contexto da tela (ex. saldo e fixos, quando a tela for o financeiro); se faltar dado pra responder com segurança, diga o que falta em vez de estimar. " +
+    "Há três jeitos de responder. REGISTRO (a pessoa conta algo para anotar ou pede para criar): proponha a ação. " +
+    "CONSULTA (uma PERGUNTA sobre a vida dela — o dia, a agenda, a rotina, a semana —, inclusive financeira, \"posso gastar X\", \"dá pra fazer Y\"): devolva suggestions vazio e responda em clarify só pelo retrato e pelo contexto da tela; quando o dado não estiver neles, diga \"não sei\" e o que falta (ex. \"o financeiro não veio no retrato: monte o financeiro\"), nunca estime nem invente. Seção do retrato que diz \"ainda carregando\" é dado que não chegou, e não \"nada\". " +
+    "CONSELHO (pede opinião, \"o que eu faço\", \"vale a pena\"): recomende citando o que viu no retrato (o horário, a sobra, a atrasada), em vez de conselho genérico. " +
+    "Em sources, liste de onde tirou a resposta, só dentre exatamente estes valores: " + PORTRAIT_SOURCES.join(", ") + " (dia é a seção hoje do retrato). Sem nada tirado do retrato, sources vazio. " +
     "Se a pessoa pedir para fechar o dia, revisar a semana ou revisar o mês, devolva suggestions vazio e diga em clarify, numa frase, que é só escrever \"fechar o dia\" no campo do início (ou \"revisar a semana\", \"revisar o mês\") — é o próprio início que abre o fechamento e a revisão, e não há ação para isso no catálogo. " +
     "Se a mensagem não corresponder a nenhuma ação nem a uma pergunta respondível, devolva suggestions vazio e clarify com UMA pergunta curta que ajudaria a decidir — nunca invente uma ação só para responder algo. " +
     "Quando houver turnos anteriores, leia-os antes de decidir: a mensagem nova costuma completar a anterior (\"o segundo\", \"muda pra terça\") em vez de começar um pedido do zero. " +
     "clarify tem até 1200 caracteres e a tela o lê como markdown simples: quando a resposta tiver partes (uma conta, uma lista de fixos, dois caminhos), use lista com \"- \", **negrito** no número que importa e \"## \" no título de cada parte. Uma frase só continua sendo uma frase só, sem enfeite. " +
     "title e note do topo (fora do payload) até 120 e 300 caracteres. " +
-    'Formato: {"suggestions":[{"actionType":"…","title":"…","note":"…","payload":{...}}],"clarify":"…"}',
+    'Formato: {"suggestions":[{"actionType":"…","title":"…","note":"…","payload":{...}}],"clarify":"…","sources":["…"]}',
   context:
     "Mensagem: " + String(c.message || "").slice(0, 1000) + "\n" +
     "Tela atual: " + String(c.page || "nenhuma").slice(0, 40) + "\n" +
     (c.pageContext ? "Contexto da tela: " + String(c.pageContext).slice(0, 1200) + "\n" : "") +
+    /* o retrato (src/shared/portrait.js): as áreas da pessoa, montadas no
+       navegador a cada pergunta. o advise() já o tirou se a tarefa não é esta
+       ou se o interruptor está ligado */
+    (c.portrait ? "Retrato (as áreas da pessoa, agora):\n" + String(c.portrait).slice(0, PORTRAIT_MAX) + "\n" : "") +
     /* o que ja foi dito nao entra aqui: `history` vira turno de verdade no
        buildMessages(), logo abaixo. colado neste texto, a conversa seria uma
        citacao dentro do pedido em vez da conversa. */
@@ -1409,6 +1422,12 @@ async function advise(req, env, person) {
   const name = String((body && body.task) || "");
   const task = body && (LIST_TASKS[name] || TEXT_TASKS[name] || BLUEPRINT_TASKS[name] || CAPTURE_TASKS[name] || BUILD_TASKS[name]);
   if (!task || !body.context || typeof body.context !== "object") return fail("tarefa inválida");
+  /* o retrato só vale para a pergunta ao assistente (PRD da secretária, D8),
+     e o segredo MERLIN_PORTRAIT_OFF o desliga para todos, sem build (D9) */
+  if (name !== "assistant" || env.MERLIN_PORTRAIT_OFF) delete body.context.portrait;
+  /* o tamanho do retrato que vai de fato (o já cortado) entra na linha da
+     medição, no wrangler tail */
+  const portraitChars = body.context.portrait ? Math.min(String(body.context.portrait).length, PORTRAIT_MAX) : 0;
   const isText = !!TEXT_TASKS[name];
   const isCapture = !!CAPTURE_TASKS[name];
   const isBuild = !!BUILD_TASKS[name];
@@ -1466,7 +1485,7 @@ async function advise(req, env, person) {
   const data = extractJson(text);
   /* a Anthropic respondeu, e respondeu cobrando: conta mesmo a recusa e o
      formato torto */
-  await recordUsage(env, person, usageTasks(name, step, data), answer.usage);
+  await recordUsage(env, person, usageTasks(name, step, data), answer.usage, portraitChars);
   if (answer.stop_reason === "refusal") return fail("o Merlin preferiu não responder a isso", 422);
   if (BLUEPRINT_TASKS[name]) {
     if (!data || typeof data !== "object") return fail("o Merlin respondeu fora do formato", 502);
@@ -1511,7 +1530,8 @@ async function advise(req, env, person) {
     }
     /* 1200 e nao 400 desde 22/09/2026: a resposta virou markdown na tela do
        assistente, e uma conta com duas ou tres linhas nao cabia em 400 */
-    return json({ suggestions, clarify: String(data.clarify || "").slice(0, 1200) });
+    const sources = Array.isArray(data.sources) ? PORTRAIT_SOURCES.filter((x) => data.sources.includes(x)) : [];
+    return json({ suggestions, clarify: String(data.clarify || "").slice(0, 1200), sources });
   }
   if (!data || !Array.isArray(data.suggestions)) return fail("o Merlin respondeu fora do formato", 502);
   return json({

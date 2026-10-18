@@ -42,6 +42,9 @@ html.onboarding .page--chat{padding-bottom:0}
   font-size:13.5px;line-height:1.55;max-width:76%;
 }
 .chat__msg.is-me{justify-content:flex-end}
+/* "vi a agenda e o dia": de onde a resposta saiu, numa linha discreta embaixo da bolha */
+.chat__msg:has(> .chat__seen){flex-direction:column;align-items:flex-start;gap:4px}
+.chat__msg > p.chat__seen{padding:0 4px;background:none;border:0;font-family:var(--mono);font-size:11px;color:var(--ink-30)}
 .chat__msg.is-me > p{background:var(--accent);border-color:var(--accent);color:var(--on-accent);white-space:pre-line}
 
 /* o markdown do Merlin: lista, titulo, negrito e codigo do jeito que ele
