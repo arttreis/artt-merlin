@@ -72,7 +72,7 @@ const block = (o) => {
 };
 const ANA = { id: "c-ana", name: "Ana", email: "ana@segredo.example", whatsapp: "5511999998888", status: "active" };
 
-const build = (o) => ({ tasks: [], routine: [], sessions: [], apps: [], closes: [], clients: [], profile: null, prefs: PREFS, loading: [], ...o });
+const build = (o) => ({ tasks: [], routine: [], sessions: [], apps: [], closes: [], clients: [], content: [], cadence: [], profile: null, prefs: PREFS, loading: [], ...o });
 const run = (o, now) => portraitOf(build(o), now || NOW);
 const sec = (p, id) => p.sections.find((s) => s.id === id);
 const lines = (p, id) => sec(p, id).text.split("\n");
@@ -632,6 +632,225 @@ const bl = (id, due, text, o) => ({ id, text, due, done: false, ...o });
   check("conversa: a fala da pessoa não ganha fontes", !("sources" in saved.messages[0]), JSON.stringify(saved.messages[0]));
   check("conversa: resposta sem fonte continua sem o campo", !("sources" in saved.messages[2]), JSON.stringify(saved.messages[2]));
   check("conversa: a linha volta depois de recarregar", sourcesLine(normalizeChat(saved).messages[1].sources) === "vi o dia e a agenda");
+}
+
+/* ---- conteúdo (ticket 13) ----
+   a seção do conteúdo: o que falta no ritmo, as atrasadas e os próximos 7
+   dias. o roteiro nunca entra. cada bloco roda dentro de `attempt`: se algo
+   ainda não existe, falha só aquele bloco (com o motivo), e o resto roda. */
+{
+  const { DEFAULT_RULE } = await import("./content-script.js");
+  const attempt = (name, fn) => { try { fn(); } catch (e) { failures.push(name + " -> lançou: " + e.message); } };
+
+  const WD = ["dom", "seg", "ter", "qua", "qui", "sex", "sáb"];
+  const lab = (day) => { const [y, m, d] = day.split("-").map(Number); return WD[new Date(y, m - 1, d).getDay()] + " " + String(d).padStart(2, "0") + "/" + String(m).padStart(2, "0"); };
+  /* o dia daqui a i dias, a partir de hoje (segunda, 19/10/2026) */
+  const dayAt = (i) => { const d = new Date(2026, 9, 19 + i); return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0"); };
+  let k = 0;
+  const pc = (o) => { k++; return { id: "pc" + k, title: "peça " + k, date: "", stage: "idea", format: "reels", client: "", script: "", createdAt: k, ...o }; };
+  const ME_DOC = { id: "me", rules: [DEFAULT_RULE] };
+  const cSec = (p) => sec(p, "content");
+  const cLines = (p) => cSec(p).text.split("\n");
+  const CONTENT = () => SECTIONS.find((s) => s.id === "content");
+
+  attempt("contrato da seção", () => {
+    const s = CONTENT();
+    check("conteúdo: a seção existe em SECTIONS", !!s);
+    check("conteúdo: rótulo 'conteúdo' e orçamento 300", !!s && s.label === "conteúdo" && s.budget === 300, JSON.stringify(s && { label: s.label, budget: s.budget }));
+    check("conteúdo: depende de conteúdo, ritmo e clientes", !!s && JSON.stringify([...s.needs].sort()) === JSON.stringify(["cadence", "clients", "content"]), JSON.stringify(s && s.needs));
+    check("conteúdo: vem depois dos produtos", SECTIONS.findIndex((x) => x.id === "content") > SECTIONS.findIndex((x) => x.id === "products"));
+    check("conteúdo: 'conteúdo' é uma fonte da lista fechada", SOURCES.includes("conteúdo"));
+  });
+
+  /* ---- a seção: faltas, atrasadas e os próximos 7 dias, nessa ordem ---- */
+  attempt("a seção", () => {
+    const cadence = [ME_DOC, { id: ANA.id, rules: [{ n: 2, per: "week", format: "reels" }] }];
+    const content = [
+      pc({ title: "Reels velho Ka", date: "2026-10-17", stage: "edit" }),
+      pc({ title: "Carrossel da quinta Lb", date: THU, stage: "script", format: "carousel" }),
+      pc({ title: "Reels da Ana Mc", date: "2026-10-24", stage: "idea", format: "reels", client: ANA.id })
+    ];
+    const data = build({ clients: [ANA], content, cadence });
+    const before = JSON.stringify(data);
+    const p = portraitOf(data, NOW);
+    check("conteúdo: o retrato não altera as peças nem o ritmo", JSON.stringify(data) === before);
+    check("conteúdo: a seção está no retrato, sem carregar", !!cSec(p) && cSec(p).loading === false && cSec(p).label === "conteúdo", JSON.stringify(cSec(p)));
+    check("conteúdo: o texto abre com o rótulo da seção", p.text.includes("conteúdo:\n" + cSec(p).text));
+    const l = cLines(p);
+    const gapMe = l.indexOf("seu conteúdo: hoje ainda sem peça · faltam 6 dias nesta semana");
+    const gapAna = l.indexOf("Ana: falta 1 reels nesta semana");
+    const late = l.findIndex((x) => x.startsWith("atrasadas: "));
+    const thu = l.indexOf("qui 22/10 Carrossel da quinta Lb · roteiro · carrossel");
+    const sat = l.indexOf("sáb 24/10 Reels da Ana Mc · ideia · Reels");
+    check("conteúdo: a falta do próprio ('seu conteúdo: ...')", gapMe >= 0, JSON.stringify(l));
+    check("conteúdo: a falta do cliente ('Ana: ...')", gapAna >= 0, JSON.stringify(l));
+    check("conteúdo: as atrasadas com a conta, o título e a data", l[late] === "atrasadas: 1 · Reels velho Ka (17/10)", String(l[late]));
+    check("conteúdo: a peça de quinta com dia, título, etapa e formato", thu >= 0, JSON.stringify(l));
+    check("conteúdo: a peça do cliente também entra nos próximos 7", sat >= 0, JSON.stringify(l));
+    check("conteúdo: a ordem é faltas, atrasadas, próximos 7", gapMe < gapAna && gapAna < late && late < thu && thu < sat, [gapMe, gapAna, late, thu, sat].join());
+    check("conteúdo: com falta e peças, não diz 'semana coberta' nem 'sem conteúdo'", !/semana coberta|sem conteúdo ainda|nada marcado/.test(cSec(p).text));
+    check("conteúdo: cabe no orçamento", cSec(p).text.length <= CONTENT().budget, String(cSec(p).text.length));
+    check("conteúdo: a peça de ontem publicada não é atrasada", !cSec(run({ content: [pc({ title: "Publicada Qa", date: "2026-10-18", stage: "published" })], cadence }, NOW)).text.includes("atrasadas"));
+  });
+
+  /* ---- sem ritmo e sem peça, e as variações do vazio ---- */
+  attempt("o vazio", () => {
+    const none = run({});
+    check("conteúdo: sem ritmo e sem peça diz 'sem conteúdo ainda'", cSec(none).text === "sem conteúdo ainda" && cSec(none).loading === false, cSec(none).text);
+
+    const quiet = run({ content: [
+      pc({ title: "Publicada Qb", date: "2026-10-20", stage: "published" }),
+      pc({ title: "Sem data Qc" }),
+      pc({ title: "Daqui a 40 dias Qd", date: "2026-11-28" })
+    ] });
+    check("conteúdo: há peças e nenhuma relevante diz 'nada marcado nos próximos 7 dias'", cSec(quiet).text === "nada marcado nos próximos 7 dias", cSec(quiet).text);
+    check("conteúdo: peça de daqui a 8 dias ainda não é dos próximos 7", cSec(run({ content: [pc({ title: "Daqui a 8 Qe", date: dayAt(8) })] })).text === "nada marcado nos próximos 7 dias");
+
+    /* um ritmo semanal já cumprido por uma peça publicada: coberto e nada a mostrar */
+    const covered = run({ content: [pc({ date: "2026-10-20", stage: "published", title: "Publicada Qf" })], cadence: [{ id: "me", rules: [{ n: 1, per: "week", format: "" }] }] });
+    check("conteúdo: ritmo cumprido e nada relevante diz 'semana coberta'", cLines(covered)[0] === "semana coberta", cSec(covered).text);
+    check("conteúdo: 'semana coberta' não convive com 'sem conteúdo ainda'", !cSec(covered).text.includes("sem conteúdo ainda"), cSec(covered).text);
+
+    /* a semana inteira coberta por peças de verdade: a linha vem antes das peças */
+    const week = [0, 1, 2, 3, 4, 5, 6].map((i) => pc({ title: "P" + i, date: dayAt(i) }));
+    const full = run({ content: week, cadence: [ME_DOC] });
+    const l = cLines(full);
+    check("conteúdo: semana coberta com peças: a linha vem primeiro", l[0] === "semana coberta", JSON.stringify(l));
+    check("conteúdo: e depois uma linha por peça dos próximos 7 dias", l.slice(1).filter((x) => /^(seg|ter|qua|qui|sex|sáb|dom) \d\d\/\d\d P\d · ideia · Reels$/.test(x)).length === 7, JSON.stringify(l));
+    check("conteúdo: semana coberta não tem linha de falta", !l.some((x) => /^seu conteúdo:/.test(x)));
+
+    /* ritmo zerado e nenhuma peça: não há ritmo, então é 'sem conteúdo ainda' */
+    check("conteúdo: ritmo zerado sem peça diz 'sem conteúdo ainda'", cSec(run({ cadence: [{ id: "me", rules: [] }] })).text === "sem conteúdo ainda");
+    /* o próprio sem documento não cobra nada, mesmo com peça solta no futuro */
+    check("conteúdo: sem documento de ritmo não há linha de falta", !/seu conteúdo:/.test(cSec(run({ content: [pc({ title: "Solta Qg", date: THU })] })).text));
+
+    /* só a falta, sem peça nenhuma */
+    const gapOnly = run({ cadence: [ME_DOC] });
+    check("conteúdo: só a falta, sem peças: a linha da falta e nada de 'sem conteúdo ainda'", cLines(gapOnly)[0] === "seu conteúdo: hoje ainda sem peça · faltam 7 dias nesta semana" && !cSec(gapOnly).text.includes("sem conteúdo ainda"), cSec(gapOnly).text);
+  });
+
+  /* ---- nunca entra: roteiro, e de cliente só o nome ---- */
+  attempt("nunca entra", () => {
+    const script = "# roteiro\n## gancho\n- ROTEIRO-SECRETO-XYZ\n## cta\n- LINHA-DO-ROTEIRO-XYZ";
+    const client = { ...ANA, note: "NOTA-INTERNA-DO-CLIENTE-XYZ", vault: [{ secret: "SENHA-DO-COFRE-XYZ" }] };
+    const content = [
+      pc({ title: "Atrasada Ra", date: "2026-10-16", stage: "script", script }),
+      pc({ title: "Semana Rb", date: THU, stage: "record", script }),
+      pc({ title: "Cliente Rc", date: "2026-10-23", client: client.id, script }),
+      pc({ title: "Sem data Rd", script })
+    ];
+    const cadence = [ME_DOC, { id: client.id, rules: [{ n: 1, per: "day" }] }, { id: "c-sumiu-77", rules: [{ n: 1, per: "week" }] }];
+    const p = run({ clients: [client], content, cadence });
+    check("nunca entra: o conteúdo veio", cSec(p).text.includes("Semana Rb") && cSec(p).text.includes("Atrasada Ra"), cSec(p).text);
+    for (const s of ["ROTEIRO-SECRETO-XYZ", "LINHA-DO-ROTEIRO-XYZ", "## gancho", "## cta", "NOTA-INTERNA-DO-CLIENTE-XYZ", "SENHA-DO-COFRE-XYZ", "ana@segredo.example", "5511999998888"]) {
+      check("nunca entra: " + s, !p.text.includes(s), p.text);
+    }
+    check("nunca entra: o id do cliente não vaza, só o nome", !p.text.includes("c-ana") && cSec(p).text.includes("Ana:"), cSec(p).text);
+    check("nunca entra: cliente sem cadastro (ritmo sobrando) não vira id no texto", !p.text.includes("c-sumiu-77"), cSec(p).text);
+    check("nunca entra: a peça sem data não é linha de nada", !cSec(p).text.includes("Sem data Rd"));
+  });
+
+  /* ---- corte por seção: 30 peças nos próximos 7 dias ---- */
+  attempt("corte por seção", () => {
+    const budget = CONTENT().budget;
+    const title = (i) => "Peça " + String(i).padStart(2, "0") + " com um título comprido para encher a seção " + "y".repeat(12);
+    const content = Array.from({ length: 30 }, (_, i) => pc({ title: title(i + 1), date: dayAt(i % 8) }));
+    const expected = new Set(content.map((c) => lab(c.date) + " " + c.title + " · ideia · Reels"));
+    const p = run({ content });
+    const l = cLines(p);
+    check("corte conteúdo: o corpo não passa do orçamento", cSec(p).text.length <= budget, cSec(p).text.length + " > " + budget);
+    check("corte conteúdo: termina em 'e mais N'", /^e mais \d+$/.test(l.at(-1)), l.at(-1));
+    const shown = l.slice(0, -1);
+    check("corte conteúdo: nenhum título sai cortado no meio", shown.length > 0 && shown.every((x) => expected.has(x)), shown.find((x) => !expected.has(x)));
+    const more = +(l.at(-1).match(/\d+/) || [0])[0];
+    check("corte conteúdo: o N é o que ficou de fora", shown.length + more === 30, shown.length + " + " + more);
+    check("corte conteúdo: cortou mesmo (o teste não é trivial)", more > 0);
+
+    /* as atrasadas: a conta é inteira, os títulos são poucos e inteiros */
+    const olds = Array.from({ length: 6 }, (_, i) => pc({ title: "Velha número " + (i + 1) + " Zq", date: "2026-10-" + String(10 + i), stage: "edit" }));
+    const q = run({ content: olds });
+    const lateLine = cLines(q).find((x) => x.startsWith("atrasadas: "));
+    const named = olds.filter((c) => (lateLine || "").includes(c.title));
+    check("corte conteúdo: atrasadas traz a conta inteira", !!lateLine && lateLine.startsWith("atrasadas: 6 · "), String(lateLine));
+    check("corte conteúdo: atrasadas mostra de 1 a 3 títulos", named.length >= 1 && named.length <= 3, String(named.length));
+    check("corte conteúdo: as atrasadas não passam do orçamento", cSec(q).text.length <= budget, String(cSec(q).text.length));
+  });
+
+  /* ---- ainda carregando ---- */
+  attempt("carregando: contrato direto", () => {
+    const c = run({ loading: ["content"] });
+    check("carregando: conteúdo diz 'ainda carregando'", cSec(c).text === "ainda carregando" && cSec(c).loading === true, cSec(c).text);
+    check("carregando: não diz 'sem conteúdo ainda' onde não sabe", !/sem conteúdo ainda|nada marcado|semana coberta/.test(c.text), c.text);
+    const r = run({ loading: ["cadence"] });
+    check("carregando: o ritmo que não desceu também carrega a seção", cSec(r).text === "ainda carregando" && cSec(r).loading === true, cSec(r).text);
+    const cl = run({ loading: ["clients"] });
+    check("carregando: sem os clientes não dá para nomear as faltas", cSec(cl).loading === true && cSec(cl).text === "ainda carregando");
+    const t = run({ loading: ["tasks"] });
+    check("carregando: as tarefas não seguram o conteúdo", cSec(t).loading === false && cSec(t).text === "sem conteúdo ainda", cSec(t).text);
+    check("carregando: o conteúdo carregando não segura a agenda", sec(c, "agenda").loading === false);
+  });
+  attempt("carregando: pelas coleções", () => {
+    core.cloud.signedIn = true;
+    try {
+      const cols = { tasks: core.collection("tasks"), content: core.collection("content"), cadence: core.collection("cadence"), clients: core.collection("clients") };
+      check("carregando: a coleção de conteúdo de verdade ainda não desceu", cols.content.hasDownloaded() === false);
+      const data = portraitData(cols, { signedIn: true, prefs: PREFS });
+      check("carregando: com sessão, loading lista conteúdo e ritmo", data.loading.includes("content") && data.loading.includes("cadence"), JSON.stringify(data.loading));
+      const p = portraitOf(data, NOW);
+      check("carregando: a seção diz 'ainda carregando', e não 'sem conteúdo ainda'", cSec(p).text === "ainda carregando" && cSec(p).loading === true, cSec(p).text);
+      const q = portraitOf(portraitData(cols, { signedIn: false, prefs: PREFS }), NOW);
+      check("carregando: sem sessão, a seção vazia diz 'sem conteúdo ainda'", cSec(q).text === "sem conteúdo ainda" && cSec(q).loading === false, cSec(q).text);
+    } finally { core.cloud.signedIn = false; }
+  });
+
+  /* ---- portraitData: o que sai das coleções do conteúdo ---- */
+  attempt("portraitData", () => {
+    const col = (items, down) => ({ all: () => items, get: () => null, hasDownloaded: () => down });
+    const items = [pc({ title: "Da coleção Cz", date: THU, stage: "scheduled" })];
+    const docs = [{ id: "me", rules: [{ n: 1, per: "week", format: "" }] }];
+    const cols = { tasks: col([], true), content: col(items, true), cadence: col(docs, false), clients: col([ANA], true) };
+    const d = portraitData(cols, { signedIn: true, prefs: PREFS });
+    check("dados: content vem de all()", Array.isArray(d.content) && d.content.length === 1 && d.content[0].title === "Da coleção Cz", JSON.stringify(d.content));
+    check("dados: cadence vem de all()", Array.isArray(d.cadence) && d.cadence.length === 1 && d.cadence[0].id === "me", JSON.stringify(d.cadence));
+    check("dados: loading só tem o que não desceu", d.loading.length === 1 && d.loading[0] === "cadence", JSON.stringify(d.loading));
+    const off = portraitData(cols, { signedIn: false, prefs: PREFS });
+    check("dados: sem sessão, nada carrega e a seção usa as peças", off.loading.length === 0 && /qui 22\/10 Da coleção Cz · agendado · Reels/.test(cSec(portraitOf(off, NOW)).text), cSec(portraitOf(off, NOW)).text);
+    const none = portraitData({ tasks: col([], true) }, { signedIn: true, prefs: PREFS });
+    check("dados: a tela que não abriu as coleções do conteúdo recebe listas vazias", Array.isArray(none.content) && none.content.length === 0 && Array.isArray(none.cadence) && none.cadence.length === 0, JSON.stringify([none.content, none.cadence]));
+  });
+
+  /* ---- corte total com o conteúdo cheio ----
+     um cenário à parte do "corte total" lá de cima (que não mexi, para o merge
+     com os outros tickets ser fácil): as seções antigas cheias E o conteúdo cheio */
+  attempt("corte total com conteúdo", () => {
+    const long = (s, i) => s + " " + String(i).padStart(2, "0") + " " + "palavra ".repeat(25).trim();
+    const tasks = [
+      ...Array.from({ length: 60 }, (_, i) => task({ title: long("Aberta de hoje", i), min: 5 })),
+      ...Array.from({ length: 60 }, (_, i) => task({ title: long("Atrasada", i), date: "2026-10-" + String(1 + (i % 17)).padStart(2, "0") })),
+      ...Array.from({ length: 40 }, (_, i) => task({ title: long("Quinta", i), date: THU, at: hm(6) + i * 10, min: 30 }))
+    ];
+    const routine = Array.from({ length: 30 }, (_, i) => block({ title: long("Bloco", i), at: hm(6, i * 5) }));
+    const apps = Array.from({ length: 12 }, (_, i) => ({ id: "a" + i, name: "Produto " + i + " " + "n".repeat(280) }));
+    const content = [
+      ...Array.from({ length: 40 }, (_, i) => pc({ title: long("Peça da semana", i), date: dayAt(i % 8), stage: "record", format: "carousel" })),
+      ...Array.from({ length: 20 }, (_, i) => pc({ title: long("Peça atrasada", i), date: "2026-10-" + String(1 + (i % 17)).padStart(2, "0"), stage: "edit" }))
+    ];
+    const cadence = [ME_DOC, { id: ANA.id, rules: [{ n: 3, per: "week", format: "reels" }] }];
+    const p = run({ tasks, routine, apps, content, cadence, clients: [ANA], profile: { focusGoal: 25, meetingCap: 6 } });
+    check("corte total + conteúdo: no máximo 6.000 caracteres", p.text.length <= PORTRAIT_MAX, String(p.text.length));
+    check("corte total + conteúdo: a seção do conteúdo está no retrato", !!cSec(p), p.sections.map((s) => s.id).join());
+    check("corte total + conteúdo: cada seção dentro do orçamento", SECTIONS.every((s) => !sec(p, s.id) || sec(p, s.id).text.length <= s.budget), p.sections.map((s) => s.id + ":" + s.text.length).join(" "));
+    check("corte total + conteúdo: o retrato ainda abre pelo dia", p.text.startsWith(SECTIONS[0].label + ":\nagora 14:20"), p.text.slice(0, 80));
+    const l = cLines(p);
+    check("corte total + conteúdo: a seção cheia diz quanto ficou de fora", /^e mais \d+$/.test(l.at(-1)), l.at(-1));
+    const day7 = /^(dom|seg|ter|qua|qui|sex|sáb) \d\d\/\d\d Peça da semana \d\d (palavra ?){25} · gravar · carrossel$/;
+    /* a linha de atrasadas: ou só a conta (os títulos não couberam), ou a conta e títulos inteiros */
+    const lateOk = (x) => /^atrasadas: \d+$/.test(x) || (/^atrasadas: \d+ · /.test(x) && x.replace(/^atrasadas: \d+ · /, "").split("; ").every((t) => /^Peça atrasada \d\d (palavra ?){25} \(\d\d\/\d\d\)$/.test(t)));
+    const ok = (x) => /^(seu conteúdo: |Ana: |e mais \d+$)/.test(x) || (x.startsWith("atrasadas: ") && lateOk(x)) || day7.test(x);
+    check("corte total + conteúdo: nenhuma linha do conteúdo sai pela metade", l.every(ok), l.find((x) => !ok(x)));
+    check("corte total + conteúdo: a linha de atrasadas diz a conta inteira", (l.find((x) => x.startsWith("atrasadas: ")) || "atrasadas: 20").startsWith("atrasadas: 20"), l.find((x) => x.startsWith("atrasadas: ")));
+    check("corte total + conteúdo: as outras seções seguem como antes", /e mais \d+$/.test(sec(p, "today").text) && /e mais \d+$/.test(sec(p, "agenda").text));
+  });
 }
 
 console.log("\n" + passed + " passaram, " + failures.length + " falharam");

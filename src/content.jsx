@@ -23,7 +23,7 @@ import {
 import { TaskDialog } from "./shared/task-form.jsx";
 import {
   FORMATS, FORMAT_IDS, formatLabel, moldFor, isUntouchedMold, setHook, upsertSection, scriptLines,
-  contentContext, clientContext, normalizeCadence, rulesOf, cadenceGaps, assignDays, gapParts, ME, ALL_DAYS
+  contentContext, clientContext, normalizeCadence, rulesOf, cadenceGaps, assignDays, gapParts, lateOf as lateAt, ME, ALL_DAYS
 } from "./shared/content-script.js";
 
 initPage("content");
@@ -66,7 +66,7 @@ function normalize(d) {
 /* a tarefa que cada etapa pede, quando pede */
 const TASK_VERB = { idea: "roteirizar", script: "gravar", record: "gravar", edit: "editar", scheduled: "publicar", published: "revisar" };
 
-const lateOf = (c) => c.date && c.date < today() && c.stage !== "published";
+const lateOf = (c) => lateAt(c, today());
 const clientDoc = (id) => (id ? clients().get(id) || null : null);
 
 /* ---------- o Merlin ----------

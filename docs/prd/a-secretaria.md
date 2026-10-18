@@ -130,6 +130,8 @@ precisam distribuí-lo.
   no `advise()`, mais uma linha por pedido no `wrangler tail`. Sem rota de leitura.
 - **D13. Conteúdo entra no retrato.** A vitrine sai, mas no projeto 2. A sessão de foco fica com
   a lista.
+  - A seção do conteúdo tem 300 caracteres. A falta do ritmo só aparece para quem gravou um
+    ritmo (o `me` sem ritmo gravado não é cobrado, ao contrário da tela). O roteiro nunca entra.
 
 ## Fora de escopo
 

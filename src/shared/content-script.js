@@ -292,3 +292,52 @@ export function gapParts(g) {
   }
   return [[{ text: g.missing === 1 ? "falta " : "faltam " }, { strong: g.missing + " " + fmtWord(g.format, g.missing) }, { text: " nesta semana" }]];
 }
+
+/* ---------- o conteúdo no retrato ----------
+   o que o Merlin precisa saber do conteúdo sem a tela aberta: o que falta do
+   ritmo, o que ficou para trás e o que vai ao ar nos próximos 7 dias. entra
+   título, etapa e formato; o roteiro nunca sai daqui. */
+
+/* a peça com a data passada e ainda não publicada. a tela e o retrato contam
+   igual: hoje ainda não é atraso */
+export const lateOf = (c, today) => c.date && c.date < today && c.stage !== "published";
+
+const plain = (parts) => parts.map((x) => (x.strong != null ? x.strong : x.text)).join("");
+const brief = (p) => ({
+  id: String(p.id || ""),
+  title: String(p.title || ""),
+  date: String(p.date || ""),
+  stage: STAGE_LABELS[p.stage] || String(p.stage || ""),
+  format: formatLabel(p.format || "other"),
+  client: String(p.client || "")
+});
+
+/* a falta do ritmo só entra para quem gravou um ritmo (`cadenceDocs`, a lista
+   de documentos): quem nunca mexeu nele não ganha cobrança no retrato, mesmo
+   que a tela mostre o padrão. `nameOf` dá o nome do cliente; sem nome (o
+   cliente já não existe), o dono fica de fora, como na tela. */
+export function contentToday(pieces, cadenceDocs, today, nameOf = (id) => id) {
+  const all = (Array.isArray(pieces) ? pieces : []).filter((p) => p && typeof p === "object");
+  const docs = (Array.isArray(cadenceDocs) ? cadenceDocs : []).filter((d) => d && d.id != null)
+    .sort((a, b) => (b.id === ME) - (a.id === ME));
+  const gaps = [];
+  let rhythm = false;
+  for (const d of docs) {
+    const who = d.id === ME ? "seu conteúdo" : nameOf(String(d.id));
+    if (!who) continue;
+    const s = cadenceGaps(String(d.id), d, all, today);
+    if (!s.active) continue;
+    rhythm = true;
+    const text = s.gaps.flatMap((g) => gapParts(g).map(plain)).join(" · ");
+    if (text) gaps.push({ owner: String(d.id), who, text });
+  }
+  const byDate = (a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0);
+  const end = new Date(toDate(today)); end.setDate(end.getDate() + 7);
+  const last = dayStr(end);
+  return {
+    gaps,
+    rhythm,
+    late: all.filter((p) => lateOf(p, today)).sort(byDate).map(brief),
+    next7: all.filter((p) => p.date && p.date >= today && p.date <= last && p.stage !== "published").sort(byDate).map(brief)
+  };
+}

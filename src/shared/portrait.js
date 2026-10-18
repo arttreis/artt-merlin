@@ -25,6 +25,7 @@ import { dayDoc, dayTasks, overdue, inRange } from "./tasks.js";
 import { budget as budgetOf, doneOf, reservesOf, fmt, clock } from "./day.js";
 import { focusMinutes, meetingMinutes } from "./focus.js";
 import { pipelineToday } from "./client-doc.js";
+import { contentToday } from "./content-script.js";
 
 export const PORTRAIT_MAX = 6000;
 const BACK = 30;
@@ -184,8 +185,7 @@ export const SECTIONS = [
     }
   },
   {
-    id: "clients", label: "clientes", budget: 230, needs: ["clients"],
-    build({ clients }, now) {
+    id: "clients", label: "clientes", budget: 230, needs: ["clients"],    build({ clients }, now) {
       const day = dayOf(now);
       const p = pipelineToday(clients, day, now.getTime());
       /* o vencido de antes da janela de 30 dias não entra, como nas tarefas */
@@ -197,6 +197,31 @@ export const SECTIONS = [
           ": " + nameOf(b.client) + " · " + nameOf(b.text))
       ];
       return lines.length ? lines : ["nada pendente nos clientes"];
+    }
+  },
+  {
+    /* o roteiro nunca entra: da peça, só o título, o dia, a etapa e o formato.
+       a falta do ritmo só aparece para quem gravou um ritmo (contentToday) */
+    id: "content", label: "conteúdo", budget: 300, needs: ["content", "cadence", "clients"],
+    build({ content, cadence, clients }, now) {
+      const day = dayOf(now);
+      const named = (id) => { const c = clients.find((x) => x && x.id === id); return c ? String(c.name || "") : ""; };
+      const c = contentToday(content, cadence, day, named);
+      const lines = c.gaps.map((g) => g.who + ": " + g.text);
+      if (c.rhythm && !c.gaps.length) lines.push("semana coberta");
+      if (c.late.length) {
+        /* os títulos entram inteiros e só até a linha encher: o resto vira o número */
+        let titles = "";
+        for (const p of c.late.slice(0, 3)) {
+          const next = (titles ? titles + "; " : "") + p.title + " (" + shortDate(p.date) + ")";
+          if (next.length > 120) break;
+          titles = next;
+        }
+        lines.push("atrasadas: " + c.late.length + (titles ? " · " + titles : ""));
+      }
+      c.next7.forEach((p) => lines.push(dayLabel(p.date) + " " + p.title + " · " + p.stage + " · " + p.format));
+      if (!lines.length) return [content.length ? "nada marcado nos próximos 7 dias" : "sem conteúdo ainda"];
+      return lines;
     }
   }
 ];
@@ -218,7 +243,7 @@ export function fit(items, budget, hidden = 0) {
   return text;
 }
 
-const EMPTY = { tasks: [], routine: [], sessions: [], apps: [], closes: [], clients: [], profile: null, loading: [] };
+const EMPTY = { tasks: [], routine: [], sessions: [], apps: [], closes: [], clients: [], content: [], cadence: [], profile: null, loading: [] };
 const DEFAULT_WINDOW = { dayStart: 540, dayEnd: 1140 };
 
 export function portraitOf(data, now = new Date()) {
@@ -261,6 +286,8 @@ export function portraitData(cols, { signedIn, prefs } = {}) {
     apps: list(cols.apps),
     closes: list(cols.closes),
     clients: list(cols.clients),
+    content: list(cols.content),
+    cadence: list(cols.cadence),
     profile: cols.profile ? cols.profile.get("me") : null,
     prefs,
     loading: signedIn ? Object.keys(cols).filter((k) => cols[k] && !cols[k].hasDownloaded()) : []
