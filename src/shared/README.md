@@ -31,6 +31,9 @@ Vite; o build sai em `server/site/`. O que é comum vive aqui:
   `prospect`, com etapa) e clientes (`active`, `paused`, `closed`); `lost` é quem saiu do funil.
   A forma mora aqui porque dois normalizadores na mesma coleção apagariam os campos um do outro.
   `syncNext(c)` põe o próximo passo com data no calendário (uma tarefa por pessoa, origem `next`).
+  `isStale` e `pipelineToday(clients, today, now)` fazem as contas de "faz tempo" (leads parados
+  há 7 dias ou mais, contato atrasado, sem próximo passo, cliente sem registro há 14 dias, backlog
+  com prazo): a lista de clientes e o retrato do Merlin leem a mesma conta.
 - `task-form.jsx` — **virar tarefa**: `TaskDialog` (dia, duração, cliente, origem) e `createTask`,
   usados por notas, clientes, prospecção e conteúdo. Sem data não existe tarefa.
 - `templates.js` — os **modelos**: o vocabulário de canal (tipos, rótulos e o checklist de

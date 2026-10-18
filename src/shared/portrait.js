@@ -12,7 +12,8 @@
  * o texto todo não passa de PORTRAIT_MAX, que é o mesmo teto do Worker.
  *
  * o que NUNCA entra: contatos, cofre, arquivos, contratos, diário do cliente,
- * corpo das notas, roteiros, dívidas e investimentos. do cliente, só o nome.
+ * corpo das notas, roteiros, dívidas e investimentos. do cliente, só o nome
+ * (e do lead, a etapa, os dias e o próximo passo).
  *
  * a lista SECTIONS é o ponto de composição: uma seção nova (o dinheiro, os
  * clientes, o conteúdo, os hábitos) é uma linha a mais nela.
@@ -23,6 +24,7 @@
 import { dayDoc, dayTasks, overdue, inRange } from "./tasks.js";
 import { budget as budgetOf, doneOf, reservesOf, fmt, clock } from "./day.js";
 import { focusMinutes, meetingMinutes } from "./focus.js";
+import { pipelineToday } from "./client-doc.js";
 
 export const PORTRAIT_MAX = 6000;
 const BACK = 30;
@@ -41,6 +43,10 @@ const dateOf = (day) => { const [y, m, d] = day.split("-").map(Number); return n
 const addDays = (day, n) => { const d = dateOf(day); d.setDate(d.getDate() + n); return dayOf(d); };
 const dayLabel = (day) => { const d = dateOf(day); return WEEKDAY[d.getDay()] + " " + pad(d.getDate()) + "/" + pad(d.getMonth() + 1); };
 const shortDate = (day) => day.slice(8, 10) + "/" + day.slice(5, 7);
+
+/* o nome de cliente e de lead é digitado por gente: sem quebra de linha, para
+   que não vire uma linha a mais do retrato */
+const nameOf = (v) => String(v || "").replace(/\s+/g, " ").trim() || "sem nome";
 
 /* zero é "0m" aqui, e não o "—" da tela: o Merlin lê texto, não traço */
 const dur = (min) => (min ? fmt(min) : "0m");
@@ -159,6 +165,38 @@ export const SECTIONS = [
     build({ apps }) {
       const names = apps.map((a) => String((a && a.name) || "").trim()).filter(Boolean);
       return names.length ? names : ["nenhum"];
+    }
+  },
+  /* os leads e os clientes dividem 500 caracteres, com os rótulos: 250 + 230
+     de texto, mais os rótulos e a linha em branco. as contas
+     (parado, atrasado, sem registro) moram em client-doc.js (pipelineToday) */
+  {
+    id: "leads", label: "leads", budget: 250, needs: ["clients"],
+    build({ clients }, now) {
+      const p = pipelineToday(clients, dayOf(now), now.getTime());
+      if (!p.stages.some((s) => s.count)) return ["nenhum lead no funil · abra a prospecção para cadastrar"];
+      return [
+        "etapas: " + p.stages.filter((s) => s.count).map((s) => s.label + " " + s.count).join(" · "),
+        ...p.late.map((c) => "contato atrasado: " + nameOf(c.name) + " · " + shortDate(c.nextDate)),
+        ...p.stuck.map((c) => "parado: " + nameOf(c.name) + " · " + c.label + " · " + c.days + "d"),
+        ...p.noNext.map((c) => "sem próximo passo: " + nameOf(c.name))
+      ];
+    }
+  },
+  {
+    id: "clients", label: "clientes", budget: 230, needs: ["clients"],
+    build({ clients }, now) {
+      const day = dayOf(now);
+      const p = pipelineToday(clients, day, now.getTime());
+      /* o vencido de antes da janela de 30 dias não entra, como nas tarefas */
+      const from = addDays(day, -BACK);
+      const lines = [
+        ...p.stale.map((c) => "sem registro há 14+ dias: " + nameOf(c.name) + " · " + c.days + "d"),
+        ...p.backlog.filter((b) => b.due >= from).map((b) =>
+          "backlog " + (b.when === "overdue" ? "vencido " + shortDate(b.due) : b.when === "today" ? "hoje" : dayLabel(b.due)) +
+          ": " + nameOf(b.client) + " · " + nameOf(b.text))
+      ];
+      return lines.length ? lines : ["nada pendente nos clientes"];
     }
   }
 ];
