@@ -7,7 +7,7 @@
    - a janela do início com um dia de demonstração andando. a conta é a do
      day.js, a mesma do Hoje e do rastreador, só que num relógio acelerado: a
      linha escrita vira tarefa pela regra do tasks.js, entra no dia, a barra
-     se gasta, a tarefa fecha com o recibo e a próxima linha vira ideia;
+     se gasta, a tarefa fecha com o recibo e a próxima linha vira nota;
    - os botões de abrir e de entrar, a barra que ganha fundo ao rolar e a
      lista de espera.
 
@@ -43,12 +43,12 @@ const SEED = () => ({
   ]
 });
 
-const HINT_EMPTY = "com a duração (45m, 1h30) entra em hoje · pergunta vai para o Merlin · o resto vira ideia";
+const HINT_EMPTY = "com a duração (45m, 1h30) entra em hoje · pergunta vai para o Merlin · o resto vira nota";
 function hintOf(route) {
   if (!route) return HINT_EMPTY;
   if (route.kind === "task") return "Enter: entra em hoje · " + fmt(route.min);
   if (route.kind === "ask") return "Enter: pergunta ao Merlin";
-  return "Enter: vira ideia";
+  return "Enter: vira nota";
 }
 
 /* o roteiro roda enquanto a janela está à vista; sair da tela para tudo, e
@@ -106,7 +106,7 @@ function FieldView({ text }) {
       <span className="ld-demo__text">
         {text
           ? <>{text}<i className="ld-demo__caret" /></>
-          : <><i className="ld-demo__caret" /><span className="ld-demo__ph">uma tarefa (revisar a landing 45m), uma pergunta ou uma ideia</span></>}
+          : <><i className="ld-demo__caret" /><span className="ld-demo__ph">uma tarefa (revisar a landing 45m), uma pergunta ou uma nota</span></>}
       </span>
       <span className="ld-demo__hint" data-kind={route ? route.kind : ""}>{hintOf(route)}</span>
     </>
