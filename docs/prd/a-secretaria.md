@@ -119,6 +119,9 @@ precisam distribuí-lo.
     com perguntas, nunca com a leitura, o check-in, a montagem ou as tarefas de conteúdo.
   - O retrato espera a primeira descida da nuvem (no máximo ~5s); a seção que não chegou diz
     "ainda carregando" em vez de "nada".
+  - O dinheiro tem uma fonte só, o retrato (900 caracteres). A página do financeiro não manda
+    mais o próprio resumo em `pageContext` (ticket 34): saía o mesmo texto duas vezes. Com
+    `MERLIN_PORTRAIT_OFF` ligado, a pergunta feita do financeiro deixa de levar o dinheiro.
   - A resposta diz de onde tirou ("vi o financeiro e a agenda"), numa lista fechada que o Worker
     filtra. Quando falta dado, diz o que falta e oferece o gesto ("montar o financeiro").
 - **D9. Interruptor geral:** o segredo `MERLIN_PORTRAIT_OFF` faz o Worker descartar o retrato,
