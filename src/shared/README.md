@@ -23,12 +23,17 @@ Vite; o build sai em `server/site/`. O que é comum vive aqui:
   caixa de entrada vira (`inboxToDocs`, gravada por `collectInbox`, que o calendário e o início
   chamam ao abrir).
 - `quests.js` — o **"o que falta hoje?"**: `questsOf(data, now)` monta os dois grupos (agora:
-  a sessão rodando ou o compromisso que começa em até 30 minutos; para trás: as atrasadas, que
-  viram um item só quando passam de duas), `nextQuest` dá a próxima não pulada, e `moveTask`,
-  `dropTask` e `doneTask` gravam devolvendo o desfazer. Fonte nova é uma linha em `SOURCES`. É a
-  conta do cartão do início, do "agora" do rastreador e do cartão que o Merlin pede.
+  a sessão rodando ou o compromisso que começa em até 30 minutos; para trás: as atrasadas e as
+  contas previstas de dias passados, pelo `pendingBefore` do `finance-data.js`; cada fonte vira
+  um item só quando passa de dois), `nextQuest` dá a próxima não pulada, e `moveTask`,
+  `dropTask`, `doneTask`, `paidEntry` ("sim, aconteceu") e `moveEntry` gravam devolvendo o
+  desfazer. Fonte nova é uma linha em `SOURCES`. É a conta do cartão do início, do "agora" do
+  rastreador e do cartão que o Merlin pede.
 - `quest-card.jsx` — o **cartão** dessa lista na conversa do início: um desenho por tipo em
-  `VIEWS` (tipo novo é uma linha ali). "agora não" é estado da página e não grava.
+  `VIEWS` (tipo novo é uma linha ali). "agora não" é estado da página e não grava. O "não" da
+  conta prevista abre a `EntryForm` num portal no `body`.
+- `entry-form.jsx` — a **caixa do lançamento** (`EntryForm`) e os campos de dinheiro
+  (`MoneyInput`, `KindChips`, `CategorySelect`), usados pelo financeiro e pelo cartão do início.
 - `focus.js` — as **sessões de foco**: `startSession`/`stopSession` (a única forma de começar e
   parar, usada pelo rastreador e pelo cartão), a meta de horas, o teto de reunião, o recibo e o
   GitHub do dia. Entra lista ou coleção, sai número; sem `localStorage`.
