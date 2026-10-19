@@ -356,11 +356,10 @@ const mariaCode = codeFromEmail();
 r = await call("POST", "/code", { email: "gente@outracasa.com" });
 check("fora do dominio recebe a mesma resposta", r.status === 200);
 check("fora do dominio NAO recebe codigo", sentEmails.length === 1, String(sentEmails.length));
-/* o e-mail veste a marca de quem vai receber: quem entra pela Guessless nao
-   deve abrir um e-mail verde de um produto que ela nao conhece. */
-check("e-mail da casa usa o azul da casa", sentEmails[0].html.includes("#368DFF"), "sem o azul");
-check("e-mail da casa assina GuessLess", sentEmails[0].html.includes("GuessLess"), "sem a assinatura");
-check("e-mail da casa nao leva o verde do Merlin", !sentEmails[0].html.includes("#2EE86B"));
+/* desde 19/10/2026 ha uma pele so: quem entra pela Guessless recebe o mesmo
+   e-mail roxo do Merlin */
+check("e-mail da casa usa o roxo do Merlin", sentEmails[0].html.includes("#8B5CF6"), "sem o roxo");
+check("e-mail da casa nao veste mais a Guessless", !sentEmails[0].html.includes("GuessLess"));
 
 /* o atributo style e delimitado por aspas duplas. uma aspa dupla DENTRO dele
    (o classico font-family:"DM Sans") fecha o atributo no meio, e o e-mail
@@ -385,7 +384,7 @@ for (const [quem, html] of [["da casa", sentEmails[0].html]]) {
 }
 r = await call("POST", "/code", { email: "arthurcastilhos@gmail.com" });
 check("endereco solto vale ao lado do dominio", sentEmails.length === 2, String(sentEmails.length));
-check("fora da casa continua verde", sentEmails[1].html.includes("#2EE86B"));
+check("fora da casa tambem e roxo", sentEmails[1].html.includes("#8B5CF6"));
 check("fora da casa nao vira Guessless", !sentEmails[1].html.includes("GuessLess"));
 /* o Merlin tinha o mesmo defeito de aspas; as duas marcas passam pela prova */
 {

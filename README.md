@@ -74,10 +74,7 @@ o navegador guarda o Merlin de uma pessoa só: se o e-mail da sessão não for o
 vez, tudo que começa com `merlin:` sai antes da primeira sincronização. O time divide o
 endereço, o custo e o código — nunca o dia, o cliente nem o financeiro.
 
-**A marca segue quem entrou.** Um e-mail `@guessless.com.br` veste o Merlin com a identidade da
-casa (`html.gl` no [shell.css](src/shared/shell.css): fundo `#0A0A0A`, DM Sans, Manrope, o azul
-`#368DFF`, o logotipo da Guessless com `merlin` de sub-rótulo); qualquer outro vê o Merlin. É
-só pele — nenhuma tela muda de comportamento e nenhum dado sabe que ela existe.
+**Uma cara só.** Desde 19/10/2026 o Merlin é roxo (`--accent: #8B5CF6`, a cor do chapéu) para todo mundo; a pele da Guessless saiu, e o domínio dela continua só abrindo a porta (VISAO, 2 e 12).
 
 ## O dia, a semana e o mês
 

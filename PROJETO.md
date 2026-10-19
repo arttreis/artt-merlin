@@ -8,7 +8,7 @@ aponta para eles e preenche o que ficou desatualizado. Levantado do código em 0
 | arquivo | para que serve |
 | --- | --- |
 | [README.md](README.md) | o produto: as páginas, o dia (a sobra), atalhos, onde ficam os dados |
-| [VISAO.md](VISAO.md) | a fonte das **decisões** e princípios (uma pessoa por vez, só o dia tem minutos, marca) |
+| [VISAO.md](VISAO.md) | a fonte das **decisões** e princípios (uma pessoa por vez, só o dia tem minutos, o roxo) |
 | [MIGRATION.md](MIGRATION.md) | HTML por string → Preact → React 19 + Vite; o **dicionário** PT→EN de nomes |
 | [server/README.md](server/README.md) | o Worker: subir do zero, segredos, rotas, segurança do login |
 | [src/shared/README.md](src/shared/README.md) | **como um módulo é feito**: esqueleto de página, `core.js`, `ui.jsx`, coleções |

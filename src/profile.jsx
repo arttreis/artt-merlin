@@ -10,7 +10,7 @@ import "./shared/base.css";
 import "./profile.css";
 import {
   initPage, cloud, signIn, collection, savedTheme, setTheme, currentTheme,
-  seen, markSeen, forgetSeen, notify, currentBrand
+  seen, markSeen, forgetSeen, notify
 } from "./shared/core.js";
 import { useState, useEffect } from "react";
 import { mount, useCloud, icon } from "./shared/ui.jsx";
@@ -126,10 +126,6 @@ function Profile() {
               : <button className="pill pill--accent" type="button" onClick={() => signIn.show()}>entrar</button>}
             {c.status === "error" && <button className="pill" type="button" onClick={() => c.syncAll()}>tentar de novo</button>}
           </div>
-          {currentBrand() === "gl" && (
-            <p className="note pf-brand">Você entrou por um e-mail da Guessless, então o Merlin
-            está vestido com a identidade da casa. É só pele: nenhuma tela muda de comportamento.</p>
-          )}
         </section>
 
         {/* ---------- aparência ---------- */}

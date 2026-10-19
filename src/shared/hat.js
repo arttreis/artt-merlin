@@ -16,9 +16,8 @@
      chapeu.look(x, y)        // olha para um ponto (-1..1); null solta
      chapeu.destroy()
 
-   a cor sai de token: o roxo --merlin e o --on-merlin do olho são só do
-   personagem, iguais nas duas marcas; as faíscas de quando ele termina
-   alguma coisa usam o --accent de quem entrou.
+   a cor sai de token: o roxo --merlin e o --on-merlin do olho são do
+   personagem; as faíscas de quando ele termina alguma coisa usam o --accent.
    --------------------------------------------------------------- */
 
 const TAU = Math.PI * 2;

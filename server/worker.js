@@ -141,15 +141,12 @@ const deadCookie = () =>
 /* ---------- o e-mail ---------- */
 
 /* o e-mail e um pedaco do app fora do app: mesmo fundo, mesma mono no codigo,
-   mesmo destaque — e agora a marca certa, porque quem entra pela Guessless nao
-   deve receber um e-mail verde de um produto que ela nao conhece. tudo inline
+   mesmo destaque roxo para todo mundo (desde 19/10/2026 ha uma pele so). tudo inline
    e em tabela porque cliente de e-mail nao le <style> nem variavel de css. as
    fontes sao as do sistema: Gmail descarta web font, e a da marca fica so como
    primeira opcao. */
-/* a paleta e o nome de cada marca, do lado do servidor. o cliente tem a
-   mesma tabela em core.js (BRANDS); as duas existem porque o e-mail sai daqui
-   e a tela sai de la, e nenhum dos dois pode perguntar ao outro na hora.
-   se um dominio novo entrar, entra nos dois. */
+/* a paleta do e-mail, do lado do servidor: o e-mail nao le os tokens do app,
+   entao a cor de destaque se repete aqui */
 const BRANDS = {
   "": {
     name: "Merlin",
@@ -158,26 +155,13 @@ const BRANDS = {
        texto solto e o e-mail chega sem formatacao nenhuma. */
     sans: "'Sora',-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif",
     bg: "#0d0d0d", card: "#141414", edge: "#262626", rule: "#1f1f1f",
-    accent: "#2EE86B", ink: "#f2f2f2", mute: "#8c8c8c", faint: "#5c5c5c", ghost: "#4a4a4a",
+    accent: "#8B5CF6", ink: "#f2f2f2", mute: "#8c8c8c", faint: "#5c5c5c", ghost: "#4a4a4a",
     line: "Digite no Merlin para entrar."
   },
-  gl: {
-    name: "GuessLess · Merlin",
-    /* DM Sans e a display da casa; cliente de e-mail descarta web font, entao
-       ela e so a primeira opcao e o sistema resolve o resto. */
-    sans: "'DM Sans','Manrope',-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif",
-    bg: "#0A0A0A", card: "#121212", edge: "#1f1f1f", rule: "#1a1a1a",
-    accent: "#368DFF", ink: "#ffffff", mute: "#9a9a9a", faint: "#6a6a6a", ghost: "#555555",
-    line: "Digite no Merlin da casa para entrar."
-  }
 };
-/* qual marca cada dominio veste. e a mesma tabela do BRANDS do core.js, do
-   outro lado do fio: dominio novo entra nos dois. */
-const EMAIL_BRANDS = { "@guessless.com.br": "gl" };
-const brandOf = (email) => EMAIL_BRANDS[email.slice(email.indexOf("@"))] || "";
 
-function codeEmailHtml(code, brand) {
-  const b = BRANDS[brand] || BRANDS[""];
+function codeEmailHtml(code) {
+  const b = BRANDS[""];
   const mono = "'JetBrains Mono','SF Mono',Menlo,Consolas,'Liberation Mono',monospace";
   const sans = b.sans;
   return `<!doctype html>
@@ -242,7 +226,7 @@ async function sendCode(env, email, code) {
       subject: code + " — seu código do Merlin",
       /* o codigo no assunto tambem: na maioria dos clientes de e-mail voce le
          sem precisar abrir a mensagem. */
-      html: codeEmailHtml(code, brandOf(email)),
+      html: codeEmailHtml(code),
       /* a versao em texto fica: e o que aparece em cliente sem html e o que
          alguns filtros de spam olham quando o html vem sozinho. */
       text: "Seu código é " + code + ".\n\n" +

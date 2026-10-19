@@ -67,16 +67,16 @@ input,select,textarea{font:inherit;color:inherit}
   --fill-hover:rgba(242,242,242,.1);
   --scrim:rgba(13,13,13,.62);
 
-  --accent:#2EE86B;
-  --accent-ink:#2EE86B;
-  --accent-glow:rgba(46,232,107,.3);
-  --on-accent:#0d0d0d;
+  /* o roxo do Merlin desde 19/10/2026 (VISAO, 12): o app inteiro veste a cor
+     do chapéu. branco sobre ele, como em todo botão de destaque */
+  --accent:#8B5CF6;
+  --accent-ink:#A78BFA;
+  --accent-glow:rgba(139,92,246,.3);
+  --on-accent:#ffffff;
 
-  /* o Merlin em pessoa, o chapéu de hat.js (VISAO, 12). é a única cor fora
-     do destaque e só o personagem a usa: botão, link e estado continuam no
-     --accent. vale igual nos dois temas e nas duas marcas, por isso não se
-     redeclara embaixo: o roxo passa de 3:1 no escuro e no claro, e é a
-     cor de ação de nenhuma das duas casas */
+  /* o Merlin em pessoa, o chapéu de hat.js (VISAO, 12). desde 19/10 tem o
+     mesmo valor do destaque, mas continua um token próprio: o personagem
+     não deve mudar de cor se o destaque um dia mudar */
   --merlin:#8B5CF6;
   --on-merlin:#ffffff;
 
@@ -111,82 +111,14 @@ html.light{
   --fill:rgba(13,13,13,.04);
   --fill-hover:rgba(13,13,13,.08);
   --scrim:rgba(242,242,240,.7);
-  --accent-ink:#0d8038;
-  --accent-glow:rgba(46,232,107,.5);
+  --accent-ink:#6D28D9;
+  --accent-glow:rgba(139,92,246,.35);
   --sombra:inset 0 1px 0 rgba(255,255,255,.6),0 30px 80px -40px rgba(13,13,13,.25);
   --sombra-2:0 10px 30px rgba(13,13,13,.14);
   --glow-op:.12;
   color-scheme:light;
 }
 
-/* ---------- a marca da casa: Guessless ----------
-   o mesmo Merlin com a identidade da agência. É **só pele**: os tokens trocam
-   de valor e nenhum componente troca de regra — nenhuma tela se comporta
-   diferente por causa da marca. Quem entra por um e-mail @guessless.com.br vê
-   isto; todo o resto vê o Merlin.
-
-   A fonte de verdade é o design system dos documentos da casa
-   (docs.guessless.com.br/assets/dashboard.css): fundo #0A0A0A, DM Sans no
-   display, Manrope no corpo, Instrument Serif no itálico de ênfase, JetBrains
-   Mono nos rótulos — a mono é a mesma dos dois lados, e é por isso que a
-   troca não desmonta nada — e o azul #368DFF no destaque. O #0014FF que
-   aparece por aí não é a marca: o próprio CSS da casa anota isso.
-
-   O token de destaque é `--accent` (até 08/10/2026 era `--green`, de quando
-   havia uma marca só e o destaque era, de fato, verde); aqui ele carrega o
-   azul. */
-html.gl{
-  --bg:#0A0A0A;
-  --surface:#121212;
-  --surface-2:#1a1a1a;
-
-  --ink:#ffffff;
-  --ink-70:rgba(255,255,255,.68);
-  --ink-50:rgba(255,255,255,.55);
-  --ink-30:rgba(255,255,255,.35);
-
-  --line:rgba(255,255,255,.10);
-  --line-soft:rgba(255,255,255,.07);
-  --fill:rgba(255,255,255,.035);
-  --fill-hover:rgba(255,255,255,.08);
-  --scrim:rgba(10,10,10,.72);
-
-  --accent:#368DFF;
-  --accent-ink:#368DFF;
-  --accent-glow:rgba(54,141,255,.22);
-  /* branco no azul, como o .btn--accent da casa — no verde era o inverso */
-  --on-accent:#ffffff;
-
-  --sans:"Manrope",system-ui,-apple-system,sans-serif;
-  --display:"DM Sans",var(--sans);
-  --serif:"Instrument Serif",Georgia,serif;
-
-  /* o raio da casa é 14px; o do Merlin, 16px */
-  --br:14px;
-  --glow-op:.34;
-}
-html.gl.light{
-  --bg:#f7f7f5;
-  --surface:#ffffff;
-  --surface-2:#ececea;
-  --ink:#0A0A0A;
-  --ink-70:rgba(10,10,10,.7);
-  --ink-50:rgba(10,10,10,.55);
-  --ink-30:rgba(10,10,10,.4);
-  --line:rgba(10,10,10,.14);
-  --line-soft:rgba(10,10,10,.08);
-  --fill:rgba(10,10,10,.04);
-  --fill-hover:rgba(10,10,10,.08);
-  --scrim:rgba(247,247,245,.72);
-  /* o azul da casa em texto sobre branco fica em 3,5:1 — abaixo do mínimo de
-     leitura. o destaque de fundo continua #368DFF; só a tinta escurece. */
-  --accent-ink:#1257C4;
-  --accent-glow:rgba(54,141,255,.34);
-  --glow-op:.14;
-}
-/* o display da casa é DM Sans; o corpo, Manrope. no Merlin os dois são Sora,
-   então esta é a única regra que a marca acrescenta em vez de trocar. */
-html.gl h1,html.gl h2,html.gl h3,html.gl .sb__logo b{font-family:var(--display);letter-spacing:-.03em}
 
 
 [hidden]{display:none !important}
@@ -224,16 +156,12 @@ html.merlin .page{padding-bottom:calc(clamp(40px,8vh,96px) + 72px)}
    Guessless assina os próprios produtos ([GUESSLESS] docs). o isotipo só
    aparece com a barra recolhida, onde os 116px do logotipo não cabem. */
 .sb__logo--gl{gap:0}
-.sb__logo--gl .gl-word{width:100px;height:auto;flex:none;color:var(--ink)}
-.sb__logo--gl .gl-mark{width:22px;height:22px;flex:none;border-radius:6px;display:none}
 .sb__sub{
   font-family:var(--mono);font-size:11px;font-weight:500;
   letter-spacing:.16em;text-transform:uppercase;color:var(--ink-30);
   padding-left:10px;margin-left:10px;border-left:1px solid var(--line);
   white-space:nowrap;
 }
-html.sidebar-closed .sb__logo--gl .gl-word,html.sidebar-closed .sb__sub{display:none}
-html.sidebar-closed .sb__logo--gl .gl-mark{display:block}
 .sb__fold{
   width:30px;height:30px;flex:none;display:grid;place-items:center;border-radius:var(--br2);
   color:var(--ink-30);transition:color var(--t),background var(--t);
@@ -592,7 +520,6 @@ html.light{--color-1:#1c6fc4;--color-2:#b8600a;--color-3:#c4234f;--color-4:#7a3b
 .tb__gap{flex:1 1 auto;pointer-events:none}
 .tb__logo{display:inline-flex;align-items:center;gap:8px;font-weight:600;font-size:14px;color:var(--ink)}
 .tb__logo svg{width:18px;height:18px;color:var(--accent)}
-.tb__logo .gl-mark{width:22px;height:22px}
 .tb__sub{font-family:var(--mono);font-size:11px;color:var(--ink-50)}
 .tb__search{
   display:flex;align-items:center;gap:8px;height:32px;padding:0 6px 0 10px;border-radius:var(--br2);
