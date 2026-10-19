@@ -892,7 +892,7 @@ seguidos, o botão da noite e os blocos de baixo (o dia, hábitos, agenda, a sem
 revisões). O dia inteiro e os hábitos continuam no calendário. Fechar o dia e revisar passaram a
 ser **pedidos**: escrever "fechar o dia" no campo abre o fechamento, e "revisar a semana" ou
 "revisar o mês" abre a revisão do período corrente, a qualquer dia. É regra local (`askIntent`, em
-`shared/tasks.js`), sem crédito; com duração ("fechar o dia 30m") continua sendo tarefa. A
+`shared/tasks.js`), sem crédito, com ou sem o "?" no fim ("fechar o dia?"); com duração ("fechar o dia 30m") continua sendo tarefa. A
 sequência de dias fechados continua gravando em `closes`. Quem pede isso ao Merlin na conversa
 ouve que é só escrever "fechar o dia" no início.
 

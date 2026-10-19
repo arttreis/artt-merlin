@@ -367,6 +367,21 @@ function spyOf(list) {
   check("texto vazio não é pedido", askIntent("") === null);
 }
 
+/* ---- o "?" do fim não muda o pedido ---- */
+{
+  const same = (a, b) => JSON.stringify(askIntent(a)) === JSON.stringify(b);
+  ["fechar o dia?", "Fechar o dia ?", "fechar o dia??"].forEach((text) => {
+    check("\"" + text + "\" abre o fechamento", same(text, { kind: "close" }), JSON.stringify(askIntent(text)));
+  });
+  check("\"revisar a semana?\" abre a revisão da semana", same("revisar a semana?", { kind: "review", period: "week" }), JSON.stringify(askIntent("revisar a semana?")));
+  check("\"revisar o mês?\" abre a revisão do mês", same("revisar o mês?", { kind: "review", period: "month" }), JSON.stringify(askIntent("revisar o mês?")));
+  check("\"o que falta hoje?\" segue sendo o cartão", same("o que falta hoje?", { kind: "quests" }), JSON.stringify(askIntent("o que falta hoje?")));
+  check("\"e agora?\" segue sendo o cartão", same("e agora?", { kind: "quests" }), JSON.stringify(askIntent("e agora?")));
+  check("\"como fecho o mês no financeiro?\" continua pergunta", askIntent("como fecho o mês no financeiro?") === null, JSON.stringify(askIntent("como fecho o mês no financeiro?")));
+  check("\"fechar o dia 30m\" continua tarefa", askIntent("fechar o dia 30m") === null, JSON.stringify(askIntent("fechar o dia 30m")));
+  check("\"?\" sozinho não é pedido", askIntent("?") === null, JSON.stringify(askIntent("?")));
+}
+
 /* ---- fechar o dia continua sendo fechar o dia ---- */
 {
   check("\"fechar o dia\" continua close", JSON.stringify(askIntent("fechar o dia")) === JSON.stringify({ kind: "close" }), JSON.stringify(askIntent("fechar o dia")));
