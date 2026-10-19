@@ -180,7 +180,7 @@ vezes numa montagem (esvaziar a caixa de entrada, gerar a recorrência da semana
 
 | o quê | para quê |
 | --- | --- |
-| `initPage(id)` | sidebar, clientes, preferências, sessão. `id` é `home, calendar, routine, notes, prospecting, clients, content, funnels, maps, apps, finance, wishlist, habits, plans, profile` |
+| `initPage(id)` | sidebar, clientes, preferências, sessão. `id` é `home, calendar, routine, notes, prospecting, clients, content, funnels, maps, apps, finance, habits, plans, profile` |
 | `collection(type, {normalize})` | fora de componente; dentro use `useCollection` |
 | `newId()`, `today()`, `dayOf(date)`, `isDay(v)`, `dateOf(day)`, `addDays(day, n)`, `mondayOf(day)` | datas como `YYYY-MM-DD` |
 | `dateLabel(day, withYear?)`, `weekdayOf(day)`, `monthLabel("YYYY-MM")` | rótulos |
@@ -261,7 +261,7 @@ Um documento é um objeto JSON plano. Coloque nele o que o módulo precisa, mas 
 | `maps` | maps.html | `{id, name, root:{id, title, note, color, collapsed, children:[…]}, client, idea, funnel}` |
 | `funnels` | funnels.html | `{id, name, client, channel, nodes:[{id, type, title, x, y, fields:{}, number}], edges:[{from, to}], creatives:[…], automations:[…], offers:[…], triggers:[…], snapshots:[…]}` |
 | `finance` | finance.html | vários docs: `{id, type:'entry'|'fixed'|'card'|'debt'|'config', …}` (`card` é uma compra parcelada: `{name, card, total, installments, start:'YYYY-MM', dayOfMonth}`). O `entry` lançado pelo campo do início ou pela conversa leva `via:'chat'` e `origin:{type:'chat', id:'home'\|<id da conversa>}` (ou `{type:'fixed', id}`), e nasce do `newEntry()` do finance-data.js; a prévia da caixa e do cartão do início (`entryLine()`) acha o previsto e o fixo pelo mesmo `refsOf()`, para dizer o valor que o lançamento vai gravar |
-| `wishlist` | wishlist.html | dois tipos: `{id, type:'list', name, order}` e `{id, type:'item', list, name, price (centavos), url, photo:{id, name, type, size}\|null, note, bought:{day, amount, entry}\|null, order}` — `entry` é o lançamento do financeiro, com `origin:{type:'wishlist', id}` |
+| `wishlist` | — (sem tela desde 19/10/2026; a vitrine saiu e `wishlist.html` só encaminha para o financeiro; a coleção continua guardada, no navegador e na nuvem) | dois tipos: `{id, type:'list', name, order}` e `{id, type:'item', list, name, price (centavos), url, photo:{id, name, type, size}\|null, note, bought:{day, amount, entry}\|null, order}` — `entry` é o lançamento do financeiro, com `origin:{type:'wishlist', id}` |
 | `vault` | clients.html | um doc `{id:'config', salt}` — só o sal do cofre; o segredo vai cifrado dentro do cliente |
 | `habits` | habits.html | `{id, name, schedule:{type:'daily'|'perWeek'|'weekdays', times, weekdays:[0-6]}, min, color, order, archived, marks:{'YYYY-MM-DD':true}}`. O criado pelo "criar e marcar" do início ou da conversa leva `origin:{type:'chat'}`. Marcar pela secretária usa o `markOn()` do habits-data.js, que nunca desmarca |
 | `plans` | plans.html | um doc por período, id `kind:period`: `{id, kind:'quarter'|'month'|'week', period:'2026-Q4'|'2026-09'|'2026-W37', goals:[{id, text, client, done, parent, card, order}], review:{went, didnt, next}}` |

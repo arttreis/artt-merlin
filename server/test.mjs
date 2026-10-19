@@ -811,6 +811,16 @@ check("conversa: os campos guardam o que a IA propôs", body.suggestions[0] && b
 check("conversa: a instrução cita habit-mark", /habit-mark/.test(claudeAsked), String(claudeAsked).slice(0, 300));
 check("conversa: o tipo financeiro continua no catálogo", /finance-entry/.test(claudeAsked));
 
+/* a vitrine saiu (PRD o-menu-por-area, D7): wishlist-item não está mais no catálogo,
+   e uma sugestão dele é descartada como qualquer tipo fora da lista */
+claudeAnswer = { stop_reason: "end_turn", content: [{ type: "text", text: JSON.stringify({ suggestions: [{ actionType: "wishlist-item", title: "novo item na vitrine", note: "", payload: {
+  list: "", name: "teclado", price: 30000, bucket: "online", qty: "1x"
+} }], clarify: "" }) }] };
+r = await call("POST", "/merlin", { task: "assistant", context: { message: "quero comprar um teclado" } }, cookie);
+body = await r.json();
+check("conversa: wishlist-item saiu do catálogo", r.status === 200 && Array.isArray(body.suggestions) && body.suggestions.length === 0, JSON.stringify(body));
+check("conversa: a instrução não cita wishlist-item", !/wishlist-item/.test(claudeAsked), String(claudeAsked).slice(0, 300));
+
 /* ---- 13f. o teto do conselheiro ----
    a chave da Anthropic e uma so para o time. o teto e por pessoa e por hora:
    quem gastou espera, e quem esta ao lado nao paga por isso. */
