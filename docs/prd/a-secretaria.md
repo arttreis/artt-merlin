@@ -1,6 +1,6 @@
 # A secretária · a conversa vira o centro do Merlin
 
-**Status:** 📝 Descoberta fechada em 2026-10-17. Tickets no milestone "a secretária".
+**Status:** ✅ No ar desde 2026-10-19 (versão do worker `d557c450`). Os 12 tickets do milestone "a secretária" foram mergeados; a tabela `usage` foi criada no D1 de produção antes do deploy. As correções seguem no milestone "acabamento da secretária".
 **Owner:** Arthur Reis
 **Criado em:** 2026-10-17
 **Origem:** o desenho do novo fluxo de 17/10 ("merlin deve agir como uma secretária"): o chat é a
