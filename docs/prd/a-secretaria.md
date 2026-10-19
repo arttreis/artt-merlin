@@ -75,6 +75,9 @@ precisam distribuí-lo.
   (`src/shared/quests.js`), então responde na hora e não gasta crédito. A frase é reconhecida
   pela regra local; o Merlin também pode devolver o cartão quando a pergunta vem com outras
   palavras.
+  O cartão aparece no início e na tela do assistente; lá, só a última mensagem de cartão da
+  conversa é ao vivo (o cartão de ontem não mostra a lista de hoje), e as anteriores ficam como
+  a linha de texto guardada.
 - **D4. A lista tem só dois grupos, nessa ordem:**
   1. **agora:** a sessão de foco rodando, ou um compromisso com hora que começa em até 30
      minutos ou já está em curso;

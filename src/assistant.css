@@ -41,6 +41,10 @@ html.onboarding .page--chat{padding-bottom:0}
   background:var(--surface);border:1px solid var(--line);
   font-size:13.5px;line-height:1.55;max-width:76%;
 }
+/* o cartão do "o que falta hoje?" (shared/quest-card.css) é claro sobre fundo
+   escuro, feito para o balão do início. aqui a bolha é clara, então ele leva
+   o escuro por baixo, até 440px (no celular, a coluna inteira) */
+.chat__quest{width:100%;max-width:min(100%,440px);padding:2px;border-radius:var(--br3);color:#fff;background:#1b2030}
 .chat__msg.is-me{justify-content:flex-end}
 /* "vi a agenda e o dia": de onde a resposta saiu, numa linha discreta embaixo da bolha */
 .chat__msg:has(> .chat__seen){flex-direction:column;align-items:flex-start;gap:4px}

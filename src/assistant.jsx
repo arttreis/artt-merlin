@@ -27,6 +27,9 @@ import { BUILD, buildIntent, answersText, draftView, docFromDraft } from "./shar
    x?" sair pelo saldo sem abrir o financeiro antes */
 import { usePortrait } from "./shared/use-portrait.js";
 import { sourcesLine } from "./shared/portrait.js";
+import { normalize as normalizeTask } from "./shared/tasks.js";
+import { questsOf, questsText } from "./shared/quests.js";
+import { QuestCard } from "./shared/quest-card.jsx";
 
 initPage("assistant");
 
@@ -161,6 +164,9 @@ function DraftCard({ draft, live, onCreate }) {
 
 function Assistant() {
   const chats = useCollection("chats", { normalize: normalizeChat });
+  /* o cartão do "o que falta hoje?" lê as mesmas coleções do início */
+  const tasks = useCollection("tasks", { normalize: normalizeTask });
+  const sessions = useCollection("sessions");
   const portrait = usePortrait();
   const hash = useHash();
   const [messages, setMessages] = useState([]); // { from: "me"|"merlin", text } | { from: "merlin", proposal }
@@ -182,6 +188,8 @@ function Assistant() {
   const start = STARTS.find((s) => s.key === startKey) || null;
   const list = chats.all().sort((a, b) => b.updatedAt - a.updatedAt);
   const flow = flowOn ? flowOf(messages) : null;
+  /* só o último cartão da conversa é ao vivo: o de ontem não mostra a lista de hoje */
+  const lastCard = messages.map((m) => m.show === "quests").lastIndexOf(true);
 
   /* o chapéu reage ao que acabou de chegar por um instante e volta */
   const feelTimer = useRef(0);
@@ -298,7 +306,10 @@ function Assistant() {
     const kind = (said && said.build) || buildIntent(message);
     if (kind) { setFlowOn(true); startBuild(kind, message); return; }
     const mine = messages.concat([{ from: "me", text: message }]);
-    const answer = (m) => keep(mine.concat([m]));
+    const answer = (...m) => keep(mine.concat(m));
+    /* o cartão é desenhado ao vivo; a conversa guarda a linha de texto, que é
+       também o que o Merlin lê na pergunta seguinte */
+    const questsMsg = () => ({ from: "merlin", show: "quests", text: questsText(questsOf({ tasks: tasks.all(), sessions: sessions.all() })) });
     keep(mine);
     setInput("");
     setThinking(WAIT.ask);
@@ -320,11 +331,14 @@ function Assistant() {
       }) });
       if (r.ok) {
         const s = (r.body.suggestions || [])[0];
-        if (s) { answer({ from: "merlin", proposal: s }); feel("done"); }
+        const card = r.body.show === "quests";
+        if (s) { answer({ from: "merlin", proposal: s }, ...(card ? [questsMsg()] : [])); feel("done"); }
         /* a resposta diz de onde tirou ("vi a agenda"): só a que respondeu de
            fato; o "não entendi" não viu nada */
-        else if (r.body.clarify) { answer({ from: "merlin", text: r.body.clarify, sources: r.body.sources || [] }); feel("talking"); }
-        else { answer({ from: "merlin", text: "não entendi bem — pode dizer de outro jeito?" }); feel("confused"); }
+        else if (r.body.clarify || card) {
+          answer(...[r.body.clarify && { from: "merlin", text: r.body.clarify, sources: r.body.sources || [] }, card && questsMsg()].filter(Boolean));
+          feel("talking");
+        } else { answer({ from: "merlin", text: "não entendi bem — pode dizer de outro jeito?" }); feel("confused"); }
       } else if (r.status === 401) {
         answer({ from: "merlin", text: "entre para usar o Merlin" });
         feel("confused");
@@ -429,6 +443,10 @@ function Assistant() {
                       ? <DraftCard draft={m.draft} live={!!flow && flow.at === i && !thinking} onCreate={() => create(m.draft)} />
                       : m.built
                       ? <p>criei o {BUILD[m.built.kind].label} <a href={BUILD[m.built.kind].href + m.built.id}>{m.built.name}</a></p>
+                      : m.show === "quests"
+                      ? i === lastCard
+                        ? <div className="chat__quest"><QuestCard tasks={tasks} sessions={sessions} /></div>
+                        : <p>{m.text}</p>
                       : m.proposal
                       ? m.proposal.done
                         ? <p className="chat__done">✓ {m.proposal.done.line}</p>
