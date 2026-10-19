@@ -90,7 +90,7 @@ function useScript(on) {
         await wait(700);
         if (!alive) return;
         set((x) => ({ ...x, text: "" }));
-        say("guardado em ideias");
+        say("guardado em notas");
         await wait(3000);
       }
     })();
