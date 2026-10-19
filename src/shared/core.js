@@ -242,52 +242,57 @@ initTheme();
 
 /* ---------- navegacao ---------- */
 
-/* seis lugares, um por trabalho, e nao um por tipo de dado (VISAO, 9).
-   ate 09/10/2026 eram dezesseis paginas em quatro grupos, todas do mesmo
-   tamanho na barra: sete faziam quase todo o uso, duas (diario e planos)
-   nunca tiveram um documento, e o dia — o coracao — ficava a dois cliques,
-   atras de uma home de relogio e citacao.
+/* cinco áreas da vida, e não um lugar por tipo de trabalho (PRD
+   docs/prd/o-menu-por-area.md, D1 e D2). de 09/10 a 19/10/2026 eram seis
+   seções no dock (hoje, ideias, produtos, distribuição, clientes, dinheiro),
+   sempre à vista, inclusive embaixo da conversa do início. agora o início é
+   só a conversa, e as áreas moram num menu que se abre do alto (o botão
+   "menu" da faixa, ui.jsx): saúde, trabalho, organização, finanças, inbox.
 
-   cada secao e UM item na barra. as paginas dela continuam sendo paginas, com
-   o endereco de sempre; o que muda e que viram abas da secao, e as abas so
-   aparecem na secao aberta. a primeira pagina e a porta da secao.
+   cada área é UMA linha aqui, nunca um componente: uma gaveta nova (o sono, o
+   treino) é uma aba a mais na área dela. as páginas continuam sendo páginas,
+   com o endereço de sempre; no menu aparecem todas de uma vez, e no dock só as
+   abas da área aberta. a primeira página é a porta da área.
 
-   fora das secoes: o inicio (index.html, so a porta de quem nunca entrou), a
-   conversa com o Merlin (chega-se pelo Ctrl+K), o perfil (o cartao embaixo da
-   barra), o rastreador e o link publico. */
+   o id "inbox" da área não tem relação com a fila merlin:inbox (a caixa de
+   entrada, mais abaixo): é o nome que o Arthur deu à área de quem espera uma
+   resposta, como "lead" ficou.
+
+   fora das áreas: o início (index.html, a conversa), a conversa com o Merlin
+   (assistant.html), o perfil (o cartão no alto), o rastreador, o link público
+   e a vitrine, que saiu em 19/10/2026: wishlist.html leva ao financeiro
+   (wishlist.jsx), e a coleção fica guardada, sem tela. */
 export const SECTIONS = [
-  /* o dia e a pagina inicial. a rotina e os habitos moram aqui porque e daqui
-     que eles vivem: a rotina so vira tarefa quando o calendario abre a semana,
-     e o habito so se marca hoje */
-  { id: "today", label: "hoje", icon: "calendar", pages: [
-    { id: "calendar", label: "calendário", href: "calendar.html" },
-    { id: "routine", label: "rotina", href: "routine.html" },
+  /* os hábitos são a saúde inteira, por enquanto */
+  { id: "health", label: "saúde", icon: "habits", pages: [
     { id: "habits", label: "hábitos", href: "habits.html" }
   ] },
-  /* o que ainda nao e tarefa: a nota solta e o mapa que pensa em galhos */
-  { id: "ideas", label: "ideias", icon: "notes", pages: [
-    { id: "notes", label: "notas", href: "notes.html" },
+  /* o produto é o centro (VISAO, 9.5) e abre a área. o conteúdo e o funil são
+     como gente chega a ele, e o mapa é o desenho que pensa em galhos */
+  { id: "work", label: "trabalho", icon: "apps", pages: [
+    { id: "apps", label: "produtos", href: "apps.html" },
+    { id: "content", label: "conteúdo", href: "content.html" },
+    { id: "funnels", label: "funis", href: "funnels.html" },
     { id: "maps", label: "mapas", href: "maps.html" }
   ] },
-  /* o SaaS que se esta construindo: conceito, banco, telas e fluxos, e a saida
-     pronta para construir (VISAO, 4.13 e 8.1) */
-  { id: "products", label: "produtos", icon: "apps", pages: [
-    { id: "apps", label: "produtos", href: "apps.html" }
+  /* onde se arruma o tempo. a rotina é a semana-modelo, que só existe para
+     virar tarefa no calendário (VISAO, 4.11) */
+  { id: "organization", label: "organização", icon: "calendar", pages: [
+    { id: "calendar", label: "calendário", href: "calendar.html" },
+    { id: "routine", label: "rotina", href: "routine.html" },
+    { id: "notes", label: "notas", href: "notes.html" }
   ] },
-  /* como gente chega ao produto: o funil e as pecas que o alimentam */
-  { id: "distribution", label: "distribuição", icon: "funnels", pages: [
-    { id: "funnels", label: "funis", href: "funnels.html" },
-    { id: "content", label: "conteúdo", href: "content.html" }
+  { id: "money", label: "finanças", icon: "finance", pages: [
+    { id: "finance", label: "financeiro", href: "finance.html" }
   ] },
-  /* de lead a cliente: as duas paginas sao o mesmo documento (client-doc.js) */
-  { id: "clients", label: "clientes", icon: "clients", pages: [
+  /* o lado de fazer: "o que falta" é o início já perguntando (o id "next" não
+     é de página nenhuma, então o início continua fora das áreas), e leads e
+     clientes são as pessoas que esperam resposta. as duas páginas são o mesmo
+     documento (client-doc.js) */
+  { id: "inbox", label: "inbox", icon: "inbox", pages: [
+    { id: "next", label: "o que falta", href: "index.html#next" },
     { id: "prospecting", label: "leads", href: "prospecting.html" },
     { id: "clients", label: "clientes", href: "clients.html" }
-  ] },
-  /* a vitrine desagua no financeiro: o "comprei" vira saida */
-  { id: "money", label: "dinheiro", icon: "finance", pages: [
-    { id: "finance", label: "financeiro", href: "finance.html" },
-    { id: "wishlist", label: "vitrine", href: "wishlist.html" }
   ] }
 ];
 export const PAGES = SECTIONS.flatMap((s) => s.pages);

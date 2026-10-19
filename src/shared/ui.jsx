@@ -1122,7 +1122,8 @@ export function HabitForm({ habits, id, draft, onClose, onArchive, onSuggest, on
 
    a primeira linha da lista diz o que o Enter vai fazer, antes de ele fazer —
    a mesma ideia da linha fantasma da home. embaixo, o que ja existe com aquele
-   nome (a busca de sempre), e com o campo vazio, as seis secoes.
+   nome (a busca de sempre), e com o campo vazio, uma linha por aba de cada
+   área ("finanças · financeiro"), na ordem do menu.
 
    a conversa com o Merlin continua sendo uma pagina (assistant.html): o
    askMerlin() leva para la a pergunta e o que esta tela sabia. Ctrl+J pergunta
@@ -1157,7 +1158,7 @@ function CommandPalette({ onClose }) {
   const hits = term.trim() ? search(term) : [];
   hits.forEach((h, i) => rows.push({ key: "hit" + i, kind: "hit", label: h.label, text: h.text, run: () => { location.href = h.href; } }));
   if (!term.trim()) {
-    SECTIONS.forEach((sec) => rows.push({ key: "sec" + sec.id, kind: "nav", icon: sec.icon, label: "ir para", text: sec.label, run: () => { location.href = sec.pages[0].href; } }));
+    SECTIONS.forEach((sec) => sec.pages.forEach((p) => rows.push({ key: "nav" + p.id, kind: "nav", icon: sec.icon, label: "ir para", text: sec.label + " · " + p.label, run: () => { location.href = p.href; } })));
   }
   const at = Math.min(focus, Math.max(0, rows.length - 1));
 
@@ -1372,11 +1373,14 @@ function Notice() {
 }
 
 /* ---------- a casca inteira ----------
-   desde 10/10/2026 nao ha barra lateral (VISAO, 10): o Merlin e um app, e
-   app navega por um dock embaixo. no alto fica so uma faixa fina — a marca a
-   esquerda; a busca, o tema e quem esta aqui a direita. o dock tem o inicio
-   (a conversa do dia), as seis secoes e o "+", que abre o campo de tudo. as
-   abas da secao aberta sobem logo acima dele. */
+   desde 10/10/2026 nao ha barra lateral (VISAO, 10). no alto fica uma faixa
+   fina: a marca e o botão "menu" à esquerda; a busca, o tema e quem está aqui
+   à direita. o menu abre as cinco áreas com todas as abas de uma vez (core.js,
+   SECTIONS), e é o único caminho de uma área para outra com o dedo.
+
+   desde 19/10/2026 o início é só a conversa (docs/prd/o-menu-por-area.md):
+   ali não há dock. nas outras telas o dock é pequeno: o início, as abas da
+   área em que se está e o "+", que abre o campo de tudo. */
 function Brand() {
   if (currentBrand() !== "gl") {
     return <a className="tb__logo" href="index.html" aria-label="Merlin">{LOGO}<b>merlin</b></a>;
@@ -1388,13 +1392,17 @@ function Brand() {
   );
 }
 
-function TopBar({ page, onCommand }) {
+function TopBar({ page, onCommand, menuOpen, onMenu, menuRef }) {
   const c = useCloud();
   const info = CLOUD_STATUS[c.status] || CLOUD_STATUS.local;
   const email = c.signedIn ? String(c.email || "") : "";
   return (
     <header className="tb">
       <Brand />
+      <button ref={menuRef} type="button" className="tb__menu" onClick={onMenu} title="menu" aria-label="menu"
+              aria-expanded={menuOpen} aria-controls="area-menu">
+        {NAV_ICONS.menu}<span>menu</span>
+      </button>
       <span className="tb__gap" />
       <button type="button" className="tb__search" onClick={onCommand} title="escrever, buscar ou perguntar">
         {NAV_ICONS.search}<span>buscar</span><kbd>ctrl k</kbd>
@@ -1409,26 +1417,24 @@ function TopBar({ page, onCommand }) {
   );
 }
 
+/* o dock decide pela página: no início não desenha (o campo da conversa já é o
+   gesto de escrever); numa página de área, o início, as abas dela (se houver
+   mais de uma) e o "+"; no resto (a conversa, o perfil), o início e o "+".
+   trocar de área é pelo menu. as abas moram no próprio dock, e não numa faixa
+   acima dele: as quatro do trabalho cabem em 390px numa linha só */
 function Dock({ page, onCommand }) {
+  if (page === "home") return null;
   const here = sectionOf(page);
+  const tabs = here && here.pages.length > 1 ? here.pages : [];
   return (
     <div className="dk-wrap">
-      {here && here.pages.length > 1 && (
-        <nav className="dk-tabs" aria-label={here.label}>
-          {here.pages.map((p) => (
-            <a key={p.id} href={p.href} aria-current={p.id === page ? "page" : undefined}>{p.label}</a>
-          ))}
-        </nav>
-      )}
-      <nav className="dk" aria-label="Seções">
-        <a className="dk__item" href="index.html" aria-current={page === "home" ? "page" : undefined} title="início">
+      <nav className="dk" aria-label={here ? here.label : "Navegação"}>
+        <a className="dk__item" href="index.html" title="início">
           {NAV_ICONS.home}<span>início</span>
         </a>
-        {SECTIONS.map((sec) => (
-          <a key={sec.id} className="dk__item" href={sec.pages[0].href} title={sec.label}
-             aria-current={here && here.id === sec.id ? "page" : undefined}>
-            {NAV_ICONS[sec.icon]}<span>{sec.label}</span>
-          </a>
+        {tabs.length > 0 && <span className="dk__sep" />}
+        {tabs.map((p) => (
+          <a key={p.id} className="dk__tab" href={p.href} aria-current={p.id === page ? "page" : undefined}>{p.label}</a>
         ))}
         <span className="dk__sep" />
         <button type="button" className="dk__plus" onClick={onCommand} title="escrever, buscar ou perguntar (Ctrl K)" aria-label="Escrever, buscar ou perguntar">
@@ -1436,6 +1442,59 @@ function Dock({ page, onCommand }) {
         </button>
       </nav>
     </div>
+  );
+}
+
+/* o menu das áreas: as cinco, com todas as abas, de uma vez e sem segundo
+   nível (são 12 links, cabem numa olhada). mora no body, e não dentro da
+   faixa, porque a faixa não recebe clique fora dos filhos dela. abrir põe o
+   foco no primeiro link; Esc fecha e devolve o foco ao botão; clicar fora ou
+   escolher um link também fecha. não há atalho de teclado próprio: quem usa o
+   teclado tem o Ctrl+K, que lista as mesmas abas (PRD, D4) */
+function AreaMenu({ page, onClose, button }) {
+  const ref = useRef(null);
+  useEffect(() => {
+    const first = ref.current && ref.current.querySelector("a");
+    if (first) first.focus();
+    const outside = (e) => {
+      if (ref.current && ref.current.contains(e.target)) return;
+      if (button.current && button.current.contains(e.target)) return;
+      onClose(false);
+    };
+    document.addEventListener("pointerdown", outside);
+    return () => document.removeEventListener("pointerdown", outside);
+  }, []);
+  useKeydown((e) => {
+    if (e.key !== "Escape") return;
+    e.preventDefault();
+    onClose(true);
+  });
+  /* o Tab que sai do painel (para a faixa ou a página) também fecha: o menu
+     não fica aberto atrás de onde o foco está */
+  const onBlur = (e) => {
+    const to = e.relatedTarget;
+    if (!to || ref.current.contains(to) || (button.current && button.current.contains(to))) return;
+    onClose(false);
+  };
+  return createPortal(
+    <nav className="am" id="area-menu" aria-label="Áreas" ref={ref} onBlur={onBlur}>
+      {SECTIONS.map((sec) => {
+        const here = sec.pages.some((p) => p.id === page);
+        return (
+          <section key={sec.id} className={"am__area" + (here ? " is-here" : "")} aria-labelledby={"am-" + sec.id}>
+            <h2 className="am__title" id={"am-" + sec.id}>{NAV_ICONS[sec.icon]}<span>{sec.label}</span></h2>
+            <ul className="am__list">
+              {sec.pages.map((p) => (
+                <li key={p.id}>
+                  <a href={p.href} aria-current={p.id === page ? "page" : undefined} onClick={() => onClose(false)}>{p.label}</a>
+                </li>
+              ))}
+            </ul>
+          </section>
+        );
+      })}
+    </nav>,
+    document.body
   );
 }
 
@@ -1477,16 +1536,25 @@ function Shell({ page }) {
     if (e.key.toLowerCase() === "k") { e.preventDefault(); setCmd(true); }
     if (e.key.toLowerCase() === "j") { e.preventDefault(); askMerlin(""); }
   });
+  /* o menu das áreas: some durante o onboarding, como a busca */
+  const [menu, setMenu] = useState(false);
+  const menuRef = useRef(null);
+  const toggleMenu = () => setMenu((on) => !on && !locked());
+  const closeMenu = (refocus) => {
+    setMenu(false);
+    if (refocus && menuRef.current) menuRef.current.focus();
+  };
   const [blocked, setBlockedView] = useState(onboardingBlocked);
   useEffect(() => {
-    const sync = () => { setBlockedView(onboardingBlocked()); if (onboardingBlocked()) setCmd(false); };
+    const sync = () => { setBlockedView(onboardingBlocked()); if (onboardingBlocked()) { setCmd(false); setMenu(false); } };
     window.addEventListener("merlin:onboarding", sync);
     return () => window.removeEventListener("merlin:onboarding", sync);
   }, []);
 
   return (
     <>
-      {page !== "tracker" && <TopBar page={page} onCommand={() => setCmd(true)} />}
+      {page !== "tracker" && <TopBar page={page} onCommand={() => setCmd(true)} menuOpen={menu} onMenu={toggleMenu} menuRef={menuRef} />}
+      {menu && <AreaMenu page={page} onClose={closeMenu} button={menuRef} />}
       {page !== "tracker" && <Dock page={page} onCommand={() => setCmd(true)} />}
       {blocked && <OnboardingWall />}
       {signInOpen && <SignInDialog />}
