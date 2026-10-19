@@ -3,12 +3,14 @@
 Sistema pessoal, de uma pessoa só — e agora de uma pessoa só **por vez**: o time da Guessless
 entra pelo mesmo endereço e cada um ganha um Merlin inteiro, que ninguém mais vê. Nasceu como
 o `artt · planner` — um controle
-de tarefas de um dia — e virou um conjunto de módulos ligados entre si, organizados em **seis
-seções**: **hoje** (o calendário, a rotina e os hábitos), **ideias** (notas e mapas),
-**produtos**, **distribuição** (funis e conteúdo), **clientes** (leads e clientes) e
-**dinheiro** (financeiro e vitrine). O `Ctrl+K` é o campo de tudo: com duração vai para hoje,
-sem duração vira ideia, com "?" pergunta ao Merlin. A visão completa e as decisões estão em
-[VISAO.md](VISAO.md) — a organização em seções é a seção 9.
+de tarefas de um dia — e virou um conjunto de módulos ligados entre si. O início é só a
+conversa com o Merlin; o resto mora num **menu** que se abre do alto, organizado em **cinco
+áreas** da vida: **saúde** (os hábitos), **trabalho** (produtos, conteúdo, funis e mapas),
+**organização** (o calendário, a rotina e as notas), **finanças** (o financeiro) e **inbox**
+(o que falta, leads e clientes). O `Ctrl+K` é o campo de tudo: com duração vai para hoje,
+sem duração vira ideia, com "?" pergunta ao Merlin, e vazio lista todas as abas. A visão
+completa e as decisões estão em [VISAO.md](VISAO.md); as áreas, em
+[docs/prd/o-menu-por-area.md](docs/prd/o-menu-por-area.md).
 
 Cada módulo é **uma página**: um HTML na raiz, com o CSS dela inline, e um módulo em
 [`src/`](src/) com a tela. A tela é **React 19 com JSX**, e o build é o **Vite**, que cospe as

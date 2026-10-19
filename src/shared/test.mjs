@@ -1271,5 +1271,65 @@ const dataLeft = () => globalThis.localStorage.keys().filter((k) => k in DATA);
   check("a vitrine: buscar não regrava a coleção", globalThis.localStorage.getItem("merlin:wishlist") === wish);
 }
 
+/* ---- as cinco áreas do menu (ticket #36) ----
+   SECTIONS alimenta o menu do alto, o dock e o Ctrl+K. se uma página sumir de
+   lá, ela fica sem porta; se estiver em duas áreas, o dock e o menu discordam
+   sobre qual é a área atual; se o href apontar para um .html que não existe,
+   o link quebra sem avisar. a vitrine não entra em área nenhuma (é o #37). */
+{
+  const fs = await import("node:fs");
+  const path = await import("node:path");
+  const { fileURLToPath } = await import("node:url");
+  const root = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
+  const { SECTIONS, PAGES, sectionOf } = await fresh({});
+
+  const wanted = [
+    ["health", "saúde", "habits", [["habits", "hábitos", "habits.html"]]],
+    ["work", "trabalho", "apps", [
+      ["apps", "produtos", "apps.html"], ["content", "conteúdo", "content.html"],
+      ["funnels", "funis", "funnels.html"], ["maps", "mapas", "maps.html"]
+    ]],
+    ["organization", "organização", "calendar", [
+      ["calendar", "calendário", "calendar.html"], ["routine", "rotina", "routine.html"], ["notes", "notas", "notes.html"]
+    ]],
+    ["money", "finanças", "finance", [["finance", "financeiro", "finance.html"]]],
+    ["inbox", "inbox", "inbox", [
+      ["next", "o que falta", "index.html#next"], ["prospecting", "leads", "prospecting.html"], ["clients", "clientes", "clients.html"]
+    ]]
+  ];
+  const ids = SECTIONS.map((s) => s.id);
+  check("áreas: são cinco, na ordem", JSON.stringify(ids) === JSON.stringify(["health", "work", "organization", "money", "inbox"]), JSON.stringify(ids));
+  check("áreas: os nomes", JSON.stringify(SECTIONS.map((s) => s.label)) === JSON.stringify(["saúde", "trabalho", "organização", "finanças", "inbox"]), JSON.stringify(SECTIONS.map((s) => s.label)));
+  check("áreas: cada uma com o seu ícone", JSON.stringify(SECTIONS.map((s) => s.icon)) === JSON.stringify(wanted.map((w) => w[2])), JSON.stringify(SECTIONS.map((s) => s.icon)));
+  wanted.forEach(([id, , , tabs]) => {
+    const got = (SECTIONS.find((s) => s.id === id) || { pages: [] }).pages.map((p) => [p.id, p.label, p.href]);
+    check("áreas: as abas de " + id + ", na ordem", JSON.stringify(got) === JSON.stringify(tabs), JSON.stringify(got));
+  });
+  check("áreas: são doze abas", PAGES.length === 12, String(PAGES.length));
+  check("áreas: a vitrine não está em nenhuma", !PAGES.some((p) => p.id === "wishlist") && !PAGES.some((p) => /wishlist/.test(p.href)));
+
+  const pageIds = PAGES.map((p) => p.id);
+  check("áreas: toda página mora em uma área só", new Set(pageIds).size === pageIds.length, pageIds.join(","));
+  check("áreas: o que cada página diz de si bate com a área que a lista",
+    PAGES.every((p) => SECTIONS.filter((s) => s.pages.includes(p)).length === 1 && sectionOf(p.id).pages.includes(p)));
+
+  check("áreas: finanças fica em money", sectionOf("finance")?.id === "money", String(sectionOf("finance")?.id));
+  check("áreas: conteúdo fica em trabalho", sectionOf("content")?.id === "work", String(sectionOf("content")?.id));
+  check("áreas: clientes fica no inbox", sectionOf("clients")?.id === "inbox", String(sectionOf("clients")?.id));
+  check("áreas: rotina fica em organização", sectionOf("routine")?.id === "organization", String(sectionOf("routine")?.id));
+  check("áreas: início, vitrine e perfil não têm área", sectionOf("home") === null && sectionOf("wishlist") === null && sectionOf("profile") === null);
+
+  const missing = PAGES.filter((p) => !p.href.startsWith("index.html") && !fs.existsSync(path.join(root, p.href))).map((p) => p.href);
+  check("áreas: todo href aponta para um .html que existe na raiz", missing.length === 0 && PAGES.every((p) => /^[\w-]+\.html(#[\w-]*)?$/.test(p.href)), missing.join(","));
+
+  const icons = fs.readFileSync(path.join(root, "src", "shared", "icons.jsx"), "utf8");
+  const start = icons.indexOf("export const NAV_ICONS = {");
+  const end = start < 0 ? -1 : icons.indexOf("\n};", start);
+  const block = start < 0 || end < 0 ? "" : icons.slice(start, end);
+  check("áreas: NAV_ICONS foi encontrado no icons.jsx", block.length > 0);
+  const noIcon = SECTIONS.filter((s) => !s.icon || !block.includes("\n  " + s.icon + ":")).map((s) => s.id + "→" + s.icon);
+  check("áreas: toda área tem o ícone em NAV_ICONS", block.length > 0 && noIcon.length === 0, noIcon.join(","));
+}
+
 console.log("\n" + passed + " passaram, " + failures.length + " falharam");
 if (failures.length) { console.log("\nFALHAS:"); failures.forEach((f) => console.log("  - " + f)); process.exit(1); }

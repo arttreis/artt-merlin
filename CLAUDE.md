@@ -31,7 +31,7 @@ Teste é script Node puro, sem framework: `src/shared/*.test.mjs`, `src/shared/t
 ## Regras que não se quebram
 
 - Nunca escreva no `localStorage` direto: use `collection()` / `useCollection()`.
-- Página nova = `nome.html` na raiz + `src/nome.jsx` + uma aba numa seção de `SECTIONS`
+- Página nova = `nome.html` na raiz + `src/nome.jsx` + uma aba numa área de `SECTIONS`
   (`core.js`). Página nova não ganha item próprio na barra.
 - Lógica que pode ser pura vai para `src/shared/*.js`, com teste.
 - Nenhuma consulta no servidor cruza a coluna `person` (teste `13d`).

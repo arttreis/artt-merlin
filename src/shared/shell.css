@@ -610,13 +610,41 @@ html.light{--color-1:#1c6fc4;--color-2:#b8600a;--color-3:#c4234f;--color-4:#7a3b
 .tb__dot[data-status="synced"]{background:var(--accent)}
 .tb__in{height:30px}
 @media (max-width:600px){.tb__search span,.tb__search kbd{display:none}.tb__search{padding:0 8px}}
+/* o botão do menu, logo depois da marca: no celular, só o ícone */
+.tb__menu{display:inline-flex;align-items:center;gap:7px;height:32px;padding:0 10px 0 8px;margin-left:6px;border-radius:var(--br2);color:var(--ink-50);font-size:12.5px}
+.tb__menu svg{width:16px;height:16px;flex:none}
+.tb__menu:hover,.tb__menu[aria-expanded="true"]{color:var(--ink);background:var(--fill-hover)}
+@media (max-width:600px){.tb__menu{width:36px;height:36px;padding:0;margin-left:2px;justify-content:center}.tb__menu span{display:none}}
+
+/* ---------- o menu das áreas ----------
+   desce do botão, preso à esquerda da faixa; no celular ocupa a largura
+   toda, numa coluna, e rola dentro dele */
+.am{
+  position:fixed;top:var(--nav-h,52px);left:clamp(12px,2.5vw,24px);z-index:61;
+  width:min(640px,calc(100vw - 2 * clamp(12px,2.5vw,24px)));
+  display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:14px 12px;padding:14px;
+  background:var(--surface);border:1px solid var(--line);border-radius:var(--br);box-shadow:var(--sombra-2);
+}
+.am__area{min-width:0}
+.am__title{display:flex;align-items:center;gap:7px;margin:0 0 4px;padding:0 8px;font-size:11.5px;font-weight:600;color:var(--ink-50)}
+.am__title svg{width:15px;height:15px;flex:none}
+.am__area.is-here .am__title{color:var(--ink)}
+.am__area.is-here .am__title svg{color:var(--accent-ink)}
+.am__list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:1px}
+.am__list a{display:flex;align-items:center;min-height:30px;padding:0 8px;border-radius:var(--br2);font-size:13.5px;color:var(--ink-70)}
+.am__list a:hover{color:var(--ink);background:var(--fill)}
+.am__list a[aria-current="page"]{color:var(--ink);background:var(--fill-hover);font-weight:600}
+@media (prefers-reduced-motion:no-preference){.am{animation:am-in .16s var(--ease)}}
+@keyframes am-in{from{opacity:0;transform:translateY(-4px)}}
+@media (max-width:600px){
+  .am{left:0;right:0;width:auto;grid-template-columns:1fr;gap:10px;max-height:calc(100svh - var(--nav-h,52px));overflow-y:auto;overscroll-behavior:contain;border-width:1px 0;border-radius:0 0 var(--br) var(--br)}
+  .am__list a{min-height:36px}
+}
 
 /* ---------- o dock ---------- */
+/* desde 19/10/2026 o dock não está no início, e nas outras telas tem só o
+   início, as abas da área aberta e o "+" (ui.jsx, Dock) */
 .dk-wrap{position:fixed;left:50%;bottom:14px;transform:translateX(-50%);z-index:60;display:flex;flex-direction:column;align-items:center;gap:6px;max-width:calc(100vw - 16px)}
-.dk-tabs{display:flex;gap:2px;padding:3px;border-radius:var(--br-pill);background:color-mix(in srgb,var(--surface-2) 88%,transparent);border:1px solid var(--line-soft);backdrop-filter:blur(10px)}
-.dk-tabs a{height:26px;padding:0 11px;display:inline-flex;align-items:center;border-radius:var(--br-pill);font-size:12px;color:var(--ink-50)}
-.dk-tabs a:hover{color:var(--ink)}
-.dk-tabs a[aria-current="page"]{background:var(--fill-hover);color:var(--ink)}
 .dk{
   display:flex;align-items:center;gap:2px;padding:5px;border-radius:18px;
   background:color-mix(in srgb,var(--surface-2) 88%,transparent);border:1px solid var(--line);
@@ -629,16 +657,23 @@ html.light{--color-1:#1c6fc4;--color-2:#b8600a;--color-3:#c4234f;--color-4:#7a3b
 .dk__item[aria-current="page"]{color:var(--ink);background:var(--fill-hover)}
 .dk__item[aria-current="page"] svg{color:var(--accent-ink)}
 .dk__item[aria-current="page"] span{display:inline}
+.dk__tab{display:inline-flex;align-items:center;height:38px;padding:0 10px;border-radius:13px;font-size:12.5px;color:var(--ink-50);white-space:nowrap;transition:background var(--t),color var(--t)}
+.dk__tab:hover{color:var(--ink);background:var(--fill)}
+.dk__tab[aria-current="page"]{color:var(--ink);background:var(--fill-hover)}
 .dk__sep{width:1px;height:22px;background:var(--line);margin:0 4px;flex:none}
 .dk__plus{width:38px;height:38px;flex:none;display:grid;place-items:center;border-radius:13px;background:var(--accent);color:var(--on-accent)}
 .dk__plus svg{width:17px;height:17px}
 .dk__plus:hover{filter:brightness(1.08)}
-@media (max-width:600px){.dk__item[aria-current="page"] span{display:none}.dk__item{padding:0 9px}}
-html.bare .tb,html.bare .dk-wrap{display:none}
+@media (max-width:600px){.dk__item[aria-current="page"] span{display:none}.dk__item{padding:0 9px}.dk__tab{padding:0 9px}}
+/* até 400px o dock aperta o respiro: as quatro abas do trabalho cabem em
+   360px. abaixo disso ele rola dentro dele, sem cortar o início nem o "+" */
+.dk{max-width:100%}
+@media (max-width:400px){.dk{gap:0}.dk__item,.dk__tab{padding:0 7px}.dk__tab{font-size:12px}.dk__sep{margin:0 3px}}
+html.bare .tb,html.bare .dk-wrap,html.bare .am{display:none}
 /* o onboarding e obrigatorio (core.js, guardOnboarding): enquanto ele dura o
-   dock e a busca saem — nao ha para onde ir antes de o Merlin te conhecer.
-   e a pagina que ainda esta decidindo se manda para ele nao aparece */
-html.onboarding .dk-wrap,html.onboarding .tb__search{display:none}
+   dock, o menu e a busca saem — nao ha para onde ir antes de o Merlin te
+   conhecer. e a pagina que ainda esta decidindo se manda para ele nao aparece */
+html.onboarding .dk-wrap,html.onboarding .tb__search,html.onboarding .tb__menu,html.onboarding .am{display:none}
 html.gated #app{visibility:hidden}
 /* o aviso das outras telas: no lugar do conteudo, abaixo da barra do topo */
 .ow{position:fixed;inset:0;z-index:50;display:grid;place-items:center;padding:24px}
