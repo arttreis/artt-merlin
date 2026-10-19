@@ -6,10 +6,9 @@
    de qualquer pagina, precisa saber o saldo pra responder "posso gastar x?"
    sem que a pessoa tenha que navegar ate o financeiro primeiro.
 
-   e tudo puro — recebe `ctx` e devolve numero. nada aqui le o DOM, e so o
-   financeBrief() do fim abre a colecao.
+   e tudo puro — recebe `ctx` e devolve numero. nada aqui le o DOM.
    --------------------------------------------------------------- */
-import { collection, today, isDay, addDays, brl, newId } from "./core.js";
+import { today, isDay, addDays, brl, newId } from "./core.js";
 
 export const pad = (n) => String(n).padStart(2, "0");
 
@@ -542,14 +541,4 @@ export function moneyLines(f, budget) {
     if (line) lines.push(line);
   });
   return lines;
-}
-
-/* ---------- o resumo que o assistente leva ----------
-   o texto que a pagina do financeiro registra como contexto quando esta
-   aberta. devolve "" quando ainda nao ha financeiro nenhum: melhor o Merlin
-   dizer que falta dado do que responder sobre um saldo inventado. */
-export function financeBrief() {
-  const finance = collection("finance", { normalize });
-  const f = financeToday(contextOf(finance), configOf(finance), today());
-  return f.empty ? "" : "Financeiro.\n" + moneyLines(f, 1200).join("\n");
 }

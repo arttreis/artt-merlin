@@ -5,9 +5,9 @@ import "./shared/base.css";
 import "./finance.css";
 import {
   initPage, newId, today, notify, brl, parseMoney,
-  isDay, addDays, weekdayOf, monthLabel, dateLabel, setPageContext
+  isDay, addDays, weekdayOf, monthLabel, dateLabel
 } from "./shared/core.js";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { FINANCE_TEMPLATES, financeGroups, buildFinance } from "./shared/templates.js";
 import {
   mount, useCollection, useKeydown, isTyping,
@@ -20,7 +20,7 @@ import {
   daysInMonth, effectiveDay, cardInstallment, installmentNumber,
   projectionsOf, oldestDay, balanceUntil, realBalanceUntil,
   pendingBefore, suggestionsBetween, buildMonth, spentByCategory, categoryOrder,
-  normalize, byType, configOf, saveConfig, contextOf, financeBrief
+  normalize, byType, configOf, saveConfig, contextOf
 } from "./shared/finance-data.js";
 /* a caixa do lancamento e os campos de dinheiro moram no shared desde
    19/10/2026: o cartao do inicio abre a mesma caixa para o previsto que
@@ -86,16 +86,6 @@ function Finance() {
   /* nunca tocado: nem saldo de partida, nem uma linha lancada, nem nada fixo.
      tres abas de zeros nao ensinam nada — e aqui que o modelo entra. */
   const virgin = !cfg.startBalance && !ctx.entries.length && !ctx.fixed.length && !ctx.debts.length && !ctx.cards.length;
-
-  /* o que o assistente sabe sem perguntar de novo, quando a pergunta for do
-     financeiro ("posso gastar X?") — so o que ja esta na tela, nunca uma
-     simulacao nova por conta propria. o texto do financeBrief() e o mesmo
-     da secao dinheiro do retrato (os dois saem do financeToday), so com mais
-     espaco: o contexto da tela leva ate 1.200 caracteres. */
-  useEffect(() => {
-    setPageContext(financeBrief);
-    return () => setPageContext(null);
-  }, []);
 
   /* ---------- navegacao ---------- */
   const openTab = (id) => { setTab(id); setOpenDay(""); };

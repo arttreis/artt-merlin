@@ -403,7 +403,7 @@ const sameJson = (a, b) => JSON.stringify(a) === JSON.stringify(b);
    que conta duas vezes, um valor cortado no meio ("R$ 1.2").
    ===================================================================== */
 const FD = await import("./finance-data.js");
-const { financeToday, moneyLines, buildMonth, spentByCategory, pendingBefore, suggestionsBetween, financeBrief, configOf } = FD;
+const { financeToday, moneyLines, buildMonth, spentByCategory, pendingBefore, suggestionsBetween, configOf } = FD;
 const { brl } = core;
 
 /* um bloco que explode não pode apagar os outros: vira uma falha com o motivo */
@@ -726,29 +726,6 @@ section("moneyLines: o orçamento e o corte por item inteiro", () => {
     check("corte: nenhum 'a confirmar' sai cortado no meio", items.every((i) => expectedItem.has(i)), items.find((i) => !expectedItem.has(i)));
     check("corte: o 'a confirmar' conta tudo (os mais recentes primeiro)", items.length + more === 12 && (!items.length || items[0].includes("#pa11")), items[0]);
   }
-});
-
-/* ---------- financeBrief e moneyLines dizem o mesmo ---------- */
-section("financeBrief", () => {
-  const store = core.collection("finance", { normalize });
-  /* o resto do arquivo gravou na coleção: parte do zero */
-  store.all().forEach((d) => store.remove(d.id));
-  check("brief: sem financeiro nenhum, é vazio", financeBrief() === "", JSON.stringify(financeBrief()));
-  store.save({ id: "d1", type: "debt", name: "empréstimo", creditor: "Pedro", total: 100000, paid: 0, installment: 10000, dayOfMonth: 5 });
-  store.save({ id: "i1", type: "invest", name: "CDB", category: "renda fixa", contributed: 100, current: 100, order: 0 });
-  check("brief: só dívida e investimento continua vazio", financeBrief() === "", JSON.stringify(financeBrief()));
-  const t = core.today();
-  store.save({ id: "config", type: "config", startBalance: { day: core.addDays(t, -10), amount: 100000 }, budgets: { Lazer: 1000 } });
-  store.save(ent("b1", core.addDays(t, -2), "mercado", "out", 12000, true, { category: "Lazer" }));
-  store.save(ent("b2", core.addDays(t, 2), "dentista", "out", 30000, false));
-  store.save(ent("b3", core.addDays(t, -3), "luz", "out", 9000, false));
-  const brief = financeBrief();
-  const expected = "Financeiro.\n" + moneyLines(financeToday(FD.contextOf(store), configOf(store), t), 1200).join("\n");
-  check("brief: é 'Financeiro.' e o texto do moneyLines com 1.200", brief === expected, brief.slice(0, 200));
-  check("brief: traz o saldo, a confirmar e o que vence", brief.startsWith("Financeiro.\nsaldo hoje ") && brief.includes("a confirmar: ") && brief.includes("#b3") && brief.includes("#b2"), brief);
-  check("brief: nunca leva a dívida nem o investimento", !brief.includes("Pedro") && !brief.includes("CDB") && !brief.includes("empréstimo"), brief);
-  check("brief: cabe em 1.200 caracteres", brief.length <= "Financeiro.\n".length + 1200, String(brief.length));
-  store.all().forEach((d) => store.remove(d.id));
 });
 
 /* ---------- as contas movidas continuam as mesmas ---------- */
