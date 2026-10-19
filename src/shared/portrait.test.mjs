@@ -960,5 +960,189 @@ const bl = (id, due, text, o) => ({ id, text, due, done: false, ...o });
   });
 }
 
+/* =====================================================================
+   o dinheiro no retrato (ticket #11): a seção `money`.
+
+   saldo, nome e valor de lançamento e fixo passam a ir em TODA pergunta. o
+   que se prova aqui é o que, errado, vaza ou mente: uma dívida com o nome do
+   credor (ou um investimento) que entra no texto, um valor cortado no meio
+   ("R$ 1.2"), um financeiro que ainda não desceu da nuvem lido como "sem
+   financeiro ainda" (o Merlin diria "você não tem nada" a quem tem a conta
+   cheia).
+   ===================================================================== */
+const FDm = await import("./finance-data.js");
+const brl = core.brl;
+const sectionM = (name, fn) => {
+  try { fn(); } catch (e) { failures.push(name + " -> exceção: " + (e && e.message)); }
+};
+
+/* os documentos como a coleção os entrega: já normalizados */
+const fdoc = (o) => FDm.normalize({ createdAt: 1, updatedAt: 1, ...o });
+const fent = (id, day, name, kind, amount, paid, extra) => fdoc({ id, type: "entry", day, name, kind, amount, paid, ...extra });
+const ffixed = (id, name, amount, dayOfMonth, extra) => fdoc({ id, type: "fixed", name, amount, kind: "out", category: "Recorrente", dayOfMonth, active: true, ...extra });
+const fconfig = (o) => fdoc({ id: "config", type: "config", startBalance: { day: "2026-10-01", amount: 100000 }, ...o });
+const moneyOf = (finance) => run({ finance });
+const fakeCol = (docs) => ({ all: () => docs, get: (id) => docs.find((x) => x.id === id) || null });
+/* o que a seção deve dizer, pela função pura, com a mesma entrada */
+const expectedMoney = (docs, budget) => FDm.moneyLines(FDm.financeToday(FDm.contextOf(fakeCol(docs)), FDm.configOf(fakeCol(docs)), TODAY), budget).join("\n");
+
+/* um financeiro com um pouco de tudo: segunda 19/10/2026 */
+const MONEY_DOCS = [
+  fconfig({ budgets: { "Básicas/PF": 100000 } }),
+  fent("m-in", "2026-10-05", "freela", "in", 50000, true, { category: "Freela" }),
+  fent("m-mercado", "2026-10-06", "mercado", "out", 120000, true, { category: "Básicas/PF" }),
+  fent("m-pend", "2026-10-15", "aluguel atrasado", "out", 150000, false, { category: "Básicas/PF" }),
+  fent("m-soon", "2026-10-22", "dentista", "out", 30000, false),
+  fent("m-later", "2026-10-28", "viagem", "out", 60000, false),
+  ffixed("m-fixo", "internet", 12000, 20)
+];
+
+/* ---- a seção no contrato público ---- */
+sectionM("money: o contrato", () => {
+  const s = SECTIONS[SECTIONS.length - 1];
+  check("money: é a última seção, 'dinheiro', de 900 caracteres, e espera a coleção finance", s && s.id === "money" && s.label === "dinheiro" && s.budget === 900 && JSON.stringify(s.needs) === JSON.stringify(["finance"]), JSON.stringify(s && { id: s.id, label: s.label, budget: s.budget, needs: s.needs }));
+  check("money: as cinco primeiras seções continuam as de antes", JSON.stringify(SECTIONS.slice(0, 5).map((x) => x.id)) === JSON.stringify(["today", "agenda", "routine", "week", "products"]));
+  check("money: o retrato tem a seção, com rótulo e id", (() => { const p = moneyOf(MONEY_DOCS); return !!sec(p, "money") && sec(p, "money").label === "dinheiro"; })());
+});
+
+/* ---- a seção: saldo, previsto, a confirmar, 7 dias, categorias, fixos ---- */
+sectionM("money: a seção com financeiro", () => {
+  const p = moneyOf(MONEY_DOCS);
+  const t = sec(p, "money").text;
+  const l = lines(p, "money");
+  check("money: não está carregando", sec(p, "money").loading === false);
+  check("money: a primeira linha é o saldo de hoje e o previsto do fim do mês", /^saldo hoje .+ · fim do mês ≈ /.test(l[0]), l[0]);
+  check("money: o saldo de hoje é o do real (100000 + 50000 − 120000)", l[0].startsWith("saldo hoje " + brl(30000, true) + " "), l[0]);
+  for (const prefix of ["a confirmar: ", "vence em 7 dias: ", "previsto no mês: ", "categorias: ", "maiores saídas: ", "fixos: "]) {
+    check("money: tem a linha '" + prefix.trim() + "'", l.some((x) => x.startsWith(prefix)), t);
+  }
+  check("money: o a confirmar traz o previsto de 15/10 com o id", l.some((x) => x.startsWith("a confirmar: ") && x.includes("15/10 aluguel atrasado " + brl(150000) + " #m-pend")), t);
+  check("money: o que vence em 7 dias traz o de 22/10", l.some((x) => x.startsWith("vence em 7 dias: ") && x.includes("22/10 dentista " + brl(30000) + " #m-soon")), t);
+  check("money: o previsto do mês traz o de 28/10", l.some((x) => x.startsWith("previsto no mês: ") && x.includes("28/10 viagem " + brl(60000) + " #m-later")), t);
+  check("money: as categorias dizem 'passou da meta'", l.some((x) => x.startsWith("categorias: ") && x.includes("Básicas/PF") && x.includes("passou da meta")), t);
+  check("money: as maiores saídas têm o mercado", l.some((x) => x.startsWith("maiores saídas: ") && x.includes("mercado · " + brl(120000))), t);
+  check("money: os fixos têm a internet, no dia 20, com o id", l.some((x) => x.startsWith("fixos: ") && x.includes("internet " + brl(12000) + " dia 20 #m-fixo")), t);
+  check("money: é o texto do moneyLines com 900 caracteres, sem mais nem menos", t === expectedMoney(MONEY_DOCS, 900), t.slice(0, 300));
+  check("money: o retrato abre a seção com o rótulo 'dinheiro:'", p.text.includes("dinheiro:\nsaldo hoje "), p.text.slice(-400));
+  check("money: sem escrever no dado que recebe", (() => { const data = build({ finance: MONEY_DOCS }); const before = JSON.stringify(data); portraitOf(data, NOW); return JSON.stringify(data) === before; })());
+});
+
+/* ---- nunca entra: dívida (com o credor) e investimento ---- */
+sectionM("money: nunca entra", () => {
+  const debt = fdoc({ id: "d-pedro", type: "debt", name: "empréstimo", creditor: "Pedro", total: 500000, paid: 100000, installment: 50000, dayOfMonth: 20 });
+  const invest = fdoc({ id: "i-cdb", type: "invest", name: "CDB", category: "renda fixa", contributed: 1000000, current: 1100000 });
+  const withBoth = [...MONEY_DOCS, debt, invest];
+  const p = moneyOf(withBoth);
+  for (const s of ["Pedro", "CDB", "empréstimo", "d-pedro", "i-cdb", "renda fixa"]) {
+    check("money nunca entra: '" + s + "' fora do retrato", !p.text.includes(s), p.text);
+  }
+  check("money nunca entra: a seção é a mesma, com ou sem dívida e investimento", sec(p, "money").text === sec(moneyOf(MONEY_DOCS), "money").text);
+  const only = moneyOf([debt, invest]);
+  check("money nunca entra: só dívida e investimento é 'sem financeiro ainda'", sec(only, "money").text === "sem financeiro ainda" && !only.text.includes("Pedro") && !only.text.includes("CDB"), sec(only, "money").text);
+});
+
+/* ---- corte por seção: 30 fixos e 20 categorias ---- */
+sectionM("money: corte por seção", () => {
+  const budget = SECTIONS.find((s) => s.id === "money").budget;
+  const cats = Array.from({ length: 20 }, (_, i) => "Categoria comprida número " + String(i).padStart(2, "0"));
+  const fixed = Array.from({ length: 30 }, (_, i) => ffixed("fx" + String(i).padStart(2, "0"), "conta fixa comprida número " + String(i).padStart(2, "0"), 123456 + i, 1 + (i % 28)));
+  const spent = cats.map((c, i) => fent("g" + i, "2026-10-" + String(2 + (i % 15)).padStart(2, "0"), "gasto " + i, "out", 4000 + i * 10, true, { category: c }));
+  const docs = [fconfig({ categories: cats, budgets: Object.fromEntries(cats.slice(0, 10).map((c) => [c, 5000])) }), ...fixed, ...spent, fent("a-pend", "2026-10-15", "aluguel", "out", 150000, false)];
+  const p = moneyOf(docs);
+  const text = sec(p, "money").text;
+  const l = text.split("\n");
+  check("money corte: a seção não passa de 900 caracteres", text.length <= budget, text.length + " > " + budget);
+  check("money corte: termina em 'e mais N'", /e mais \d+$/.test(l[l.length - 1]), l[l.length - 1]);
+  check("money corte: cortou mesmo (o teste não é trivial)", /e mais \d+/.test(text));
+  check("money corte: o retrato inteiro cabe no teto", p.text.length <= PORTRAIT_MAX, String(p.text.length));
+  const f = FDm.financeToday(FDm.contextOf(fakeCol(docs)), FDm.configOf(fakeCol(docs)), TODAY);
+  const cutOf = (prefix) => {
+    const line = l.find((x) => x.startsWith(prefix));
+    if (!line) return null;
+    const parts = line.slice(prefix.length).split("; ");
+    const m = /^e mais (\d+)$/.exec(parts[parts.length - 1]);
+    return { items: m ? parts.slice(0, -1) : parts, more: m ? +m[1] : 0 };
+  };
+  const fx = cutOf("fixos: ");
+  check("money corte: os fixos aparecem, e cada um inteiro (valor, dia e id intactos)", !!fx && fx.items.length > 0 && fx.items.every((i) => f.fixed.some((x) => i === x.name + " " + (x.kind === "in" ? "+" : "") + brl(x.amount) + " dia " + Number(x.day.slice(8, 10)) + (x.entered ? " lançado" : " #" + x.id))), JSON.stringify(fx && fx.items.slice(-2)));
+  check("money corte: os fixos que não couberam viram 'e mais N', sem perder a conta", !!fx && fx.more > 0 && fx.items.length + fx.more === 30, fx && fx.items.length + " + " + fx.more);
+  const cat = cutOf("categorias: ");
+  const catText = (c) => c.goal
+    ? c.name + " " + brl(c.outAll) + (c.outReal !== c.outAll ? " (" + brl(c.outReal) + " pago)" : "") + " de " + brl(c.goal) + (c.over ? ", passou da meta" : "")
+    : c.outAll ? c.name + " " + brl(c.outAll) : c.name;
+  check("money corte: as categorias aparecem, cada uma inteira", !!cat && cat.items.length > 0 && cat.items.every((i) => f.categories.some((c) => catText(c) === i)), JSON.stringify(cat && cat.items.slice(-2)));
+  check("money corte: as categorias contam as 20 (as que couberam mais o 'e mais N')", !!cat && cat.items.length + cat.more === f.categories.length, cat && cat.items.length + " + " + cat.more + " de " + f.categories.length);
+  const pend = cutOf("a confirmar: ");
+  check("money corte: o 'a confirmar' curto continua inteiro", !!pend && pend.more === 0 && pend.items.length === 1 && pend.items[0] === "15/10 aluguel " + brl(150000) + " #a-pend", JSON.stringify(pend));
+  check("money corte: a primeira linha, a do saldo, continua inteira", /^saldo hoje .+ · fim do mês ≈ /.test(l[0]), l[0]);
+  const rs = (text.match(/R\$/g) || []).length;
+  check("money corte: todo 'R$' do texto leva um valor inteiro ('R$ 1.234,56'), nenhum cortado no meio", rs > 0 && rs === (text.match(/R\$\s[\d.]+,\d{2}/g) || []).length, text.slice(-200));
+});
+
+/* ---- o retrato cheio de tudo continua dentro do teto ---- */
+sectionM("money: com o retrato cheio", () => {
+  const long = (s, i) => s + " " + String(i).padStart(2, "0") + " " + "palavra ".repeat(25).trim();
+  const tasks = [
+    ...Array.from({ length: 60 }, (_, i) => task({ title: long("Aberta de hoje", i), min: 5 })),
+    ...Array.from({ length: 40 }, (_, i) => task({ title: long("Quinta", i), date: THU, at: hm(6) + i * 10, min: 30 }))
+  ];
+  const routine = Array.from({ length: 30 }, (_, i) => block({ title: long("Bloco", i), at: hm(6, i * 5) }));
+  const apps = Array.from({ length: 12 }, (_, i) => ({ id: "a" + i, name: "Produto " + i + " " + "n".repeat(280) }));
+  const fixed = Array.from({ length: 30 }, (_, i) => ffixed("fx" + i, long("fixo", i), 123456 + i, 1 + (i % 28)));
+  const p = run({ tasks, routine, apps, finance: [fconfig({}), ...fixed] });
+  check("money cheio: o retrato não passa de 6.000", p.text.length <= PORTRAIT_MAX, String(p.text.length));
+  check("money cheio: a seção de dinheiro vai, dentro dos seus 900", !!sec(p, "money") && sec(p, "money").text.length <= 900, sec(p, "money") && String(sec(p, "money").text.length));
+});
+
+/* ---- ainda carregando ---- */
+sectionM("money: ainda carregando", () => {
+  const down = (docs, ok) => ({ all: () => docs, get: (id) => docs.find((x) => x.id === id) || null, hasDownloaded: () => ok });
+  const cols = { finance: down([], false) };
+  const data = portraitData(cols, { signedIn: true, prefs: PREFS });
+  check("carregando: com sessão e sem descida, 'finance' está em loading", data.loading.includes("finance"), JSON.stringify(data.loading));
+  const p = portraitOf(data, NOW);
+  check("carregando: a seção diz 'ainda carregando'", sec(p, "money").text === "ainda carregando" && sec(p, "money").loading === true, sec(p, "money").text);
+  check("carregando: não diz 'sem financeiro ainda' onde não sabe", !p.text.includes("sem financeiro ainda"), p.text);
+  check("carregando: nem mostra saldo inventado", !sec(p, "money").text.includes("saldo hoje"));
+
+  /* mesmo com documentos locais: o que ainda não desceu pode mudar tudo */
+  const local = portraitData({ finance: down(MONEY_DOCS, false) }, { signedIn: true, prefs: PREFS });
+  check("carregando: documentos locais não bastam, a seção espera a nuvem", sec(portraitOf(local, NOW), "money").text === "ainda carregando");
+
+  const off = portraitData(cols, { signedIn: false, prefs: PREFS });
+  check("carregando: sem sessão, nada fica carregando", off.loading.length === 0);
+  check("carregando: sem sessão e sem nada, a seção diz 'sem financeiro ainda'", sec(portraitOf(off, NOW), "money").text === "sem financeiro ainda", sec(portraitOf(off, NOW), "money").text);
+
+  const direct = run({ loading: ["finance"] });
+  check("carregando: loading ['finance'] só pega a seção do dinheiro", sec(direct, "money").loading === true && sec(direct, "today").loading === false && sec(direct, "agenda").loading === false);
+  const other = run({ loading: ["tasks"], finance: MONEY_DOCS });
+  check("carregando: as tarefas carregando não calam o dinheiro", sec(other, "money").loading === false && /^saldo hoje /.test(sec(other, "money").text), sec(other, "money").text);
+
+  const done = portraitData({ finance: down(MONEY_DOCS, true) }, { signedIn: true, prefs: PREFS });
+  check("carregando: a coleção que desceu sai de loading e a seção volta", !done.loading.includes("finance") && /^saldo hoje /.test(sec(portraitOf(done, NOW), "money").text));
+});
+
+/* ---- vazio de verdade: desceu e não tem nada ---- */
+sectionM("money: vazio", () => {
+  const empty = () => ({ all: () => [], get: () => null, hasDownloaded: () => true });
+  const data = portraitData({ finance: empty() }, { signedIn: true, prefs: PREFS });
+  check("vazio: a coleção que desceu não está em loading", !data.loading.includes("finance"), JSON.stringify(data.loading));
+  check("vazio: portraitData passa a lista (vazia) como finance", Array.isArray(data.finance) && data.finance.length === 0, JSON.stringify(data.finance));
+  const p = portraitOf(data, NOW);
+  check("vazio: a seção diz 'sem financeiro ainda'", sec(p, "money").text === "sem financeiro ainda" && sec(p, "money").loading === false, sec(p, "money").text);
+  check("vazio: sem nenhuma lista, o retrato não quebra e a seção diz o mesmo", sec(portraitOf({}, NOW), "money").text === "sem financeiro ainda", sec(portraitOf({}, NOW), "money").text);
+  check("vazio: só a config (saldo inicial) já não é vazio", /^saldo hoje /.test(sec(moneyOf([fconfig({})]), "money").text), sec(moneyOf([fconfig({})]), "money").text);
+  check("vazio: só a config sem saldo inicial é vazio", sec(moneyOf([fdoc({ id: "config", type: "config" })]), "money").text === "sem financeiro ainda");
+});
+
+/* ---- portraitData: a lista crua da coleção, de todos os tipos ---- */
+sectionM("money: portraitData", () => {
+  const col = (docs, ok) => ({ all: () => docs, get: () => null, hasDownloaded: () => ok });
+  const all = [...MONEY_DOCS, fdoc({ id: "d1", type: "debt", name: "x", creditor: "y" }), fdoc({ id: "i1", type: "invest", name: "z" })];
+  const d = portraitData({ finance: col(all, true) }, { signedIn: true, prefs: PREFS });
+  check("dados: finance é tudo que a coleção tem, de todos os tipos (o filtro é da seção)", d.finance.length === all.length && ["entry", "fixed", "config", "debt", "invest"].every((t) => d.finance.some((x) => x.type === t)), JSON.stringify(d.finance.map((x) => x.type)));
+  check("dados: sem a coleção finance, é lista vazia", Array.isArray(portraitData({}, { signedIn: false, prefs: PREFS }).finance) && portraitData({}, { signedIn: false, prefs: PREFS }).finance.length === 0);
+});
+
 console.log("\n" + passed + " passaram, " + failures.length + " falharam");
 if (failures.length) { console.log("\nFALHAS:"); failures.forEach((f) => console.log("  - " + f)); process.exit(1); }
