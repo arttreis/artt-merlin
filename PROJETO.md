@@ -108,7 +108,7 @@ cd server
 npx wrangler d1 execute artt-planner --local --file schema.sql   # uma vez
 npm run dev                 # build + wrangler dev: front + API juntos
 npm test                    # servidor + navegador
-npm run deploy              # testes → build → wrangler deploy (nada sobe se falhar)
+npm run deploy              # testes → build → wrangler deploy (nada sobe se falhar; o merge na main já faz isso)
 ```
 
 `.dev.vars` em `server/` (ignorado pelo git): `RESEND_API_KEY=re_fake…` (código aparece no

@@ -107,7 +107,10 @@ O tamanho fica nas labels `pontos:1`, `pontos:2`, `pontos:3` e `pontos:5`.
 2. **No PR:** o CI (`.github/workflows/ci.yml`) roda o mesmo portão do `npm run deploy`. O
    orquestrador separa falha real de run cancelado por push novo.
 3. **Review humano:** você lê o diff contra o ticket e faz o merge.
-4. **Depois do merge:** `cd server && npm run deploy` (testes → build → deploy). Teste em
+4. **Depois do merge:** o `.github/workflows/deploy.yml` publica sozinho, com o mesmo
+   `npm run deploy` (testes → build → deploy); teste quebrado não sobe. Acompanhe o run em
+   Actions (ou `gh run watch`). Para publicar sem merge, rode o workflow à mão
+   (`gh workflow run deploy`) ou `cd server && npm run deploy` local. Teste em
    produção o caminho principal, olhe os logs (`npx wrangler tail`) e as métricas que o
    ticket definiu. Se der errado, abra um ticket de correção e o ciclo recomeça.
 
