@@ -713,6 +713,16 @@ function Home() {
     return () => document.documentElement.classList.remove("onboarding");
   }, [state]);
 
+  /* durante o onboarding o #next não vale e sai do endereço. enquanto o estado
+     ainda é "waiting" ele fica: se o perfil chegar feito, o Today responde */
+  useEffect(() => {
+    if (state !== "pending") return;
+    const drop = () => { if (location.hash === "#next") history.replaceState(null, "", location.pathname + location.search); };
+    drop();
+    window.addEventListener("hashchange", drop);
+    return () => window.removeEventListener("hashchange", drop);
+  }, [state]);
+
   if (state !== "done") {
     return (
       <div className="hm hm--onboarding">
@@ -803,6 +813,23 @@ function Today({ c, tasks, habits, journal, closes, reviews, sessions, me, h, ph
     setAsking(false);
     keepTalk(mine.concat(reply));
   };
+  /* `index.html#next` (a aba "o que falta" do inbox) é a frase "o que falta
+     hoje?" escrita no campo: o mesmo openIntent, e portanto a mesma mensagem.
+     o endereço perde o hash para o recarregar não perguntar de novo, e o
+     hashchange cobre o menu aberto no próprio início. a ref guarda o
+     openIntent da última pintura, porque o ouvinte nasce uma vez só */
+  const intent = useRef(openIntent);
+  intent.current = openIntent;
+  useEffect(() => {
+    const next = () => {
+      if (location.hash !== "#next") return;
+      history.replaceState(null, "", location.pathname + location.search);
+      intent.current({ kind: "quests" }, "o que falta hoje?");
+    };
+    next();
+    window.addEventListener("hashchange", next);
+    return () => window.removeEventListener("hashchange", next);
+  }, []);
   const lastQ = talk.map((m) => m.from).lastIndexOf("me");
   /* a pílula confirmada vira a linha "✓ lançado · …" e não abre de novo; o
      desfazer a devolve, se a conversa ainda for a mesma */
