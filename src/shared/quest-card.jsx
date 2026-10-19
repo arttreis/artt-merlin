@@ -6,15 +6,19 @@
  * desenhado de novo a cada mudança das coleções: concluir mostra a próxima no
  * mesmo lugar, sem perguntar outra vez.
  *
- * cada tipo de item tem o seu desenho em VIEWS. tipo novo (as contas previstas
- * de dias passados, #15) é uma linha ali e uma fonte no quests.js.
+ * cada tipo de item tem o seu desenho em VIEWS. tipo novo é uma linha ali e uma
+ * fonte no quests.js (as contas previstas de dias passados entraram assim).
  *
  * toda ação que grava avisa com desfazer. "agora não" não grava: pula até a
  * lista mudar, e o pulo mora só nesta página. */
 import "./quest-card.css";
 import { useState } from "react";
-import { today, addDays, dateOf, notify } from "./core.js";
-import { questsOf, nextQuest, listKey, countLine, moveTask, dropTask, doneTask, DAY_HREF } from "./quests.js";
+import { createPortal } from "react-dom";
+import { today, addDays, dateOf, notify, brl } from "./core.js";
+import { useCollection } from "./ui.jsx";
+import { normalize as normalizeFinance, configOf } from "./finance-data.js";
+import { EntryForm } from "./entry-form.jsx";
+import { questsOf, nextQuest, listKey, countLine, moveTask, dropTask, doneTask, paidEntry, moveEntry, DAY_HREF } from "./quests.js";
 import { runningOf, startSession, stopSession, receipt } from "./focus.js";
 import { costOf, fmt, longFmt, clock } from "./day.js";
 
@@ -134,10 +138,49 @@ function OverdueQuest({ quest, tasks, later }) {
   );
 }
 
-function GroupQuest({ quest, later }) {
+/* a conta prevista cujo dia passou: aconteceu? "não" abre a caixa do
+   lançamento com o previsto, para mudar a data ou apagar. a caixa vai para o
+   body: o balão do Merlin tem backdrop-filter, e um diálogo fixo dentro dele
+   ficaria preso no balão */
+function BillQuest({ quest, finance, later }) {
+  const e = quest.entry;
+  const [editing, setEditing] = useState(false);
+  const paid = () => {
+    const undo = paidEntry(finance, e);
+    if (undo) notify(e.name + " confirmado", undo);
+  };
+  const tomorrow = () => {
+    const undo = moveEntry(finance, e, addDays(today(), 1));
+    if (undo) notify(e.name + " foi para amanhã", undo);
+  };
+  /* as mesmas gravações da tela do financeiro */
+  const save = (doc, existing, text) => {
+    finance.save({ ...doc, createdAt: existing ? existing.createdAt : Date.now(), updatedAt: Date.now() });
+    notify(text);
+  };
+  const remove = (id, text) => {
+    const before = finance.remove(id);
+    notify(text, before ? () => finance.save(before) : null);
+  };
+  return (
+    <Shell from="ficou para trás" title={e.name} meta={(e.kind === "in" ? "+" : "") + brl(e.amount)}
+           why={"era para " + dayWord(e.day) + " · aconteceu?"}>
+      <Act main onClick={paid}>sim</Act>
+      <Act onClick={() => setEditing(true)}>não</Act>
+      <Act onClick={tomorrow}>amanhã</Act>
+      <Act onClick={later}>agora não</Act>
+      {editing && createPortal(
+        <EntryForm finance={finance} categories={configOf(finance).categories} id={e.id}
+                   onClose={() => setEditing(false)} onSave={save} onRemove={remove} />,
+        document.body)}
+    </Shell>
+  );
+}
+
+function GroupQuest({ quest, later, open = "abrir o dia" }) {
   return (
     <Shell from="ficou para trás" title={quest.title} why={"a mais antiga é de " + dayWord(quest.items[0].date)}>
-      <a className="qc__act is-main" href={quest.href}>abrir o dia</a>
+      <a className="qc__act is-main" href={quest.href}>{open}</a>
       <Act onClick={later}>agora não</Act>
     </Shell>
   );
@@ -147,13 +190,16 @@ const VIEWS = {
   session: SessionQuest,
   appointment: AppointmentQuest,
   overdue: OverdueQuest,
-  "overdue-group": GroupQuest
+  "overdue-group": GroupQuest,
+  bill: BillQuest,
+  "bill-group": (props) => <GroupQuest {...props} open="abrir o financeiro" />
 };
 
 /* ---------- o cartão ---------- */
 
 export function QuestCard({ tasks, sessions }) {
-  const state = questsOf({ tasks: tasks.all(), sessions: sessions.all() });
+  const finance = useCollection("finance", { normalize: normalizeFinance });
+  const state = questsOf({ tasks: tasks.all(), sessions: sessions.all(), entries: finance.all() });
   const key = listKey(state);
   const [skip, setSkip] = useState({ key, ids: [] });
   const skipped = skip.key === key ? skip.ids : [];
@@ -172,7 +218,7 @@ export function QuestCard({ tasks, sessions }) {
     <section className="qc" aria-label="O que falta hoje">
       {/* a chave troca o desenho quando a coisa muda: o "quanto leva?" de uma
           atrasada não pode ficar aberto na seguinte */}
-      <View key={quest.id} quest={quest} tasks={tasks} sessions={sessions}
+      <View key={quest.id} quest={quest} tasks={tasks} sessions={sessions} finance={finance}
             later={() => setSkip({ key, ids: skipped.concat(quest.id) })} />
       <p className="qc__foot">
         {next && <span>a seguir: {next}</span>}
