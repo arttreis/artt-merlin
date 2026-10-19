@@ -20,7 +20,7 @@ import { useState, useEffect, useRef } from "react";
 import { mount, useCollection, useHash, setHash, Markdown, ProposalDialog, HabitProposal, Hat, icon } from "./shared/ui.jsx";
 import { chatMood } from "./shared/hat.js";
 import { NAV_ICONS } from "./shared/icons.jsx";
-import { MAX_TURNS, normalizeChat, chatTitle, turnsOf, markProposal } from "./shared/assistant-actions.js";
+import { MAX_TURNS, normalizeChat, chatTitle, turnsOf, markProposal, atBottom } from "./shared/assistant-actions.js";
 import { BUILD, buildIntent, answersText, draftView, docFromDraft } from "./shared/build.js";
 /* o retrato vai em toda pergunta: é ele que faz "continuar na conversa"
    chegar sabendo o dia, "o que tenho quinta?" ter resposta e "posso gastar
@@ -410,7 +410,43 @@ function Assistant() {
     if (doc) { idRef.current = doc.id; setMessages(doc.messages); setStartKey(""); }
     else if (!hash) { idRef.current = ""; setMessages([]); }
   }, [hash]);
-  useEffect(() => { if (listRef.current) listRef.current.scrollTop = listRef.current.scrollHeight; }, [messages, thinking]);
+  /* mensagem nova sempre rola até o fim */
+  const pinned = useRef(true);
+  useEffect(() => {
+    if (!listRef.current) return;
+    pinned.current = true;
+    listRef.current.scrollTop = listRef.current.scrollHeight;
+  }, [messages, thinking]);
+  /* se a pessoa estava no fim, ainda estava quando o cartão cresceu */
+  useEffect(() => {
+    const el = listRef.current;
+    if (!el) return;
+    const onScroll = () => { pinned.current = atBottom(el); };
+    el.addEventListener("scroll", onScroll, { passive: true });
+    return () => el.removeEventListener("scroll", onScroll);
+  }, []);
+  /* o cartão do "o que falta hoje?" muda de altura sem que `messages` mude: as
+     tarefas chegam da nuvem depois da pintura, "hoje" abre os chips, concluir
+     troca a coisa. a caixa da conversa não muda de tamanho (quem cresce é o
+     conteúdo dela), então se observa o cartão. cresceu e a pessoa estava no
+     fim: acompanha. ela subiu para reler: fica onde está. */
+  useEffect(() => {
+    const el = listRef.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const heights = new Map();
+    const ro = new ResizeObserver((entries) => {
+      let grew = false;
+      for (const e of entries) {
+        const h = e.target.offsetHeight;
+        const was = heights.get(e.target);
+        if (was !== undefined && h > was) grew = true;
+        heights.set(e.target, h);
+      }
+      if (grew && pinned.current) el.scrollTop = el.scrollHeight;
+    });
+    el.querySelectorAll(".chat__quest").forEach((q) => { heights.set(q, q.offsetHeight); ro.observe(q); });
+    return () => ro.disconnect();
+  }, [messages]);
 
   /* a conversa desta pintura: o desfazer da marca chega depois, e pode já ser outra */
   const chatNow = idRef.current;

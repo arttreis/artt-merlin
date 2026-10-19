@@ -255,6 +255,14 @@ export function normalizeChat(d) {
   };
 }
 
+/* a pessoa estava no fim da conversa? é a conta que decide se o cartão que
+   cresce depois de desenhado a acompanha (rola até o fim) ou a deixa em paz
+   (ela subiu para reler). a folga de 48px perdoa o arredondamento da rolagem
+   e o resto de uma linha; conteúdo que cabe na caixa conta como "no fim". */
+export function atBottom({ scrollTop, clientHeight, scrollHeight }, slack = 48) {
+  return scrollHeight - scrollTop - clientHeight <= slack;
+}
+
 /* o titulo e a primeira coisa que a pessoa escreveu — e assim que ela
    reconhece a conversa na lista, e nao por um resumo que a IA inventaria
    (e que custaria outra chamada) */
