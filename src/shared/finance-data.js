@@ -347,11 +347,26 @@ export function contextOf(finance) {
    que uma conta passada ainda não foi paga, mas não que uma futura já foi */
 export const paidOf = (date, paid, base) => (date > base ? false : paid !== false);
 
+/* o previsto e o fixo que o pedido aponta, achados do mesmo jeito para o
+   lançamento (`newEntry`) e para a prévia (`entryLine`): a caixa não pode dizer
+   uma coisa e gravar outra. `confirm` é o id de um previsto aberto; `fixed`, o de
+   um fixo ativo e ainda não lançado no mês da data do pedido (`spec.date`, ou
+   `base` se vier vazia ou inválida). o retrato mostra o id como "#id" e a IA às
+   vezes o devolve assim, então o "#" sai. id que não bate com nada vale como
+   vazio, a mesma regra do Worker (cleanCapture) */
+export function refsOf(spec, ctx, base) {
+  const s = spec || {};
+  const c = ctx || {};
+  const date = isDay(s.date) ? s.date : base;
+  const ref = (v) => String(v || "").replace(/^#/, "");
+  const planned = s.confirm ? (c.entries || []).find((e) => e.id === ref(s.confirm) && !e.paid) || null : null;
+  const fixed = s.fixed ? (c.fixed || []).find((f) => f.id === ref(s.fixed) && f.active && !alreadyEntered(c.entries, "fixed", f.id, date)) || null : null;
+  return { planned, fixed };
+}
+
 /* `spec`: { title, amount (centavos), flow, category, date, paid, confirm, fixed, chat }.
-   `confirm` é o id de um previsto aberto: "paguei o aluguel" confirma o que já
-   estava lá, em vez de lançar outro. `fixed` é o id de um fixo ainda não
-   lançado no mês: lança com a origem nele, e a sugestão do mês some. id que não
-   bate com nada vale como vazio, a mesma regra do Worker (cleanCapture). */
+   "paguei o aluguel" confirma o previsto que já estava lá, em vez de lançar
+   outro; `fixed` lança com a origem no fixo, e a sugestão do mês some. */
 export function newEntry(spec, cfg, ctx, base) {
   const s = spec || {};
   const now = Date.now();
@@ -360,13 +375,10 @@ export function newEntry(spec, cfg, ctx, base) {
   const categories = (cfg && cfg.categories) || DEFAULT_CATEGORIES;
   const category = categories.includes(s.category) ? s.category : "";
   const title = String(s.title || "").trim().slice(0, 140);
-  /* o retrato mostra o id como "#id"; a IA às vezes devolve com o "#" */
-  const ref = (v) => String(v || "").replace(/^#/, "");
-  const planned = s.confirm ? (ctx.entries || []).find((e) => e.id === ref(s.confirm) && !e.paid) : null;
+  const { planned, fixed } = refsOf(s, ctx, base);
   if (planned) {
     return { doc: { ...planned, name: title || planned.name, amount: amount || planned.amount, paid: true, via: "chat", updatedAt: now } };
   }
-  const fixed = s.fixed ? (ctx.fixed || []).find((f) => f.id === ref(s.fixed) && f.active && !alreadyEntered(ctx.entries, "fixed", f.id, date)) : null;
   const value = amount || (fixed ? fixed.amount : 0);
   if (!value) return { error: "falta o valor" };
   return { doc: {
@@ -388,16 +400,17 @@ export const undoEntry = (before, after) => (before ? { save: before } : { remov
 
 /* a linha que confere o lançamento de relance, no cartão do início e na caixa:
    "R$ 45,00 · Básicas/PF · saída · pago". com o `ctx` do financeiro, a linha
-   acha o previsto confirmado e o fixo; sem ele, só diz que confirma um */
+   mostra o que `newEntry` vai gravar (o previsto confirmado, o valor e o tipo do
+   fixo, ou "falta o valor"); sem ele, não sabe achar nada e só diz que confirma
+   um previsto */
 export function entryLine(s, base, ctx) {
-  const c = ctx || {};
-  const planned = s.confirm ? (c.entries || []).find((e) => e.id === s.confirm) : null;
-  const fixed = s.fixed ? (c.fixed || []).find((f) => f.id === s.fixed) : null;
+  const { planned, fixed } = refsOf(s, ctx, base);
   const when = planned ? "confirma o previsto de " + planned.day.slice(8, 10) + "/" + planned.day.slice(5, 7)
-    : s.confirm ? "confirma um previsto"
+    : s.confirm && !ctx ? "confirma um previsto"
     : paidOf(isDay(s.date) ? s.date : base, s.paid, base) ? "pago" : "previsto";
-  const amount = Math.round(+s.amount) || (planned ? planned.amount : fixed ? fixed.amount : 0);
-  return [amount > 0 ? brl(amount) : "falta o valor", s.category, s.flow === "in" ? "entrada" : "saída", when].filter(Boolean).join(" · ");
+  const amount = Math.max(0, Math.round(+s.amount) || 0) || (planned ? planned.amount : fixed ? fixed.amount : 0);
+  const kind = fixed ? fixed.kind : s.flow;
+  return [amount > 0 ? brl(amount) : "falta o valor", s.category || (fixed ? fixed.category : ""), kind === "in" ? "entrada" : "saída", when].filter(Boolean).join(" · ");
 }
 
 /* o que a leitura do início precisa saber para não inventar: as categorias, os
