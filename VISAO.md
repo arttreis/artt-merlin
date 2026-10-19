@@ -957,6 +957,11 @@ no escuro, 3,8:1 no claro) — o verde dava 1,46:1 no claro. O preço é que o c
 cor do botão; ele se separa pela forma e pelo movimento, não mais pela cor. `--merlin` continua
 existindo como o token do personagem, com o mesmo valor.
 
+**O chapéu é o logotipo (19/10/2026).** O monograma antigo saiu de todo lugar: barra, favicon
+(`public/merlin.svg`), landing, privacidade, rastreador, link compartilhado e o ícone do app de
+desktop. É o mesmo chapéu de `hat.js`, parado no humor de repouso. Ficou de fora só a imagem de
+prévia de link (`public/og.jpg`), que é uma foto pronta.
+
 **Onde ele aparece.** Primeiro no chat (`assistant.html`): grande na abertura, no lugar da
 faísca, e pequeno ao lado do campo durante a conversa. Ali ele ouve quando a pessoa escreve,
 pensa enquanto espera, trabalha enquanto monta um rascunho, fica pronto quando chega uma

@@ -29,7 +29,7 @@ html.tracker .notice{top:4px;bottom:auto;max-width:calc(100vw - 20px);font-size:
 .tk--strip{padding:0;gap:0}
 .tk-strip{display:flex;align-items:center;gap:8px;height:44px;padding:0 8px 0 14px}
 .tk-grip{display:grid;place-items:center;cursor:grab}
-.tk-grip svg{width:14px;height:14px;color:var(--accent);pointer-events:none}
+.tk-grip svg{width:18px;height:18px;pointer-events:none}
 .tk-peek{
   flex:1 1 auto;min-width:0;display:flex;align-items:baseline;gap:8px;
   height:32px;padding:0 6px;border-radius:var(--br2);text-align:left;
@@ -45,7 +45,7 @@ html.tracker .notice{top:4px;bottom:auto;max-width:calc(100vw - 20px);font-size:
 .tk-bar{display:flex;align-items:center;gap:6px;height:36px;flex:0 0 auto;cursor:default}
 .tk-brand{display:flex;align-items:center;gap:7px;color:var(--ink-70);font-size:12px}
 .tk-brand b{font-weight:600;letter-spacing:-.02em}
-.tk-brand svg{width:14px;height:14px;color:var(--accent);pointer-events:none}
+.tk-brand svg{width:18px;height:18px;pointer-events:none}
 .tk-win{margin-left:auto;font-size:10.5px;color:var(--ink-30)}
 .tk-btn{
   display:grid;place-items:center;width:26px;height:26px;border-radius:var(--br2);

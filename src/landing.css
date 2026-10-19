@@ -55,7 +55,7 @@ html.bare body::before,html.bare body::after{opacity:0}
   -webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);
 }
 .ld-nav__logo{display:inline-flex;align-items:center;gap:9px;font-weight:600;font-size:15.5px;color:inherit}
-.ld-nav__logo svg{width:20px;height:20px;color:var(--accent);flex:none}
+.ld-nav__logo img{width:24px;height:24px;flex:none}
 .ld-nav__links{display:flex;gap:2px;margin:0 auto}
 .ld-nav__links a{padding:8px 13px;border-radius:var(--br-pill);font-size:13.5px;opacity:.82;transition:opacity var(--t),background var(--t)}
 .ld-nav__links a:hover{opacity:1;background:color-mix(in srgb,currentColor 10%,transparent)}

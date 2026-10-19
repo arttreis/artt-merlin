@@ -17,6 +17,7 @@
    a semana e o mes mostram o que ha em cada data, sem prometer que cabe. */
 import "./shared/base.css";
 import "./calendar.css";
+import { LOGO } from "./shared/icons.jsx";
 import "./shared/week-grid.css";
 import {
   initPage, newId, today, isDay, dateOf, dayOf, addDays, sundayOf, dateLabel, monthLabel,
@@ -135,9 +136,7 @@ const liveNotes = (col) => col.all()
   .slice(0, MAX_NOTES);
 
 /* icones que nao moram no core por serem exclusivos desta tela */
-const LogoIcon = () => (
-  <svg viewBox="0 0 472.5 472.5" fill="currentColor"><path d="M236.31,236.23c-3.63,128.42,107.71,238.95,236.22,236.22v-118.11c-64.78,2.88-121-53.42-118.11-118.11h-118.11Z"/><path d="M236.22,0C239.85,128.42,128.52,238.95,0,236.22v-118.11C64.78,120.99,121,64.69,118.11,0h118.11Z"/><path d="M315.07,0h77.61c44.09,0,79.89,35.8,79.89,79.89v77.61h-157.5V0h0Z"/><path d="M79.96,315H.07v78.75h78.75v78.75h78.75v-79.89c0-42.86-34.75-77.61-77.61-77.61Z"/></svg>
-);
+const LogoIcon = () => LOGO;
 const ChevronIcon = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
 );

@@ -519,7 +519,7 @@ html.light{--color-1:#1c6fc4;--color-2:#b8600a;--color-3:#c4234f;--color-4:#7a3b
 .tb > *{pointer-events:auto}
 .tb__gap{flex:1 1 auto;pointer-events:none}
 .tb__logo{display:inline-flex;align-items:center;gap:8px;font-weight:600;font-size:14px;color:var(--ink)}
-.tb__logo svg{width:18px;height:18px;color:var(--accent)}
+.tb__logo svg{width:24px;height:24px}
 .tb__sub{font-family:var(--mono);font-size:11px;color:var(--ink-50)}
 .tb__search{
   display:flex;align-items:center;gap:8px;height:32px;padding:0 6px 0 10px;border-radius:var(--br2);
