@@ -205,10 +205,12 @@ export function Dialog({ title, sub, wide, onClose, actions, label, children, ..
    false mantem a caixa aberta. o primeiro campo ganha foco ao abrir. */
 export function Form({ title, sub, wide, submit, remove, removeIcon, aside, onSubmit, onRemove, onClose, children }) {
   const ref = useRef(null);
-  /* foco antes da pintura: a primeira tecla ja entra no campo certo */
+  /* foco antes da pintura: a primeira tecla ja entra no campo certo. sem rolar
+     a pagina: a caixa e fixa e rola por dentro, entao o foco nao tem nada a
+     trazer a vista, e a pagina de tras (o balao do inicio) fica onde estava */
   useLayoutEffect(() => {
     const first = ref.current && ref.current.querySelector("input:not([type=hidden]):not([type=checkbox]),select,textarea");
-    if (first) { first.focus(); if (first.select && first.type !== "date") first.select(); }
+    if (first) { first.focus({ preventScroll: true }); if (first.select && first.type !== "date") first.select(); }
   }, []);
   useEscape(onClose);
   const handleSubmit = (e) => {
