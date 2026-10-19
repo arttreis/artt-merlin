@@ -28,10 +28,11 @@ Vite; o build sai em `server/site/`. O que é comum vive aqui:
   contas previstas de dias passados, pelo `pendingBefore` do `finance-data.js`; cada fonte vira
   um item só quando passa de dois), `nextQuest` dá a próxima não pulada, e `moveTask`,
   `dropTask`, `doneTask`, `paidEntry` ("sim, aconteceu") e `moveEntry` gravam devolvendo o
-  desfazer. Fonte nova é uma linha em `SOURCES`. É a conta do cartão do início, do "agora" do
+  desfazer (`doneTask` recusa reserva, com `null`). Fonte nova é uma linha em `SOURCES`. É a conta do cartão do início, do "agora" do
   rastreador e do cartão que o Merlin pede.
 - `quest-card.jsx` — o **cartão** dessa lista na conversa do início: um desenho por tipo em
-  `VIEWS` (tipo novo é uma linha ali). "agora não" é estado da página e não grava. O "não" da
+  `VIEWS` (tipo novo é uma linha ali). "agora não" é estado da página e não grava. A reserva não tem "concluir"
+  (nem a sessão de foco nela): tem "amanhã" e "agora não". O "não" da
   conta prevista abre a `EntryForm` num portal no `body`.
 - `entry-form.jsx` — a **caixa do lançamento** (`EntryForm`) e os campos de dinheiro
   (`MoneyInput`, `KindChips`, `CategorySelect`), usados pelo financeiro e pelo cartão do início.

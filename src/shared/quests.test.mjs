@@ -314,6 +314,38 @@ function spyOf(list) {
   check("concluir uma de hoje sobe a contagem de feitas", after === before + 1, before + " -> " + after);
 }
 
+/* ---- reserva não se conclui ---- */
+{
+  const lunch = task({ id: "lunch", title: "almoço", at: clock(12), min: 60, reserved: true });
+  const spy = spyOf([lunch]);
+  const undo = doneTask(spy, lunch);
+  check("concluir uma reserva aberta: devolve null", undo === null, String(undo));
+  check("concluir uma reserva: continua aberta", spy.get("lunch").done === false);
+  check("concluir uma reserva: o store não registra gravação", spy.saves === 0, String(spy.saves));
+
+  /* regressão: a tarefa comum aberta ainda conclui e devolve o desfazer */
+  const store = tasks();
+  store.save(task({ id: "plain", title: "tarefa comum" }));
+  const undoPlain = doneTask(store, store.get("plain"));
+  check("concluir uma tarefa comum: conclui", store.get("plain").done === true);
+  check("concluir uma tarefa comum: devolve o desfazer", typeof undoPlain === "function");
+  await undoPlain();
+  check("o desfazer reabre a tarefa comum", store.get("plain").done === false);
+
+  /* amanhã: a reserva muda de dia, com o mesmo horário, e sai de agora */
+  const store2 = tasks();
+  store2.save(task({ id: "lunch2", title: "almoço", at: clock(12), min: 60, reserved: true }));
+  const now = at(11, 45);
+  check("antes de mover, o almoço é agora", questsOf({ tasks: store2.all(), sessions: [] }, now).now.map((q) => q.id).join() === "task:lunch2");
+  const undoMove = moveTask(store2, store2.get("lunch2"), TOMORROW, 0);
+  const moved = store2.get("lunch2");
+  check("amanhã: a reserva fica com a data de amanhã", moved.date === TOMORROW, moved.date);
+  check("amanhã: o mesmo horário e ainda reserva", moved.at === clock(12) && moved.reserved === true, JSON.stringify([moved.at, moved.reserved]));
+  check("amanhã: sai de agora de hoje", questsOf({ tasks: store2.all(), sessions: [] }, now).now.length === 0);
+  await undoMove();
+  check("o desfazer devolve a reserva para hoje, no mesmo horário", store2.get("lunch2").date === TODAY && store2.get("lunch2").at === clock(12), JSON.stringify(store2.get("lunch2")));
+}
+
 /* ---- contagem ---- */
 {
   const list = [

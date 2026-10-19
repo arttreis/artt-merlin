@@ -10,7 +10,11 @@
  * fonte no quests.js (as contas previstas de dias passados entraram assim).
  *
  * toda ação que grava avisa com desfazer. "agora não" não grava: pula até a
- * lista mudar, e o pulo mora só nesta página. */
+ * lista mudar, e o pulo mora só nesta página.
+ *
+ * reserva (almoço, call, bloco fixo) ocupa a janela e não se conclui: o cartão
+ * dela não tem "concluir" (tem "amanhã" e "agora não"), nem a sessão de foco
+ * aberta nela. concluir devolveria a hora da reserva à sobra do dia. */
 import "./quest-card.css";
 import { useState } from "react";
 import { createPortal } from "react-dom";
@@ -73,28 +77,38 @@ function SessionQuest({ quest, tasks, sessions }) {
       if (undoTask) undoTask();
     });
   };
+  const canFinish = !!task && !task.done && !task.reserved;
   return (
     <Shell from="agora · em foco" title={quest.title}
            meta={fmt(quest.elapsed || 1) + (quest.min ? " de " + fmt(quest.min) : "")}
            why="a sessão de foco está rodando">
-      {task && !task.done && <Act main onClick={() => stop(true)}>concluir</Act>}
-      <Act main={!task || task.done} onClick={() => stop(false)}>parar</Act>
+      {canFinish && <Act main onClick={() => stop(true)}>concluir</Act>}
+      <Act main={!canFinish} onClick={() => stop(false)}>parar</Act>
     </Shell>
   );
 }
 
-function AppointmentQuest({ quest, tasks, sessions }) {
+function AppointmentQuest({ quest, tasks, sessions, later }) {
   const t = quest.task;
   const end = t.at + costOf(t);
   const done = () => {
     const undo = doneTask(tasks, t);
     if (undo) notify("concluída · " + t.title, undo);
   };
+  const tomorrow = () => {
+    const undo = moveTask(tasks, t, addDays(today(), 1), 0);
+    if (undo) notify("foi para amanhã", undo);
+  };
   return (
     <Shell from="agora" title={t.title} meta={clock(t.at) + " · " + fmt(costOf(t))}
            why={quest.live ? "em curso, até " + clock(end) : quest.wait ? "começa em " + quest.wait + " min" : "começa agora"}>
       <Act main onClick={() => begin(sessions, t)}>começar foco</Act>
-      <Act onClick={done}>concluir</Act>
+      {t.reserved ? (
+        <>
+          <Act onClick={tomorrow}>amanhã</Act>
+          <Act onClick={later}>agora não</Act>
+        </>
+      ) : <Act onClick={done}>concluir</Act>}
     </Shell>
   );
 }
