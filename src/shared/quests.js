@@ -130,9 +130,10 @@ export function dropTask(store, task) {
   return before ? () => store.save(before) : null;
 }
 
+/* reserva não se conclui: concluir devolveria a hora dela à sobra do dia */
 export function doneTask(store, task) {
   const before = store.get(task.id);
-  if (!before || before.done) return null;
+  if (!before || before.done || before.reserved) return null;
   store.save({ ...before, done: true, updatedAt: Date.now() });
   return restore(store, before);
 }
