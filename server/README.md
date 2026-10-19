@@ -137,6 +137,12 @@ npm run deploy
 Isso roda os testes, faz o `vite build` (que escreve as páginas prontas em `site/`) e publica. Se
 algum teste falhar, nada sobe.
 
+Normalmente ninguém roda isso à mão: todo push na `main` dispara o
+`.github/workflows/deploy.yml`, que faz o mesmo `npm run deploy`. Ele usa dois segredos do
+repositório no GitHub: `CLOUDFLARE_API_TOKEN` (modelo "Edit Cloudflare Workers", só a conta
+arttreis e a zona `arttreis.com.br`, porque o custom domain precisa de Workers Routes) e
+`CLOUDFLARE_ACCOUNT_ID`. Os segredos do app continuam no `wrangler secret`, fora do GitHub.
+
 ## Mexer sem quebrar nada
 
 ```bash
