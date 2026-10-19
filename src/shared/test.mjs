@@ -1331,5 +1331,54 @@ const dataLeft = () => globalThis.localStorage.keys().filter((k) => k in DATA);
   check("áreas: toda área tem o ícone em NAV_ICONS", block.length > 0 && noIcon.length === 0, noIcon.join(","));
 }
 
+/* ---- a apresentação das áreas e o "ideias" que virou "notas" (ticket #39) ----
+   a apresentação é a primeira explicação do Merlin para quem chega, e a que
+   descrevia a barra antiga ensinava lugares que não existem mais. ela é lida
+   como texto (como a porta lê o core.js): os passos são um array literal. */
+{
+  const fs = await import("node:fs");
+  const path = await import("node:path");
+  const { fileURLToPath } = await import("node:url");
+  const root = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
+  const read = (...p) => fs.readFileSync(path.join(root, ...p), "utf8");
+  const { SECTIONS } = await fresh({});
+
+  const src = read("src", "shared", "tour.jsx");
+  const literal = (name) => {
+    const m = src.match(new RegExp("const " + name + " = (\\[[\\s\\S]*?\\n\\]|\\[[^\\n]*\\]);"));
+    return m ? new Function("return " + m[1])() : null;
+  };
+  const tour = literal("TOUR") || [];
+  check("apresentação: o TOUR foi encontrado", tour.length > 0);
+  check("apresentação: são seis passos, cada um com título e texto", tour.length === 6 && tour.every((s) => s.title && s.text), String(tour.length));
+  check("apresentação: os títulos", JSON.stringify(tour.map((s) => s.title)) === JSON.stringify([
+    "fale com o Merlin", "o que falta, uma coisa por vez", "o resto mora no menu",
+    "só o dia tem minutos", "do produto a quem usa", "dinheiro e hábitos sem se enganar"
+  ]), JSON.stringify(tour.map((s) => s.title)));
+  const art = src.slice(src.indexOf("function TourArt"));
+  const words = tour.map((s) => s.title + " " + s.text).join(" ") + art;
+  const stale = ["ideias", "vitrine", "distribuição", "quest"].filter((w) => words.toLowerCase().includes(w));
+  check("apresentação: nada de ideias, vitrine, distribuição ou quest", stale.length === 0, stale.join(","));
+  const areas = SECTIONS.map((s) => s.label);
+  const third = tour[2] ? tour[2].text.toLowerCase() : "";
+  check("apresentação: o passo 3 diz as cinco áreas", areas.every((a) => third.includes(a)), third);
+  const drawn = literal("AREAS") || [];
+  check("apresentação: o desenho do passo 3 tem as áreas do menu, com o ícone de cada uma",
+    JSON.stringify(drawn) === JSON.stringify(SECTIONS.map((s) => [s.icon, s.label])), JSON.stringify(drawn));
+
+  const index = read("src", "index.jsx"), calendar = read("src", "calendar.jsx"), profile = read("src", "profile.jsx");
+  check("apresentação: abre no início pela chave nova", /useState\(\(\) => !seen\("tour-areas"\)\)/.test(index) && /markSeen\("tour-areas"\)/.test(index));
+  check("apresentação: o calendário não a abre mais", !/tour\.jsx|<Tour\b|seen\("tour/.test(calendar));
+  check("apresentação: o perfil revê e esquece a chave nova", !/seen\("tour"\)/.test(profile)
+    && /forgetSeen\("tour-areas"\)/.test(profile) && /markSeen\("tour-areas"\)/.test(profile));
+  check("apresentação: o perfil diz que ela abre no início", profile.includes("abre sozinha no início") && !profile.includes("sozinha no Hoje"));
+
+  const files = { "src/index.jsx": index, "src/shared/ui.jsx": read("src", "shared", "ui.jsx"), "src/profile.jsx": profile };
+  Object.entries(files).forEach(([name, text]) => {
+    const old = ["em ideias", "guardar em ideias", "vira ideia"].filter((w) => text.includes(w));
+    check("notas: " + name + " não manda mais para \"ideias\"", old.length === 0, old.join(","));
+  });
+}
+
 console.log("\n" + passed + " passaram, " + failures.length + " falharam");
 if (failures.length) { console.log("\nFALHAS:"); failures.forEach((f) => console.log("  - " + f)); process.exit(1); }

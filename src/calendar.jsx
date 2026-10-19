@@ -21,7 +21,7 @@ import "./shared/week-grid.css";
 import {
   initPage, newId, today, isDay, dateOf, dayOf, addDays, sundayOf, dateLabel, monthLabel,
   api, cloud, notify, readDuration, formatMin, parseDuration, readPrefs, savePrefs,
-  parseMentions, clientName, clients, seen, markSeen
+  parseMentions, clientName, clients
 } from "./shared/core.js";
 import { useState, useEffect, useLayoutEffect, useRef } from "react";
 import { createPortal } from "react-dom";
@@ -42,7 +42,6 @@ import {
 import { isClient } from "./shared/client-doc.js";
 import { MiniMonth, monthGrid, monthOf } from "./shared/mini-month.jsx";
 import { TodayBlock } from "./shared/today-block.jsx";
-import { Tour } from "./shared/tour.jsx";
 
 initPage("calendar");
 
@@ -204,15 +203,6 @@ function Calendar() {
   const [editing, setEditing] = useState(null);
   const [hidden, setHidden] = useState(readHidden);   /* as agendas desligadas: "" e a pessoal */
   const [side, setSide] = useState(readSide);
-  /* a apresentação: o Hoje é a primeira tela de quem acabou de chegar, então
-     é aqui que ela aparece uma vez. rever é pelo perfil. */
-  const [tour, setTour] = useState(() => !seen("tour"));
-  const closeTour = () => {
-    setTour(false);
-    markSeen("tour");
-    /* quem acabou de ler é devolvido ao campo do dia, com o cursor dentro */
-    requestAnimationFrame(() => { if (fieldRef.current) fieldRef.current.focus(); });
-  };
 
   const undoStack = useRef([]);
   const toastTimer = useRef(null);
@@ -922,7 +912,6 @@ function Calendar() {
         </Dialog>
       )}
 
-      {tour && <Tour onClose={closeTour} />}
       {form && <TaskForm store={store} id={form.id} presetDate={form.date || anchor} presetAt={form.at} presetClient={view === "day" ? "" : soloClient} onClose={() => setForm(null)} onRemove={remove} onDuplicate={duplicate} />}
       {summary != null && <MerlinDialog text={summary} onClose={() => setSummary(null)} />}
 

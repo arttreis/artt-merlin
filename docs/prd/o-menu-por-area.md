@@ -3,7 +3,8 @@
 **Status:** 📝 Rascunho, decisões a revisar. A descoberta foi feita pelo orquestrador em
 2026-10-19, com autonomia dada pelo Arthur. Toda decisão marcada com **(orq.)** foi decidida pelo
 orquestrador e está **a revisar pelo Arthur**. As marcadas com **(Arthur)** já vieram decididas.
-Tickets ainda não publicados (rascunhos em `C:\Users\arthu\AppData\Local\Temp\claude\menu-tickets\`).
+Tickets publicados no milestone "o menu por área" (#36 a #39). As decisões viraram a seção 13 da
+[VISAO](../../VISAO.md), com notas nas seções 2, 9.1, 9.2, 9.4 e 10.
 **Owner:** Arthur Reis
 **Criado em:** 2026-10-19
 **Origem:** o desenho de 17/10 ("merlin deve agir como uma secretária"): o chat é a entrada, com
@@ -169,7 +170,7 @@ levar a qualquer página pelo nome.
 
 - **D11. A VISAO ganha a seção 13, "O menu por área"**, e as seções 2 ("Sidebar"), 9.1, 9.2, 9.4
   e 10 ganham uma nota apontando para ela, como a secretária fez na 10 **(orq.)**. Fica no
-  último ticket, quando a casca já mudou.
+  último ticket, quando a casca já mudou. Feito no #39.
 
 ## Fora de escopo
 
@@ -216,15 +217,14 @@ levar a qualquer página pelo nome.
 
 ## Tickets
 
-Rascunhos ainda não publicados. A numeração é a dos arquivos; vira número de issue na
-publicação.
+Publicados no milestone "o menu por área". O 01 a 04 dos rascunhos viraram as issues #36 a #39.
 
 | # | título | pts | bloqueado por | onda |
 | --- | --- | --- | --- | --- |
-| 01 | Trocar as seis seções por cinco áreas num menu que se abre do alto | 5 | — | 1 |
-| 02 | Tirar a vitrine, levando o endereço dela para o financeiro | 2 | — | 1 |
-| 03 | Abrir o início já com "o que falta hoje?" respondido pela aba do inbox | 1 | — | 1 |
-| 04 | Reescrever a apresentação para as cinco áreas, abri-la no início e trocar "ideias" por "notas" | 3 | 01, 02, 03 | 2 |
+| #36 | Trocar as seis seções por cinco áreas num menu que se abre do alto | 5 | — | 1 |
+| #37 | Tirar a vitrine, levando o endereço dela para o financeiro | 2 | — | 1 |
+| #38 | Abrir o início já com "o que falta hoje?" respondido pela aba do inbox | 1 | — | 1 |
+| #39 | Reescrever a apresentação para as cinco áreas, abri-la no início e trocar "ideias" por "notas" | 3 | #36, #37, #38 | 2 |
 
 Os três da onda 1 mexem em trechos diferentes do `core.js` (o 01 em `SECTIONS`, o 02 em
 `SEARCH_SOURCES`) e do `README.md` (o 01 no parágrafo de abertura, o 02 na linha da vitrine). O

@@ -150,15 +150,15 @@ function Profile() {
           <div className="pf-sep" />
           <p className="heading"><span className="t-mono">a apresentação</span></p>
           <p className="note">
-            {seen("tour")
+            {seen("tour-areas")
               ? "Você já viu como o Merlin se organiza. Dá para rever quando quiser."
-              : "Você ainda não viu a apresentação — ela abre sozinha no Hoje."}
+              : "Você ainda não viu a apresentação — ela abre sozinha no início."}
           </p>
           <div className="pf-actions">
             <button className="pill" type="button" onClick={() => setTour(true)}>{icon("spark")}<span>ver a apresentação</span></button>
-            {seen("tour") && (
+            {seen("tour-areas") && (
               <button className="pill" type="button"
-                      onClick={() => { forgetSeen("tour"); notify("ela volta a abrir sozinha no Hoje"); }}>
+                      onClick={() => { forgetSeen("tour-areas"); notify("ela volta a abrir sozinha no início"); }}>
                 esquecer que eu vi
               </button>
             )}
@@ -172,7 +172,7 @@ function Profile() {
         <section className="block col-12">
           <p className="heading"><span className="t-mono">o que está guardado</span></p>
           {nothing
-            ? <p className="empty">Nada ainda. O Ctrl K é o jeito mais curto de começar: com duração vai para hoje, sem duração vira ideia.</p>
+            ? <p className="empty">Nada ainda. O Ctrl K é o jeito mais curto de começar: com duração vai para hoje, sem duração vira nota.</p>
             : (
               <ul className="pf-counts">
                 {counts.filter((k) => k.n).map((k) => (
@@ -192,7 +192,7 @@ function Profile() {
           </p>
         </section>
       </div>
-      {tour && <Tour onClose={() => { setTour(false); markSeen("tour"); }} />}
+      {tour && <Tour onClose={() => { setTour(false); markSeen("tour-areas"); }} />}
     </>
   );
 }

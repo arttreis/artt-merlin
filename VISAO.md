@@ -151,6 +151,10 @@ por título em ideias, clientes, semana, mapas, funis e lançamentos), as sete t
 "o que é isso", o tema, e embaixo o cartão da nuvem e quem está entrando. Recolhe para só ícones
 (`Ctrl+B`); no celular vira gaveta aberta por uma barra fina no topo.
 
+**Atualização de 19/10/2026 (§13):** não há barra lateral desde 10/10/2026, quando o dock
+embaixo tomou o lugar dela (§10). A navegação agora é a da §13: a faixa do alto com o botão
+"menu", que abre as cinco áreas, e o dock só com as abas da área aberta.
+
 ### Dois temas
 
 O design system do arttreis.com.br nos dois modos: escuro (`#0d0d0d` e o verde `#2EE86B`) e
@@ -833,6 +837,10 @@ e as abas só aparecem na seção em que você está (`SECTIONS` no `core.js`).
 Fora das seções: a porta de quem nunca entrou (`index.html`), a conversa com o Merlin
 (chega-se pelo `Ctrl+K`), o perfil (o cartão embaixo da barra), o rastreador e o link público.
 
+**Atualização de 19/10/2026 (§13):** as seis seções viraram cinco **áreas** da vida (saúde,
+trabalho, organização, finanças, inbox), abertas por um menu no alto. A regra continua: página
+nova é aba de uma área, nunca item próprio. A tabela que vale é a da §13.
+
 ### 9.2 O dia é a primeira tela
 
 `index.html` deixou de ser a home: quem já entrou é encaminhado para o calendário antes de ver
@@ -840,6 +848,10 @@ qualquer coisa, e só quem nunca esteve aqui vê a porta. Do bento saíram o rel
 os favoritos; os **hábitos do dia** e o **"como foi o dia"** foram para o lado da fila
 (`shared/today-block.jsx`). A apresentação foi junto: aparece uma vez no Hoje e se revê pelo
 perfil (`shared/tour.jsx`), reescrita para as seis seções.
+
+**Atualização de 19/10/2026 (§13):** o dia não é mais a primeira tela. Desde a secretária
+(17/10/2026, §10) a primeira tela é a conversa do início, e o calendário é a primeira aba de
+organização. A apresentação saiu do calendário: abre uma vez no início, reescrita para as áreas.
 
 ### 9.3 Diário e planos saíram
 
@@ -862,6 +874,10 @@ embaixo dele, uma linha diz para onde o Enter vai mandar o texto antes de mandar
 A primeira linha da lista diz o que o Enter vai fazer antes de ele fazer; embaixo vem o que já
 existe com aquele nome, e com o campo vazio, as seis seções. `Ctrl+J` pergunta direto. O campo
 do dia e o do rastreador continuam cobrando a duração: neles a pessoa já disse "é para hoje".
+
+**Atualização de 19/10/2026 (§13):** com o campo vazio, o `Ctrl+K` lista as abas pela área, uma
+linha por aba ("finanças · financeiro"), na ordem do menu. O que fica sem duração vira **nota**,
+e o aviso diz "guardado em notas".
 
 ### 9.5 O produto é o centro
 
@@ -895,6 +911,10 @@ ser **pedidos**: escrever "fechar o dia" no campo abre o fechamento, e "revisar 
 `shared/tasks.js`), sem crédito, com ou sem o "?" no fim ("fechar o dia?"); com duração ("fechar o dia 30m") continua sendo tarefa. A
 sequência de dias fechados continua gravando em `closes`. Quem pede isso ao Merlin na conversa
 ouve que é só escrever "fechar o dia" no início.
+
+**Atualização de 19/10/2026 (§13):** o dock não tem mais as seções. No início não há dock; nas
+outras telas ele fica com o início, as abas da área aberta e o "+". Trocar de área é pelo menu
+do alto.
 
 ---
 
@@ -981,3 +1001,108 @@ do Merlin", e não o Merlin.
 `docs/prd/a-secretaria.md`). Lá o chapéu pode dormir quando a floresta está de noite. Os outros
 humores do desenho (feliz, triste, dormindo, aviso…) entram no `MOODS` quando uma tela precisar
 deles, não antes.
+
+---
+
+## 13. O menu por área (19/10/2026)
+
+O desenho de 17/10 ("merlin deve agir como uma secretária") tinha duas metades. A primeira, a
+secretária (`docs/prd/a-secretaria.md`), deixou o início só com a conversa. A segunda é esta: o
+resto do Merlin sai da frente da conversa e vai para um **menu oculto**, organizado pelas
+**áreas da vida** e não pelos tipos de trabalho (`docs/prd/o-menu-por-area.md`).
+
+Faltava a casca acompanhar. Com o início sendo a conversa, o dock das seis seções aparecia
+embaixo dela com o mesmo peso, e as seções (hoje, ideias, produtos, distribuição, clientes,
+dinheiro) eram a navegação da §9, pensada para quando o calendário era a primeira tela. As
+gavetas que o desenho promete (sono, treino, alimentação, meu negócio) não tinham onde se
+encaixar. O argumento da contagem de 09/10 continua: o que a conversa traz de volta vive, e o
+que espera visita numa gaveta morre. Com a conversa trazendo o dia de volta, a gaveta pode ficar
+fechada, desde que se ache em um gesto.
+
+### 13.1 As cinco áreas
+
+Na ordem do desenho do Arthur. A primeira aba é a porta da área (`SECTIONS`, no `core.js`).
+
+| área | id | ícone | abas, na ordem |
+| --- | --- | --- | --- |
+| **saúde** | `health` | `habits` | hábitos |
+| **trabalho** | `work` | `apps` | produtos, conteúdo, funis, mapas |
+| **organização** | `organization` | `calendar` | calendário, rotina, notas |
+| **finanças** | `money` | `finance` | financeiro |
+| **inbox** | `inbox` | `inbox` | o que falta, leads, clientes |
+
+Os endereços não mudaram: `finance.html` continua sendo o financeiro, e nenhum favorito quebrou.
+O produto abre o trabalho porque é o centro (§9.5). O calendário e as notas ficam em organização,
+que é onde se **arruma** o tempo; o inbox fica com o lado de **fazer**. Três escolhas são
+discutíveis, e cada uma muda numa linha de `SECTIONS`, sem migração:
+
+- **a rotina** fica em organização, ao lado do calendário, porque é a semana-modelo que só existe
+  para virar tarefa (§4.11). A seta "inbox → rotina" do desenho foi lida como a rotina de cumprir
+  o que falta, que é o cartão da próxima coisa;
+- **leads e clientes** ficam no inbox, porque o desenho põe o "crm" ali: são as pessoas que
+  esperam uma resposta. A alternativa era o trabalho, que ficaria com seis abas;
+- **os mapas** vão para o trabalho, porque o desenho põe o mapa mental em "desenhos", dentro do
+  trabalho.
+
+Os hábitos são a saúde inteira, por enquanto. O id `inbox` da área não tem relação com a fila
+`merlin:inbox` (§3), e o comentário de `SECTIONS` diz isso. "inbox" e "lead" ficaram como o
+Arthur escreveu: são as palavras que esse público usa.
+
+### 13.2 O menu
+
+Um botão "menu" na faixa do alto, logo depois da marca, **em toda tela e do mesmo jeito no
+desktop e no celular** (no celular, só o ícone). Ficar sempre no mesmo canto vale mais do que
+ficar perto do polegar: no início, o polegar já tem o campo. É o único caminho do início para uma
+área com o mouse ou o dedo.
+
+Ele abre um painel com as cinco áreas e **todas as abas de uma vez**, cada aba um link, sem
+segundo nível: são doze links e cabem numa olhada. A área e a aba de onde se está ficam marcadas.
+No desktop o painel desce do botão, com as áreas em colunas; no celular ocupa a largura toda, com
+as áreas numa coluna e alvos de toque de 36px. Fecha com `Esc` (o foco volta ao botão), clicando
+fora, no botão de novo ou num link. Durante o onboarding o botão some, como a busca.
+
+**Não há atalho de teclado para o menu.** Quem usa o teclado tem o `Ctrl+K`, que com o campo
+vazio lista as mesmas abas pela área (§9.4). Um atalho a mais é uma coisa a mais para lembrar.
+
+### 13.3 O dock encolheu
+
+No início não há dock: só a faixa do alto, a saudação e o campo. Nas outras telas o dock fica com
+o início, as abas da área em que se está e o "+"; na conversa (`assistant.html`) e no perfil, que
+não são de área nenhuma, com o início e o "+". O "+" e o `Ctrl+K` continuam em toda tela que não
+seja o início e o rastreador; no início, o próprio campo é esse gesto.
+
+### 13.4 "O que falta" no inbox
+
+A sessão de foco não ganhou página. A aba "o que falta" do inbox leva a `index.html#next`, e o
+início abre com a pergunta "o que falta hoje?" já feita e o cartão da próxima coisa respondido,
+sem crédito, como se a pessoa tivesse escrito. É no cartão que a sessão de foco começa (D6 da
+secretária). O endereço perde o `#next` depois de responder, e recarregar não pergunta de novo.
+
+### 13.5 A vitrine saiu
+
+A vitrine não tinha lugar nas áreas. `wishlist.html` passou a levar ao financeiro, para onde o
+"comprei" sempre desaguou, e ela saiu da busca e do catálogo do chat. **Os dados ficaram**: a
+coleção `wishlist` continua no navegador e no D1, sem tela, como o diário e os planos (§9.3), e
+os lançamentos que vieram de uma compra continuam no financeiro. Uma proposta antiga de vitrine
+numa conversa guardada responde "tipo de ação desconhecido" e não grava nada.
+
+### 13.6 A apresentação e as palavras
+
+A apresentação foi reescrita para as áreas, em seis passos: fale com o Merlin; o que falta, uma
+coisa por vez; o resto mora no menu; só o dia tem minutos (organização); do produto a quem usa
+(trabalho e inbox); dinheiro e hábitos (finanças e saúde). Ela saiu do calendário e abre **uma
+vez no início**, depois do onboarding. A marca mudou de `tour` para `tour-areas`, para quem já
+tinha visto a antiga ver a nova uma vez: a navegação mudou inteira para quem já usa. O perfil
+revê e esquece a marca nova.
+
+"Ideias" deixou de ser um lugar, e o texto acompanhou: o que fica sem duração "vira nota" e é
+"guardado em notas". Os nomes internos (`kind: "note"`, a coleção `notes`) não mudaram.
+
+### 13.7 Gaveta nova só com um verbo
+
+Nenhuma área ganhou lugar "em breve": o que não está, não existe ainda. Sono, treino,
+alimentação, dashboard, meu negócio, o diário de volta e as outras gavetas do desenho ficaram de
+fora, e cada uma é uma descoberta própria. **Uma gaveta nova só entra quando tiver um verbo na
+conversa** ("dormi 6h", "treinei perna"): é a conversa que a traz de volta, e é isso que mantém
+um módulo vivo, não o lugar no menu. Quando entrar, é uma aba numa área de `SECTIONS`, nunca um
+item próprio.
