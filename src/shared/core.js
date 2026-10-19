@@ -1109,7 +1109,7 @@ export function writeInbox(list) {
 export function newNote(spec) {
   const now = Date.now();
   const doc = {
-    id: newId(),
+    id: spec && typeof spec.id === "string" && spec.id ? spec.id : newId(),
     title: String((spec && spec.title) || "").slice(0, 300),
     body: String((spec && spec.body) || ""),
     stage: "seed",
