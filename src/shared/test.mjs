@@ -1249,5 +1249,27 @@ const dataLeft = () => globalThis.localStorage.keys().filter((k) => k in DATA);
   check("montar: a carta do funil resume", B.draftView("funnel", funnel).lines[0].text.startsWith("Anúncio → Página") && B.draftView("funnel", funnel).lines[1].text === "consultoria · R$ 4.997,50", B.draftView("funnel", funnel).lines[1].text);
 }
 
+/* ---- a vitrine saiu da busca (PRD o-menu-por-area, D7) ----
+   a coleção `wishlist` fica guardada, sem tela; o Ctrl+K não a acha mais, e
+   buscar não grava nada nela. a nota é o controle: a busca funciona, e os
+   documentos da vitrine estão mesmo lá (senão "não acha" não prova nada). */
+{
+  const entry = (doc) => ({ v: 1000, doc: { createdAt: 1, updatedAt: 1, order: 0, ...doc } });
+  const shelf = (items) => JSON.stringify({ items, serverV: 0, dirty: [], refused: {} });
+  const wish = shelf({
+    l1: entry({ id: "l1", type: "list", name: "casa nova" }),
+    i1: entry({ id: "i1", type: "item", list: "l1", name: "luminaria de mesa", price: 9000, bought: null })
+  });
+  const notes = shelf({ n1: entry({ id: "n1", title: "luminaria para o escritorio", body: "" }) });
+  const { search, collection } = await fresh({ "merlin:wishlist": wish, "merlin:notes": notes });
+  const lum = search("luminaria"), casa = search("casa nova");
+  check("a vitrine: os documentos estão no navegador", collection("wishlist").all().length === 2);
+  check("a vitrine: o item não aparece na busca", !lum.some((h) => h.label === "vitrine"), JSON.stringify(lum));
+  check("a vitrine: a coletânea não aparece na busca", casa.length === 0, JSON.stringify(casa));
+  check("a vitrine: nenhum resultado aponta para wishlist.html", ![...lum, ...casa].some((h) => /wishlist\.html/.test(h.href)), JSON.stringify([...lum, ...casa]));
+  check("a vitrine: a busca das outras fontes segue achando", lum.some((h) => h.label === "nota"), JSON.stringify(lum));
+  check("a vitrine: buscar não regrava a coleção", globalThis.localStorage.getItem("merlin:wishlist") === wish);
+}
+
 console.log("\n" + passed + " passaram, " + failures.length + " falharam");
 if (failures.length) { console.log("\nFALHAS:"); failures.forEach((f) => console.log("  - " + f)); process.exit(1); }

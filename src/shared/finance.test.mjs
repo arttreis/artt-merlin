@@ -50,7 +50,7 @@ const {
   newEntry, entryLine, undoEntry, paidOf, normalize, contextOf, balanceUntil, realBalanceUntil, projectionsOf
 } = await import("./finance-data.js");
 const {
-  ACTION_COLLECTIONS, buildDoc, previewOf, normalizeChat, markProposal
+  ACTION_COLLECTIONS, ACTION_LABELS, buildDoc, previewOf, normalizeChat, markProposal
 } = await import("./assistant-actions.js");
 
 /* ---- o cenário: hoje é 17/10/2026 (sábado) ---- */
@@ -869,6 +869,25 @@ section("pendingBefore e suggestionsBetween", () => {
   check("suggestionsBetween: o fixo já lançado no mês não é sugerido", suggestionsBetween("2026-09-05", "2026-09-05", FIX_CTX).length === 0);
   check("suggestionsBetween: intervalo invertido é vazio", suggestionsBetween("2026-10-02", "2026-09-28", FIX_CTX).length === 0);
 });
+
+/* a vitrine saiu (PRD o-menu-por-area, D7): wishlist-item não é mais um tipo.
+   uma proposta antiga, guardada numa conversa, abre como "desconhecido" e não grava */
+{
+  const store = core.collection("wishlist");
+  const antes = store.all().length;
+  check("vitrine: wishlist-item não tem coleção", ACTION_COLLECTIONS["wishlist-item"] === undefined);
+  check("vitrine: wishlist-item não tem rótulo", ACTION_LABELS["wishlist-item"] === undefined);
+  let r, lancou = false;
+  try { r = buildDoc("wishlist-item", { name: "x" }, { name: "x" }, store); } catch (e) { lancou = true; }
+  check("vitrine: buildDoc de wishlist-item devolve o erro, sem lançar", !lancou && !!r && r.error === "tipo de ação desconhecido" && !r.doc, JSON.stringify(r));
+  check("vitrine: e não grava nada", store.all().length === antes);
+  /* a conversa guardada com uma proposta antiga abre sem quebrar: a pílula
+     não volta (o tipo não existe mais), e nada vai para a coleção */
+  let chat, abriu = true;
+  try { chat = normalizeChat({ id: "c1", messages: [{ from: "me", text: "quero um teclado" }, { from: "merlin", proposal: { actionType: "wishlist-item", title: "teclado", payload: { name: "teclado" } } }] }); } catch (e) { abriu = false; }
+  check("vitrine: a conversa com proposta antiga abre sem lançar", abriu && chat.messages.length === 2, JSON.stringify(chat));
+  check("vitrine: a proposta antiga não vira pílula", abriu && !chat.messages[1].proposal);
+}
 
 console.log("\n" + passed + " passaram, " + failures.length + " falharam");
 if (failures.length) { console.log("\nFALHAS:"); failures.forEach((f) => console.log("  - " + f)); process.exit(1); }

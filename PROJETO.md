@@ -72,7 +72,7 @@ os pares sozinho; não há lista de rotas. Nunca escreva no `localStorage` diret
 | mapas | `maps.jsx` + `maps-board.jsx` | mapa mental + quadro livre (estilo Miro, `board.js`) |
 | produtos | `apps.jsx` | o centro: visão geral (construir, distribuir, pensar) + projeto de app: conceito, banco, telas e fluxos → SQL, mermaid, spec e prompt (`app-spec.js`) |
 | financeiro | `finance.jsx` | mês, ano, painel 50/30/20. As contas (saldo, `buildMonth`, a confirmar, gasto por categoria, `financeToday`) moram em `shared/finance-data.js`, com teste. A caixa do lançamento (`EntryForm`) mora em `shared/entry-form.jsx`, porque o cartão do início a abre para o previsto que passou |
-| wishlist | `wishlist.jsx` | "comprei" lança no financeiro |
+| wishlist | `wishlist.jsx` | só encaminha para `finance.html` (a vitrine saiu em 19/10/2026); a coleção `wishlist` continua guardada, sem tela |
 | hábitos | `habits.jsx` | grade do mês; a caixa de criar e editar (`HabitForm`) mora no `ui.jsx`, porque o início e a conversa também a abrem |
 | perfil | `profile.jsx` | sessão, tema, inventário |
 | link público | `share.jsx` | leitura sem conta de mapa/funil |

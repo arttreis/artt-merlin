@@ -20,7 +20,6 @@ export const ACTION_COLLECTIONS = {
   "onboarding-map": "maps",
   "onboarding-funnel": "funnels",
   script: "content",
-  "wishlist-item": "wishlist",
   "finance-entry": "finance",
   "habit-mark": "habits"
 };
@@ -33,7 +32,6 @@ export const ACTION_LABELS = {
   "onboarding-map": "novo mapa de onboarding",
   "onboarding-funnel": "novo funil de onboarding",
   script: "roteiro",
-  "wishlist-item": "novo item na vitrine",
   "finance-entry": "novo lançamento",
   "habit-mark": "marcar hábito"
 };
@@ -72,11 +70,6 @@ export const ACTION_FIELDS = {
   "onboarding-map": [{ key: "name", label: "nome" }],
   "onboarding-funnel": [{ key: "name", label: "nome" }],
   script: [{ key: "script", label: "roteiro", type: "textarea" }],
-  "wishlist-item": [
-    { key: "name", label: "nome" },
-    { key: "qty", label: "quantidade" },
-    { key: "bucket", label: "categoria" }
-  ],
   /* o previsto confirmado e o fixo (confirm, fixed) seguem como a IA propos:
      sao ids, nao campo de formulario */
   "finance-entry": [
@@ -104,7 +97,6 @@ export function previewOf(actionType, payload, ctx) {
     case "onboarding-map": return ((p.tree && p.tree.children) || []).length + " ramos";
     case "onboarding-funnel": return (p.stages || []).length + " etapas";
     case "script": return "entra no roteiro da peça de conteúdo";
-    case "wishlist-item": return [p.qty, p.bucket].filter(Boolean).join(" · ");
     case "finance-entry": return entryLine({ ...p, flow: p.kind, date: p.day }, today(), ctx);
     case "habit-mark": return [p.habit || p.name, p.date && p.date !== today() ? p.date.slice(8, 10) + "/" + p.date.slice(5, 7) : ""].filter(Boolean).join(" · ");
     default: return "";
@@ -170,8 +162,6 @@ export function buildDoc(actionType, payload, v, store, opts) {
       if (!habit) return { error: "não achei esse hábito" };
       return markOn(habit, day, today());
     }
-    case "wishlist-item":
-      return { doc: { id: newId(), type: "item", list: p.list || "", name: v.name.trim(), price: Math.round(Math.abs(+p.price)) || 0, url: "", photo: null, note: "", bought: null, bucket: v.bucket || "", qty: v.qty || "", order: now, createdAt: now, updatedAt: now } };
     default:
       return { error: "tipo de ação desconhecido" };
   }

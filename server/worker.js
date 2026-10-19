@@ -999,7 +999,6 @@ const ASSISTANT_ACTIONS = {
   "onboarding-map": { collection: "maps", fields: ["name", "tree"] },
   "onboarding-funnel": { collection: "funnels", fields: ["name", "stages"] },
   script: { collection: "content", fields: ["contentId", "script"] },
-  "wishlist-item": { collection: "wishlist", fields: ["list", "name", "price", "bucket", "qty"] },
   "finance-entry": { collection: "finance", fields: ["name", "amount", "kind", "day", "category", "paid", "confirm", "fixed"] },
   "habit-mark": { collection: "habits", fields: ["habit", "name", "date"] }
 };
@@ -1023,7 +1022,6 @@ LIST_TASKS.assistant = (c) => ({
     "onboarding-map {name, tree: {title, note, children:[{title, note, children:[...]}]} — no máximo 3 níveis, 6 filhos por nó}; " +
     "onboarding-funnel {name, stages: lista de {nodeType (um de " + NODE_TYPES + "), title}}; " +
     "script {contentId (o id da peça de conteúdo do contexto — NUNCA invente um; sem id no contexto, não proponha este tipo), script (roteiro em markdown: # título e depois as seções \"## \" do molde do formato que vier no contexto da tela, na mesma ordem e sem as linhas de dica em itálico — sem molde no contexto, ## gancho, ## desenvolvimento, ## fechamento —, com bullets para falar, não texto corrido; gancho com número, contraste ou case, nunca pergunta nem saudação; virada antes do fim e CTA amarrado nela; NUNCA invente número, resultado ou case — o dado que faltar entra marcado com [conferir])}; " +
-    "wishlist-item {list (id da coletânea do contexto, ou vazio), name, price (centavos, número, ou 0), bucket (um de asap, longterm, online, presencial, mercado, ou vazio), qty (ex. \"2x\", \"~1\", ou vazio)}; " +
     "finance-entry {name (o que foi, curto), amount (centavos, número inteiro; 0 se a pessoa não disse o valor — nunca estime), kind (out para gasto, in para entrada), day (AAAA-MM-DD; sem data, hoje), category (uma das categorias do contexto, ou vazio), paid (true se já aconteceu, false se é para depois), confirm (o id de um previsto do contexto — na seção dinheiro do retrato, o que vem depois do # em \"a confirmar\", \"vence em 7 dias\" e \"previsto no mês\", sem o # — quando a pessoa diz que pagou ou recebeu algo que já estava previsto — NUNCA invente; sem id no contexto, vazio), fixed (o id de um fixo do contexto — no retrato, o que vem depois do # em \"fixos\" — quando é a conta fixa do mês e não há previsto para ela — NUNCA invente; sem id no contexto, vazio)} — use quando a pessoa contar um gasto ou uma entrada (\"gastei 45 no almoço\", \"recebi 3 mil da Ana\"); fixo, parcela, dívida, investimento e transferência novos não entram por aqui; " +
     "habit-mark {habit (o nome exato de um hábito do contexto, ou vazio), name (o hábito como a pessoa disse, curto: \"treinar\", \"ler\"), date (AAAA-MM-DD do dia em que a pessoa fez; sem data, hoje)} — use quando a pessoa contar que fez um hábito (\"treinei\", \"ontem li 20 páginas\"), mesmo que ele ainda não exista: a tela oferece criar; nunca para desmarcar nem para mudar a frequência. " +
     "Há três jeitos de responder. REGISTRO (a pessoa conta algo para anotar ou pede para criar): proponha a ação. " +
