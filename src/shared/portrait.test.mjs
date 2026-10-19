@@ -741,6 +741,27 @@ const bl = (id, due, text, o) => ({ id, text, due, done: false, ...o });
   check("conversa: a linha volta depois de recarregar", sourcesLine(normalizeChat(saved).messages[1].sources) === "vi o dia e a agenda");
 }
 
+/* ---- o cartão do "o que falta hoje?" fica guardado com a conversa ----
+   o normalizeChat jogava o `show` fora, e o cartão sumia ao recarregar e ao
+   continuar a conversa vinda do início (ticket 30) */
+{
+  const { normalizeChat } = await import("./assistant-actions.js");
+  const line = "agora: call · faltam 1 · 0 feitas";
+  const saved = normalizeChat({ id: "c2", messages: [
+    { from: "me", text: "e aí, o que eu faço agora?", show: "quests" },
+    { from: "merlin", show: "quests", text: line },
+    { from: "merlin", show: "outra-coisa", text: "sem cartão" },
+    { from: "merlin", text: "resposta comum" }
+  ] });
+  check("cartão: a mensagem do Merlin guarda o show e o mesmo texto", saved.messages[1].show === "quests" && saved.messages[1].text === line, JSON.stringify(saved.messages[1]));
+  check("cartão: show fora da lista fechada é descartado", !("show" in saved.messages[2]), JSON.stringify(saved.messages[2]));
+  check("cartão: a fala da pessoa não guarda o show", !("show" in saved.messages[0]), JSON.stringify(saved.messages[0]));
+  check("cartão: resposta sem show continua sem o campo", !("show" in saved.messages[3]), JSON.stringify(saved.messages[3]));
+  const { turnsOf } = await import("./assistant-actions.js");
+  check("cartão: o histórico leva a linha de texto, não o cartão", JSON.stringify(turnsOf(saved.messages.slice(1, 2))) === JSON.stringify([{ role: "assistant", content: line }]), JSON.stringify(turnsOf(saved.messages.slice(1, 2))));
+  check("cartão: o show continua lá depois de recarregar", normalizeChat(saved).messages[1].show === "quests", JSON.stringify(normalizeChat(saved).messages[1]));
+}
+
 /* ---- conteúdo (ticket 13) ----
    a seção do conteúdo: o que falta no ritmo, as atrasadas e os próximos 7
    dias. o roteiro nunca entra. cada bloco roda dentro de `attempt`: se algo

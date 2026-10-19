@@ -233,6 +233,11 @@ function normalizeBuildMsg(m) {
   return null;
 }
 
+/* o que uma resposta do Merlin pode pedir para a tela desenhar além do texto.
+   lista fechada, como as fontes: o Worker tem a sua (ASSISTANT_SHOW), e o que
+   não está aqui é descartado ao guardar */
+export const SHOWS = ["quests"];
+
 export function normalizeChat(d) {
   const messages = (Array.isArray(d.messages) ? d.messages : []).slice(-MAX_TURNS).map((m) => {
     const built = m && normalizeBuildMsg(m);
@@ -246,6 +251,9 @@ export function normalizeChat(d) {
        que está na lista fechada do retrato */
     const sources = Array.isArray(m && m.sources) ? SOURCES.filter((x) => m.sources.includes(x)) : [];
     if (sources.length) msg.sources = sources;
+    /* o cartão do "o que falta hoje?": guarda só o pedido, e o cartão é
+       desenhado ao vivo a partir das coleções. o texto fica como a linha */
+    if (m && SHOWS.includes(m.show)) msg.show = m.show;
     return msg;
   });
   return {
