@@ -10,9 +10,14 @@
 
    são seis passos, na ordem em que alguém chega: a conversa, o que falta, o
    menu com as cinco áreas, e as áreas em três pares — organização, trabalho
-   com o inbox, finanças com a saúde. */
+   com o inbox, finanças com a saúde.
+
+   ela se diz modal, então o teclado também é: ao abrir, o foco vai para o
+   "continuar" (Enter avança, e o que se digita não cai no campo de trás); Tab
+   e Shift+Tab circulam só entre os botões dela; se o foco escapar, volta; e ao
+   fechar ele volta para onde estava (o início o leva ao campo logo depois). */
 import "./tour.css";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useLayoutEffect, useRef } from "react";
 import { icon, NAV_ICONS } from "./icons.jsx";
 
 const TOUR = [
@@ -50,19 +55,48 @@ export function Tour({ onClose }) {
   const last = i === TOUR.length - 1;
   const step = TOUR[i];
   const go = (n) => setI(Math.max(0, Math.min(TOUR.length - 1, n)));
-  /* setas andam, Esc pula — quem lê com a mão no teclado não precisa do mouse */
+  const box = useRef(null);
+  const buttons = () => Array.from(box.current.querySelectorAll("button"));
+  const main = () => box.current.querySelector(".tour__next");
+  /* um foco que cai fora da caixa volta para dentro. fica antes do efeito de
+     devolver o foco: na desmontagem as limpezas rodam na ordem, e esta tem que
+     soltar o ouvinte antes de o foco voltar para quem o tinha, senão ele o
+     puxaria de novo para cá */
+  useLayoutEffect(() => {
+    const f = (e) => { if (!box.current.contains(e.target)) main().focus(); };
+    document.addEventListener("focusin", f);
+    return () => document.removeEventListener("focusin", f);
+  }, []);
+  /* ao abrir, o foco vai para o "continuar"; ao fechar, volta para quem o tinha */
+  useLayoutEffect(() => {
+    const before = document.activeElement;
+    main().focus();
+    return () => { if (before && before !== document.body && document.contains(before)) before.focus(); };
+  }, []);
+  /* o botão focado pode sumir ao mudar de passo ("voltar" no primeiro) */
+  useLayoutEffect(() => {
+    if (!box.current.contains(document.activeElement)) main().focus();
+  }, [i]);
+  /* setas andam, Esc pula, Tab circula — quem lê com a mão no teclado não precisa do mouse */
   useEffect(() => {
     const f = (e) => {
       if (e.key === "ArrowRight") { e.preventDefault(); last ? onClose() : go(i + 1); }
       else if (e.key === "ArrowLeft") { e.preventDefault(); go(i - 1); }
       else if (e.key === "Escape") { e.preventDefault(); onClose(); }
+      else if (e.key === "Tab") {
+        const all = buttons(), first = all[0], end = all[all.length - 1], on = document.activeElement;
+        if (!box.current.contains(on)) { e.preventDefault(); (e.shiftKey ? end : first).focus(); }
+        else if (e.shiftKey && on === first) { e.preventDefault(); end.focus(); }
+        else if (!e.shiftKey && on === end) { e.preventDefault(); first.focus(); }
+      }
     };
     window.addEventListener("keydown", f);
     return () => window.removeEventListener("keydown", f);
   }, [i, last, onClose]);
   return (
-    <div className="tour" role="dialog" aria-modal="true" aria-label="Apresentação do Merlin">
-      <div className="tour__box">
+    <div className="tour" role="dialog" aria-modal="true" aria-label="Apresentação do Merlin"
+         onMouseDown={(e) => { if (!e.target.closest("button")) e.preventDefault(); }}>
+      <div className="tour__box" ref={box}>
         <button className="tour__skip" type="button" onClick={onClose}>pular</button>
         <div className="tour__art"><TourArt step={i} /></div>
         <div className="tour__words" aria-live="polite">

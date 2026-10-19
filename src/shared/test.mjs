@@ -1366,6 +1366,9 @@ const dataLeft = () => globalThis.localStorage.keys().filter((k) => k in DATA);
   check("apresentação: o desenho do passo 3 tem as áreas do menu, com o ícone de cada uma",
     JSON.stringify(drawn) === JSON.stringify(SECTIONS.map((s) => [s.icon, s.label])), JSON.stringify(drawn));
 
+  check("apresentação: o teclado prende o foco (Tab no keydown, focusin e foco ao abrir)",
+    /e\.key === "Tab"/.test(src) && /addEventListener\("focusin"/.test(src) && /useLayoutEffect/.test(src) && /\.focus\(\)/.test(src));
+
   const index = read("src", "index.jsx"), calendar = read("src", "calendar.jsx"), profile = read("src", "profile.jsx");
   check("apresentação: abre no início pela chave nova", /useState\(\(\) => !seen\("tour-areas"\)\)/.test(index) && /markSeen\("tour-areas"\)/.test(index));
   check("apresentação: o calendário não a abre mais", !/tour\.jsx|<Tour\b|seen\("tour/.test(calendar));
