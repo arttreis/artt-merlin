@@ -76,7 +76,7 @@ por hora, contado na tabela `advice` em três cotas separadas (`QUOTA`, no worke
 - **conselho**: 30 (`ADVICE_PER_HOUR`), no Opus. Inclui as perguntas antes de
   montar um funil, app ou mapa: o fluxo de montagem inteiro gasta uma vez daqui.
 - **leitura do início**: 60 (`CAPTURE_PER_HOUR`), no Haiku: o campo da home
-  separando tarefa, data, hora, ideia e dinheiro (gasto ou entrada).
+  separando tarefa, data, hora, nota e dinheiro (gasto ou entrada).
 - **montagem**: 40 (`BUILD_PER_HOUR`), no Opus: o rascunho e cada ajuste de um
   funil, app ou mapa montado na conversa.
 

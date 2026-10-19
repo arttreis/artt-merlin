@@ -285,7 +285,7 @@ function dayLabel(date, base) {
 /* o hábito lido, do jeito que o cartão o mostra: "marca hoje", "já estava
    marcado" ou "não existe" */
 const habitMeta = (st, base) => st.error ? st.error : !st.habit ? "não existe" : st.already ? "✓ já estava marcado" + (st.day === base ? "" : " · " + markWhen(st.day, base)) : "marca " + markWhen(st.day, base);
-const draftMeta = (it, base, money, habitsNow) => it.kind === "note" ? "ideia"
+const draftMeta = (it, base, money, habitsNow) => it.kind === "note" ? "nota"
   : it.kind === "money" ? entryLine(it, base, money)
   : it.kind === "habit" ? habitMeta(habitStatus(habitsNow, it, base), base)
   : [dayLabel(it.date, base), it.at, it.min ? (it.guess ? "~" : "") + fmt(it.min) : "", it.client].filter(Boolean).join(" · ");
@@ -400,7 +400,7 @@ function Composer({ tasks, habits, b, smart, onAsk, onIntent, readContext }) {
         if (n) { undo.push(() => collection("notes").remove(n.id)); nNotes++; }
       }
     });
-    const parts = [nTasks && nTasks + (nTasks === 1 ? " tarefa" : " tarefas"), nNotes && nNotes + (nNotes === 1 ? " ideia" : " ideias")].filter(Boolean);
+    const parts = [nTasks && nTasks + (nTasks === 1 ? " tarefa" : " tarefas"), nNotes && nNotes + (nNotes === 1 ? " nota" : " notas")].filter(Boolean);
     const said = [
       parts.length && parts.join(" e ") + (nTasks + nNotes === 1 ? " criada" : " criadas"),
       nMoney && (nMoney === 1 ? "lançado no financeiro" : nMoney + " lançados no financeiro"),
@@ -427,7 +427,7 @@ function Composer({ tasks, habits, b, smart, onAsk, onIntent, readContext }) {
     setReading(false);
     /* lista vazia é o Merlin dizendo que a linha inteira é uma pergunta */
     if (items && !items.length) { onAsk(said.trim()); clear(); return; }
-    /* uma ideia só, onde a regra já via uma ideia: grava com as palavras da
+    /* uma nota só, onde a regra já via uma nota: grava com as palavras da
        pessoa, sem cartão para confirmar o que não mudou */
     if (items && !(items.length === 1 && items[0].kind === "note" && route.kind === "note")) { setDraft({ text: said, items }); return; }
     byRule(route);
@@ -437,7 +437,7 @@ function Composer({ tasks, habits, b, smart, onAsk, onIntent, readContext }) {
     const items = draft.items.filter((_, j) => j !== i);
     setDraft(items.length ? { ...draft, items } : null);
   };
-  const asIdea = () => {
+  const asNote = () => {
     const n = newNote({ title: draft.text.replace(/\s+/g, " ").trim() });
     if (n) notify("guardado em notas", () => collection("notes").remove(n.id));
     clear();
@@ -454,7 +454,7 @@ function Composer({ tasks, habits, b, smart, onAsk, onIntent, readContext }) {
     : draft && lacking ? "Enter cria o que está pronto · " + (toCreate ? "o hábito novo espera a caixa" : "o que falta o valor fica") + " · Esc volta ao texto"
     : draft ? "Enter cria · Esc volta ao texto"
     : intent ? INTENT_HINT[intent.period || intent.kind]
-    : !route ? (smart ? "escreva do seu jeito: o Merlin separa tarefa, data, hora e ideia · a pergunta ele responde aqui em cima"
+    : !route ? (smart ? "escreva do seu jeito: o Merlin separa tarefa, data, hora e nota · a pergunta ele responde aqui em cima"
                       : "com a duração (45m, 1h30) entra em hoje · pergunta vai para o Merlin · o resto vira nota")
     : build ? "montar o " + BUILD[build].label + " com o Merlin · ele pergunta o que falta e mostra o rascunho"
     : route.kind === "ask" ? (smart ? "perguntar ao Merlin · a resposta aparece lá em cima" : "perguntar ao Merlin")
@@ -466,7 +466,7 @@ function Composer({ tasks, habits, b, smart, onAsk, onIntent, readContext }) {
     <>
     <form className="hm-field" aria-busy={reading} onSubmit={(e) => { e.preventDefault(); submit(); }}>
       <textarea ref={field} rows={2} maxLength="300" value={text} autoFocus
-                placeholder={smart ? "ligar pro João amanhã às 15h, uma pergunta, uma ideia — do seu jeito" : "uma tarefa (revisar a landing 45m), uma pergunta ou uma ideia"}
+                placeholder={smart ? "ligar pro João amanhã às 15h, uma pergunta, uma nota — do seu jeito" : "uma tarefa (revisar a landing 45m), uma pergunta ou uma nota"}
                 onChange={(e) => { setText(e.currentTarget.value); if (draft) setDraft(null); }}
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); submit(); }
@@ -494,7 +494,7 @@ function Composer({ tasks, habits, b, smart, onAsk, onIntent, readContext }) {
           </ul>
           <div className="hm-draft__actions">
             <button type="button" className="pill" onClick={() => { setDraft(null); if (field.current) field.current.focus(); }}>voltar ao texto</button>
-            <button type="button" className="pill" onClick={asIdea}>guardar como ideia</button>
+            <button type="button" className="pill" onClick={asNote}>guardar em notas</button>
             <button type="submit" className="pill pill--accent">
               {!readyN && !lacking ? "ok" : !readyN ? (toCreate ? "criar e marcar" : "abrir a caixa") : readyN === 1 ? "criar" : "criar as " + readyN}
             </button>
