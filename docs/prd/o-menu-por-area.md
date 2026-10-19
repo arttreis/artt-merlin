@@ -162,7 +162,10 @@ levar a qualquer página pelo nome.
 - **D9. Os textos (orq.).** "guardado em ideias" vira "guardado em notas", "vira ideia" vira
   "vira nota", e "abre sozinha no Hoje" vira "abre sozinha no início". O nome "inbox" fica como o
   Arthur escreveu, como "lead" ficou: é a palavra que esse público usa. O id `inbox` da área não
-  tem relação com a fila `merlin:inbox` (VISAO §3); o comentário de `SECTIONS` diz isso.
+  tem relação com a fila `merlin:inbox` (VISAO §3); o comentário de `SECTIONS` diz isso. O #39 trocou
+  os textos da apresentação e do aviso; o #52 fechou o resto do campo do início (o botão "guardar em
+  notas", o placeholder, a dica, o rótulo do rascunho e a contagem de "notas criadas"), e o teste agora
+  barra qualquer literal com "ideia" em `src/index.jsx`.
 
 - **D10. Sem interruptor (orq.).** É navegação, sem dado novo e sem custo. Voltar atrás é
   reverter o PR e publicar. Os endereços não mudam, então quem se perder no menu ainda chega

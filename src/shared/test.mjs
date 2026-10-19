@@ -1381,6 +1381,11 @@ const dataLeft = () => globalThis.localStorage.keys().filter((k) => k in DATA);
     const old = ["em ideias", "guardar em ideias", "vira ideia"].filter((w) => text.includes(w));
     check("notas: " + name + " não manda mais para \"ideias\"", old.length === 0, old.join(","));
   });
+
+  // o início não diz "ideia" em nenhum texto de tela (só os literais de string; comentário pode)
+  const ideiasNoInicio = [...index.matchAll(/(["'`])((?:(?!\1).)*)\1/g)].filter((m) => /\bideias?\b/i.test(m[2])).map((m) => m[2]);
+  check("notas: nenhum literal de src/index.jsx diz \"ideia\"", ideiasNoInicio.length === 0, ideiasNoInicio.join(" | "));
+  check("notas: o rascunho do início tem \"guardar em notas\"", index.includes("guardar em notas"));
 }
 
 console.log("\n" + passed + " passaram, " + failures.length + " falharam");
