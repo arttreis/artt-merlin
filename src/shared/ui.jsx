@@ -1118,7 +1118,7 @@ export function HabitForm({ habits, id, draft, onClose, onArchive, onSuggest, on
 
      com "?" no comeco ou no fim  → pergunta ao Merlin
      com duracao ("45m", "1h30")  → tarefa de hoje
-     sem duracao                  → ideia (uma nota)
+     sem duracao                  → nota
 
    a primeira linha da lista diz o que o Enter vai fazer, antes de ele fazer —
    a mesma ideia da linha fantasma da home. embaixo, o que ja existe com aquele
@@ -1130,7 +1130,7 @@ export function HabitForm({ habits, id, draft, onClose, onArchive, onSuggest, on
    direto, sem passar pela regra. */
 const ROUTE_LABEL = {
   task: (r) => (r.reserved ? "reservar em hoje" : "pôr em hoje") + " · " + formatMin(r.min),
-  note: () => "guardar em ideias",
+  note: () => "guardar em notas",
   ask: () => "perguntar ao Merlin"
 };
 
@@ -1172,7 +1172,7 @@ function CommandPalette({ onClose }) {
       notify((r.reserved ? "reservado em hoje · " : "entrou em hoje · ") + formatMin(r.min), () => store.remove(t.id));
     } else {
       const note = newNote({ title: r.title, client: r.client });
-      if (note) notify("guardado em ideias", () => collection("notes").remove(note.id));
+      if (note) notify("guardado em notas", () => collection("notes").remove(note.id));
     }
     onClose();
   };
@@ -1219,7 +1219,7 @@ function CommandPalette({ onClose }) {
           {term.trim() && !hits.length && <li className="cmd__none">nada guardado com esse nome</li>}
         </ul>
         <p className="cmd__rule">
-          com <b>duração</b> vai para hoje · sem duração vira <b>ideia</b> · com <b>?</b> pergunta ao Merlin · <kbd>ctrl j</kbd> pergunta direto
+          com <b>duração</b> vai para hoje · sem duração vira <b>nota</b> · com <b>?</b> pergunta ao Merlin · <kbd>ctrl j</kbd> pergunta direto
         </p>
       </div>
     </div>,

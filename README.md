@@ -8,7 +8,7 @@ conversa com o Merlin; o resto mora num **menu** que se abre do alto, organizado
 áreas** da vida: **saúde** (os hábitos), **trabalho** (produtos, conteúdo, funis e mapas),
 **organização** (o calendário, a rotina e as notas), **finanças** (o financeiro) e **inbox**
 (o que falta, leads e clientes). O `Ctrl+K` é o campo de tudo: com duração vai para hoje,
-sem duração vira ideia, com "?" pergunta ao Merlin, e vazio lista todas as abas. A visão
+sem duração vira nota, com "?" pergunta ao Merlin, e vazio lista todas as abas. A visão
 completa e as decisões estão em [VISAO.md](VISAO.md); as áreas, em
 [docs/prd/o-menu-por-area.md](docs/prd/o-menu-por-area.md).
 

@@ -38,6 +38,7 @@ import { normalize as normalizeHabit, habitStatus, markOn, undoHabit, markWhen }
 import { distribute, fmt, clock, costOf } from "./shared/day.js";
 import { Forest, phaseOf } from "./shared/forest.jsx";
 import { githubDay } from "./shared/focus.js";
+import { Tour } from "./shared/tour.jsx";
 import { usePortrait } from "./shared/use-portrait.js";
 import { sourcesLine } from "./shared/portrait.js";
 import { questsOf, questsText } from "./shared/quests.js";
@@ -236,7 +237,7 @@ function Onboarding({ profile, apps, habits, veteran, onDone }) {
    ================================================================
    um campo só, sem abas: o Merlin lê o que foi escrito e decide pela regra
    única (routeLine, no tasks.js) — com duração é tarefa de hoje, pergunta vai
-   para a conversa, o resto vira ideia. a linha de baixo diz o que o Enter vai
+   para a conversa, o resto vira nota. a linha de baixo diz o que o Enter vai
    fazer ANTES de ele fazer, e todo destino tem desfazer no aviso.
 
    desde 10/10/2026, com sessão, o Merlin lê o que a regra não resolve
@@ -355,7 +356,7 @@ function Composer({ tasks, habits, b, smart, onAsk, onIntent, readContext }) {
       notify((r.reserved ? "reservado em hoje · " : "entrou em hoje · ") + formatMin(r.min), () => tasks.remove(t.id));
     } else {
       const n = newNote({ title: r.title, client: r.client });
-      if (n) notify("guardado em ideias", () => collection("notes").remove(n.id));
+      if (n) notify("guardado em notas", () => collection("notes").remove(n.id));
     }
     clear();
   };
@@ -438,7 +439,7 @@ function Composer({ tasks, habits, b, smart, onAsk, onIntent, readContext }) {
   };
   const asIdea = () => {
     const n = newNote({ title: draft.text.replace(/\s+/g, " ").trim() });
-    if (n) notify("guardado em ideias", () => collection("notes").remove(n.id));
+    if (n) notify("guardado em notas", () => collection("notes").remove(n.id));
     clear();
   };
 
@@ -454,12 +455,12 @@ function Composer({ tasks, habits, b, smart, onAsk, onIntent, readContext }) {
     : draft ? "Enter cria · Esc volta ao texto"
     : intent ? INTENT_HINT[intent.period || intent.kind]
     : !route ? (smart ? "escreva do seu jeito: o Merlin separa tarefa, data, hora e ideia · a pergunta ele responde aqui em cima"
-                      : "com a duração (45m, 1h30) entra em hoje · pergunta vai para o Merlin · o resto vira ideia")
+                      : "com a duração (45m, 1h30) entra em hoje · pergunta vai para o Merlin · o resto vira nota")
     : build ? "montar o " + BUILD[build].label + " com o Merlin · ele pergunta o que falta e mostra o rascunho"
     : route.kind === "ask" ? (smart ? "perguntar ao Merlin · a resposta aparece lá em cima" : "perguntar ao Merlin")
     : willRead ? "o Merlin lê e mostra o que entendeu antes de criar"
     : route.kind === "task" ? (route.reserved ? "reservar em hoje · " : "pôr em hoje · ") + fmt(route.min) + (route.reserved ? "" : route.min > b.slack ? " · não cabe hoje" : " · cabe")
-    : "guardar em ideias · com a duração no fim, entra em hoje";
+    : "guardar em notas · com a duração no fim, entra em hoje";
 
   return (
     <>
@@ -687,7 +688,7 @@ function Home() {
       const got = collectInbox(tasks);
       const parts = [];
       if (got.tasks) parts.push(got.tasks + (got.tasks === 1 ? " tarefa" : " tarefas") + " na fila");
-      if (got.notes) parts.push(got.notes + (got.notes === 1 ? " nota" : " notas") + " em ideias");
+      if (got.notes) parts.push(got.notes + (got.notes === 1 ? " nota guardada" : " notas guardadas"));
       if (parts.length) notify("chegou de outro módulo: " + parts.join(" e "));
     };
     collect();
@@ -745,6 +746,20 @@ function Home() {
 function Today({ c, tasks, habits, journal, closes, reviews, sessions, me, h, phase, date }) {
   const [closing, setClosing] = useState(false);
   const [reviewing, setReviewing] = useState(null); // { id, kind }: a revisão aberta
+  /* a apresentação (VISAO, 13): abre uma vez, aqui, porque o Today só existe
+     depois do onboarding. a chave é "tour-areas", e não a "tour" de antes:
+     quem viu a das seis seções vê a das áreas uma vez. rever é pelo perfil */
+  const [tour, setTour] = useState(() => !seen("tour-areas"));
+  const center = useRef(null);
+  const closeTour = () => {
+    setTour(false);
+    markSeen("tour-areas");
+    /* quem acabou de ler é devolvido ao campo, com o cursor dentro */
+    requestAnimationFrame(() => {
+      const f = center.current && center.current.querySelector("textarea");
+      if (f) f.focus();
+    });
+  };
   /* a mesma conta do calendário e do rastreador (shared/tasks.js, dayTasks):
      é a sobra que o campo usa para dizer se cabe; a que vai ao Merlin sai da
      mesma função, no retrato (shared/portrait.js) */
@@ -873,10 +888,11 @@ function Today({ c, tasks, habits, journal, closes, reviews, sessions, me, h, ph
             </div>}
       </header>
 
-      <div className="hm-center">
+      <div className="hm-center" ref={center}>
         <Composer tasks={tasks} habits={habits} b={b} smart={c.signedIn} onAsk={ask} onIntent={openIntent} readContext={readContext} />
       </div>
 
+      {tour && <Tour onClose={closeTour} />}
       {closing && <Closing tasks={tasks} journal={journal} closes={closes} date={date} login={me.github} onClose={() => setClosing(false)} />}
       {reviewing && <Review key={reviewing.id} reviews={reviews} due={reviewing} onClose={() => setReviewing(null)} />}
       {proposal && <ProposalDialog proposal={proposal.p} chat={proposal.chat} onClose={() => setProposal(null)}

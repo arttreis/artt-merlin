@@ -1,6 +1,7 @@
 /* merlin · a apresentacao
-   saiu do index.css em 09/10/2026, quando a home deixou de existir (VISAO, 9):
-   quem chega a ve no Hoje, e quem quiser rever a abre pelo perfil. */
+   saiu do index.css em 09/10/2026, quando a home deixou de existir (VISAO, 9).
+   desde 19/10/2026 (VISAO, 13) quem chega a ve uma vez no inicio, e quem
+   quiser rever a abre pelo perfil. */
 
 /* ================================================================
    a apresentacao
@@ -56,10 +57,40 @@
 .ta small{font-size:10px;color:var(--ink-30)}
 .ta__bar{display:block;height:5px;border-radius:100px;background:var(--fill-hover);overflow:hidden}
 .ta__bar i{display:block;height:100%;background:var(--accent);border-radius:100px}
-.ta__arrow{display:grid;place-items:center;width:26px;height:26px;border-radius:50%;background:var(--accent);color:var(--on-accent);flex:none}
-.ta__arrow svg{width:13px;height:13px}
+.ta__card{width:100%;padding:10px 12px;border-radius:var(--br3);background:var(--surface);border:1px solid var(--line-soft);color:var(--ink)}
+.ta__card b{display:block;font-size:12px;font-weight:600;margin-bottom:5px}
+.ta__card small{display:block;margin-top:2px}
 
-/* 1 · o calendario: as tres visoes, uma semana e a barra do dia */
+/* 1 · a conversa: o que a pessoa disse e o cartao ja confirmado */
+.ta--talk{display:flex;flex-direction:column;align-items:flex-end;gap:10px}
+.ta__said{margin:0;max-width:80%;padding:8px 12px;border-radius:14px 14px 4px 14px;background:var(--surface);border:1px solid var(--line);font-size:12px;color:var(--ink)}
+.ta__done{margin:0;align-self:flex-start;padding:5px 11px;border-radius:100px;font-family:var(--mono);font-size:10.5px;color:var(--accent-ink);background:color-mix(in srgb,var(--accent) 12%,transparent);border:1px solid color-mix(in srgb,var(--accent) 40%,transparent)}
+
+/* 2 · a proxima coisa: o cartao do "o que falta", em miniatura */
+.ta--next{display:flex;flex-direction:column;align-items:center;gap:8px}
+.ta__card--next{display:flex;flex-direction:column;gap:4px;border-color:color-mix(in srgb,var(--accent) 45%,transparent)}
+.ta__card--next small{margin:0;font-family:var(--mono)}
+.ta__card--next b{margin:0}
+.ta__cost{font-family:var(--mono);font-weight:400;color:var(--ink-50)}
+.ta__why{font-size:10.5px;color:var(--ink-50)}
+.ta__acts{display:flex;gap:5px;margin-top:3px}
+.ta__acts i{font-style:normal;padding:2px 9px;border-radius:100px;border:1px solid var(--line);font-size:10px;color:var(--ink-70)}
+.ta__acts i.is-main{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
+.ta__count{font-family:var(--mono)}
+
+/* 3 · o menu: as cinco areas, e os dois gestos de qualquer tela */
+.ta--menu{display:flex;flex-direction:column;align-items:center;gap:18px}
+.ta__areas{display:grid;grid-template-columns:repeat(5,1fr);gap:4px;width:100%}
+.ta__areas span{display:flex;flex-direction:column;align-items:center;gap:5px;padding:9px 2px 7px;border-radius:9px;background:var(--surface);border:1px solid var(--line-soft);color:var(--ink-70)}
+.ta__areas svg{width:16px;height:16px}
+.ta__areas small{font-size:9px;color:var(--ink-50)}
+.ta__keyrow{display:flex;align-items:center;gap:10px}
+.ta__key{display:inline-flex;align-items:center;gap:4px;height:38px;min-width:38px;padding:0 10px;justify-content:center;border-radius:11px;background:var(--surface);border:1px solid var(--line);color:var(--ink-70)}
+.ta__key svg{width:15px;height:15px}
+.ta__key--plus{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
+.ta__key kbd{font-size:10px}
+
+/* 4 · o calendario: as tres visoes, uma semana e a barra do dia */
 .ta__tabs{display:flex;gap:4px;margin-bottom:10px}
 .ta__tabs span{padding:3px 9px;border-radius:100px;border:1px solid var(--line-soft);font-size:10px;color:var(--ink-30)}
 .ta__tabs span.is-on{color:var(--ink);border-color:var(--line);background:var(--fill-hover)}
@@ -73,28 +104,7 @@
 .ta__daybar b{font-family:var(--mono);font-size:16px;font-weight:500;color:var(--accent-ink)}
 .ta__daybar small{grid-column:1 / -1}
 
-/* 2 · a rotina: um bloco vira cinco dias */
-.ta--routine{display:flex;flex-direction:column;align-items:center;gap:10px}
-.ta__rblock{width:70%;padding:9px 12px;border-radius:var(--br3);border:1px solid var(--line);background:var(--surface);text-align:center}
-.ta__rblock b{display:block;font-size:12px;color:var(--ink);font-weight:600}
-.ta__rdays{display:grid;grid-template-columns:repeat(5,1fr);gap:5px;width:100%}
-.ta__rdays span{display:flex;flex-direction:column;align-items:center;gap:4px;padding:6px 0;border-radius:7px;background:var(--fill)}
-.ta__rdays i{display:block;width:70%;height:16px;border-radius:4px;background:color-mix(in srgb,var(--accent) 55%,transparent)}
-.ta--routine .ta__arrow svg{transform:rotate(90deg)}
-
-/* 3 · nota com checklist vira tarefa */
-.ta--pull{display:flex;flex-direction:column;align-items:center;gap:8px}
-.ta__card{width:100%;padding:10px 12px;border-radius:var(--br3);background:var(--surface);border:1px solid var(--line-soft);color:var(--ink)}
-.ta__card b{display:block;font-size:12px;font-weight:600;margin-bottom:5px}
-.ta__card small{display:block;margin-top:2px}
-.ta__check{display:flex;align-items:center;gap:7px;margin-top:4px;font-size:10.5px;color:var(--ink-70)}
-.ta__check::before{content:"";width:11px;height:11px;border-radius:3px;border:1px solid var(--line);flex:none}
-.ta__check.is-done{color:var(--ink-30);text-decoration:line-through}
-.ta__check.is-done::before{background:var(--accent);border-color:var(--accent)}
-.ta__card--task{border-color:color-mix(in srgb,var(--accent) 45%,transparent)}
-.ta__card--task b{margin:0}
-
-/* 4 · o quadro da prospeccao e o que atrai */
+/* 5 · o quadro de lead a cliente e o que leva gente ate o produto */
 .ta__stages{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
 .ta__stages div{display:flex;flex-direction:column;gap:5px;min-height:92px;padding:6px;border-radius:8px;background:var(--fill)}
 .ta__stages i{display:block;height:20px;border-radius:5px;background:var(--surface);border:1px solid var(--line-soft)}
@@ -105,7 +115,7 @@
 .ta__chips span{display:inline-flex;align-items:center;gap:5px;padding:3px 9px 3px 7px;border-radius:100px;border:1px solid var(--line-soft);font-size:10px;color:var(--ink-50)}
 .ta__chips svg{width:11px;height:11px}
 
-/* 5 · o dinheiro em dois tempos e a grade dos habitos */
+/* 6 · o dinheiro em dois tempos */
 .ta__money{margin:0 0 8px;display:flex;align-items:baseline;justify-content:space-between}
 .ta__money b{font-family:var(--mono);font-size:20px;font-weight:500;color:var(--ink)}
 .ta__split{display:flex;height:7px;border-radius:100px;background:var(--fill-hover);overflow:hidden}
@@ -116,19 +126,3 @@
 .ta__legend i + i,.ta__legend i:not(:first-child){margin-left:6px}
 .ta__legend .is-real{background:var(--accent)}
 .ta__legend .is-forecast{border:1px dashed var(--ink-30)}
-.ta__habits{display:grid;grid-template-columns:repeat(12,1fr);gap:4px}
-.ta__habits i{display:block;aspect-ratio:1;border-radius:4px;border:1px solid var(--line)}
-.ta__habits i.is-on{background:var(--accent);border-color:var(--accent)}
-
-/* 6 · os gestos e os aparelhos */
-.ta--keys{display:flex;flex-direction:column;align-items:center;gap:22px}
-.ta__keyrow{display:flex;align-items:center;gap:10px}
-.ta__key{display:inline-flex;align-items:center;gap:4px;height:38px;min-width:38px;padding:0 10px;justify-content:center;border-radius:11px;background:var(--surface);border:1px solid var(--line);color:var(--ink-70)}
-.ta__key svg{width:15px;height:15px}
-.ta__key--plus{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
-.ta__key--spark{color:var(--accent-ink)}
-.ta__key kbd{font-size:10px}
-.ta__sync{display:flex;align-items:center;gap:12px}
-.ta__device{display:grid;place-items:center;width:42px;height:42px;border-radius:12px;background:var(--surface);border:1px solid var(--line);color:var(--ink-50)}
-.ta__device svg{width:18px;height:18px}
-.ta__link{width:34px;height:1px;background:repeating-linear-gradient(90deg,var(--accent) 0 4px,transparent 4px 8px)}

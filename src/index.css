@@ -17,10 +17,11 @@
   height:calc(min(58vh,500px) + 120px);z-index:0;overflow:hidden;pointer-events:none;
 }
 .hm-scene::after{content:"";position:absolute;inset:auto 0 0 0;height:45%;background:linear-gradient(to bottom,transparent,var(--bg))}
-/* as caixas (o fechamento, a revisão e a proposta do Merlin) também são filhas
-   do .hm, e sem a exceção esta regra desligava o position:fixed delas: abriam
-   em linha, embaixo do campo, e o dock cobria o botão */
-.hm > *:not(.hm-scene):not(.cl):not(.dialog){position:relative;z-index:1}
+/* as caixas (o fechamento, a revisão e a proposta do Merlin) e a apresentação
+   também são filhas do .hm, e sem a exceção esta regra desligava o
+   position:fixed delas: abriam em linha, embaixo do campo, e o dock cobria o
+   botão */
+.hm > *:not(.hm-scene):not(.cl):not(.dialog):not(.tour){position:relative;z-index:1}
 
 .hm-hero{text-align:center;padding:clamp(56px,13vh,128px) 16px 0;min-height:calc(min(58vh,500px) - 160px)}
 .hm-hero h1{
