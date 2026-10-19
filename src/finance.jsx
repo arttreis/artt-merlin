@@ -22,10 +22,13 @@ import {
   pendingBefore, suggestionsBetween, buildMonth, spentByCategory, categoryOrder,
   normalize, byType, configOf, saveConfig, contextOf, financeBrief
 } from "./shared/finance-data.js";
+/* a caixa do lancamento e os campos de dinheiro moram no shared desde
+   19/10/2026: o cartao do inicio abre a mesma caixa para o previsto que
+   passou ("nao aconteceu") */
+import { EntryForm, MoneyInput, KindChips, CategorySelect, inReais, pickCategory } from "./shared/entry-form.jsx";
 
 initPage("finance");
 
-const inReais = (cents) => cents ? (cents / 100).toFixed(2).replace(".", ",") : "";
 const SHORT_MONTHS = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
 
 
@@ -66,11 +69,6 @@ function adjacentMonth(yyyymm, delta) {
   if (m < 1) { m = 12; y--; } else if (m > 12) { m = 1; y++; }
   return y + "-" + pad(m);
 }
-
-/* o <select> de categoria e controlado: quando o valor pedido nao esta na
-   lista (categoria apagada, ou nenhuma ainda), fica a primeira — que e o
-   que o navegador fazia sozinho no formulario por string */
-const pickCategory = (categories, wanted) => categories.includes(wanted) ? wanted : (categories[0] || "");
 
 /* ---------- a pagina ----------
    o estado de tela mora aqui: a aba, o mes e o ano abertos, o dia expandido
@@ -869,54 +867,8 @@ function InvestView({ ctx, onEdit, onNew }) {
    o mesmo <Form> do ui: criar e editar sao a mesma caixa, a diferenca e
    ter ou nao um documento por baixo. */
 /* a unidade mora no campo ("R$" antes, "%" e "x" depois), e nao no rotulo */
-const MoneyInput = (props) => <span className="affix affix--pre"><i>R$</i><input className="input input--num" inputMode="decimal" placeholder="0,00" {...props}/></span>;
 const UnitInput = ({ unit, ...props }) => <span className="affix affix--post"><input className="input input--num" type="number" {...props}/><i>{unit}</i></span>;
 const DayOfMonthInput = (props) => <DayOfMonthField required {...props}/>;
-/* entrada ou saida: duas opcoes cabem num par de chips, sem abrir lista */
-const KindChips = ({ value, onChange }) => (
-  <div className="chips" role="radiogroup">
-    {[["out", "saída"], ["in", "entrada"]].map(([k, label]) => (
-      <button key={k} type="button" className="chip" role="radio" aria-checked={String(value === k)} aria-pressed={String(value === k)}
-              onClick={() => onChange({ currentTarget: { value: k } })}>{label}</button>
-    ))}
-  </div>
-);
-const CategorySelect = ({ categories, ...props }) => <select className="select" {...props}>{categories.map((c) => <option key={c} value={c}>{c}</option>)}</select>;
-
-function EntryForm({ finance, categories, id, presetDay, preset, onClose, onRemove, onSave }) {
-  const l = id ? finance.get(id) : null;
-  const pre = preset || {};
-  const [v, bind] = useFields({
-    name: l ? l.name : (pre.name || ""),
-    amount: inReais(l ? l.amount : pre.amount),
-    day: l ? l.day : (presetDay || today()),
-    kind: l ? l.kind : (pre.kind || "out"),
-    category: pickCategory(categories, l ? l.category : (pre.category || "")),
-    paid: l ? l.paid : (pre.paid != null ? pre.paid : true)
-  });
-  if (id && !l) return null;
-  const submit = () => {
-    const amount = parseMoney(v.amount);
-    if (!v.name.trim() || !amount) { notify("preciso de um nome e um valor"); return false; }
-    onSave({
-      id: l ? l.id : newId(), type: "entry", name: v.name.trim(), amount,
-      day: isDay(v.day) ? v.day : today(), kind: v.kind, category: v.category,
-      paid: v.paid, origin: l ? l.origin : (pre.origin || null)
-    }, l, l ? "lançamento atualizado" : "lançamento criado");
-  };
-  return (
-    <Form title={l ? "lançamento" : (pre.origin ? "lançar a sugestão" : "novo lançamento")}
-        sub={l ? "" : "pago é real; não pago é previsto e entra no fim do mês com ≈"} submit={l ? "salvar" : "adicionar"} remove={l ? "apagar" : ""}
-        onRemove={() => onRemove(id, "lançamento apagado")} onClose={onClose} onSubmit={submit}>
-      <Field label="nome" full><input className="input" required maxLength="140" {...bind("name")}/></Field>
-      <Field label="valor"><MoneyInput {...bind("amount")}/></Field>
-      <Field label="data"><DateField {...bind("day")} /></Field>
-      <Field label="tipo"><KindChips {...bind("kind")}/></Field>
-      <Field label="categoria"><CategorySelect categories={categories} {...bind("category")}/></Field>
-      <label className="row full"><input type="checkbox" {...bind("paid", "check")}/> já aconteceu (desmarcado, fica previsto)</label>
-    </Form>
-  );
-}
 
 function FixedForm({ finance, categories, id, presetKind, onClose, onRemove, onSave }) {
   const f = id ? finance.get(id) : null;

@@ -3,8 +3,8 @@
  * "o que falta hoje?" responde com UMA coisa: a próxima. a lista tem só dois
  * grupos, nessa ordem — o que é agora (a sessão de foco rodando, ou um
  * compromisso com hora que começa em até 30 minutos ou já está em curso) e o
- * que ficou para trás (as atrasadas). a fila do dia, os hábitos, o que vence
- * hoje e o conteúdo não entram: o dia inteiro mora no calendário, e uma lista
+ * que ficou para trás (as atrasadas e as contas previstas de dias passados). a
+ * fila do dia, os hábitos, o que vence hoje e o conteúdo não entram: o dia inteiro mora no calendário, e uma lista
  * que repetisse a fila viraria a segunda fila.
  *
  * é a conta de três telas: o cartão da conversa no início, o "agora" do
@@ -12,7 +12,7 @@
  * (PRD da secretária): as três leem daqui, e nenhuma monta a lista sozinha.
  *
  * cada grupo vem de uma fonte em SOURCES. fonte nova é uma linha ali (as
- * contas previstas de dias passados, #15, entram assim). mais de dois itens da
+ * contas previstas de dias passados entraram assim). mais de dois itens da
  * mesma fonte viram um item só, que abre a tela deles (`many`).
  *
  * a palavra "quest" fica no código: na tela, nunca (VISAO, 11). */
@@ -20,10 +20,12 @@ import { dayOf } from "./core.js";
 import { overdue, onDate, dayTasks, topOrder } from "./tasks.js";
 import { runningOf, minutesOf } from "./focus.js";
 import { costOf } from "./day.js";
+import { pendingBefore } from "./finance-data.js";
 
 /* quantos minutos antes o compromisso já é "agora" */
 export const SOON = 30;
 export const DAY_HREF = "calendar.html#day";
+export const FINANCE_HREF = "finance.html";
 
 /* ---------- as fontes ---------- */
 
@@ -52,16 +54,26 @@ const lateTasks = (data, ctx) =>
 const lateGroup = (items) =>
   ({ type: "overdue-group", id: "overdue-group", title: items.length + " atrasadas", count: items.length, href: DAY_HREF, items });
 
+/* as contas previstas cujo dia já passou: aconteceu ou não? a de hoje e a do
+   futuro não entram (D4), e a conta é a mesma da aba hoje do financeiro */
+const lateBills = (data, ctx) =>
+  pendingBefore(ctx.date, { entries: (data.entries || []).filter((e) => e.type === "entry") })
+    .map(({ it: e }) => ({ type: "bill", id: "entry:" + e.id, title: e.name, entry: e, date: e.day, amount: e.amount, kind: e.kind }));
+const billGroup = (items) =>
+  ({ type: "bill-group", id: "bill-group", title: items.length + " contas a confirmar", count: items.length, href: FINANCE_HREF, items });
+
 export const SOURCES = [
   { key: "session", group: "now", list: sessionNow },
   { key: "appointment", group: "now", list: appointmentsNow },
-  { key: "overdue", group: "behind", list: lateTasks, many: lateGroup }
+  { key: "overdue", group: "behind", list: lateTasks, many: lateGroup },
+  { key: "bill", group: "behind", list: lateBills, many: billGroup }
 ];
 
 /* ---------- a lista ---------- */
 
-/* data = { tasks, sessions, blocks? }: as coleções inteiras, como `all()` as
-   devolve. now é Date ou epoch ms. a conta do dia é a mesma do calendário e do
+/* data = { tasks, sessions, blocks?, entries? }: as coleções inteiras, como
+   `all()` as devolve (`entries` é a coleção `finance`; só os lançamentos
+   contam). now é Date ou epoch ms. a conta do dia é a mesma do calendário e do
    rastreador (dayTasks): a cópia da rotina conta. */
 export function questsOf(data, now) {
   const at = now instanceof Date ? now.getTime() : +now || Date.now();
@@ -100,7 +112,7 @@ export function questsText(state) {
 }
 
 /* ---------- as ações que gravam ----------
-   recebem a coleção de tarefas e devolvem o desfazer: o documento de antes,
+   recebem a coleção (de tarefas ou, nas contas, a `finance`) e devolvem o desfazer: o documento de antes,
    gravado de volta. "agora não" não está aqui porque não grava. */
 const restore = (store, before) => () => store.save({ ...before, updatedAt: Date.now() });
 
@@ -122,5 +134,22 @@ export function doneTask(store, task) {
   const before = store.get(task.id);
   if (!before || before.done) return null;
   store.save({ ...before, done: true, updatedAt: Date.now() });
+  return restore(store, before);
+}
+
+/* "sim, aconteceu": o previsto vira real no mesmo dia, como o "aconteceu" da
+   aba hoje do financeiro */
+export function paidEntry(store, entry) {
+  const before = store.get(entry.id);
+  if (!before || before.paid) return null;
+  store.save({ ...before, paid: true, updatedAt: Date.now() });
+  return restore(store, before);
+}
+
+/* "amanhã": o previsto continua previsto, em outro dia */
+export function moveEntry(store, entry, day) {
+  const before = store.get(entry.id);
+  if (!before) return null;
+  store.save({ ...before, day, updatedAt: Date.now() });
   return restore(store, before);
 }

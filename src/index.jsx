@@ -777,8 +777,10 @@ function Today({ c, tasks, habits, journal, closes, reviews, sessions, me, h, ph
     chats.save({ id: talkId.current, title: chatTitle(list), messages: list.slice(-MAX_TURNS), createdAt: before ? before.createdAt : now, updatedAt: now });
   };
   /* o cartão do "o que falta hoje?" é desenhado ao vivo a partir das
-     coleções; a linha de texto é o que a conversa guarda e o Merlin lê depois */
-  const questsMsg = () => ({ from: "merlin", show: "quests", text: questsText(questsOf({ tasks: tasks.all(), sessions: sessions.all() })) });
+     coleções; a linha de texto é o que a conversa guarda e o Merlin lê depois.
+     as contas previstas que passaram também estão na lista */
+  const finance = useCollection("finance", { normalize: normalizeFinance });
+  const questsMsg = () => ({ from: "merlin", show: "quests", text: questsText(questsOf({ tasks: tasks.all(), sessions: sessions.all(), entries: finance.all() })) });
   const ask = async (q) => {
     if (!c.signedIn) { askMerlin(q); return; }
     if (asking) return;

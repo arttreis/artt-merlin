@@ -42,7 +42,9 @@ globalThis.fetch = async (url) => { throw new Error("fetch não previsto no test
 const { today, addDays } = await import("./core.js");
 const { normalize, tasks, askIntent } = await import("./tasks.js");
 const { runningOf, startSession, stopSession } = await import("./focus.js");
-const { questsOf, nextQuest, countLine, moveTask, dropTask, doneTask, SOON, DAY_HREF, SOURCES } = await import("./quests.js");
+const { normalize: normalizeFinance } = await import("./finance-data.js");
+const { collection } = await import("./core.js");
+const { questsOf, nextQuest, countLine, moveTask, dropTask, doneTask, paidEntry, moveEntry, SOON, DAY_HREF, FINANCE_HREF, SOURCES } = await import("./quests.js");
 
 /* ---- os ingredientes ---- */
 
@@ -403,6 +405,206 @@ function spyOf(list) {
   /* começar sem nenhuma rodando não inventa um end */
   const third = startSession(sessions, { id: "t3", title: "x", min: 0 }, at(10, 0).getTime());
   check("começar sem outra rodando: nasce sem end e sem duração planejada", third && !third.end && third.planned === 0, JSON.stringify(third));
+}
+
+/* ---- as contas a confirmar (#15, D4): o previsto que já passou ----
+ * um lançamento previsto (`paid:false`) de um dia anterior a hoje entra em "para
+ * trás", depois das atrasadas, do mais antigo para o mais novo. o de hoje, o de
+ * amanhã, o pago e o que não é `entry` ficam de fora. */
+
+/* um lançamento já normalizado, como a coleção `finance` o entrega */
+let eseq = 0;
+const entry = (over = {}) => normalizeFinance({ id: "e" + (++eseq), type: "entry", day: YESTERDAY, name: "conta " + eseq, amount: 10000, kind: "out", paid: false, ...over });
+const billIds = (q) => q.behind.map((x) => x.id);
+
+{
+  check("FINANCE_HREF abre o financeiro", FINANCE_HREF === "finance.html", String(FINANCE_HREF));
+  const keys = SOURCES.map((s) => s.key);
+  const bill = SOURCES.find((s) => s.key === "bill");
+  check("a fonte \"bill\" existe e é de para trás", !!bill && bill.group === "behind" && typeof bill.list === "function", JSON.stringify(keys));
+  check("a fonte \"bill\" vem depois de \"overdue\"", keys.indexOf("overdue") >= 0 && keys.indexOf("bill") > keys.indexOf("overdue"), keys.join());
+}
+
+/* para trás, conta */
+{
+  const rent = entry({ id: "rent", name: "aluguel", amount: 200000, day: YESTERDAY });
+  const late = task({ id: "late", title: "enviar a proposta", date: D3 });
+  const q = quests({ tasks: [late], entries: [rent] });
+  check("conta: depois das atrasadas, em para trás", billIds(q).join() === "task:late,entry:rent", billIds(q).join());
+  const b = q.behind[1];
+  check("conta: tipo, id e título", !!b && b.type === "bill" && b.id === "entry:rent" && b.title === "aluguel", JSON.stringify(b));
+  check("conta: o valor e o dia", !!b && b.amount === 200000 && b.date === YESTERDAY, JSON.stringify(b && [b.amount, b.date]));
+  check("conta: o sentido (saída) e o lançamento vêm junto", !!b && b.kind === "out" && b.entry && b.entry.id === "rent" && b.entry.day === YESTERDAY, JSON.stringify(b && [b.kind, b.entry]));
+  check("conta: não é agora", q.now.length === 0);
+  check("conta: left conta a atrasada e a conta", q.left === 2, String(q.left));
+  check("conta: o countLine soma as duas", countLine(q) === "faltam 2 · 0 feitas", countLine(q));
+
+  /* só a conta, sem nenhuma tarefa */
+  const only = quests({ tasks: [], entries: [rent] });
+  check("só a conta: é o único item de para trás", billIds(only).join() === "entry:rent" && only.left === 1, billIds(only).join() + " / " + only.left);
+
+  /* uma entrada (kind in) prevista também é conta a confirmar, com o sentido guardado */
+  const pay = entry({ id: "pay", name: "freela da Ana", amount: 50000, kind: "in", day: D2 });
+  const qin = quests({ tasks: [], entries: [pay] });
+  check("entrada prevista: o sentido é in", qin.behind.length === 1 && qin.behind[0].kind === "in" && qin.behind[0].amount === 50000, JSON.stringify(qin.behind[0]));
+
+  /* o `entries` é opcional: sem ele nada muda */
+  const noEntries = questsOf({ tasks: [late], sessions: [], blocks: [] }, at(9, 0));
+  check("sem entries: só a atrasada, como antes", ids(noEntries.behind).join() === "task:late" && noEntries.left === 1, JSON.stringify(ids(noEntries.behind)));
+  const empty = quests({ tasks: [], entries: [] });
+  check("entries vazio: nada em para trás", empty.behind.length === 0 && empty.left === 0, JSON.stringify(empty));
+}
+
+/* ordem: do mais antigo para o mais novo */
+{
+  const newer = entry({ id: "n", name: "mais nova", day: D2 });
+  const older = entry({ id: "o", name: "mais velha", day: D4 });
+  const q = quests({ entries: [newer, older] });
+  check("ordem: o de 4 dias atrás vem antes do de 2", billIds(q).join() === "entry:o,entry:n", billIds(q).join());
+  check("duas contas ainda não viram grupo", q.behind.length === 2 && q.behind.every((x) => x.type === "bill"), JSON.stringify(q.behind.map((x) => x.type)));
+  check("duas contas: left é 2", q.left === 2, String(q.left));
+}
+
+/* agrupar: mais de duas viram um item só */
+{
+  const list = [
+    entry({ id: "c", name: "c", day: D2 }),
+    entry({ id: "a", name: "a", day: D4 }),
+    entry({ id: "b", name: "b", day: D3 })
+  ];
+  const q = quests({ entries: list });
+  check("3 contas: um item só", q.behind.length === 1, String(q.behind.length));
+  const g = q.behind[0];
+  check("o grupo se chama \"3 contas a confirmar\"", !!g && g.type === "bill-group" && g.id === "bill-group" && g.title === "3 contas a confirmar", JSON.stringify(g && { type: g.type, id: g.id, title: g.title }));
+  check("o grupo abre o financeiro", !!g && g.href === "finance.html", String(g && g.href));
+  check("o grupo sabe quantas são", !!g && g.count === 3, String(g && g.count));
+  check("o grupo guarda as contas, da mais antiga para a mais nova", !!g && Array.isArray(g.items) && g.items.map((x) => x.id).join() === "entry:a,entry:b,entry:c", g && g.items && g.items.map((x) => x.id).join());
+  check("o grupo conta como 3 em left", q.left === 3, String(q.left));
+
+  const four = quests({ entries: [...list, entry({ id: "d", day: YESTERDAY })] });
+  check("4 contas: \"4 contas a confirmar\"", four.behind.length === 1 && four.behind[0].title === "4 contas a confirmar" && four.behind[0].count === 4 && four.left === 4, JSON.stringify(four.behind.map((x) => x.title)));
+
+  /* o grupo de contas e o de atrasadas não se misturam: cada fonte agrupa as suas */
+  const overdue3 = [task({ id: "t1", date: D4 }), task({ id: "t2", date: D3 }), task({ id: "t3", date: D2 })];
+  const both = quests({ tasks: overdue3, entries: list });
+  check("3 atrasadas e 3 contas: dois grupos, as atrasadas primeiro", ids(both.behind).join() === "overdue-group,bill-group", ids(both.behind).join());
+  check("dois grupos: left soma 6", both.left === 6, String(both.left));
+
+  /* 1 atrasada + 3 contas: a tarefa solta e o grupo de contas */
+  const mixed = quests({ tasks: [task({ id: "solo", date: D3 })], entries: list });
+  check("1 atrasada e 3 contas: a tarefa, depois o grupo", ids(mixed.behind).join() === "task:solo,bill-group", ids(mixed.behind).join());
+  check("1 atrasada e 3 contas: left é 4", mixed.left === 4, String(mixed.left));
+}
+
+/* o que não entra */
+{
+  const paid = entry({ id: "paid", day: YESTERDAY, paid: true });
+  check("pago não entra", quests({ entries: [paid] }).behind.length === 0 && quests({ entries: [paid] }).left === 0);
+
+  const todays = entry({ id: "hoje", day: TODAY });
+  const tomorrows = entry({ id: "amanha", day: TOMORROW });
+  const qf = quests({ entries: [todays, tomorrows] });
+  check("o previsto de hoje e o de amanhã não entram (D4)", qf.behind.length === 0 && qf.now.length === 0 && qf.left === 0, JSON.stringify(billIds(qf)));
+
+  const fixed = normalizeFinance({ id: "fx", type: "fixed", name: "internet", amount: 12000, dayOfMonth: 5 });
+  /* um fixo com campos de lançamento por engano continua sendo outro tipo */
+  const sneaky = { ...fixed, id: "fx2", day: D4, paid: false };
+  const qo = quests({ entries: [fixed, sneaky, normalizeFinance({ id: "config", type: "config" })] });
+  check("outro tipo (fixed, config) não vira item", qo.behind.length === 0 && qo.left === 0, JSON.stringify(billIds(qo)));
+
+  /* misturado: só o previsto passado entra */
+  const real = entry({ id: "real", day: D2, name: "luz" });
+  const qm = quests({ entries: [paid, todays, tomorrows, fixed, sneaky, real] });
+  check("misturado: só o previsto passado entra", billIds(qm).join() === "entry:real", billIds(qm).join());
+}
+
+/* sim e amanhã: gravam, e desfazem (sobre a coleção de verdade) */
+{
+  const store = collection("finance", { normalize: normalizeFinance });
+  store.save(entry({ id: "rent", name: "aluguel", amount: 200000, day: YESTERDAY }));
+  store.save(entry({ id: "luz", name: "luz", amount: 18000, day: D4 }));
+  store.save(normalizeFinance({ id: "fx", type: "fixed", name: "internet", amount: 12000, dayOfMonth: 5 }));
+  const billsOf = () => questsOf({ tasks: [], sessions: [], blocks: [], entries: store.all() }, at(9, 0)).behind.map((q) => q.id);
+  check("antes de agir: as duas contas estão em para trás, a mais antiga primeiro", billsOf().join() === "entry:luz,entry:rent", billsOf().join());
+
+  /* sim */
+  const undoPaid = paidEntry(store, store.get("rent"));
+  const paid = store.get("rent");
+  check("sim: o lançamento fica pago", paid && paid.paid === true, JSON.stringify(paid));
+  check("sim: o dia fica o mesmo", paid && paid.day === YESTERDAY, String(paid && paid.day));
+  check("sim: o resto do lançamento não muda", paid && paid.name === "aluguel" && paid.amount === 200000 && paid.kind === "out", JSON.stringify(paid));
+  check("sim: sai de para trás", billsOf().join() === "entry:luz", billsOf().join());
+  check("sim: devolve a função de desfazer", typeof undoPaid === "function");
+  await undoPaid();
+  check("o desfazer do sim volta para paid:false", store.get("rent").paid === false, JSON.stringify(store.get("rent")));
+  check("o desfazer do sim mantém o dia", store.get("rent").day === YESTERDAY, String(store.get("rent").day));
+  check("o desfazer do sim devolve a conta a para trás", billsOf().join() === "entry:luz,entry:rent", billsOf().join());
+
+  /* sim em quem não existe ou já está pago */
+  check("sim em documento que não existe: null", paidEntry(store, entry({ id: "fantasma" })) === null);
+  paidEntry(store, store.get("rent"));
+  check("sim em quem já está pago: null", paidEntry(store, store.get("rent")) === null);
+  check("sim repetido não desfaz nem muda o dia", store.get("rent").paid === true && store.get("rent").day === YESTERDAY);
+  store.save({ ...store.get("rent"), paid: false });
+
+  /* amanhã */
+  const undoMove = moveEntry(store, store.get("rent"), TOMORROW);
+  const moved = store.get("rent");
+  check("amanhã: o dia vira amanhã", moved && moved.day === TOMORROW, String(moved && moved.day));
+  check("amanhã: continua previsto, não vira pago", moved && moved.paid === false, JSON.stringify(moved));
+  check("amanhã: o resto do lançamento não muda", moved && moved.name === "aluguel" && moved.amount === 200000, JSON.stringify(moved));
+  check("amanhã: sai de para trás", billsOf().join() === "entry:luz", billsOf().join());
+  check("amanhã: devolve a função de desfazer", typeof undoMove === "function");
+  await undoMove();
+  check("o desfazer do amanhã devolve o dia antigo", store.get("rent").day === YESTERDAY && store.get("rent").paid === false, JSON.stringify(store.get("rent")));
+  check("o desfazer do amanhã devolve a conta a para trás", billsOf().join() === "entry:luz,entry:rent", billsOf().join());
+
+  check("amanhã em documento que não existe: null", moveEntry(store, entry({ id: "fantasma" }), TOMORROW) === null);
+
+  /* mexer num não toca o outro, nem o fixo */
+  check("as ações não mexem no que não escolheram", store.get("luz").day === D4 && store.get("luz").paid === false && store.get("fx") && store.get("fx").type === "fixed");
+}
+
+/* agora não: pular não grava */
+{
+  const first = entry({ id: "first", name: "aluguel", day: D4 });
+  const second = entry({ id: "second", name: "luz", day: D2 });
+  const spy = spyOf([first, second]);
+  const state = questsOf({ tasks: [], sessions: [], blocks: [], entries: spy.all() }, at(9, 0));
+
+  const r0 = nextQuest(state, new Set());
+  check("sem pulos: a primeira conta, e a seguinte pelo nome", r0.quest && r0.quest.id === "entry:first" && r0.next === "luz", JSON.stringify(r0.quest && r0.quest.id) + " / " + r0.next);
+
+  const r1 = nextQuest(state, new Set(["entry:first"]));
+  check("pulada a primeira conta: mostra a seguinte", r1.quest && r1.quest.id === "entry:second" && r1.next === "", JSON.stringify(r1));
+
+  const r2 = nextQuest(state, new Set(["entry:first", "entry:second"]));
+  check("puladas todas as contas: não há quest", r2.quest === null, JSON.stringify(r2.quest));
+
+  check("pular a conta não grava", spy.saves === 0 && spy.removes === 0, JSON.stringify([spy.saves, spy.removes]));
+  check("pular a conta não muda a lista", state.behind.length === 2 && spy.all().every((e) => e.paid === false));
+
+  /* com a tarefa atrasada na frente: pular a tarefa leva à conta */
+  const late = task({ id: "late", title: "enviar a proposta", date: D3 });
+  const mixed = questsOf({ tasks: [late], sessions: [], blocks: [], entries: spy.all() }, at(9, 0));
+  const m1 = nextQuest(mixed, new Set(["task:late"]));
+  check("pulada a atrasada: a conta mais antiga vem", m1.quest && m1.quest.id === "entry:first", JSON.stringify(m1.quest && m1.quest.id));
+  check("questsOf com contas não grava", spy.saves === 0 && spy.removes === 0, JSON.stringify([spy.saves, spy.removes]));
+}
+
+/* agora vem antes: a sessão de foco é a primeira, a conta vem depois */
+{
+  const now = at(10, 20);
+  const landing = task({ id: "landing", title: "revisar a landing", min: 60 });
+  const session = { id: "s1", task: "landing", title: "revisar a landing", start: now.getTime() - 5 * 60000, end: null, planned: 60 };
+  const rent = entry({ id: "rent", name: "aluguel", day: YESTERDAY });
+  const q = questsOf({ tasks: [landing], sessions: [session], blocks: [], entries: [rent] }, now);
+  const r = nextQuest(q, new Set());
+  check("sessão rodando e conta passada: a sessão é a primeira", r.quest && r.quest.id === "session:s1", JSON.stringify(r.quest && r.quest.id));
+  check("sessão rodando e conta passada: a seguinte é a conta", r.next === "aluguel", JSON.stringify(r.next));
+  check("sessão rodando e conta passada: a conta está em para trás, não em agora", q.now.length === 1 && billIds(q).join() === "entry:rent", JSON.stringify([ids(q.now), billIds(q)]));
+  const skipped = nextQuest(q, new Set(["session:s1"]));
+  check("pulada a sessão: a conta aparece", skipped.quest && skipped.quest.id === "entry:rent", JSON.stringify(skipped.quest && skipped.quest.id));
 }
 
 console.log("\n" + passed + " passaram, " + failures.length + " falharam");
