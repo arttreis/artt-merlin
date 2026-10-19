@@ -762,6 +762,21 @@ const bl = (id, due, text, o) => ({ id, text, due, done: false, ...o });
   check("cartão: o show continua lá depois de recarregar", normalizeChat(saved).messages[1].show === "quests", JSON.stringify(normalizeChat(saved).messages[1]));
 }
 
+/* ---- a conversa acompanha o cartão que cresce (ticket 54) ----
+   a conta "a pessoa estava no fim?" decide se o cartão que cresce depois de
+   desenhado rola a conversa até o fim ou a deixa onde a pessoa a pôs */
+{
+  const { atBottom } = await import("./assistant-actions.js");
+  check("no fim: exatamente no fim", atBottom({ scrollTop: 600, clientHeight: 400, scrollHeight: 1000 }) === true);
+  check("no fim: faltam 40px, dentro da folga de 48", atBottom({ scrollTop: 560, clientHeight: 400, scrollHeight: 1000 }) === true);
+  check("no fim: faltam 48px, o limite da folga", atBottom({ scrollTop: 552, clientHeight: 400, scrollHeight: 1000 }) === true);
+  check("no fim: faltam 49px, fora da folga", atBottom({ scrollTop: 551, clientHeight: 400, scrollHeight: 1000 }) === false);
+  check("no fim: faltam 200px, subiu para reler", atBottom({ scrollTop: 400, clientHeight: 400, scrollHeight: 1000 }) === false);
+  check("no fim: conteúdo menor que a caixa", atBottom({ scrollTop: 0, clientHeight: 400, scrollHeight: 250 }) === true);
+  check("no fim: conteúdo do tamanho da caixa", atBottom({ scrollTop: 0, clientHeight: 400, scrollHeight: 400 }) === true);
+  check("no fim: a folga é um parâmetro", atBottom({ scrollTop: 400, clientHeight: 400, scrollHeight: 1000 }, 200) === true && atBottom({ scrollTop: 559, clientHeight: 400, scrollHeight: 1000 }, 0) === false);
+}
+
 /* ---- conteúdo (ticket 13) ----
    a seção do conteúdo: o que falta no ritmo, as atrasadas e os próximos 7
    dias. o roteiro nunca entra. cada bloco roda dentro de `attempt`: se algo
