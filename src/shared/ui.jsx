@@ -20,10 +20,10 @@ import {
   collection, cloud, clients, listClients, clientName, md, brl, parseMoney,
   api, notify, sendToDay, formatMin, readDuration, parseDuration, newId, newNote, today,
   SECTIONS, sectionOf, CLOUD_STATUS, search, signIn, currentNotice, onNotice, closeNotice,
-  toggleSidebar, setShellRenderer, currentBrand, share, shareOf, unshare, shareUrl,
+  toggleSidebar, setShellRenderer, share, shareOf, unshare, shareUrl,
   currentTheme, toggleTheme, askMerlin, onboardingBlocked
 } from "./core.js";
-import { LOGO, GL_LOGO, GL_MARK, ICONS, NAV_ICONS, icon } from "./icons.jsx";
+import { LOGO, ICONS, NAV_ICONS, icon } from "./icons.jsx";
 /* o ProposalDialog mora aqui, e nao na tela do assistente, porque ele e um
    Form como qualquer outro do sistema — e porque qualquer tela que um dia
    receba uma proposta usa o mesmo. */
@@ -1382,14 +1382,7 @@ function Notice() {
    ali não há dock. nas outras telas o dock é pequeno: o início, as abas da
    área em que se está e o "+", que abre o campo de tudo. */
 function Brand() {
-  if (currentBrand() !== "gl") {
-    return <a className="tb__logo" href="index.html" aria-label="Merlin">{LOGO}<b>merlin</b></a>;
-  }
-  return (
-    <a className="tb__logo tb__logo--gl" href="index.html" aria-label="Merlin, da Guessless">
-      {GL_MARK}<span className="tb__sub">merlin</span>
-    </a>
-  );
+  return <a className="tb__logo" href="index.html" aria-label="Merlin">{LOGO}<b>merlin</b></a>;
 }
 
 function TopBar({ page, onCommand, menuOpen, onMenu, menuRef }) {

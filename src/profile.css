@@ -26,7 +26,6 @@
 .pf-cloud .dot{width:6px;height:6px;border-radius:50%;background:currentColor;flex:none}
 
 .pf-actions{display:flex;flex-wrap:wrap;gap:var(--pd2);margin-top:var(--pd2)}
-.pf-brand{margin-top:var(--pd2)}
 
 /* ---------- aparencia ---------- */
 .pf-now{margin:var(--pd2) 0 0;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-30)}

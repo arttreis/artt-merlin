@@ -202,40 +202,6 @@ const dataLeft = () => globalThis.localStorage.keys().filter((k) => k in DATA);
   check("nao mexe no que nao e do merlin", globalThis.localStorage.getItem("outracoisa:x") === "nao e do merlin");
 }
 
-/* ---- 10. a marca segue o domínio de quem entrou ----
-   é só pele: nenhum dado muda. o que importa aqui é que ela seja gravada
-   ANTES do recarregamento — a página que volta tem que já nascer pintada. */
-{
-  const { cloud, currentBrand } = await fresh({ ...PREFS });
-  answers = { "/me": { body: { signedIn: true, email: "ana@guessless.com.br" } } };
-  await cloud.resume();
-  check("quem é da casa veste a casa", currentBrand() === "gl", currentBrand());
-}
-{
-  const { cloud, currentBrand } = await fresh({ ...PREFS });
-  answers = { "/me": { body: { signedIn: true, email: "arthurcastilhos@gmail.com" } } };
-  await cloud.resume();
-  check("quem não é da casa fica no Merlin", currentBrand() === "", currentBrand());
-}
-{
-  /* o caso que justifica gravar a marca junto com o dono: a pessoa da casa
-     entra num navegador que era de fora. a limpeza roda, e a marca tem que
-     estar escrita quando a página voltar — senão ela pisca em verde. */
-  const { signIn, currentBrand } = await fresh({ ...PREFS, ...DATA, "merlin:who": "arthurcastilhos@gmail.com" });
-  answers = { "/sign-in": { body: { ok: true, email: "ana@guessless.com.br" } } };
-  await signIn.submitCode("ana@guessless.com.br", "123456");
-  check("a marca sobrevive à limpeza", currentBrand() === "gl", currentBrand());
-  check("a limpeza aconteceu mesmo assim", dataLeft().length === 0, dataLeft().join(","));
-}
-{
-  /* e o inverso: sair leva a marca junto, senão o próximo a abrir este
-     navegador veria a pele de quem saiu. */
-  const { cloud, currentBrand } = await fresh({ ...PREFS, "merlin:who": "ana@guessless.com.br", "merlin:brand": "gl" });
-  answers = { "/me": { body: { signedIn: true, email: "ana@guessless.com.br" } } }; answers["/sign-out"] = { body: { ok: true } };
-  await cloud.resume();
-  await cloud.signOut();
-  check("sair leva a marca junto", currentBrand() === "", currentBrand());
-}
 
 {
   /* ---- ideias viraram notas ----

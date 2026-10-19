@@ -62,43 +62,16 @@ O Merlin conselheiro também deixou de falar do Arthur em terceira pessoa: o con
 da casa (Guessless, GL Suite, os canais, o Stripe), e ele fala com quem está na tela sem supor
 nome nem cargo.
 
-### A marca segue quem entrou
+### Uma cara só (19/10/2026)
 
-Quem entra por um e-mail `@guessless.com.br` vê o Merlin **com a identidade da Guessless**;
-todo o resto vê o Merlin. É a mesma decisão do login, aplicada à pele: um deploy, um endereço,
-duas caras.
+De 07/09 a 19/10/2026 quem entrava por um e-mail `@guessless.com.br` via o Merlin com a
+identidade da Guessless (fundo `#0A0A0A`, DM Sans, Manrope, o azul `#368DFF` e o logotipo da
+casa). Saiu junto com o verde: o app inteiro passou a vestir o roxo do chapéu (seção 12), e duas
+caras para um personagem só não fazem sentido. O domínio continua abrindo a porta
+(`OWNER_EMAILS`); só a pele foi embora — `html.gl`, `merlin:brand` (apagada no navegador na
+primeira carga), o lockup na barra e o e-mail azul.
 
-> A marca é só pele. Nenhuma tela muda de comportamento, nenhum dado sabe que ela existe.
-
-A identidade vem do design system dos documentos da casa
-(`docs.guessless.com.br/assets/dashboard.css`), que é a fonte de verdade: fundo `#0A0A0A`,
-**DM Sans** no display, **Manrope** no corpo, **Instrument Serif** no itálico de ênfase,
-**JetBrains Mono** nos rótulos e `#368DFF` no destaque. A mono é a mesma dos dois lados — é por
-isso que a troca não desmonta nada. O `#0014FF` que aparece por aí não é a marca; o próprio CSS
-da casa anota isso.
-
-Como funciona, em três peças:
-
-- **`html.gl` no `shell.css`** troca o valor dos tokens que já existiam. Nenhum componente
-  ganhou regra nova, com duas exceções anotadas lá: o display em DM Sans (o Merlin usa a mesma
-  fonte nos dois papéis) e o mono mais aberto da casa.
-- **`merlin:brand` no `localStorage`**, escrito junto com `merlin:who` e lido pelo `<head>` de
-  cada página **antes da primeira pintura**. Se dependesse do `/me`, a pessoa da casa veria um
-  quadro de Merlin antes do próprio Merlin a cada carregamento.
-- **O lockup na barra**: o logotipo da Guessless com `merlin` de sub-rótulo, que é como a casa
-  já assina os próprios produtos (`[GUESSLESS] docs`). Recolhida, entra o isotipo — ele existe
-  exatamente para esse tamanho. O e-mail do código também veste a marca de quem vai recebê-lo:
-  ninguém deve abrir um e-mail verde de um produto que não conhece.
-
-Duas coisas ficaram de fora, de propósito:
-
-- **O endereço continua `merlin.arttreis.com.br`.** Um `merlin.guessless.com.br` apontando para
-  o mesmo Worker resolve (a Cloudflare aceita mais de um `custom_domain`), mas depende de um
-  registro de DNS no domínio da casa — decisão de quem tem a zona, não do código.
-- **O token de destaque se chamava `--green`** e carregava o azul. Ficou de fora deste passo
-  por ser mecânico, e foi feito em 08/10/2026 num commit só dele: `--green`, `--green-ink`,
-  `--green-glow` e `--on-green` viraram `--accent`, `--accent-ink`, `--accent-glow` e `--on-accent`,
-  e os modificadores `pill--green`, `chip--green` e `badge--green` viraram `--accent` junto.
+O token de destaque continua se chamando `--accent` (até 08/10/2026 era `--green`).
 
 ### Só o dia tem minutos
 
@@ -157,8 +130,10 @@ embaixo tomou o lugar dela (§10). A navegação agora é a da §13: a faixa do 
 
 ### Dois temas
 
-O design system do arttreis.com.br nos dois modos: escuro (`#0d0d0d` e o verde `#2EE86B`) e
-claro (`#f2f2f0`, branco, e o verde escurecido `#0d8038` para texto). O botão de tema fica na
+Escuro (`#0d0d0d`) e claro (`#f2f2f0`, branco), com o roxo `#8B5CF6` de destaque nos dois
+desde 19/10/2026 (até ali era o verde `#2EE86B` do arttreis.com.br). O texto roxo usa
+`--accent-ink`: `#A78BFA` no escuro e `#6D28D9` no claro, porque o roxo cheio não lê como
+texto nos dois fundos. O botão de tema fica na
 barra de navegação; a escolha persiste no navegador e segue o sistema quando não há escolha.
 
 ---
@@ -974,18 +949,13 @@ O chapéu é o que se reconhece do Merlin em qualquer tamanho, até em 16px. A p
 segundo rosto: balança quando ele pensa, enrola num "?" quando ele não entende e fica em pé
 quando ele presta atenção.
 
-**A cor é dele, e não do destaque.** Roxo `#8B5CF6` com olho branco, igual nas duas marcas e nos
-dois temas (`--merlin` e `--on-merlin`, no `shell.css`):
-
-- verde e azul já são a cor de ação (botão, foco, seleção) do Merlin e da Guessless. Um
-  personagem da cor do botão disputa com o botão que aparece logo abaixo dele na conversa;
-- roxo lê como mago;
-- o verde some no tema claro (1,46:1 contra o fundo), e o azul também fica abaixo de 3:1 no claro
-  (2,92:1). O roxo passa nos dois temas: 4,6:1 no escuro e 3,8:1 no claro.
-
-A regra de "monocromático + um destaque" continua valendo para todo o resto: o roxo nunca vai
-para botão, link ou estado. As faíscas de quando ele termina alguma coisa usam o `--accent` de
-quem entrou.
+**A cor dele virou a do app.** Em 17/10 o roxo `#8B5CF6` com olho branco foi decidido só para
+o chapéu, para ele não disputar com os botões verdes. Em 19/10 o app inteiro foi para o roxo:
+`--accent` é o roxo, e a pele da Guessless saiu (seção 2, "Uma cara só"). Os motivos que
+valeram para o chapéu valem para o app: roxo lê como mago, e passa de 3:1 nos dois temas (4,6:1
+no escuro, 3,8:1 no claro) — o verde dava 1,46:1 no claro. O preço é que o chapéu agora tem a
+cor do botão; ele se separa pela forma e pelo movimento, não mais pela cor. `--merlin` continua
+existindo como o token do personagem, com o mesmo valor.
 
 **Onde ele aparece.** Primeiro no chat (`assistant.html`): grande na abertura, no lugar da
 faísca, e pequeno ao lado do campo durante a conversa. Ali ele ouve quando a pessoa escreve,

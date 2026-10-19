@@ -331,9 +331,8 @@ toca no documento do dia. O aviso já é mostrado pelo core.
   `closest()`.
 - Canvas e SVG desenhados à mão ficam num componente com `useRef`; o desenho continua
   imperativo por dentro.
-- Nada de vermelho: o sistema é monocromático + um destaque (o `--accent`: verde no Merlin, azul
-  na Guessless). A única outra cor é o roxo `--merlin`, e ela é só do personagem (VISAO, 12):
-  nunca em botão, link ou estado. Negativo é `--ink-50` ou hachura.
+- Nada de vermelho: o sistema é monocromático + um destaque, o roxo `--accent` (VISAO, 12).
+  Negativo é `--ink-50` ou hachura.
 - Toda ação destrutiva passa por `notify(text, undo)`.
 - Responsivo: no celular a página vira uma coluna. Nada rola horizontal fora de
   `.table-scroll` ou de um canvas.
@@ -344,9 +343,8 @@ toca no documento do dia. O aviso já é mostrado pelo core.
   que está escrito para uma conversa em `assistant.html` — dois gestos no mesmo campo (ela
   chegou a ser só a porta da conversa, em 17/09/2026, e voltou a achar em 22/09).
 - Comentários no código explicam **por quê**, não o quê, como no `index.html`.
-- **Cor nova sai de token, nunca de hex na regra.** São duas marcas agora (`:root` é o Merlin,
-  `html.gl` é a Guessless), e um `#2EE86B` escrito à mão numa página não troca junto — vira um
-  verde solto no meio do azul da casa. Se faltar um token, crie no `shell.css` para as duas.
+- **Cor nova sai de token, nunca de hex na regra.** São dois temas, e um hex escrito à mão numa
+  página não troca junto com o claro. Se faltar um token, crie no `shell.css`.
 - **Toda chave nova do `localStorage` começa com `merlin:`.** Não é estilo: o guarda de
   identidade varre por esse prefixo e apaga tudo que encontra quando o e-mail da sessão muda.
   Chave fora do padrão é dado de uma pessoa que fica no navegador da outra. As três exceções

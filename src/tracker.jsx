@@ -21,12 +21,12 @@
    sempre aberta e nao tem bandeja nem botao de esconder. */
 import "./shared/base.css";
 import "./tracker.css";
-import { initPage, today, notify, readPrefs, readDuration, currentBrand } from "./shared/core.js";
+import { initPage, today, notify, readPrefs, readDuration } from "./shared/core.js";
 import { runningOf, minutesOf, receipt, startSession, stopSession } from "./shared/focus.js";
 import { questsOf } from "./shared/quests.js";
 import { useState, useEffect, useLayoutEffect, useRef } from "react";
 import { mount, useCollection } from "./shared/ui.jsx";
-import { LOGO, GL_MARK } from "./shared/icons.jsx";
+import { LOGO } from "./shared/icons.jsx";
 import { normalize, dayDoc, dayTasks, overdue, topOrder, newTask, readLine, isReserve, stripPrefix } from "./shared/tasks.js";
 import { costOf, guessMin, distribute, fmt, longFmt, clock } from "./shared/day.js";
 import { isDesktop, setStatus, openMain, hideTracker, fitTracker } from "./shared/desktop.js";
@@ -167,7 +167,7 @@ function Tracker() {
     const s = slots.get(t.id);
     return s ? clock(doc.start + s.from) + "–" + clock(doc.start + s.from + s.min) : "";
   };
-  const mark = currentBrand() === "gl" ? GL_MARK : LOGO;
+  const mark = LOGO;
 
   if (compact) {
     return (

@@ -164,9 +164,6 @@ export const debounce = (fn, ms) => { let t; return (...a) => { clearTimeout(t);
 /* ---------- tema ---------- */
 
 const THEME_KEY = "merlin:theme";
-/* aqui em cima, junto do tema, porque as duas chaves sao lidas antes da
-   primeira pintura — a marca vive na secao de identidade, mais abaixo. */
-const BRAND_KEY = "merlin:brand";
 
 export function currentTheme() {
   return document.documentElement.classList.contains("light") ? "light" : "dark";
@@ -175,11 +172,8 @@ export function applyTheme(which) {
   document.documentElement.classList.toggle("light", which === "light");
   const meta = document.querySelector('meta[name="theme-color"]');
   if (!meta) return;
-  /* a barra do navegador acompanha o fundo, e o fundo depende da marca:
-     #0A0A0A e o preto da casa, #0d0d0d o do Merlin. */
-  const gl = document.documentElement.classList.contains("gl");
-  if (which === "light") meta.content = gl ? "#f7f7f5" : "#f2f2f0";
-  else meta.content = gl ? "#0A0A0A" : "#0d0d0d";
+  /* a barra do navegador acompanha o fundo */
+  meta.content = which === "light" ? "#f2f2f0" : "#0d0d0d";
 }
 export function savedTheme() {
   try { return localStorage.getItem(THEME_KEY) || ""; } catch (e) { return ""; }
@@ -227,17 +221,11 @@ export function forgetSeen(key) {
 document.documentElement.classList.add("merlin");
 try { if (localStorage.getItem("merlin:sidebar") === "closed") document.documentElement.classList.add("sidebar-closed"); } catch (e) {}
 
-/* a marca tambem entra no <head> de cada pagina, antes da primeira pintura;
-   aqui e a rede para quem carregar o core sem aquele trecho (uma pagina solta
-   no servidor de desenvolvimento, por exemplo). o modulo carrega depois do
-   <head>, entao sozinho ele pisca. */
-try {
-  const b = localStorage.getItem(BRAND_KEY);
-  if (b && /^[a-z]{2,12}$/.test(b)) document.documentElement.classList.add(b);
-} catch (e) {}
+/* a pele da Guessless saiu em 19/10/2026 (VISAO, 12): quem ainda tem a
+   chave antiga no navegador a perde aqui, sem nenhum efeito na tela */
+try { localStorage.removeItem("merlin:brand"); } catch (e) {}
 
-/* aplica antes da primeira pintura, para nao piscar. depois da marca de
-   proposito: a cor da barra do navegador sai do fundo, e o fundo e dela. */
+/* aplica antes da primeira pintura, para nao piscar */
 initTheme();
 
 /* ---------- navegacao ---------- */
@@ -383,27 +371,10 @@ export function onNotice(fn) { noticeListeners.add(fn); return () => noticeListe
    preferencia nao e dado e atravessa — tema e sidebar ficam. */
 
 const WHO_KEY = "merlin:who";
-/* o que atravessa uma troca de pessoa: preferência, nunca dado. o dono e a
-   marca NÃO estão aqui de propósito — são reescritos logo depois da varredura,
+/* o que atravessa uma troca de pessoa: preferência, nunca dado. o dono NÃO está aqui de propósito — são reescritos logo depois da varredura,
    e sair leva os dois embora junto com o resto. */
 const KEPT = [THEME_KEY, "merlin:sidebar"];
 
-/* ---------- a marca ----------
-   quem entra por um e-mail da casa vê o Merlin com a identidade da Guessless.
-   é só pele: tokens de cor e fonte (`html.gl`, no shell.css) e a marca na
-   barra. nenhuma tela muda de comportamento, e nenhum dado sabe que existe
-   marca — trocar de e-mail troca a pele, não o produto.
-
-   fica no localStorage, e não numa resposta do servidor, porque a classe tem
-   que estar no <html> ANTES da primeira pintura: o <head> de cada página lê
-   esta chave junto com o tema. saber a marca só depois do /me faria a tela
-   piscar na identidade errada a cada carregamento. */
-const BRANDS = { "@guessless.com.br": "gl" };
-const brandOf = (email) => {
-  const at = String(email || "").indexOf("@");
-  return at < 0 ? "" : BRANDS[String(email).slice(at).toLowerCase()] || "";
-};
-export const currentBrand = () => { try { return localStorage.getItem(BRAND_KEY) || ""; } catch (e) { return ""; } };
 
 /* varrer as chaves em vez de listar os tipos e de proposito: o modulo que
    alguem escrever amanha ja nasce sendo apagado aqui, e esquecer de incluir
@@ -433,12 +404,8 @@ function adoptIdentity(email) {
   const changed = !!who && who !== email;
   if (changed) wipeLocal();
   /* depois da varredura, nunca antes: quem anota o dono primeiro o perde na
-     limpeza. a marca vai junto para que o recarregamento ja pinte certo — sem
-     ela, a pessoa da casa veria um quadro de Merlin antes do proprio Merlin. */
-  try {
-    localStorage.setItem(WHO_KEY, email);
-    localStorage.setItem(BRAND_KEY, brandOf(email));
-  } catch (e) {}
+     limpeza. */
+  try { localStorage.setItem(WHO_KEY, email); } catch (e) {}
   return changed;
 }
 
@@ -533,7 +500,7 @@ export const cloud = {
        nao subiu segura a limpeza: perder trabalho e pior que deixar dado na
        maquina, e a proxima pessoa a entrar apaga isso de qualquer jeito. */
     const held = anyPending();
-    /* a varredura leva o dono e a marca junto: nao estao em KEPT */
+    /* a varredura leva o dono junto: ele nao esta em KEPT */
     if (!held) wipeLocal();
     this.setStatus("local");
     this.emit();
