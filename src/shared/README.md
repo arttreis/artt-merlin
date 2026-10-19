@@ -21,7 +21,8 @@ Vite; o build sai em `server/site/`. O que é comum vive aqui:
   propósito: ela é a decisão mais arriscada que este sistema já tomou, e dá para prová-la sem
   navegador. Também decide o que conta no dia e o que o calendário lista (`dayTasks`) e o que a
   caixa de entrada vira (`inboxToDocs`, gravada por `collectInbox`, que o calendário e o início
-  chamam ao abrir).
+  chamam ao abrir). A tarefa e a nota saem com o `id` do item da caixa, então duas abas que
+  recolhem o mesmo item gravam o mesmo documento em vez de dois.
 - `quests.js` — o **"o que falta hoje?"**: `questsOf(data, now)` monta os dois grupos (agora:
   a sessão rodando ou o compromisso que começa em até 30 minutos; para trás: as atrasadas e as
   contas previstas de dias passados, pelo `pendingBefore` do `finance-data.js`; cada fonte vira

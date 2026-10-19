@@ -324,6 +324,14 @@ const dataLeft = () => globalThis.localStorage.keys().filter((k) => k in DATA);
     check("com duração continua na caixa de entrada", readInbox().length === 1, String(readInbox().length));
     check("com duração não vira nota", collection("notes").entries().length === 1, String(collection("notes").entries().length));
   }
+
+  {
+    /* newNote aceita o id de quem chama (a caixa de entrada); sem id, gera um */
+    const { newNote, collection } = await fresh({});
+    check("newNote: com id grava a nota com esse id", newNote({ title: "x", id: "n1" }).id === "n1" && !!collection("notes").get("n1"));
+    const semId = newNote({ title: "x" });
+    check("newNote: sem id ganha um id novo", typeof semId.id === "string" && semId.id.length > 0 && semId.id !== "n1", semId.id);
+  }
 }
 
 {
@@ -1033,6 +1041,22 @@ const dataLeft = () => globalThis.localStorage.keys().filter((k) => k in DATA);
     check("caixa: nota no meio não quebra a ordem das tarefas", mixed.tasks.length === 2 && mixed.tasks[0].order < mixed.tasks[1].order && mixed.tasks[1].order < lowest, mixed.tasks.map((t) => t.order).join());
   }
 
+  /* o id do item atravessa: duas abas que recolhem o mesmo item gravam o mesmo documento */
+  {
+    const item = { id: "ib1", title: "meditar", min: 15 };
+    const r1 = T.inboxToDocs([item], [], hoje);
+    const r2 = T.inboxToDocs([item], [], hoje);
+    check("caixa: o item com id vira tarefa com o mesmo id", r1.tasks[0].id === "ib1", r1.tasks[0].id);
+    check("caixa: a mesma lista duas vezes dá o mesmo id", r1.tasks[0].id === r2.tasks[0].id, r1.tasks[0].id + "/" + r2.tasks[0].id);
+    const nota = T.inboxToDocs([{ id: "ib2", title: "ideia solta" }], [], hoje);
+    check("caixa: a nota sai com o id do item", nota.notes.length === 1 && nota.notes[0].id === "ib2", JSON.stringify(nota.notes));
+    const velho = T.inboxToDocs([{ title: "sem id", min: 5 }], [], hoje);
+    check("caixa: item sem id continua ganhando id novo", typeof velho.tasks[0].id === "string" && velho.tasks[0].id.length > 0 && velho.tasks[0].id !== "sem id", velho.tasks[0].id);
+    const ruim = T.inboxToDocs([{ id: "", title: "a", min: 5 }, { id: 7, title: "b", min: 5 }, { id: null, title: "c" }], [], hoje);
+    check("caixa: id vazio ou que não é texto é ignorado", ruim.tasks.length === 2 && ruim.tasks.every((t) => typeof t.id === "string" && t.id && t.id !== "7") && ruim.notes.length === 1 && !!ruim.notes[0].id === false, JSON.stringify(ruim));
+    check("newTask: sem spec.id continua com id novo, com spec.id usa o dado", T.newTask({ title: "x" }).id.length > 0 && T.newTask({ title: "x", id: "t9" }).id === "t9");
+  }
+
   /* dayTasks: o que conta no dia e o que o calendário lista */
   const routineBlock = R.normalize({ id: "b-rot", title: "almoço", days: [6], min: 60, reserved: true, kind: "routine" });
   const eventBlock = R.normalize({ id: "b-evt", title: "daily", days: [6], min: 60, reserved: true, kind: "event" });
@@ -1130,6 +1154,26 @@ const dataLeft = () => globalThis.localStorage.keys().filter((k) => k in DATA);
     check("recolher: a nota está nas ideias", collection("notes").all().some((x) => x.title === "ler sobre retenção"));
     const again = T.collectInbox(store);
     check("recolher: a segunda tela não encontra nada", again.tasks === 0 && again.notes === 0 && mine().length === 1);
+  }
+
+  /* as duas abas leem antes de uma zerar: a caixa é escrita de novo com o mesmo
+     item (mesmo id) e recolhida outra vez, e a tarefa continua uma só */
+  {
+    const store = T.tasks();
+    const bilhete = { id: "ib-dup", title: "pilates", min: 30, origin: { type: "habit", id: "h-dup" } };
+    localStorage.setItem("merlin:inbox", JSON.stringify([bilhete]));
+    T.collectInbox(store);
+    localStorage.setItem("merlin:inbox", JSON.stringify([bilhete]));
+    const segunda = T.collectInbox(store);
+    const mine = store.all().filter((t) => t.origin && t.origin.id === "h-dup");
+    check("recolher: o mesmo item recolhido duas vezes deixa uma tarefa só, com o id do item", segunda.tasks === 1 && mine.length === 1 && mine[0].id === "ib-dup", mine.length + "/" + (mine[0] && mine[0].id));
+    localStorage.setItem("merlin:inbox", JSON.stringify([{ id: "ib-nota", title: "ideia repetida" }]));
+    T.collectInbox(store);
+    localStorage.setItem("merlin:inbox", JSON.stringify([{ id: "ib-nota", title: "ideia repetida" }]));
+    T.collectInbox(store);
+    /* a nota é gravada pela instância do core que o tasks.js importa, não pela do teste */
+    const notas = (await import("./core.js")).collection("notes").all().filter((x) => x.title === "ideia repetida");
+    check("recolher: a nota repetida também fica uma só, com o id do item", notas.length === 1 && notas[0].id === "ib-nota", notas.length + "/" + (notas[0] && notas[0].id));
   }
 }
 

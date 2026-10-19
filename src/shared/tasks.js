@@ -128,7 +128,11 @@ export function dayTasks(all, blocks) {
    inicio, com esta mesma funcao. com duracao vira tarefa de hoje, na frente
    da fila e na ordem em que entrou; sem duracao vira nota, onde paga o pedagio
    como qualquer outra. so decide: gravar, e zerar a caixa antes, e de quem
-   chama. */
+   chama.
+
+   o documento nasce com o id do item (o sendToDay ja grava um): duas abas que
+   recolham o mesmo item gravam o mesmo documento, em vez de dois. item antigo,
+   sem id, ganha um novo, como antes. */
 export function inboxToDocs(list, all, date) {
   const top = topOrder(all, date);
   const out = { tasks: [], notes: [] };
@@ -137,21 +141,24 @@ export function inboxToDocs(list, all, date) {
     if (!title) return;
     if (it.min) {
       out.tasks.push(newTask({
-        title, min: it.min, reserved: isReserve(title), client: it.client,
+        id: it.id, title, min: it.min, reserved: isReserve(title), client: it.client,
         origin: it.origin, date, order: top - list.length + out.tasks.length
       }));
       return;
     }
     const clean = title.replace(/\s+/g, " ").trim().slice(0, 300);
-    if (clean) out.notes.push({ title: clean, client: String(it.client || "") });
+    if (clean) out.notes.push({ id: it.id, title: clean, client: String(it.client || "") });
   });
   return out;
 }
 
 /* o lado que grava. a caixa e lida e ZERADA antes de qualquer gravacao: o
    calendario e o inicio abertos juntos recebem o mesmo evento de storage, e
-   quem chega segundo encontra a caixa vazia em vez de criar a tarefa de novo.
-   devolve quantas de cada para quem chama dizer em voz alta. */
+   quem chega segundo costuma encontrar a caixa vazia. mas cada aba roda no seu
+   processo, e as duas podem ler antes de uma zerar; ai quem garante que a
+   tarefa nao duplica e o id: o documento sai com o id do item (inboxToDocs), e
+   gravar de novo sobrescreve o mesmo documento. devolve quantas de cada para
+   quem chama dizer em voz alta. */
 export function collectInbox(store) {
   const list = readInbox();
   if (!list.length) return { tasks: 0, notes: 0 };
@@ -165,7 +172,7 @@ export function collectInbox(store) {
 export function newTask(spec) {
   const now = Date.now();
   return normalize({
-    id: newId(),
+    id: typeof spec.id === "string" && spec.id ? spec.id : newId(),
     title: spec.title,
     date: spec.date || today(),
     min: spec.min || 0,
