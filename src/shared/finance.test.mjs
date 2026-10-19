@@ -47,10 +47,10 @@ globalThis.localStorage = makeStorage({});
 
 const core = await import("./core.js");
 const {
-  newEntry, undoEntry, paidOf, normalize, contextOf, balanceUntil, realBalanceUntil, projectionsOf
+  newEntry, entryLine, undoEntry, paidOf, normalize, contextOf, balanceUntil, realBalanceUntil, projectionsOf
 } = await import("./finance-data.js");
 const {
-  ACTION_COLLECTIONS, buildDoc, normalizeChat, markProposal
+  ACTION_COLLECTIONS, buildDoc, previewOf, normalizeChat, markProposal
 } = await import("./assistant-actions.js");
 
 /* ---- o cenário: hoje é 17/10/2026 (sábado) ---- */
@@ -220,6 +220,65 @@ const sameJson = (a, b) => JSON.stringify(a) === JSON.stringify(b);
   check("fixo: id que não existe é ignorado", newEntry({ title: "x", amount: 500, flow: "out", date: TODAY, fixed: "nada" }, cfg, ctx, TODAY).doc.origin.type === "chat");
 }
 
+/* ---------- a prévia diz o que o lançamento grava (ticket #35) ----------
+   a caixa de proposta mostra `entryLine` debaixo do título e grava `newEntry`.
+   os dois achavam o fixo e o previsto de jeitos diferentes: a prévia dizia "falta
+   o valor" e o lançamento saía com o valor do fixo (ou o inverso). */
+{
+  const { brl } = core;
+  const internet = { id: "f-net", type: "fixed", name: "internet", amount: 12000, kind: "out", category: "Recorrente", dayOfMonth: 20, active: true };
+  const planned = { id: "p1", type: "entry", name: "luz", amount: 20000, kind: "out", category: "", day: "2026-10-12", paid: false, origin: null, via: "", createdAt: 1, updatedAt: 1 };
+  const launched = { id: "e1", type: "entry", name: "internet", amount: 12000, kind: "out", category: "Recorrente", day: "2026-10-05", paid: true, origin: { type: "fixed", id: "f-net" }, via: "", createdAt: 1, updatedAt: 1 };
+  const ctx = { ...baseCtx, fixed: [internet], entries: [planned] };
+  const spec = (extra) => ({ title: "", amount: 0, flow: "out", date: TODAY, ...extra });
+  const line = (s, c) => entryLine(s, TODAY, c);
+  const doc = (s, c) => newEntry(s, cfg, c, TODAY);
+
+  const bare = line(spec({ fixed: "f-net" }), ctx);
+  check("prévia do fixo: sem valor dito, mostra o valor do fixo", bare.startsWith(brl(12000)), bare);
+  check("prévia do fixo: a linha completa", bare === brl(12000) + " · Recorrente · saída · pago", bare);
+
+  const hashed = line(spec({ fixed: "#f-net" }), ctx);
+  const hashedDoc = doc(spec({ fixed: "#f-net" }), ctx).doc;
+  check("prévia do fixo: o id com # mostra o valor do fixo", hashed.startsWith(brl(12000)), hashed);
+  check("prévia do fixo: o id com # lança esse valor, com a origem no fixo", hashedDoc && hashedDoc.amount === 12000 && hashedDoc.origin.type === "fixed" && hashedDoc.origin.id === "f-net", JSON.stringify(hashedDoc));
+
+  const done = { ...ctx, entries: [launched] };
+  check("prévia do fixo: já lançado no mês e sem valor diz \"falta o valor\"", line(spec({ fixed: "f-net" }), done).startsWith("falta o valor"), line(spec({ fixed: "f-net" }), done));
+  check("prévia do fixo: já lançado no mês e sem valor, o lançamento dá o mesmo erro", doc(spec({ fixed: "f-net" }), done).error === "falta o valor");
+  check("prévia do fixo: já lançado em outro mês ainda vale", line(spec({ fixed: "f-net", date: "2026-11-20" }), done).startsWith(brl(12000)), line(spec({ fixed: "f-net", date: "2026-11-20" }), done));
+
+  const said = spec({ amount: 13990, fixed: "f-net" });
+  check("prévia do fixo: o valor dito vale na linha e no documento", line(said, ctx).startsWith(brl(13990)) && doc(said, ctx).doc.amount === 13990, line(said, ctx));
+
+  const off = { ...ctx, fixed: [{ ...internet, active: false }] };
+  check("prévia do fixo: fixo inativo diz \"falta o valor\", como o lançamento", line(spec({ fixed: "f-net" }), off).startsWith("falta o valor") && doc(spec({ fixed: "f-net" }), off).error === "falta o valor");
+  check("prévia do fixo: id que não existe diz \"falta o valor\"", line(spec({ fixed: "nada" }), ctx).startsWith("falta o valor"));
+
+  const confirm = line(spec({ confirm: "#p1" }), ctx);
+  const confirmDoc = doc(spec({ confirm: "#p1" }), ctx).doc;
+  check("prévia do previsto: o id com # acha o previsto e mostra o valor dele", confirm === brl(20000) + " · saída · confirma o previsto de 12/10", confirm);
+  check("prévia do previsto: o documento tem o mesmo valor", confirmDoc && confirmDoc.id === "p1" && confirmDoc.amount === 20000, JSON.stringify(confirmDoc));
+  const paidCtx = { ...ctx, entries: [{ ...planned, paid: true }] };
+  check("prévia do previsto: já pago não é confirmado de novo, nem na linha", !line(spec({ confirm: "p1", amount: 500 }), paidCtx).includes("confirma o previsto"), line(spec({ confirm: "p1", amount: 500 }), paidCtx));
+
+  /* sem o ctx do financeiro a linha não sabe: continua dizendo que confirma um */
+  check("prévia sem ctx: confirm continua \"confirma um previsto\"", line(spec({ confirm: "p1" })).includes("confirma um previsto"), line(spec({ confirm: "p1" })));
+  check("prévia sem ctx: o fixo não é achado", line(spec({ fixed: "f-net" })).startsWith("falta o valor"), line(spec({ fixed: "f-net" })));
+
+  /* o critério de aceite: para qualquer pedido, o valor da linha é o do documento */
+  const specs = [];
+  for (const confirm of ["", "p1", "#p1", "nada"]) for (const fixed of ["", "f-net", "#f-net", "nada"])
+    for (const amount of [0, 13990, "abc"]) for (const date of [TODAY, "2026-11-20", "lixo"]) specs.push(spec({ confirm, fixed, amount, date }));
+  for (const [name, c] of [["fixo livre", ctx], ["fixo já lançado", done], ["fixo inativo", off], ["previsto pago", paidCtx]]) {
+    const bad = specs.filter((s) => {
+      const first = line(s, c).split(" · ")[0], r = doc(s, c);
+      return first !== (r.error ? "falta o valor" : brl(r.doc.amount));
+    });
+    check("prévia igual ao lançamento: " + name + ", em " + specs.length + " pedidos", bad.length === 0, bad.length + " diferem, ex.: " + JSON.stringify(bad[0]) + " -> " + (bad[0] && line(bad[0], c)));
+  }
+}
+
 /* ---------- sem valor ---------- */
 {
   const r = newEntry({ title: "almoço", amount: 0, flow: "out", date: TODAY }, cfg, baseCtx, TODAY);
@@ -285,6 +344,19 @@ const sameJson = (a, b) => JSON.stringify(a) === JSON.stringify(b);
   const before = store.get("p-aluguel");
   check("buildDoc: não grava nada sozinho (quem grava é a caixa)", before && before.paid === false && before.amount === 150000, JSON.stringify(before));
   check("buildDoc: o desfazer volta o previsto", undoEntry(before, conf).save.paid === false);
+
+  /* a caixa do fixo sem valor: o que a prévia diz é o que o lançar grava, também com "#" */
+  store.save({ id: "f-net", type: "fixed", name: "internet", amount: 12000, kind: "out", category: "Recorrente", dayOfMonth: 20, active: true });
+  const ctxNow = contextOf(store);
+  const fixedPayload = { name: "internet", amount: 0, kind: "out", day: core.today(), category: "", paid: true, confirm: "", fixed: "#f-net" };
+  const fixedBox = { name: "internet", amount: 0, kind: "out", day: core.today(), category: "", paid: true };
+  const shown = previewOf("finance-entry", fixedPayload, ctxNow);
+  const launched = buildDoc("finance-entry", fixedPayload, fixedBox, store, {}).doc;
+  check("caixa do fixo: a prévia mostra o valor do fixo", shown.startsWith(core.brl(12000)), shown);
+  check("caixa do fixo: lançar grava o mesmo valor, com a origem no fixo", launched && launched.amount === 12000 && launched.origin.type === "fixed" && launched.origin.id === "f-net", JSON.stringify(launched));
+  store.save(launched);
+  check("caixa do fixo: depois de lançado, uma segunda proposta sem valor diz \"falta o valor\" nos dois lados", previewOf("finance-entry", fixedPayload, contextOf(store)).startsWith("falta o valor") && buildDoc("finance-entry", fixedPayload, fixedBox, store, {}).error === "falta o valor");
+  check("caixa do fixo: a linha da pílula, feita com o contexto de antes de gravar, mostra o valor lançado", previewOf("finance-entry", { ...fixedPayload, ...fixedBox }, ctxNow).startsWith(core.brl(12000)));
 }
 
 /* ---------- a pílula confirmada ---------- */
