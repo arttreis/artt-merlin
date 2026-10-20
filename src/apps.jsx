@@ -28,7 +28,8 @@ import { FORMATS, FORMAT_IDS } from "./shared/content-script.js";
 import {
   PHASES, phaseLabel, FIELD_TYPES, typeLabel, ENTITY_W, ENTITY_HEAD, FIELD_H, SCREEN_W, SCREEN_H, entityHeight,
   normalizeApp, snake, problemsOf, layoutEntities, layoutScreens, fromBlueprint, mergeDraft,
-  toSQL, toMermaidER, toMermaidFlow, toMarkdown, toPrompt, digestOf
+  toSQL, toMermaidER, toMermaidFlow, toMarkdown, toPrompt, digestOf,
+  FRAME_W, FRAME_H, WIRE_PAD, wireframeOf, placeWireframe, wireframeLabel
 } from "./shared/app-spec.js";
 
 initPage("apps");
@@ -754,6 +755,9 @@ function FlowsTab({ app, save, saveUndo }) {
   const [open, setOpen] = useState(null);
   const [link, setLink] = useState(null);      // a seta sendo puxada: {from, x, y}
   const [naming, setNaming] = useState(null);  // a acao recem-ligada, pedindo nome
+  /* caixas ou telas: e jeito de ver, estado da pagina, nao vai para o documento */
+  const [mode, setMode] = useState("boxes");
+  const [trail, setTrail] = useState(null);    // navegar: as telas andadas, a ultima e a em foco
   const frameRef = useRef(null);
   const stageRef = useRef(null);
   const [handlers, pos] = useDrag(view,
@@ -817,14 +821,42 @@ function FlowsTab({ app, save, saveUndo }) {
   }
 
   const current = open && app.screens.find((s) => s.id === open);
+  /* sem tela nao ha o que desenhar: o vazio e o do palco, como sempre */
+  const showing = app.screens.length ? mode : "boxes";
+  /* o caminho andado no modo navegar; tela apagada no meio sai do caminho */
+  const path = (trail || []).filter((id) => app.screens.some((s) => s.id === id));
+  const ordered = useMemo(() => layoutScreens(app.screens, app.flows).sort((a, b) => a.x - b.x || a.y - b.y), [app.screens, app.flows]);
+  const startNav = () => { const s = ordered.find((x) => x.start) || ordered[0]; if (s) setTrail([s.id]); };
   return (
     <>
       <div className="ap-toolbar">
         <button className="pill pill--accent" type="button" onClick={add}>{icon("plus")}tela</button>
-        {app.screens.length > 1 && <button className="pill" type="button" onClick={arrange}>organizar</button>}
-        <span className="ap-toolbar__hint">puxe a bolinha da direita até outra tela para ligar · clique para editar · arraste para mover</span>
+        {app.screens.length > 0 && (
+          <div className="ap-seg" role="group" aria-label="ver como">
+            {[["boxes", "caixas"], ["screens", "telas"]].map(([id, label]) => (
+              <button key={id} type="button" aria-pressed={String(showing === id)} onClick={() => { setMode(id); setTrail(null); }}>{label}</button>
+            ))}
+          </div>
+        )}
+        {showing === "boxes" && app.screens.length > 1 && <button className="pill" type="button" onClick={arrange}>organizar</button>}
+        {showing === "screens" && !path.length && <button className="pill" type="button" onClick={startNav}>{icon("arrow")}navegar</button>}
+        <span className="ap-toolbar__hint">{showing === "boxes"
+          ? "puxe a bolinha da direita até outra tela para ligar · clique para editar · arraste para mover"
+          : "cada linha do que a tela tem vira um bloco · clique numa tela para andar a partir dela"}</span>
       </div>
-      <div ref={stageRef}>
+      {showing === "screens" && (path.length
+        ? <WireNav app={app} path={path} setTrail={setTrail} onEdit={(id) => setOpen(id)} />
+        : <div className="ap-wires">
+            {ordered.map((s) => (
+              <figure key={s.id} className="ap-wire" aria-label={wireframeLabel(s)}>
+                <button type="button" className="ap-wire__open" title="navegar a partir desta tela" onClick={() => setTrail([s.id])}>
+                  <Wireframe screen={s} />
+                </button>
+                <figcaption className="ap-wire__name">{s.start && <span className="ap-start-badge">entrada</span>}{s.name}</figcaption>
+              </figure>
+            ))}
+          </div>)}
+      {showing === "boxes" && <div ref={stageRef}>
         <Stage view={view} setView={setView} items={app.screens} w={() => SCREEN_W} h={() => SCREEN_H} onFrame={frameRef}
           overlay={!app.screens.length && <div className="ap-stage__empty">
             <p>Nenhuma tela ainda. Comece pela que a pessoa vê primeiro.</p>
@@ -844,7 +876,7 @@ function FlowsTab({ app, save, saveUndo }) {
             </div>
           ))}
         </Stage>
-      </div>
+      </div>}
       {current && <ScreenDialog key={current.id} screen={current} app={app} onClose={() => setOpen(null)}
         onSave={(next, flows) => save((cur) => ({
           ...cur,
@@ -860,6 +892,146 @@ function FlowsTab({ app, save, saveUndo }) {
       {naming && <ActionForm from={byId.get(naming.from)} to={byId.get(naming.to)} onClose={() => setNaming(null)}
         onSave={(action) => save((cur) => ({ ...cur, flows: cur.flows.concat({ id: newId(), from: naming.from, to: naming.to, action }) }))} />}
     </>
+  );
+}
+
+/* ---------- o wireframe ----------
+   a tela desenhada em baixa fidelidade: moldura de celular e, de cima para
+   baixo, um bloco por linha do que ela tem. tudo por atributo (e nao por
+   classe), para o PNG sair igual ao que esta na tela. */
+const WIRE_FONT = "Sora, system-ui, sans-serif";
+const INNER = FRAME_W - WIRE_PAD * 2;
+/* corta o rotulo pela largura: o SVG nao quebra linha sozinho */
+const fit = (t, px) => { const n = Math.floor(INNER / px); return t.length > n ? t.slice(0, n - 1) + "…" : t; };
+
+function WireBlock({ b }) {
+  const x = WIRE_PAD, y = b.y;
+  if (b.kind === "heading") return <text x={x} y={y + 19} fontSize="15" fontWeight="700" fill="var(--ink)">{fit(b.label, 8.4)}</text>;
+  if (b.kind === "button") return (
+    <g>
+      <rect x={x} y={y} width={INNER} height={b.h} rx="9" fill="var(--accent)" />
+      <text x={FRAME_W / 2} y={y + b.h / 2 + 4} fontSize="12" fontWeight="600" textAnchor="middle" fill="var(--on-accent)">{fit(b.label, 7)}</text>
+    </g>
+  );
+  if (b.kind === "input") return (
+    <g>
+      <rect x={x + 0.5} y={y + 0.5} width={INNER - 1} height={b.h - 1} rx="7" fill="var(--surface)" stroke="var(--ink-30)" />
+      <text x={x + 10} y={y + b.h / 2 + 4} fontSize="11" fill="var(--ink-50)">{fit(b.label, 6.6)}</text>
+    </g>
+  );
+  if (b.kind === "image") return (
+    <g>
+      <rect x={x + 0.5} y={y + 0.5} width={INNER - 1} height={b.h - 1} rx="7" fill="var(--fill)" stroke="var(--line)" />
+      <path d={"M" + (x + 3) + "," + (y + 3) + " L" + (x + INNER - 3) + "," + (y + b.h - 3) + " M" + (x + INNER - 3) + "," + (y + 3) + " L" + (x + 3) + "," + (y + b.h - 3)} stroke="var(--line)" />
+      <text x={FRAME_W / 2} y={y + b.h / 2 + 4} fontSize="10.5" textAnchor="middle" fill="var(--ink-50)" stroke="var(--surface-2)" strokeWidth="4" paintOrder="stroke">{fit(b.label, 6.4)}</text>
+    </g>
+  );
+  if (b.kind === "list") return (
+    <g>
+      <text x={x} y={y + 11} fontSize="10.5" fontWeight="600" fill="var(--ink-50)">{fit(b.label, 6.4)}</text>
+      {[0, 1, 2].map((i) => {
+        const ry = y + 18 + i * 21;
+        return (
+          <g key={i}>
+            <circle cx={x + 7} cy={ry + 9} r="7" fill="var(--fill)" stroke="var(--line)" />
+            <rect x={x + 22} y={ry + 3} width={INNER * (i === 1 ? 0.5 : 0.62)} height="5" rx="2.5" fill="var(--ink-30)" />
+            <rect x={x + 22} y={ry + 12} width={INNER * (i === 2 ? 0.28 : 0.38)} height="4" rx="2" fill="var(--line)" />
+          </g>
+        );
+      })}
+    </g>
+  );
+  return <text x={x} y={y + 13} fontSize="11" fill="var(--ink-70)">{fit(b.label, 6.6)}</text>;
+}
+
+function Wireframe({ screen }) {
+  const { items, hidden } = placeWireframe(wireframeOf(screen.parts));
+  return (
+    <svg className="ap-wire__svg" viewBox={"0 0 " + FRAME_W + " " + FRAME_H} width={FRAME_W} height={FRAME_H}
+      fontFamily={WIRE_FONT} aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+      <rect x="0.5" y="0.5" width={FRAME_W - 1} height={FRAME_H - 1} rx="24" fill="var(--surface-2)" stroke="var(--line)" />
+      <rect x={FRAME_W / 2 - 22} y="9" width="44" height="6" rx="3" fill="var(--line)" />
+      <text x={WIRE_PAD} y="31" fontSize="10.5" fill="var(--ink-30)">{fit(screen.name, 6.4)}</text>
+      {items.map((b, i) => <WireBlock key={i} b={b} />)}
+      {!items.length && (
+        <text x={FRAME_W / 2} y={FRAME_H / 2 - 8} fontSize="11.5" textAnchor="middle" fill="var(--ink-50)">
+          <tspan x={FRAME_W / 2}>escreva o que a tela tem,</tspan>
+          <tspan x={FRAME_W / 2} dy="16">uma coisa por linha</tspan>
+        </text>
+      )}
+      {hidden > 0 && <text x={FRAME_W / 2} y={FRAME_H - 11} fontSize="10.5" textAnchor="middle" fill="var(--ink-50)">+ {hidden} {hidden === 1 ? "coisa" : "coisas"} abaixo</text>}
+    </svg>
+  );
+}
+
+/* o PNG da tela em foco: a mesma tecnica do mapa — o SVG copiado, as cores
+   do tema resolvidas (a imagem nao enxerga as variaveis), desenhado num
+   canvas em dobro para nao sair borrado */
+function exportWirePng(svgEl, name) {
+  if (!svgEl) return;
+  const style = getComputedStyle(document.documentElement);
+  const resolve = (v) => {
+    const m = v && v.match(/^var\((--[a-z0-9-]+)\)$/i);
+    return m ? (style.getPropertyValue(m[1]).trim() || v) : v;
+  };
+  const copy = svgEl.cloneNode(true);
+  copy.setAttribute("xmlns", "http://www.w3.org/2000/svg");
+  copy.querySelectorAll("*").forEach((el) => ["fill", "stroke"].forEach((attr) => {
+    const v = el.getAttribute(attr);
+    if (v && v.indexOf("var(") === 0) el.setAttribute(attr, resolve(v));
+  }));
+  const background = style.getPropertyValue("--surface").trim() || "#ffffff";
+  const url = URL.createObjectURL(new Blob([new XMLSerializer().serializeToString(copy)], { type: "image/svg+xml;charset=utf-8" }));
+  const img = new Image();
+  const scale = 2, pad = 16;
+  img.onload = () => {
+    const canvas = document.createElement("canvas");
+    canvas.width = (FRAME_W + pad * 2) * scale; canvas.height = (FRAME_H + pad * 2) * scale;
+    const ctx = canvas.getContext("2d");
+    ctx.fillStyle = background; ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(img, pad * scale, pad * scale, FRAME_W * scale, FRAME_H * scale);
+    URL.revokeObjectURL(url);
+    canvas.toBlob((blob) => {
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob); a.download = name + ".png";
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    });
+  };
+  img.src = url;
+}
+
+/* navegar: uma tela de cada vez, a partir da entrada (ou da que foi
+   clicada). as acoes que saem dela viram botoes na base; voltar refaz o
+   caminho de tras para a frente. */
+function WireNav({ app, path, setTrail, onEdit }) {
+  const figRef = useRef(null);
+  const at = app.screens.find((s) => s.id === path[path.length - 1]);
+  const names = new Map(app.screens.map((s) => [s.id, s.name]));
+  const out = app.flows.filter((f) => f.from === at.id && names.has(f.to));
+  return (
+    <div className="ap-nav">
+      <div className="ap-nav__bar">
+        <button className="pill" type="button" onClick={() => setTrail(null)}>{icon("arrowLeft")}todas as telas</button>
+        <span className="ap-nav__path">{path.map((id) => names.get(id)).join(" → ")}</span>
+        <span className="spacer" />
+        <button className="pill" type="button" onClick={() => onEdit(at.id)}>{icon("pencil")}editar</button>
+        <button className="pill" type="button" onClick={() => exportWirePng(figRef.current && figRef.current.querySelector("svg"), snake(app.name) + "-" + snake(at.name))}>exportar png</button>
+      </div>
+      <figure ref={figRef} className="ap-wire ap-wire--focus" aria-label={wireframeLabel(at)}>
+        <Wireframe screen={at} />
+        <figcaption className="ap-wire__name">{at.start && <span className="ap-start-badge">entrada</span>}{at.name}</figcaption>
+      </figure>
+      <div className="ap-nav__actions" role="group" aria-label="para onde ir">
+        {path.length > 1 && <button className="pill" type="button" onClick={() => setTrail(path.slice(0, -1))}>{icon("arrowLeft")}voltar</button>}
+        {out.length
+          ? out.map((f) => (
+              <button key={f.id} className="pill pill--accent" type="button" title={"vai para " + names.get(f.to)}
+                onClick={() => setTrail(path.concat(f.to))}>{"→ " + (f.action.trim() || names.get(f.to))}</button>
+            ))
+          : <p className="ap-nav__end">fim deste caminho</p>}
+      </div>
+    </div>
   );
 }
 
