@@ -327,6 +327,10 @@ export const stripPrefix = (title) => title.replace(/^-\s*/, "").trim();
    quem escreve "como precifico o plano anual" esta perguntando, com ou sem
    ponto. a palavra de pergunta so vale DEPOIS da duracao — "como fazer o
    deck 45m" e tarefa. */
+/* "dormi 7h" tem duração e não é tarefa: é uma noite de sono, que só o Merlin
+   registra (ticket #63). sem sessão ninguém lê a linha, então a regra local
+   reconhece o "dormi" sozinha e não faz dela uma tarefa de 7 horas (ticket #74) */
+const SLEPT_RE = /(?:^|\s)dormi(?:mos)?(?=$|[\s,.;])/i;
 const ASK_RE = /^(?:o que|o qu[eê]|qual|quais|quant[oa]s?|quando|onde|por ?qu[eê]|pra qu[eê]|como|quem|devo|deveria|vale a pena|[eé] melhor|me (?:ajud[ae]|expli[cq]u?[ae]|di[zg]a?|sugir[ae]|sugere|recomend[ae])|voc[eê] acha|vc acha|merlin\b)/i;
 export function routeLine(text) {
   const raw = String(text || "").replace(/\s+/g, " ").trim();
@@ -337,7 +341,7 @@ export function routeLine(text) {
   }
   const l = readLine(raw);
   const name = String(l.title || "").replace(/\s+/g, " ").trim() || raw;
-  if (l.min) return { kind: "task", title: stripPrefix(name), min: l.min, reserved: isReserve(name), clickup: l.clickup, client: l.client || "" };
+  if (l.min && !SLEPT_RE.test(raw)) return { kind: "task", title: stripPrefix(name), min: l.min, reserved: isReserve(name), clickup: l.clickup, client: l.client || "" };
   if (ASK_RE.test(raw)) return { kind: "ask", text: raw.replace(/^merlin[,:]?\s*/i, "") || raw };
   const m = parseMentions(raw);
   const title = String(m.title || "").replace(/\s+/g, " ").trim();
@@ -377,7 +381,6 @@ export function askIntent(text) {
    regra seria uma tarefa, e é um treino que já aconteceu (ticket #64). */
 const DATE_RE = /(?:^|\s)(?:amanh[ãa]|segunda|ter[çc]a|quarta|quinta|sexta|s[áa]bado|domingo|semana que vem|pr[óo]xima semana|dia \d{1,2}(?!\d)|[àa]s \d{1,2}(?:h|:\d{2}))/i;
 const DURATIONS_RE = /(?:^|\s)\d+\s*(?:h\d*|min|m)(?=$|[\s,.;])/gi;
-const SLEPT_RE = /(?:^|\s)dormi(?:mos)?(?=$|[\s,.;])/i;
 const TRAINED_RE = /(?:^|\s)(?:trein(?:ei|amos)|malhei|corri|corremos|pedalei|nadei|caminhei|fiz (?:yoga|pilates|muscula[çc][ãa]o|academia|funcional|crossfit|nata[çc][ãa]o|treino))(?=$|[\s,.;])/i;
 export function needsReading(text, route) {
   if (!route || route.kind === "ask") return false;

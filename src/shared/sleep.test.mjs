@@ -81,6 +81,8 @@ const night = (id, min, extra) => ({ id, min, createdAt: 1, updatedAt: 1, ...ext
   check("nightOf: data explícita passada vale", nightOf({ date: "2026-10-19" }, TODAY).day === "2026-10-19" && !nightOf({ date: "2026-10-19" }, TODAY).error);
   check("nightOf: hoje explícito vale", nightOf({ date: TODAY }, TODAY).day === TODAY && !nightOf({ date: TODAY }, TODAY).error);
   check("nightOf: data inválida cai em hoje", nightOf({ date: "ontem" }, TODAY).day === TODAY && nightOf({ date: "2026-10-1" }, TODAY).day === TODAY, JSON.stringify([nightOf({ date: "ontem" }, TODAY)]));
+  check("nightOf: dia que não existe cai em hoje", nightOf({ date: "2026-13-45" }, TODAY).day === TODAY && nightOf({ date: "2026-02-30" }, TODAY).day === TODAY && !nightOf({ date: "2026-13-45" }, TODAY).error, JSON.stringify([nightOf({ date: "2026-13-45" }, TODAY), nightOf({ date: "2026-02-30" }, TODAY)]));
+  check("nightOf: 29 de fevereiro só vale em ano bissexto", nightOf({ date: "2024-02-29" }, TODAY).day === "2024-02-29" && nightOf({ date: "2025-02-29" }, TODAY).day === TODAY);
   const f = nightOf({ date: "2026-10-21" }, TODAY);
   check("nightOf: amanhã é erro 'esse dia ainda não chegou'", f.error === "esse dia ainda não chegou", JSON.stringify(f));
   check("nightOf: no erro o dia também vem", f.day === "2026-10-21", JSON.stringify(f));

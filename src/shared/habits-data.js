@@ -6,7 +6,7 @@
    precisa saber ou gravar.
    desde 18/10/2026 também é daqui que a secretária marca e acha o hábito
    (markOn, findHabit, habitStatus): o início e a conversa. */
-import { dateOf, addDays, mondayOf, foldKey } from "./core.js";
+import { dateOf, addDays, mondayOf, foldKey, isDay } from "./core.js";
 
 export const WEEKDAY_NAMES = ["dom", "seg", "ter", "qua", "qui", "sex", "sáb"];
 export const SCHEDULES = [
@@ -62,7 +62,6 @@ export function toggleMark(habits, h, day, today) {
 /* ---------- marcar pela secretária (ticket #10) ----------
    "treinei" escrito no início ou dito na conversa. o toggleMark alterna, e
    falar "treinei" duas vezes desmarcaria: daqui só se marca. */
-const isDay = (s) => /^\d{4}-\d{2}-\d{2}$/.test(String(s || ""));
 
 /* marca o dia e nunca desmarca. dia já marcado devolve o mesmo documento, com
    `already`: não há o que gravar. dia que ainda não chegou é erro */
