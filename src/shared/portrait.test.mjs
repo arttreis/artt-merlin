@@ -1450,7 +1450,7 @@ const expectedBiz = (docs) => {
 
 sectionM("negócio: o contrato", () => {
   const s = BIZ();
-  check("negócio: é a última seção, 'negócio', de 260 caracteres, e espera a coleção finance", !!s && SECTIONS.at(-1) === s && s.label === "negócio" && s.budget === 260 && JSON.stringify(s.needs) === JSON.stringify(["finance"]), JSON.stringify(s && { label: s.label, budget: s.budget, needs: s.needs }));
+  check("negócio: é a última seção, 'negócio', de 260 caracteres, e espera finance, plans, team e ops", !!s && SECTIONS.at(-1) === s && s.label === "negócio" && s.budget === 260 && JSON.stringify(s.needs) === JSON.stringify(["finance", "plans", "team", "ops"]), JSON.stringify(s && { label: s.label, budget: s.budget, needs: s.needs }));
   check("negócio: o rótulo é uma fonte da lista fechada, a última", SOURCES.includes("negócio") && SOURCES.at(-1) === "negócio");
   check("negócio: tem o interruptor off() (sem livro da empresa, some)", !!s && typeof s.off === "function");
   check("negócio: o dinheiro vem logo antes dele", SECTIONS.at(-2).id === "money");
@@ -1502,7 +1502,7 @@ sectionM("negócio: a seção com caixa", () => {
   check("negócio: não está carregando", !!s && s.loading === false);
   check("negócio: só saldo inicial de 8.400: o texto exato", !!s && s.text === "caixa hoje " + S(840000) + " · fim do mês " + S(840000) + " · fôlego sem saída para medir", s && s.text);
   check("negócio: com sinal e sem ',00'", !!s && /^caixa hoje \+R\$\s8\.400 · fim do mês \+R\$\s8\.400 · fôlego sem saída para medir$/.test(s.text), s && s.text);
-  check("negócio: é uma linha só (o T6 estende)", !!s && !s.text.includes("\n"), s && s.text);
+  check("negócio: só com o caixa, é uma linha só", !!s && !s.text.includes("\n"), s && s.text);
   check("negócio: cabe nos 260", !!s && s.text.length <= 260, s && String(s.text.length));
   check("negócio: bate com as contas do caixa (financeToday e cashMonth)", !!s && s.text === expectedBiz(BIZ_CASH), s && s.text + " | " + expectedBiz(BIZ_CASH));
   check("negócio: o retrato abre a seção com o rótulo 'negócio:'", p.text.includes("negócio:\ncaixa hoje "), p.text);
@@ -1658,6 +1658,164 @@ sectionM("negócio: o pior caso", () => {
   /* sem o negócio, o mesmo pior caso também cabe */
   const sem = run(all([]));
   check("pior caso: sem livro da empresa também cabe, e ela não está", sem.text.length <= PORTRAIT_MAX && !sec(sem, "business"));
+
+  /* e com o negócio inteiro: 40 metas, 60 pessoas de nome e custo enormes e 40 processos */
+  const extras = {
+    plans: Array.from({ length: 40 }, (_, i) => ({ id: "pl" + i, kind: "quarter", period: "2026-Q4", text: long("Meta", i), source: "clients", target: 99999, createdAt: 1 + i })),
+    team: Array.from({ length: 60 }, (_, i) => ({ id: "tm" + i, name: "Fulano" + i + " " + "sobrenome ".repeat(8), role: "designer", cost: 99999999, deliveries: [{ id: "e", day: "2026-10-01", text: "entrega segredo" }] })),
+    ops: Array.from({ length: 40 }, (_, i) => ({ id: "op" + i, title: long("Processo", i), freq: "weekly", day: 3, createdAt: 1, done: [] }))
+  };
+  for (const [label, docs] of [["caixa grande", bizBig(9999999999)], ["caixa negativo", bizBig(-9999999999)], ["só o saldo", BIZ_CASH], ["sem caixa", []]]) {
+    const p = run({ ...all(docs), ...extras });
+    const b = bizLine(p);
+    check("pior caso com metas, time e operação (" + label + "): o retrato não passa de 6.000", p.text.length <= PORTRAIT_MAX, String(p.text.length));
+    check("pior caso com metas, time e operação (" + label + "): todas as seções estão, cada uma no seu orçamento", SECTIONS.every((s) => sec(p, s.id) && sec(p, s.id).text.length <= s.budget), p.sections.map((s) => s.id + ":" + s.text.length + "/" + s.budget).join(" "));
+    check("pior caso com metas, time e operação (" + label + "): o negócio é a última seção, com no máximo 260 e cortada em 'e mais N'", p.sections.at(-1).id === "business" && b.length <= 260 && /e mais \d+$/.test(b), b);
+    check("pior caso com metas, time e operação (" + label + "): nenhum nome do time vai", !/Fulano|sobrenome|entrega segredo|designer/.test(p.text), p.text.slice(-300));
+  }
+  check("pior caso com metas, time e operação: o caixa é a primeira linha e sobrevive ao corte", /^caixa hoje /.test(bizLine(run({ ...all(bizBig(9999999999)), ...extras }))));
+});
+
+
+/* =====================================================================
+   metas, time e operação no retrato (ticket #80): a seção `business` deixa
+   de ser só o caixa. "como estou na meta?" passa a ter resposta, e o que se
+   prova é o que, errado, mente ou vaza: o nome de uma pessoa do time indo à IA,
+   a meta medida por uma conta diferente da da aba, o processo já feito
+   voltando como "vence", e o corte que perde o caixa antes do time.
+   ===================================================================== */
+const TD = await import("./team-data.js");
+const PDm = await import("./plans-data.js");
+const goalQ = (o) => ({ id: "g" + (++n), kind: "quarter", period: "2026-Q4", text: "10 clientes ativos", source: "clients", target: 10, current: 0, done: false, createdAt: 1, updatedAt: 1, ...o });
+const person = (o) => ({ id: "p" + (++n), name: "Ana Souza", role: "design", cost: 300000, since: "", next: "", deliveries: [], archived: false, fixed: "", createdAt: 1, updatedAt: 1, ...o });
+const opDoc = (o) => ({ id: "o" + (++n), title: "emitir notas", freq: "monthly", day: 22, checklist: [], done: [], createdAt: 1, updatedAt: 1, ...o });
+const actives = (k) => Array.from({ length: k }, (_, i) => ({ id: "ac" + i, name: "Cliente " + i, status: "active" }));
+const bizLines = (p) => (bizLine(p) || "").split("\n");
+
+sectionM("negócio: as metas do trimestre", () => {
+  const p = run({ plans: [goalQ()], clients: actives(6) });
+  check("metas: 'meta: 10 clientes ativos 6/10' aparece, sem caixa nenhum", bizLine(p) === "meta: 10 clientes ativos 6/10", bizLine(p));
+  check("metas: a seção entra só com a meta, e a fonte é 'o negócio'", !!sec(p, "business") && sourcesLine([sec(p, "business").label]) === "vi o negócio");
+  check("metas: o retrato abre o rótulo 'negócio:'", p.text.endsWith("negócio:\nmeta: 10 clientes ativos 6/10"), p.text.slice(-120));
+  const feita = bizLine(run({ plans: [goalQ({ target: 5 })], clients: actives(9) }));
+  check("metas: passou do alvo, mostra o número real (9/5)", feita === "meta: 10 clientes ativos 9/5", feita);
+  /* só o trimestre de hoje: outro trimestre, semestre e ano ficam fora */
+  const fora = run({ plans: [goalQ({ period: "2026-Q3" }), goalQ({ kind: "half", period: "2026-H2" }), goalQ({ kind: "year", period: "2026" })], clients: actives(6) });
+  check("metas: trimestre antigo, semestre e ano não entram", !sec(fora, "business"), JSON.stringify(sec(fora, "business")));
+  /* a conta é a da aba (progressOf) */
+  const g = PDm.normalize(goalQ({ source: "won", target: 4, text: "fechar 4" }));
+  const won = [1, 2, 3].map((i) => ({ id: "w" + i, name: "L" + i, status: "prospect", wonAt: new Date(2026, 9, 5).getTime() }));
+  check("metas: leads fechados batem com o progressOf", bizLine(run({ plans: [g], clients: won })) === "meta: fechar 4 " + PDm.progressOf(g, { clients: won }).text, bizLine(run({ plans: [g], clients: won })));
+  const rev = [bent("r1", "2026-10-05", "Cliente Segredo Rv", "in", 1200000, true)];
+  const gr = goalQ({ source: "revenue", target: 3000000, text: "faturar 30 mil" });
+  const lr = bizLines(run({ plans: [gr], finance: rev }));
+  check("metas: o faturamento mede só o caixa da empresa, em reais (R$ 12.000/R$ 30.000)", lr.length === 2 && /^caixa hoje /.test(lr[0]) && /^meta: faturar 30 mil R\$\s12\.000\/R\$\s30\.000$/.test(lr[1]), lr.join(" | "));
+  check("metas: o nome do lançamento não vai", !run({ plans: [gr], finance: rev }).text.includes("Segredo"));
+  const lan = bizLine(run({ plans: [goalQ({ source: "launched", text: "lançar o app", target: 0 })] }));
+  check("metas: lançar é 'ainda não' ou 'lançado'", lan === "meta: lançar o app (ainda não)" && bizLine(run({ plans: [goalQ({ source: "launched", text: "lançar o app", done: true })] })) === "meta: lançar o app (lançado)", lan);
+  const manual = bizLine(run({ plans: [goalQ({ source: "manual", text: "3 contratos", target: 3, current: 1 })] }));
+  check("metas: à mão usa o número que a pessoa pôs", manual === "meta: 3 contratos 1/3", manual);
+  const longa = bizLine(run({ plans: [goalQ({ text: "uma meta com um texto bem comprido que passa de trinta e seis caracteres" })], clients: actives(1) }));
+  check("metas: o texto comprido termina em reticências e a linha cabe", longa.length <= 60 && /^meta: .{1,36}… 1\/10$/.test(longa), longa);
+  const tres = bizLines(run({ plans: [goalQ({ text: "A", createdAt: 3 }), goalQ({ text: "B", createdAt: 1 }), goalQ({ text: "C", createdAt: 2 })], clients: actives(1) }));
+  check("metas: na ordem em que foram criadas, uma por linha", tres.join("|") === "meta: B 1/10|meta: C 1/10|meta: A 1/10", tres.join("|"));
+  const velha = bizLine(run({ plans: [{ id: "old", kind: "quarter", period: "2026-Q4", goals: [{ text: "x" }] }], clients: actives(1) }));
+  check("metas: o plano antigo (checklist em goals) não entra", velha === null, String(velha));
+});
+
+sectionM("negócio: o time", () => {
+  const one = bizLine(run({ team: [person({ name: "Ana Souza" })] }));
+  check("time: uma pessoa, com o custo total", one === "time: 1 pessoa · " + TD.costLabel(300000), one);
+  const two = bizLine(run({ team: [person({ name: "Ana Souza" }), person({ name: "Bruno Lima", cost: 200000 })] }));
+  check("time: duas pessoas somam o custo (R$ 5.000/mês)", two === "time: 2 pessoas · " + TD.costLabel(500000) && /R\$\s5\.000\/mês$/.test(two), two);
+  check("time: sem custo, só a contagem", bizLine(run({ team: [person({ cost: 0 })] })) === "time: 1 pessoa");
+  const saiu = bizLine(run({ team: [person({ name: "Ana Souza" }), person({ name: "Quem Saiu", cost: 900000, archived: true }), person({ name: "Apagado", cost: 900000, deleted: true })] }));
+  check("time: quem saiu e quem foi apagado não contam", saiu === "time: 1 pessoa · " + TD.costLabel(300000), saiu);
+  check("time: só arquivados, sem seção", !sec(run({ team: [person({ archived: true })] }), "business"));
+  /* nenhum nome, papel, custo individual nem entrega */
+  const gente = [person({ name: "Ana Souza", role: "design", cost: 300000, deliveries: [{ id: "d1", day: "2026-10-10", text: "landing nova" }] }), person({ name: "Bruno Lima", role: "dev", cost: 200000 })];
+  const p = run({ team: gente, clients: [], finance: BIZ_CASH });
+  for (const s of ["Ana", "Souza", "Bruno", "Lima", "landing", "design", "dev ", "3.000", "2.000"]) check("time: '" + s + "' não vai no retrato", !p.text.includes(s), p.text.slice(-200));
+  check("time: o retrato tem a contagem e o total, e nada mais da equipe", /time: 2 pessoas · R\$\s5\.000\/mês$/.test(p.text), p.text.slice(-120));
+});
+
+sectionM("negócio: a operação da semana", () => {
+  /* hoje é segunda 19/10: o dia 22 é quinta */
+  const ok = bizLine(run({ ops: [opDoc({ day: 22 })] }));
+  check("operação: o que vence na semana, com o dia", ok === "vence qui 22/10: emitir notas", ok);
+  check("operação: hoje também é a semana", bizLine(run({ ops: [opDoc({ day: 19, title: "backup" })] })) === "vence seg 19/10: backup");
+  check("operação: o prazo de daqui a 7 dias fica de fora", !sec(run({ ops: [opDoc({ day: 26 })] }), "business"));
+  check("operação: o do fim do mês também", !sec(run({ ops: [opDoc({ day: 28 })] }), "business"));
+  check("operação: já feito no período não volta", !sec(run({ ops: [opDoc({ day: 22, done: ["2026-10-02"] })] }), "business"));
+  check("operação: processo apagado não aparece", !sec(run({ ops: [opDoc({ day: 22, deleted: true })] }), "business"));
+  check("operação: processo sem título não aparece", !sec(run({ ops: [opDoc({ day: 22, title: "" })] }), "business"));
+  const late = bizLines(run({ ops: [opDoc({ day: 22, title: "emitir notas" }), opDoc({ day: 5, title: "pagar DAS" })] }));
+  check("operação: o que venceu e não foi feito vem primeiro ('venceu')", late.join("|") === "venceu seg 05/10: pagar DAS|vence qui 22/10: emitir notas", late.join("|"));
+  const semana = bizLine(run({ ops: [opDoc({ freq: "weekly", day: 5, title: "backup" })] }));
+  check("operação: semanal vence na sexta", semana === "vence sex 23/10: backup", semana);
+  const anual = bizLine(run({ ops: [opDoc({ freq: "yearly", day: "10-21", title: "renovar domínio" })] }));
+  check("operação: anual vence no dia", anual === "vence qua 21/10: renovar domínio", anual);
+  const muitos = bizLines(run({ ops: [1, 2, 3, 4, 5].map((i) => opDoc({ day: 19 + (i % 4), title: "proc " + i })) }));
+  check("operação: até 3 linhas", muitos.length === 3 && muitos.every((l) => /^vence /.test(l)), muitos.join("|"));
+  const longo = bizLine(run({ ops: [opDoc({ day: 22, title: "emitir as notas fiscais de todos os clientes do mês inteiro" })] }));
+  check("operação: título comprido termina em reticências", /^vence qui 22\/10: .{1,31}…$/.test(longo), longo);
+  const crua = bizLine(run({ ops: [{ id: "cru", title: "só o mínimo", freq: "monthly", day: "22" }] }));
+  check("operação: documento cru é normalizado (dia como texto)", crua === "vence qui 22/10: só o mínimo", crua);
+});
+
+sectionM("negócio: a seção inteira", () => {
+  const dados = {
+    finance: BIZ_CASH, plans: [goalQ()], clients: actives(6),
+    ops: [opDoc({ day: 22 })], team: [person({ name: "Ana Souza" }), person({ name: "Bruno Lima", cost: 200000 })]
+  };
+  const p = run(dados);
+  const l = bizLines(p);
+  check("tudo junto: caixa, meta, operação e time, nessa ordem", l.length === 4 && /^caixa hoje /.test(l[0]) && l[1] === "meta: 10 clientes ativos 6/10" && l[2] === "vence qui 22/10: emitir notas" && /^time: 2 pessoas · /.test(l[3]), l.join(" | "));
+  check("tudo junto: cabe nos 260 sem cortar", bizLine(p).length <= 260 && !/e mais \d+$/.test(bizLine(p)), String(bizLine(p).length));
+  check("tudo junto: o retrato não passa de 6.000", p.text.length <= PORTRAIT_MAX);
+  check("tudo junto: a seção não leva nome de gente do time", !/Ana|Souza|Bruno|Lima/.test(p.text), p.text.slice(-200));
+  /* sem metas, time ou processos, as linhas somem; o caixa fica */
+  check("sem metas, as linhas de meta somem", !bizLine(run({ ...dados, plans: [] })).includes("meta:"));
+  check("sem processos, as linhas de operação somem", !/vence/.test(bizLine(run({ ...dados, ops: [] }))));
+  check("sem time, a linha do time some", !bizLine(run({ ...dados, team: [] })).includes("time:"));
+  check("sem nada além do caixa, é só o caixa", bizLines(run({ ...dados, plans: [], ops: [], team: [] })).length === 1);
+  check("sem nada de nada, a seção some", !sec(run({ clients: actives(6) }), "business"));
+  check("o dado que recebe não é alterado", (() => { const before = JSON.stringify(dados); portraitOf(build(dados), NOW); return JSON.stringify(dados) === before; })());
+  /* o corte: o caixa, as metas, a operação e por último o time */
+  const cheio = {
+    finance: BIZ_CASH, clients: actives(1),
+    plans: [goalQ({ text: "uma meta bem comprida número 1", createdAt: 1 }), goalQ({ text: "uma meta bem comprida número 2", createdAt: 2 }), goalQ({ text: "uma meta bem comprida número 3", createdAt: 3 })],
+    ops: [opDoc({ day: 20, title: "um processo com um nome comprido" }), opDoc({ day: 21, title: "outro processo com nome comprido" }), opDoc({ day: 22, title: "mais um processo com nome longo" })],
+    team: [person()]
+  };
+  const full = SECTIONS.find((s) => s.id === "business").build(build(cheio), NOW);
+  const cut = bizLines(run(cheio));
+  const shown = cut.filter((x) => !/^e mais \d+$/.test(x));
+  check("corte: o negócio cheio passa dos 260 (o teste não é trivial)", full.join("\n").length > 260, String(full.join("\n").length));
+  check("corte: o que fica é o começo da lista, na ordem caixa, metas, operação, time", shown.length < full.length && shown.every((x, i) => x === full[i]), cut.join(" | "));
+  check("corte: o resto vira 'e mais N' com a conta certa", cut.at(-1) === "e mais " + (full.length - shown.length), cut.at(-1));
+  check("corte: o caixa nunca é cortado antes do time", /^caixa hoje /.test(cut[0]) && !shown.some((x) => x.startsWith("time:")), cut.join(" | "));
+  check("corte: cabe nos 260", cut.join("\n").length <= 260, String(cut.join("\n").length));
+});
+
+sectionM("negócio: ainda carregando (metas, time e operação)", () => {
+  for (const c of ["plans", "team", "ops", "finance"]) {
+    const p = run({ loading: [c], plans: [goalQ()], clients: actives(6) });
+    check("carregando " + c + ": com meta local, a seção diz 'ainda carregando'", !!sec(p, "business") && sec(p, "business").text === "ainda carregando" && sec(p, "business").loading === true && !p.text.includes("meta:"), JSON.stringify(sec(p, "business")));
+  }
+  check("carregando: sem nada local, a seção some (não diz 'carregando' a quem não tem empresa)", !sec(run({ loading: ["plans", "team", "ops"] }), "business"));
+  check("carregando: as tarefas carregando não calam as metas", sec(run({ loading: ["tasks"], plans: [goalQ()], clients: actives(6) }), "business").text === "meta: 10 clientes ativos 6/10");
+  /* pela tela */
+  const down = (docs, ok) => ({ all: () => docs, get: (id) => docs.find((x) => x.id === id) || null, hasDownloaded: () => ok });
+  const cols = (ok) => ({ plans: down([goalQ()], ok), clients: down(actives(6), true), team: down([person()], ok), ops: down([opDoc({ day: 22 })], ok) });
+  const desceu = portraitOf(portraitData(cols(true), { signedIn: true, prefs: PREFS }), NOW);
+  check("tela: as coleções plans, team e ops chegam ao retrato", sec(desceu, "business").text === ["meta: 10 clientes ativos 6/10", "vence qui 22/10: emitir notas", "time: 1 pessoa · " + TD.costLabel(300000)].join("\n"), sec(desceu, "business").text);
+  const falta = portraitOf(portraitData(cols(false), { signedIn: true, prefs: PREFS }), NOW);
+  check("tela: sem descer, o negócio diz 'ainda carregando'", sec(falta, "business").text === "ainda carregando");
+  const semSessao = portraitOf(portraitData(cols(false), { signedIn: false, prefs: PREFS }), NOW);
+  check("tela: sem sessão nada carrega, o dado local vale", sec(semSessao, "business").loading === false && sec(semSessao, "business").text.startsWith("meta: "));
+  const vazio = portraitData({}, { signedIn: false, prefs: PREFS });
+  check("tela: sem as coleções, vêm listas vazias", Array.isArray(vazio.plans) && Array.isArray(vazio.team) && Array.isArray(vazio.ops) && !vazio.plans.length);
 });
 
 console.log("\n" + passed + " passaram, " + failures.length + " falharam");

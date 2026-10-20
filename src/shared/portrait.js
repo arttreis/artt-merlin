@@ -16,11 +16,14 @@
  * estágio e a data). do cliente, só o nome
  * (e do lead, a etapa, os dias e o próximo passo). da saúde, só números de 7
  * dias: nunca o diário, o texto da refeição nem o que se treinou. do caixa da
- * empresa, só o saldo, o fim do mês e o fôlego: nenhum nome de lançamento.
+ * empresa, só o saldo, o fim do mês e o fôlego: nenhum nome de lançamento. do
+ * time, só quantas pessoas são e quanto custam juntas: nome, papel, custo de
+ * cada um e o texto das entregas ficam de fora (dado de terceiros, LGPD).
  *
  * a lista SECTIONS é o ponto de composição: uma seção nova (o dinheiro, os
  * clientes, o conteúdo) é uma linha a mais nela. o financeiro guarda dois
- * livros: "dinheiro" lê só o pessoal, e "negócio" só o caixa da empresa.
+ * livros: "dinheiro" lê só o pessoal, e "negócio" a empresa (o caixa, as metas
+ * do trimestre, a operação da semana e a conta do time).
  *
  * sem React e sem coleção aberta aqui: entra lista, sai texto. quem abre as
  * coleções é a tela (useCollection), e `portraitData` só lê o que ela abriu.
@@ -33,6 +36,9 @@ import { contentToday } from "./content-script.js";
 import { normalize as normalizeHabit, isExpected, monthStats, streakOf as habitStreak, weekProgress } from "./habits-data.js";
 import { normalize as normalizeFinance, contextOf, configOf, financeToday, moneyLines, bookCollection, cashMonth, runwayLabel } from "./finance-data.js";
 import { weekAverage, sleepLabel } from "./sleep-data.js";
+import { goalsOf, periodOf as planPeriod, progressOf } from "./plans-data.js";
+import { activeTeam, teamTotal, costLabel } from "./team-data.js";
+import { normalize as normalizeOp, dueBetween, pendingOn } from "./ops-data.js";
 import { brl } from "./core.js";
 
 export const PORTRAIT_MAX = 6000;
@@ -138,8 +144,59 @@ function bookView(finance, book) {
 }
 /* nada lançado, nada fixo e nenhum saldo de partida: o caixa que não existe */
 const cashEmpty = (col) => { const c = contextOf(col); return !c.entries.length && !c.fixed.length && !c.startBalance; };
+/* o texto digitado por gente (meta, processo) entra numa linha só e curto: o
+   que passa de `n` termina em "…", para uma meta comprida não comer a seção */
+const clip = (v, n) => { const t = String(v || "").replace(/\s+/g, " ").trim(); return t.length > n ? t.slice(0, n - 1).trimEnd() + "…" : t; };
 /* o sinal vai no texto, e o real inteiro sem ",00", como se fala */
 const signed = (cents) => (cents > 0 ? "+" : "") + brl(cents, true).replace(/,00$/, "");
+
+/* ---------- o negócio ----------
+   as linhas na ordem em que sobrevivem ao corte dos 260: o caixa, as metas do
+   trimestre, a operação da semana e, por último, o time. cada grupo some
+   sozinho quando não tem nada, e a seção some quando nenhum tem */
+function cashLines(finance, day) {
+  const col = bookView(finance, "business");
+  if (cashEmpty(col)) return [];
+  const ctx = contextOf(col);
+  const f = financeToday(ctx, configOf(col), day);
+  const r = cashMonth(ctx, day).runway;
+  return ["caixa hoje " + signed(f.real) + " · fim do mês " + signed(f.monthEnd) + " · fôlego " + (r == null ? "sem saída para medir" : runwayLabel(r))];
+}
+
+/* as metas do trimestre de hoje, medidas pela mesma conta da aba do plano
+   (progressOf): "meta: 10 clientes ativos 6/10" */
+function goalLines({ plans, finance, clients, team }, day) {
+  const goals = goalsOf(plans, "quarter", planPeriod(day, "quarter"));
+  if (!goals.length) return [];
+  const data = { finance: (finance || []).filter(Boolean).map(normalizeFinance), clients, team };
+  return goals.map((g) => {
+    const p = progressOf(g, data);
+    return "meta: " + clip(g.text, 36) + (g.source === "launched" ? " (" + p.text + ")" : " " + p.text);
+  });
+}
+
+/* os processos da empresa que vencem: o que já venceu sem ser feito e o que
+   vence nos próximos 7 dias, a "esta semana" da aba da operação. até 3 */
+function opLines(ops, day) {
+  const list = (ops || []).filter(Boolean).map(normalizeOp);
+  return pendingOn(list, day).filter((x) => x.late)
+    .concat(dueBetween(list, day, addDays(day, 6)).filter((x) => !x.done))
+    .slice(0, 3)
+    .map(({ op, due }) => (due < day ? "venceu " : "vence ") + dayLabel(due) + ": " + clip(op.title, 32));
+}
+
+/* o time: só a conta. nenhum nome, papel nem custo de uma pessoa */
+function teamLines(team) {
+  const n = activeTeam(team).length;
+  if (!n) return [];
+  const cost = costLabel(teamTotal(team));
+  return ["time: " + n + (n === 1 ? " pessoa" : " pessoas") + (cost ? " · " + cost : "")];
+}
+
+const businessLines = (d, now) => {
+  const day = dayOf(now);
+  return [...cashLines(d.finance, day), ...goalLines(d, day), ...opLines(d.ops, day), ...teamLines(d.team)];
+};
 
 /* ---------- as seções ----------
    cada uma: {id, label, budget, max?, needs, build(data, now) -> linhas}.
@@ -336,20 +393,14 @@ export const SECTIONS = [
     }
   },
   {
-    /* o caixa da empresa (PRD meu-negocio, D7): só números agregados, nenhum
-       nome de lançamento. as contas são as do topo do caixa (financeToday e
-       cashMonth), nenhuma nova. é uma lista de linhas para crescer com as
-       metas, o time e a operação; sem livro da empresa, a seção não vai */
-    id: "business", label: "negócio", budget: 260, needs: ["finance"],
-    off: (d) => cashEmpty(bookView(d.finance, "business")),
-    build({ finance }, now) {
-      const col = bookView(finance, "business");
-      const day = dayOf(now);
-      const ctx = contextOf(col);
-      const f = financeToday(ctx, configOf(col), day);
-      const r = cashMonth(ctx, day).runway;
-      return ["caixa hoje " + signed(f.real) + " · fim do mês " + signed(f.monthEnd) + " · fôlego " + (r == null ? "sem saída para medir" : runwayLabel(r))];
-    }
+    /* o negócio (PRD meu-negocio, D7): só números agregados, nenhum nome de
+       lançamento nem de pessoa. o caixa, as metas do trimestre, a operação da
+       semana e o time, cada um com a conta da sua aba (financeToday e
+       cashMonth, progressOf, dueBetween, activeTeam); sem nenhum dos quatro,
+       a seção não vai */
+    id: "business", label: "negócio", budget: 260, needs: ["finance", "plans", "team", "ops"],
+    off: (d, now) => !businessLines(d, now).length,
+    build: (d, now) => businessLines(d, now)
   }
 ];
 
@@ -370,7 +421,7 @@ export function fit(items, budget, hidden = 0) {
   return text;
 }
 
-const EMPTY = { tasks: [], routine: [], sessions: [], apps: [], closes: [], clients: [], content: [], cadence: [], habits: [], notes: [], finance: [], sleep: [], workouts: [], meals: [], healthOff: false, profile: null, loading: [] };
+const EMPTY = { tasks: [], routine: [], sessions: [], apps: [], closes: [], clients: [], content: [], cadence: [], habits: [], notes: [], finance: [], plans: [], team: [], ops: [], sleep: [], workouts: [], meals: [], healthOff: false, profile: null, loading: [] };
 const DEFAULT_WINDOW = { dayStart: 540, dayEnd: 1140 };
 
 export function portraitOf(data, now = new Date()) {
@@ -380,7 +431,7 @@ export function portraitOf(data, now = new Date()) {
   const sections = [];
   let used = 0;
   for (const s of SECTIONS) {
-    if (s.off && s.off(d)) continue;
+    if (s.off && s.off(d, now)) continue;
     const head = s.label + ":\n";
     const gap = sections.length ? 2 : 0;
     const room = Math.min(s.budget, PORTRAIT_MAX - used - gap - head.length);
@@ -420,6 +471,9 @@ export function portraitData(cols, { signedIn, prefs } = {}) {
     habits: list(cols.habits),
     notes: list(cols.notes),
     finance: list(cols.finance),
+    plans: list(cols.plans),
+    team: list(cols.team),
+    ops: list(cols.ops),
     sleep: list(cols.sleep),
     workouts: list(cols.workouts),
     meals: list(cols.meals),

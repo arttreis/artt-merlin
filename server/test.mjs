@@ -762,7 +762,7 @@ check("as fontes aceitas seguem a ordem da lista fechada, com o negócio no fim"
 check("o fora da lista continua fora, mesmo ao lado do negócio", !body.sources.includes("inventado"), JSON.stringify(body.sources));
 check("o pedido lista o negócio entre as fontes", /só dentre exatamente estes valores: [^.]*negócio/.test(claudeAsked), String(claudeAsked).slice(0, 300));
 check("o negócio é o último valor da lista que o pedido oferece", /só dentre exatamente estes valores: [^(]*saúde, negócio(\s|\.|\()/.test(claudeAsked), String(claudeAsked).slice(0, 300));
-check("a instrução diz que dinheiro é o pessoal e negócio é o caixa da empresa", /dinheiro é o (dinheiro )?pessoal/.test(claudeAsked) && /negócio é o caixa da empresa/.test(claudeAsked), String(claudeAsked).slice(0, 300));
+check("a instrução diz que dinheiro é o pessoal e negócio é a empresa (o caixa, as metas, a operação e o time)", /dinheiro é o (dinheiro )?pessoal/.test(claudeAsked) && /negócio é a empresa: o caixa, as metas do trimestre, a operação da semana e o time/.test(claudeAsked), String(claudeAsked).slice(0, 300));
 claudeAnswer = { stop_reason: "end_turn", content: [{ type: "text", text: '{"suggestions":[],"clarify":"ok"}' }] };
 r = await call("POST", "/merlin", { task: "assistant", context: { message: "e aí?" } }, cookie);
 body = await r.json();
