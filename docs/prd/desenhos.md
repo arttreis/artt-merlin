@@ -88,7 +88,7 @@ Milestone "desenhos" (arttreis/merlin).
 | #90 | A aba "mapas" vira "desenhos", e as planilhas nascem nela com fórmulas e CSV | — | 5 |
 | #92 | As apresentações entram em desenhos: slides de texto, tela cheia e PDF | #90 | 5 |
 | #91 | O projeto de app mostra cada tela como wireframe e deixa navegar pelo fluxo | — | 3 |
-| #93 | "faz uma planilha de…" monta a planilha na conversa | #90 | 3 |
+| #93 | "faz uma planilha de…" monta a planilha na conversa (`sheet` em `BUILD_KINDS`, `build:<passo>:<tipo>`) | #90 | 3 |
 | #94 | "monta uma apresentação do produto X" gera os slides com os dados do Merlin | #92, #93 | 3 |
 | #95 | "desenha o protótipo do fluxo X do app Y" propõe as telas e as ações | #91, #94 | 3 |
 

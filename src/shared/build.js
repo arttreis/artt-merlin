@@ -1,4 +1,4 @@
-/* merlin · montar com o Merlin (funil, app e mapa)
+/* merlin · montar com o Merlin (funil, app, mapa e planilha)
    logica pura, sem React. ate 10/10/2026 o Merlin montava essas coisas numa
    resposta so, a partir de uma frase, e tinha que adivinhar o negocio. agora
    a tela do assistente conduz uma conversa curta (a tarefa `build` do
@@ -11,6 +11,8 @@
 import { layoutNodes } from "./funnel-layout.js";
 import { NODE_TYPES } from "./funnel-draw.js";
 import { fromBlueprint, normalizeApp } from "./app-spec.js";
+import { normalizeSheet, buildSheet, evaluateSheet } from "./sheet.js";
+import { SECTIONS } from "./portrait.js";
 import { BUILD } from "./build-intent.js";
 
 export { BUILD, buildIntent } from "./build-intent.js";
@@ -25,6 +27,16 @@ export function answersText(questions, answers) {
     .join("\n");
 }
 
+/* a planilha que fala do caixa ("planilha do meu fluxo de caixa") nasce com
+   os números de hoje: o dinheiro e o negócio do retrato vão junto do pedido,
+   como cópia — a planilha não se atualiza sozinha depois (PRD desenhos, D3) */
+const CASH = /(?:^|[^\p{L}])(?:caixa|saldo|financeiro|finanças|fôlego)(?![\p{L}])/iu;
+export const citesCash = (text) => CASH.test(String(text || ""));
+const CASH_SECTIONS = SECTIONS.filter((s) => s.id === "money" || s.id === "business").map((s) => s.label + ":");
+export function cashPortrait(text) {
+  return String(text || "").split("\n\n").filter((s) => CASH_SECTIONS.some((h) => s.startsWith(h + "\n"))).join("\n\n");
+}
+
 /* ---------- o que mostrar do rascunho ---------- */
 const plural = (n, one, many) => n + " " + (n === 1 ? one : many);
 const typeLabel = (t) => (NODE_TYPES[t] ? NODE_TYPES[t].label : "etapa");
@@ -34,7 +46,23 @@ const priceLabel = (reais) => {
   return Number(reais).toLocaleString("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: cents, maximumFractionDigits: cents }).replace(/\s/g, " ");
 };
 
-/* { title, lines: [{ label, text }] } — a carta do rascunho na conversa.
+/* o rascunho da planilha é o mesmo {name, cols, rows: [[…]]} dos modelos
+   (sheet.js): vira documento pela mesma porta, e o normalizeSheet acerta o
+   resto */
+const SHOWN_ROWS = 8;
+const counter = () => { let n = 0; return () => "d" + ++n; };
+const sheetOf = (d, makeId) => normalizeSheet(buildSheet({ name: d.name || "planilha", cols: d.cols || [], rows: d.rows || [] }, makeId));
+const sheetSize = (s) => plural(s.rows.length, "linha", "linhas") + " · " + plural(s.cols.length, "coluna", "colunas");
+
+/* a linha que fica na conversa depois de criar ("✓ planilha pronta · 14
+   linhas · 5 colunas · abrir"). vazia para quem ainda vai direto para a tela
+   do que foi criado (funil, app, mapa) */
+export function builtLine(kind, doc) {
+  if (kind === "sheet" && doc) return "planilha pronta · " + sheetSize(normalizeSheet(doc));
+  return "";
+}
+
+/* { title, lines: [{ label, text }], table? } — a carta do rascunho na conversa.
    curta de proposito: e para conferir de relance, o detalhe esta na tela de
    cada um depois de criar */
 export function draftView(kind, d) {
@@ -55,6 +83,22 @@ export function draftView(kind, d) {
     if (d.screens.length) lines.push({ label: plural(d.screens.length, "tela", "telas"), text: d.screens.map((s) => s.name).join(", ") });
     if (d.stack) lines.push({ label: "stack", text: d.stack });
     return { title: d.name || "app", sub: d.pitch || "", lines };
+  }
+  /* a planilha se confere na grade: as primeiras linhas, com a fórmula já
+     calculada pela mesma conta do editor. `right`: a coluna de número, R$ ou
+     data alinha à direita, como no editor */
+  if (kind === "sheet") {
+    const sheet = sheetOf(d, counter());
+    const values = evaluateSheet(sheet);
+    return {
+      title: d.name || "planilha", sub: sheetSize(sheet), lines: [],
+      table: {
+        head: sheet.cols.map((c) => c.name),
+        right: sheet.cols.map((c) => c.type !== "text"),
+        rows: sheet.rows.slice(0, SHOWN_ROWS).map((r) => sheet.cols.map((c) => values[r.id][c.id].text)),
+        more: Math.max(0, sheet.rows.length - SHOWN_ROWS)
+      }
+    };
   }
   const branches = (d.tree && d.tree.children) || [];
   return {
@@ -79,6 +123,10 @@ export function docFromDraft(kind, d, makeId) {
   }
   if (kind === "app") {
     const doc = normalizeApp({ id, name: d.name, ...fromBlueprint(d, makeId), createdAt: now, updatedAt: now }, makeId);
+    return { collection: base.collection, href: base.href + id, doc };
+  }
+  if (kind === "sheet") {
+    const doc = normalizeSheet({ ...sheetOf(d, makeId), id, createdAt: now, updatedAt: now });
     return { collection: base.collection, href: base.href + id, doc };
   }
   /* o funil: a etapa liga na anterior, ou na que o Merlin apontou em `after`

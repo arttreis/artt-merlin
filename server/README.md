@@ -74,11 +74,11 @@ Essa chave é **uma só para o time**, e por isso a rota tem teto, por pessoa e
 por hora, contado na tabela `advice` em três cotas separadas (`QUOTA`, no worker):
 
 - **conselho**: 30 (`ADVICE_PER_HOUR`), no Opus. Inclui as perguntas antes de
-  montar um funil, app ou mapa: o fluxo de montagem inteiro gasta uma vez daqui.
+  montar um funil, app, mapa ou planilha: o fluxo de montagem inteiro gasta uma vez daqui.
 - **leitura do início**: 60 (`CAPTURE_PER_HOUR`), no Haiku: o campo da home
   separando tarefa, data, hora, nota e dinheiro (gasto ou entrada).
 - **montagem**: 40 (`BUILD_PER_HOUR`), no Opus: o rascunho e cada ajuste de um
-  funil, app ou mapa montado na conversa.
+  funil, app, mapa ou planilha montado na conversa.
 
 Quem estourar espera; quem está ao lado não paga por isso.
 
@@ -89,7 +89,9 @@ tirou no perfil), dos títulos das notas, do dinheiro pessoal (sem dívidas nem
 investimentos) e do negócio (só números: caixa hoje, fim do mês e fôlego, as metas do trimestre com o progresso, os processos que vencem na semana, e do time só a contagem e o custo total, nunca nome), montado no
 navegador (`src/shared/portrait.js`) e mandado em `context.portrait`. O Worker corta o
 retrato em 6.000 caracteres (o `pageContext` continua com 1.200), descarta-o em qualquer
-outra tarefa e não lê documento nenhum para montá-lo. A resposta traz `sources`, filtrado
+outra tarefa e não lê documento nenhum para montá-lo. A exceção é a montagem de um tipo com
+`cash` em `BUILD_KINDS` (a planilha): quando o pedido cita o caixa, a tela manda só as seções
+dinheiro e negócio, e o Worker as aceita cortadas em 1.500 caracteres (`BUILD_PORTRAIT_MAX`). A resposta traz `sources`, filtrado
 por uma lista fechada, e o tamanho do retrato que foi (o já cortado) entra no
 `portrait=` da linha de medição de cada pedido, no `wrangler tail` (ver "A medição", abaixo).
 
@@ -244,7 +246,8 @@ com a pessoa). É a conta que diz o que cada tarefa custa; o teto (`advice`) só
 - **`task` é o que a pessoa fez, não só a rota**: `assistant:action` (a resposta trouxe
   proposta) ou `assistant:answer` (só `clarify`); `capture:<kind>`, uma linha por tipo de item
   devolvido (`capture:task`, `capture:note`), ou `capture:none` quando a lista vem vazia;
-  `build:<step>` (`brief`, `draft`, `revise`); para as outras, o nome da tarefa (`week`, `app`…).
+  `build:<step>:<kind>` (`brief`, `draft`, `revise` × `funnel`, `app`, `map`, `sheet`:
+  `build:draft:sheet`); para as outras, o nome da tarefa (`week`, `app`…).
 - **Os tokens vêm do `usage` da resposta** e, numa captura que grava mais de uma linha, entram
   só na primeira, para a soma de tokens não contar o mesmo pedido duas vezes. Resposta sem
   `usage` soma o pedido e deixa os tokens como estavam.

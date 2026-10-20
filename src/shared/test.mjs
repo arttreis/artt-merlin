@@ -1222,6 +1222,85 @@ const dataLeft = () => globalThis.localStorage.keys().filter((k) => k in DATA);
   const cliente = a.doc.entities.find((e) => e.name === "Cliente");
   check("montar: o app resolve nome em id", a.collection === "apps" && a.doc.name === "Agenda" && a.doc.entities[1].fields.some((x) => x.type === "ref" && x.ref === cliente.id), JSON.stringify(a.doc.entities[1].fields));
   check("montar: a carta do funil resume", B.draftView("funnel", funnel).lines[0].text.startsWith("Anúncio → Página") && B.draftView("funnel", funnel).lines[1].text === "consultoria · R$ 4.997,50", B.draftView("funnel", funnel).lines[1].text);
+
+  /* a planilha na conversa (ticket #93) */
+  check("planilha: o verbo e o substantivo pedem a planilha", B.buildIntent("faz uma planilha de precificação") === "sheet" && B.buildIntent("monta uma planilha dos custos do produto") === "sheet", String(B.buildIntent("faz uma planilha de precificação")));
+  check("planilha: falar dela, ou dar duração, não é pedir uma", B.buildIntent("revisar a planilha") === null && B.buildIntent("planilha 2h") === null && B.buildIntent("planilha") === null);
+  check("planilha: com dois tipos do mesmo verbo, vence o mais perto do verbo", B.buildIntent("faz uma planilha de custos do meu app") === "sheet" && B.buildIntent("monta um funil numa planilha") === "funnel", B.buildIntent("faz uma planilha de custos do meu app") + "/" + B.buildIntent("monta um funil numa planilha"));
+  check("planilha: o desempate novo não muda o mapa do funil", B.buildIntent("monta um mapa do funil de vendas") === "map" && B.buildIntent("monta um funil pra minha consultoria") === "funnel");
+  check("planilha: BUILD.sheet aponta para sheets e abre em sheets.html", B.BUILD.sheet.label === "planilha" && B.BUILD.sheet.collection === "sheets" && B.BUILD.sheet.href === "sheets.html#" && B.BUILD.sheet.create === "criar a planilha");
+  check("planilha: todo tipo tem o artigo (the/of)", B.BUILD.sheet.the === "a planilha" && B.BUILD.sheet.of === "da planilha" && B.BUILD.funnel.the === "o funil" && B.BUILD.funnel.of === "do funil" && B.BUILD.app.the === "o app" && B.BUILD.app.of === "do app" && B.BUILD.map.the === "o mapa" && B.BUILD.map.of === "do mapa");
+
+  const S = await import("./sheet.js?n=" + (++n));
+  let sk = 0;
+  const sid = () => "s" + (++sk);
+  const sheetDraft = {
+    name: "Custos do produto",
+    cols: [{ name: "item", type: "text" }, { name: "qtd", type: "number" }, { name: "preço", type: "money" }, { name: "total", type: "money" }],
+    rows: [["caixa", "2", "18", "=B1*C1"], ["fita", "10", "", "=B2*C2"], ["etiqueta", "", "3,5", ""]]
+  };
+  const sh = B.docFromDraft("sheet", sheetDraft, sid);
+  check("planilha: vai para sheets e abre nela", sh.collection === "sheets" && sh.href === "sheets.html#" + sh.doc.id && !!sh.doc.id, JSON.stringify([sh.collection, sh.href]));
+  check("planilha: o documento já é o que o normalizeSheet devolveria", JSON.stringify(S.normalizeSheet(sh.doc)) === JSON.stringify(sh.doc), JSON.stringify(sh.doc).slice(0, 300));
+  check("planilha: nome, colunas e tipos", sh.doc.name === "Custos do produto" && sh.doc.cols.length === 4 && sh.doc.cols.map((c) => c.type).join() === "text,number,money,money" && sh.doc.cols.map((c) => c.name).join() === "item,qtd,preço,total");
+  check("planilha: o id da coluna vem do makeId e é único", sh.doc.cols.every((c) => /^s\d+$/.test(c.id)) && new Set(sh.doc.cols.map((c) => c.id)).size === 4, JSON.stringify(sh.doc.cols));
+  check("planilha: a célula guarda o texto digitado, com a fórmula", sh.doc.rows[0].cells[sh.doc.cols[0].id] === "caixa" && sh.doc.rows[0].cells[sh.doc.cols[3].id] === "=B1*C1", JSON.stringify(sh.doc.rows[0]));
+  check("planilha: célula vazia não entra", sh.doc.rows.length === 3 && !(sh.doc.cols[2].id in sh.doc.rows[1].cells) && !(sh.doc.cols[1].id in sh.doc.rows[2].cells) && !(sh.doc.cols[3].id in sh.doc.rows[2].cells), JSON.stringify(sh.doc.rows));
+  check("planilha: as datas de criação e edição estão preenchidas", sh.doc.createdAt > 0 && sh.doc.updatedAt > 0);
+  const calc = S.evaluateSheet(sh.doc);
+  const cellOf = (r, c) => calc[sh.doc.rows[r].id][sh.doc.cols[c].id];
+  check("planilha: a fórmula calcula (2 × R$ 18 = R$ 36,00)", cellOf(0, 3).kind === "number" && cellOf(0, 3).cents === 3600 && cellOf(0, 3).text === "36,00", JSON.stringify(cellOf(0, 3)));
+  check("planilha: a fórmula sobre célula vazia calcula zero, sem erro", cellOf(1, 3).kind === "number" && cellOf(1, 3).cents === 0, JSON.stringify(cellOf(1, 3)));
+  const lone = B.docFromDraft("sheet", { name: "", cols: [{ name: "a", type: "inventado" }], rows: [["x"]] }, sid);
+  check("planilha: tipo inventado vira texto e nome vazio ganha um nome", lone.doc.cols[0].type === "text" && lone.doc.name.length > 0, JSON.stringify(lone.doc));
+  check("planilha: cada planilha tem ids próprios", lone.doc.id !== sh.doc.id);
+
+  const view = B.draftView("sheet", sheetDraft);
+  check("planilha: a carta traz título e o tamanho", view.title === "Custos do produto" && view.sub === "3 linhas · 4 colunas", JSON.stringify(view.sub));
+  check("planilha: a carta não tem linhas soltas, tem tabela", Array.isArray(view.lines) && view.lines.length === 0 && !!view.table);
+  check("planilha: o cabeçalho da tabela são os nomes das colunas", view.table.head.join() === "item,qtd,preço,total", JSON.stringify(view.table.head));
+  check("planilha: a tabela mostra a fórmula calculada, não o '='", view.table.rows[0][3] === "36,00" && view.table.rows[0][0] === "caixa" && !view.table.rows.some((r) => r.some((c) => String(c).startsWith("="))), JSON.stringify(view.table.rows[0]));
+  check("planilha: cada linha da tabela tem uma célula por coluna", view.table.rows.length === 3 && view.table.rows.every((r) => r.length === 4), JSON.stringify(view.table.rows));
+  check("planilha: cabendo tudo, não sobra nada", view.table.more === 0);
+  check("planilha: só a coluna de texto alinha à esquerda", view.table.right.length === view.table.head.length && view.table.right[0] === false && view.table.right.slice(1).every(Boolean), JSON.stringify(view.table.right));
+  const big = { name: "", cols: [{ name: "n", type: "number" }, { name: "dobro", type: "number" }], rows: Array.from({ length: 14 }, (_, i) => [String(i + 1), "=A" + (i + 1) + "*2"]) };
+  const bigView = B.draftView("sheet", big);
+  check("planilha: mostra até 8 linhas e diz quantas ficaram de fora", bigView.table.rows.length === 8 && bigView.table.more === 6 && bigView.sub === "14 linhas · 2 colunas", JSON.stringify([bigView.table.rows.length, bigView.table.more, bigView.sub]));
+  check("planilha: sem nome, a carta se chama planilha", bigView.title === "planilha");
+  check("planilha: exatamente 8 linhas não deixa sobra", B.draftView("sheet", { ...big, rows: big.rows.slice(0, 8) }).table.more === 0 && B.draftView("sheet", { ...big, rows: big.rows.slice(0, 9) }).table.more === 1);
+  check("planilha: o singular de linha e coluna", B.draftView("sheet", { name: "x", cols: [{ name: "a", type: "text" }], rows: [["1"]] }).sub === "1 linha · 1 coluna");
+
+  check("planilha pronta: a linha de 'criei'", B.builtLine("sheet", { cols: new Array(5).fill(0).map((_, i) => ({ id: "c" + i, name: "", type: "text" })), rows: new Array(14).fill(0).map((_, i) => ({ id: "r" + i, cells: {} })) }) === "planilha pronta · 14 linhas · 5 colunas", B.builtLine("sheet", sh.doc));
+  check("planilha pronta: a linha da planilha montada de verdade", B.builtLine("sheet", sh.doc) === "planilha pronta · 3 linhas · 4 colunas", B.builtLine("sheet", sh.doc));
+  check("planilha pronta: o singular", B.builtLine("sheet", lone.doc) === "planilha pronta · 1 linha · 1 coluna", B.builtLine("sheet", lone.doc));
+  check("planilha pronta: funil, app e mapa seguem sem linha extra", B.builtLine("funnel", f.doc) === "" && B.builtLine("app", a.doc) === "" && B.builtLine("map", m.doc) === "");
+
+  /* quando o pedido cita o caixa, o retrato vai (só dinheiro e negócio) */
+  check("caixa: cita o caixa, o saldo e o financeiro", B.citesCash("planilha do meu fluxo de caixa") && B.citesCash("usa o saldo que eu tenho") && B.citesCash("planilha do financeiro da empresa"));
+  check("caixa: precificação e custos do produto não citam o caixa", !B.citesCash("planilha de precificação") && !B.citesCash("faz uma planilha dos custos do produto") && !B.citesCash(""));
+  const portrait = "hoje:\nagora 10:00\n\ndinheiro:\nsaldo +1.000\n\nsaúde:\nsono 7h\n\nnegócio:\ncaixa hoje +5.000";
+  check("caixa: do retrato só ficam o dinheiro e o negócio, com o rótulo", B.cashPortrait(portrait) === "dinheiro:\nsaldo +1.000\n\nnegócio:\ncaixa hoje +5.000", JSON.stringify(B.cashPortrait(portrait)));
+  check("caixa: só uma das duas seções também serve", B.cashPortrait("hoje:\nx\n\nnegócio:\ncaixa hoje +5.000") === "negócio:\ncaixa hoje +5.000" && B.cashPortrait("dinheiro:\nsaldo +1.000\n\nsaúde:\nsono 7h") === "dinheiro:\nsaldo +1.000");
+  check("caixa: sem dinheiro nem negócio, nada vai", B.cashPortrait("hoje:\nagora 10:00\n\nsaúde:\nsono 7h") === "" && B.cashPortrait("") === "");
+
+  /* a conversa guarda o rascunho, o pedido e a linha do "criei" */
+  const { normalizeChat } = await import("./assistant-actions.js?n=" + (++n));
+  const chat = normalizeChat({ id: "c1", messages: [
+    { from: "me", text: "faz uma planilha dos custos" },
+    { from: "merlin", brief: { kind: "sheet", request: "faz uma planilha dos custos", answered: false, questions: [{ q: "Quais custos?", options: ["fixos", "variáveis"] }] } },
+    { from: "merlin", draft: { kind: "sheet", request: "faz uma planilha dos custos", answers: "", title: "Custos", summary: "3 linhas", data: sheetDraft } },
+    { from: "merlin", built: { kind: "sheet", id: "p1", name: "Custos", line: "planilha pronta · 3 linhas · 4 colunas" } },
+    { from: "merlin", built: { kind: "sheet", id: "p2", name: "Outra" } },
+    { from: "merlin", built: { kind: "sheet", id: "p3", name: "Longa", line: "x".repeat(500) } },
+    { from: "merlin", built: { kind: "funnel", id: "f1", name: "Funil" } },
+    { from: "merlin", built: { kind: "deck", id: "d1", name: "inventado" } }
+  ] });
+  check("conversa: o brief da planilha sobrevive", !!chat.messages[1].brief && chat.messages[1].brief.kind === "sheet" && chat.messages[1].brief.questions.length === 1, JSON.stringify(chat.messages[1]));
+  check("conversa: o rascunho da planilha sobrevive, com os dados", !!chat.messages[2].draft && chat.messages[2].draft.kind === "sheet" && chat.messages[2].draft.data && chat.messages[2].draft.data.rows.length === 3, JSON.stringify(chat.messages[2]).slice(0, 200));
+  check("conversa: o 'criei' da planilha guarda a linha", chat.messages[3].built && chat.messages[3].built.kind === "sheet" && chat.messages[3].built.line === "planilha pronta · 3 linhas · 4 colunas", JSON.stringify(chat.messages[3]));
+  check("conversa: 'criei' sem linha ganha linha vazia", chat.messages[4].built && chat.messages[4].built.line === "" && chat.messages[6].built.line === "", JSON.stringify([chat.messages[4], chat.messages[6]]));
+  check("conversa: a linha do 'criei' tem teto de 200", chat.messages[5].built && chat.messages[5].built.line.length === 200, String(chat.messages[5].built && chat.messages[5].built.line.length));
+  check("conversa: tipo que não existe não vira 'criei'", !chat.messages[7].built, JSON.stringify(chat.messages[7]));
 }
 
 /* ---- a vitrine saiu da busca (PRD o-menu-por-area, D7) ----

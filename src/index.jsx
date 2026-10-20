@@ -563,7 +563,7 @@ function Composer({ tasks, habits, b, smart, onAsk, onIntent, readContext }) {
     : intent ? INTENT_HINT[intent.period || intent.kind]
     : !route ? (smart ? "escreva do seu jeito: o Merlin separa tarefa, data, hora e nota · a pergunta ele responde aqui em cima"
                       : "com a duração (45m, 1h30) entra em hoje · pergunta vai para o Merlin · o resto vira nota")
-    : build ? "montar o " + BUILD[build].label + " com o Merlin · ele pergunta o que falta e mostra o rascunho"
+    : build ? "montar " + BUILD[build].the + " com o Merlin · ele pergunta o que falta e mostra o rascunho"
     : route.kind === "ask" ? (smart ? "perguntar ao Merlin · a resposta aparece lá em cima" : "perguntar ao Merlin")
     : willRead ? "o Merlin lê e mostra o que entendeu antes de criar"
     : route.kind === "task" ? (route.reserved ? "reservar em hoje · " : "pôr em hoje · ") + fmt(route.min) + (route.reserved ? "" : route.min > b.slack ? " · não cabe hoje" : " · cabe")

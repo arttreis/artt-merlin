@@ -517,6 +517,63 @@ r = await call("POST", "/merlin", { task: "build", context: { kind: "funnel", st
 check("rascunho vazio é erro, não funil vazio", r.status === 502);
 r = await call("POST", "/merlin", { task: "build", context: { kind: "planilha", step: "draft", request: "x" } }, cookie);
 check("montagem recusa o que não sabe montar", r.status === 400);
+/* as chamadas de montagem abaixo contam na cota do conselho: restaura ao fim */
+const adviceSnapSheet = db.advice.map((x) => ({ ...x }));
+/* a planilha na conversa (ticket #93): os três passos, o teto de 40 linhas e
+   10 colunas, o tipo inválido que vira texto, e o rascunho sem nada */
+claudeAnswer = { stop_reason: "end_turn", content: [{ type: "text", text: JSON.stringify({ questions: [{ q: "Que custos entram?", options: ["fixos", "variáveis"] }] }) }] };
+r = await call("POST", "/merlin", { task: "build", context: { kind: "sheet", step: "brief", request: "faz uma planilha dos custos do produto" } }, cookie);
+body = await r.json();
+check("planilha: o passo brief pergunta antes", r.status === 200 && body.questions && body.questions.length === 1 && body.questions[0].options.length === 2, JSON.stringify(body));
+check("planilha: a pergunta fala em planilha e leva o pedido", /planilha/i.test(claudeMessages.at(-1).content) && /custos do produto/.test(claudeAsked), String(claudeAsked).slice(0, 200));
+check("planilha: a pergunta vai no Haiku", claudeModel === "claude-haiku-5-5/low", claudeModel);
+const oversize = {
+  name: "Custos do produto",
+  cols: Array.from({ length: 12 }, (_, i) => ({ name: "col" + i, type: ["text", "number", "money", "date", "inventado", "percent"][i % 6] })),
+  rows: Array.from({ length: 50 }, (_, i) => ["linha " + i, i, "=B" + (i + 1) + "*2", null, { a: 1 }, "e", "f", "g", "h", "i", "j", "k", "l-sobra", "m-sobra"]),
+  summary: "custos por unidade"
+};
+claudeAnswer = { stop_reason: "end_turn", content: [{ type: "text", text: JSON.stringify(oversize) }] };
+const sheetBefore = spent(2);
+r = await call("POST", "/merlin", { task: "build", context: { kind: "sheet", step: "draft", request: "faz uma planilha dos custos do produto", answers: "Que custos entram? fixos" } }, cookie);
+body = await r.json();
+check("planilha: o passo draft devolve rascunho e resumo", r.status === 200 && body.draft && body.summary === "custos por unidade", JSON.stringify(body).slice(0, 300));
+check("planilha: o rascunho tem só name, cols e rows", body.draft && Object.keys(body.draft).sort().join() === "cols,name,rows", JSON.stringify(Object.keys(body.draft || {})));
+check("planilha: o teto é de 10 colunas e 40 linhas", body.draft.cols.length === 10 && body.draft.rows.length === 40, body.draft.cols.length + "x" + body.draft.rows.length);
+check("planilha: tipo fora de text/number/money/date vira texto", body.draft.cols.map((c) => c.type).join() === "text,number,money,date,text,text,text,number,money,date", body.draft.cols.map((c) => c.type).join());
+check("planilha: a linha é cortada ao número de colunas", body.draft.rows.every((row) => Array.isArray(row) && row.length <= 10) && body.draft.rows[0].length === 10, JSON.stringify(body.draft.rows[0]));
+check("planilha: número vira texto e objeto ou nulo viram vazio", body.draft.rows[3][0] === "linha 3" && body.draft.rows[3][1] === "3" && body.draft.rows[3][3] === "" && body.draft.rows[3][4] === "", JSON.stringify(body.draft.rows[3]));
+check("planilha: a fórmula passa como texto", body.draft.rows[3][2] === "=B4*2", JSON.stringify(body.draft.rows[3]));
+check("planilha: toda célula é texto", body.draft.rows.every((row) => row.every((c) => typeof c === "string")));
+check("planilha: o rascunho vai no Opus e conta na montagem", claudeModel === "claude-opus-5-5/medium" && spent(2) === sheetBefore + 1, claudeModel);
+check("planilha: o pedido do rascunho leva o pedido e as respostas", /custos do produto/.test(claudeAsked) && /Que custos entram\? fixos/.test(claudeAsked), String(claudeAsked).slice(0, 300));
+check("planilha: o pedido explica a fórmula com = e o teto de 40 linhas e 10 colunas", /=/.test(claudeMessages.at(-1).content) && /40/.test(claudeMessages.at(-1).content) && /10/.test(claudeMessages.at(-1).content), String(claudeMessages.at(-1).content).slice(0, 300));
+check("planilha: a linha de log traz o tipo", /^merlin build:draft:sheet in=/.test(logged.at(-1)), logged.at(-1));
+const sheetDraft1 = body.draft;
+claudeAnswer = { stop_reason: "end_turn", content: [{ type: "text", text: JSON.stringify({
+  name: "Preço", cols: [{ name: "a", type: "money" }, { name: "b", type: "date" }, { name: "c", type: 7 }],
+  rows: ["texto solto", ["1", 2, "=A1*2", "sobra"], 5, null, {}, ["x"]],
+  summary: "ok"
+}) }] };
+r = await call("POST", "/merlin", { task: "build", context: { kind: "sheet", step: "revise", request: "faz uma planilha", draft: sheetDraft1, change: "tira a coluna de imposto" } }, cookie);
+body = await r.json();
+check("planilha: o passo revise devolve outro rascunho", r.status === 200 && body.draft && body.draft.name === "Preço" && body.summary === "ok", JSON.stringify(body).slice(0, 300));
+check("planilha: o ajuste manda o rascunho atual e o pedido", /Rascunho atual/.test(claudeAsked) && /linha 3/.test(claudeAsked) && /Ajuste pedido: tira a coluna de imposto/.test(claudeAsked) && /AJUSTE/.test(claudeMessages.at(-1).content), String(claudeAsked).slice(0, 200));
+check("planilha: linha que não é array é descartada, as outras ficam cortadas nas colunas", !!body.draft && body.draft.rows.some((row) => row.join("|") === "1|2|=A1*2") && body.draft.rows.some((row) => row[0] === "x") && !body.draft.rows.some((row) => row.includes("texto solto") || row.includes("sobra")) && body.draft.rows.every((row) => Array.isArray(row)), JSON.stringify(body.draft && body.draft.rows));
+check("planilha: coluna com tipo que não é texto conhecido vira texto", body.draft.cols.length === 3 && body.draft.cols[0].type === "money" && body.draft.cols[1].type === "date" && body.draft.cols[2].type === "text", JSON.stringify(body.draft.cols));
+claudeAnswer = { stop_reason: "end_turn", content: [{ type: "text", text: JSON.stringify({ name: "sem linhas", cols: [{ name: "a", type: "text" }], rows: [] }) }] };
+r = await call("POST", "/merlin", { task: "build", context: { kind: "sheet", step: "draft", request: "x" } }, cookie);
+body = await r.json();
+check("planilha: sem linhas é erro, não planilha vazia", r.status === 502 && /o Merlin devolveu um rascunho vazio; tente de novo/.test(body.error || ""), r.status + " " + JSON.stringify(body));
+claudeAnswer = { stop_reason: "end_turn", content: [{ type: "text", text: JSON.stringify({ name: "sem colunas", cols: [], rows: [["a"]] }) }] };
+r = await call("POST", "/merlin", { task: "build", context: { kind: "sheet", step: "draft", request: "x" } }, cookie);
+check("planilha: sem colunas também é erro", r.status === 502, String(r.status));
+claudeAnswer = { stop_reason: "end_turn", content: [{ type: "text", text: JSON.stringify({ name: "x" }) }] };
+r = await call("POST", "/merlin", { task: "build", context: { kind: "sheet", step: "revise", request: "x", draft: sheetDraft1, change: "y" } }, cookie);
+check("planilha: o ajuste que volta sem nada também é erro", r.status === 502, String(r.status));
+r = await call("POST", "/merlin", { task: "build", context: { kind: "sheet", step: "publicar", request: "x" } }, cookie);
+check("planilha: passo que não existe continua recusado", r.status === 400);
+db.advice.splice(0, db.advice.length, ...adviceSnapSheet);
 r = await call("POST", "/merlin", { task: "build", context: { kind: "map", step: "publicar", request: "x" } }, cookie);
 check("montagem recusa passo que não existe", r.status === 400);
 globalThis.fetch = realFetch;
@@ -772,6 +829,35 @@ env.MERLIN_PORTRAIT_OFF = "1";
 r = await call("POST", "/merlin", { task: "assistant", context: { message: "o que tenho quinta?", portrait: PORTRAIT } }, cookie);
 check("com MERLIN_PORTRAIT_OFF, o retrato não vai", r.status === 200 && !claudeAsked.includes("RETRATO-XYZ") && !claudeAsked.includes("aaaaaaaaaa"), String(claudeAsked).slice(0, 200));
 delete env.MERLIN_PORTRAIT_OFF;
+const adviceSnapPortrait = db.advice.map((x) => ({ ...x }));
+/* o retrato na montagem da planilha (ticket #93): o rascunho usa os números do
+   caixa como valor inicial, então a planilha recebe o retrato, com teto de
+   1.500; os outros tipos de montagem continuam sem ele */
+const sheetAnswer = { stop_reason: "end_turn", content: [{ type: "text", text: JSON.stringify({ name: "Caixa", cols: [{ name: "mês", type: "text" }, { name: "saldo", type: "money" }], rows: [["out", "1000"]], summary: "ok" }) }] };
+const sentToClaude = () => JSON.stringify(claudeMessages) + "\n" + JSON.stringify(claudeSystem);
+const cashCtx = (step) => ({ kind: "sheet", step, request: "planilha do meu fluxo de caixa", portrait: PORTRAIT, ...(step === "revise" ? { draft: { name: "Caixa", cols: [{ name: "mês", type: "text" }], rows: [["out"]] }, change: "soma o saldo" } : {}) });
+for (const step of ["brief", "draft", "revise"]) {
+  claudeAnswer = step === "brief" ? { stop_reason: "end_turn", content: [{ type: "text", text: '{"questions":[]}' }] } : sheetAnswer;
+  r = await call("POST", "/merlin", { task: "build", context: cashCtx(step) }, cookie);
+  check("planilha: o retrato vai no passo " + step, r.status === 200 && sentToClaude().includes("RETRATO-XYZ"), r.status + " " + sentToClaude().slice(0, 200));
+}
+check("planilha: o retrato da montagem é cortado em 1.500", sentToClaude().includes(PORTRAIT.slice(0, 1500)) && !sentToClaude().includes(PORTRAIT.slice(0, 1501)));
+check("planilha: a linha de medição traz o retrato já cortado", / portrait=1500$/.test(logged.at(-1)), logged.at(-1));
+claudeAnswer = sheetAnswer;
+r = await call("POST", "/merlin", { task: "build", context: { kind: "sheet", step: "draft", request: "faz uma planilha de precificação" } }, cookie);
+check("planilha: sem retrato no pedido, nada de retrato", r.status === 200 && !sentToClaude().includes("RETRATO-XYZ") && / portrait=0$/.test(logged.at(-1)), logged.at(-1));
+claudeAnswer = { stop_reason: "end_turn", content: [{ type: "text", text: JSON.stringify({ name: "Funil", channel: "", stages: [{ nodeType: "ad", title: "anúncio" }], summary: "ok" }) }] };
+r = await call("POST", "/merlin", { task: "build", context: { kind: "funnel", step: "draft", request: "monta um funil", portrait: PORTRAIT } }, cookie);
+check("o retrato não vai na montagem de funil", r.status === 200 && !sentToClaude().includes("RETRATO-XYZ") && !sentToClaude().includes("aaaaaaaaaa") && / portrait=0$/.test(logged.at(-1)), logged.at(-1));
+claudeAnswer = { stop_reason: "end_turn", content: [{ type: "text", text: JSON.stringify({ name: "Mapa", tree: { title: "x", children: [{ title: "a" }] } }) }] };
+r = await call("POST", "/merlin", { task: "build", context: { kind: "map", step: "draft", request: "mapa", portrait: PORTRAIT } }, cookie);
+check("o retrato não vai na montagem de mapa", r.status === 200 && !sentToClaude().includes("RETRATO-XYZ"));
+env.MERLIN_PORTRAIT_OFF = "1";
+claudeAnswer = sheetAnswer;
+r = await call("POST", "/merlin", { task: "build", context: cashCtx("draft") }, cookie);
+check("planilha: com MERLIN_PORTRAIT_OFF, o retrato não vai", r.status === 200 && !sentToClaude().includes("RETRATO-XYZ") && !sentToClaude().includes("aaaaaaaaaa") && / portrait=0$/.test(logged.at(-1)), logged.at(-1));
+delete env.MERLIN_PORTRAIT_OFF;
+db.advice.splice(0, db.advice.length, ...adviceSnapPortrait);
 claudeAnswer = { stop_reason: "end_turn", content: [{ type: "text", text: '{"text":"Cabem 2h."}' }] };
 r = await call("POST", "/merlin", { task: "checkin", context: { moment: "start", hour: "09:10", window: "09:00–18:00", slack: "cabem 2h", open: [], done: [], habits: [], streak: 0, products: [], portrait: PORTRAIT } }, cookie);
 check("o check-in não leva o retrato", r.status === 200 && !claudeMessages.some((m) => m.content.includes("RETRATO-XYZ")), String(claudeAsked).slice(0, 200));
@@ -1357,7 +1443,13 @@ claudeAnswer = answerWith({ questions: [] }, { input_tokens: 200, output_tokens:
 await ask("build", { kind: "funnel", step: "brief", request: "um funil" }, meterCookie);
 claudeAnswer = answerWith({ name: "Mapa", tree: { title: "x", children: [{ title: "a" }] } }, { input_tokens: 900, output_tokens: 400 });
 await ask("build", { kind: "map", step: "draft", request: "um mapa" }, meterCookie);
-check("a montagem grava build:<passo>", usageOf(meterId, "build:brief").n === 1 && usageOf(meterId, "build:draft").tokens_out === 400, JSON.stringify(usageRows(meterId).map((x) => x.task)));
+claudeAnswer = answerWith({ name: "Custos", cols: [{ name: "item", type: "text" }], rows: [["caixa"]] }, { input_tokens: 600, output_tokens: 250 });
+await ask("build", { kind: "sheet", step: "draft", request: "uma planilha" }, meterCookie);
+check("a montagem grava build:<passo>:<tipo>", usageOf(meterId, "build:brief:funnel").n === 1 && usageOf(meterId, "build:draft:map").tokens_out === 400, JSON.stringify(usageRows(meterId).map((x) => x.task)));
+check("a planilha grava build:draft:sheet, com os tokens dela", !!usageOf(meterId, "build:draft:sheet") && usageOf(meterId, "build:draft:sheet").n === 1 && usageOf(meterId, "build:draft:sheet").tokens_in === 600 && usageOf(meterId, "build:draft:sheet").tokens_out === 250, JSON.stringify(usageRows(meterId).map((x) => x.task)));
+check("o tipo separa as linhas: o do mapa não leva os tokens da planilha", !!usageOf(meterId, "build:draft:map") && usageOf(meterId, "build:draft:map").n === 1 && usageOf(meterId, "build:draft:map").tokens_in === 900);
+check("a medição da montagem não grava mais o nome sem tipo", !usageRows(meterId).some((x) => x.task === "build:brief" || x.task === "build:draft" || x.task === "build:revise"), JSON.stringify(usageRows(meterId).map((x) => x.task)));
+check("a linha de log da montagem traz o tipo", /^merlin build:draft:sheet in=600 out=250 portrait=0$/.test(logged.at(-1)), logged.at(-1));
 
 claudeAnswer = answerWith({ text: "## semana\n- foi" }, { input_tokens: 700, output_tokens: 80 });
 await ask("week", { range: "1-7 set", cards: [] }, meterCookie);
