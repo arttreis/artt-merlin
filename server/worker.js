@@ -1381,6 +1381,7 @@ const BUILD_KINDS = {
      inicial — cópia, sem ligação viva */
   sheet: {
     label: "planilha",
+    a: "uma ",
     cash: true,
     matters: "para que serve a conta, o que entra como linha e que números a pessoa já tem",
     draft:
