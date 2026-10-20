@@ -8,7 +8,7 @@
 import { newId, today, foldKey } from "./core.js";
 import { journalEntry } from "./client-doc.js";
 import { layoutNodes } from "./funnel-layout.js";
-import { newEntry, entryLine, paidOf, configOf, contextOf, bookOf, bookCollection } from "./finance-data.js";
+import { newEntry, entryLine, paidOf, configOf, contextOf, bookOf, bookCollection, BOOKS } from "./finance-data.js";
 import { SOURCES } from "./portrait.js";
 import { normalize as normalizeHabit, habitStatus, markOn } from "./habits-data.js";
 import { sleepLabel, sleepLine, readHours, sleepDoc, nightOf } from "./sleep-data.js";
@@ -95,7 +95,7 @@ export const ACTION_FIELDS = {
      na dúvida a IA manda pessoal, e quem decide é a pessoa (PRD meu-negocio).
      `options` recebe também o que está na caixa, e as categorias seguem o livro */
   "finance-entry": [
-    { key: "book", label: "de quem", type: "select", initial: (p) => bookOf(p.book), options: () => [["personal", "pessoal"], ["business", "empresa"]] },
+    { key: "book", label: "de quem", type: "select", initial: (p) => bookOf(p.book), options: () => BOOKS },
     { key: "name", label: "o quê" },
     { key: "amount", label: "valor", type: "money" },
     { key: "day", label: "data", type: "date", initial: () => today() },

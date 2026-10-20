@@ -983,10 +983,8 @@ const ASSISTANT_ACTIONS = {
   "onboarding-map": { collection: "maps", fields: ["name", "tree"] },
   "onboarding-funnel": { collection: "funnels", fields: ["name", "stages"] },
   script: { collection: "content", fields: ["contentId", "script"] },
-  /* o livro só aceita "business"; o resto, e a falta dele, é o pessoal: na
-     dúvida a tela abre em pessoal, com o seletor à vista (PRD meu-negocio) */
   "finance-entry": { collection: "finance", fields: ["name", "amount", "kind", "day", "category", "paid", "confirm", "fixed", "book"],
-    clean: (p) => ({ ...p, book: p.book === "business" ? "business" : "personal" }) },
+    clean: (p) => ({ ...p, book: bookOf(p.book) }) },
   "habit-mark": { collection: "habits", fields: ["habit", "name", "date"] },
   "sleep-log": { collection: "sleep", fields: ["min", "date"] },
   "workout-log": { collection: "workouts", fields: ["title", "min", "date"] },
@@ -1083,6 +1081,10 @@ function buildMessages(name, ctx, instruction, context) {
    (o campo aponta para "Cliente"): a tela resolve nome em id, e o que nao
    fechar cai la. aqui so se corta tamanho e se descarta o que nao e lista.
    se FIELD_TYPES mudar em shared/app-spec.js, muda aqui junto. */
+/* o livro só aceita "business"; o resto, e a falta dele, é o pessoal: na
+   dúvida a tela abre em pessoal, com o seletor à vista (PRD meu-negocio). vale
+   para a proposta do assistente e para o dinheiro lido no campo do início */
+const bookOf = (book) => (book === "business" ? "business" : "personal");
 const APP_FIELD_TYPES = "uuid, text, int, decimal, money, bool, date, timestamp, email, enum, json, file, ref";
 const APP_RULES =
   "Você é arquiteto de produto e de software. Pense como quem vai construir de verdade, em Postgres. " +
@@ -1167,13 +1169,14 @@ const CAPTURE_TASKS = {
       "Para money, além de title e date: amount = o valor em centavos (\"45\" é 4500, \"3 mil\" é 300000; 0 se a linha não diz o valor — nunca estime); flow = out para gasto, in para entrada; " +
       "category = o nome exato de uma das categorias listadas que caiba, senão vazio; paid = true se já aconteceu, false se é para depois; " +
       "confirm = o id de um dos previstos listados quando a linha diz que pagou ou recebeu justamente aquele (\"paguei o aluguel\" e há um previsto \"aluguel\"), senão vazio; " +
-      "fixed = o id de um dos fixos listados quando a linha é a conta fixa do mês e não há previsto para ela, senão vazio. NUNCA invente id. " +
+      "fixed = o id de um dos fixos listados quando a linha é a conta fixa do mês e não há previsto para ela, senão vazio. NUNCA invente id; " +
+      "book = business quando o dinheiro é da empresa (a linha diz \"a empresa\", \"PJ\", \"na empresa\" ou cita um dos clientes listados), senão personal — e personal na dúvida, que a tela pergunta. " +
       "Para habit, só estes campos: habit = o nome exato de um dos hábitos listados que a linha cita (\"treinei\" e há \"treinar\"), senão vazio; name = o hábito como a pessoa disse, curto (\"yoga\"); date = o dia em que fez, AAAA-MM-DD (\"ontem\"); sem data, hoje. " +
       "Para sleep, só estes campos: min = os minutos dormidos (\"7h\" é 420, \"7h e meia\" é 450; 0 se a linha não diz as horas — nunca estime); date = o dia em que a pessoa ACORDOU, AAAA-MM-DD (\"dormi 7h\" é hoje, \"ontem dormi 6h\" é ontem). " +
       "Para workout, só estes campos: title = o que treinou, curto e na grafia da pessoa (\"perna\", \"corrida\"), sem a duração e a data, ou vazio; min = os minutos de treino (\"1h\" é 60; 0 se a linha não diz — nunca estime); date = o dia em que treinou, AAAA-MM-DD (\"ontem\"); sem data, hoje. " +
       "Para meal, só estes campos: meal = breakfast (café da manhã), lunch (almoço), snack (lanche) ou dinner (jantar); quando a linha não diz a refeição, escolha pela hora de agora: antes das 11 breakfast, até as 15 lunch, até as 18 snack, depois dinner; text = o que comeu, curto e na grafia da pessoa (\"salada\"), sem a refeição e a data; date = o dia em que comeu, AAAA-MM-DD (\"ontem\"); sem data, hoje. Nunca fale de caloria. " +
       "Nunca invente item que a linha não diz. Se a linha inteira for uma pergunta, devolva items vazio. " +
-      'Formato: {"items":[{"kind":"task","title":"…","min":45,"guess":false,"date":"AAAA-MM-DD","at":"","client":""},{"kind":"money","title":"almoço","amount":4500,"flow":"out","category":"","date":"AAAA-MM-DD","paid":true,"confirm":"","fixed":""},{"kind":"habit","habit":"treinar","name":"treinar","date":"AAAA-MM-DD"},{"kind":"sleep","min":420,"date":"AAAA-MM-DD"},{"kind":"workout","title":"perna","min":40,"date":"AAAA-MM-DD"},{"kind":"meal","meal":"lunch","text":"salada","date":"AAAA-MM-DD"}]}',
+      'Formato: {"items":[{"kind":"task","title":"…","min":45,"guess":false,"date":"AAAA-MM-DD","at":"","client":""},{"kind":"money","title":"almoço","amount":4500,"flow":"out","category":"","date":"AAAA-MM-DD","paid":true,"confirm":"","fixed":"","book":"personal"},{"kind":"habit","habit":"treinar","name":"treinar","date":"AAAA-MM-DD"},{"kind":"sleep","min":420,"date":"AAAA-MM-DD"},{"kind":"workout","title":"perna","min":40,"date":"AAAA-MM-DD"},{"kind":"meal","meal":"lunch","text":"salada","date":"AAAA-MM-DD"}]}',
     context:
       "Linha: " + String(c.text || "").slice(0, 600) + "\n" +
       "Hoje: " + String(c.today || "").slice(0, 40) + " · agora " + String(c.hour || "").slice(0, 5) + "\n" +
@@ -1194,7 +1197,10 @@ const moneyRefs = (label, list) => {
 };
 /* o dinheiro lido: nada do que a IA devolve vira referencia sem bater com o
    que o navegador mandou. o pago sai da data, e nao da IA: hoje ou antes e
-   pago, depois de hoje e previsto — a mesma regra do paidOf (finance-data.js) */
+   pago, depois de hoje e previsto — a mesma regra do paidOf (finance-data.js).
+   o livro vem da IA e é só uma sugestão: qualquer coisa que não seja "business"
+   é pessoal, e a tela mostra o seletor antes de gravar. os previstos e fixos
+   que o navegador mandou são os do livro pessoal, então no da empresa não valem */
 const MAX_AMOUNT = 100000000;
 function cleanMoney(x, c) {
   const base = /^\d{4}-\d{2}-\d{2}/.test(String(c.today || "")) ? String(c.today).slice(0, 10) : new Date().toISOString().slice(0, 10);
@@ -1202,16 +1208,18 @@ function cleanMoney(x, c) {
   const amount = Math.round(+x.amount);
   const ids = (list) => refsOf(list).map((r) => String(r.id));
   const categories = arr(c.categories, 30).map(String);
+  const book = bookOf(x.book);
   return {
     kind: "money",
+    book,
     title: cut(x.title, 120).trim(),
     amount: Number.isFinite(amount) ? Math.max(0, Math.min(MAX_AMOUNT, amount)) : 0,
     flow: x.flow === "in" ? "in" : "out",
     category: categories.includes(String(x.category)) ? String(x.category) : "",
     date,
     paid: date <= base,
-    confirm: x.confirm && ids(c.planned).includes(String(x.confirm)) ? String(x.confirm) : "",
-    fixed: x.fixed && ids(c.fixed).includes(String(x.fixed)) ? String(x.fixed) : ""
+    confirm: book === "personal" && x.confirm && ids(c.planned).includes(String(x.confirm)) ? String(x.confirm) : "",
+    fixed: book === "personal" && x.fixed && ids(c.fixed).includes(String(x.fixed)) ? String(x.fixed) : ""
   };
 }
 /* o habito lido: o nome so vale se estava na lista que o navegador mandou
