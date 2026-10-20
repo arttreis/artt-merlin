@@ -412,7 +412,28 @@ tem **frequência** e um **registro por dia**.
   moram dentro do hábito porque um mês inteiro cabe em poucos bytes e um hábito é editado
   por uma pessoa só.
 
-### 4.10 Planos (`plans.html`) — a construir
+### 4.10 Planos (`plans.html`)
+
+**Atualização de 20/10/2026:** o plano voltou como a primeira aba de **meu negócio**, e o que
+está abaixo desta nota é o desenho antigo, que nunca teve documento em produção (§9.3). O novo
+(`docs/prd/meu-negocio.md`, D4) muda o que ficava de fora de propósito: o que matou os planos foi
+não ter número nem retorno.
+
+- **Três horizontes**: uma meta-norte no **ano**, uma no **semestre** e até **três** no
+  **trimestre** (o "+" some na terceira: "três já é muito para um trimestre"). O trimestre fica
+  aberto, com navegação; o ano e o semestre são uma linha cada, com barra. Mês e semana ficam com
+  o calendário.
+- **A meta se mede sozinha** quando escolhe uma fonte: faturamento do caixa da empresa, clientes
+  ativos, leads fechados, produto lançado (sim ou não) ou pessoas no time. "À mão" é permitido, e
+  marcado como tal.
+- **O verbo**: "meta do tri: 10 clientes" na conversa vira a proposta `goal-set`, que confirma
+  "✓ meta do 4º tri · 10 clientes ativos (hoje 6)".
+- Coleção `plans`, agora um documento por meta: `{id, kind:'year'|'half'|'quarter',
+  period:'2026'|'2026-H2'|'2026-Q4', text, source, target, current, done}`. Os documentos antigos
+  (mês, semana, o trimestre com checklist) são ignorados, e não apagados.
+- Fora: OKR em cascata, metas filhas, revisão de período e lembretes.
+
+O desenho antigo, de 2026-09:
 
 O mesmo pedido: planejamento **trimestral, mensal e semanal**, com "o que está aberto no meu
 trimestre / no meu mês / na minha semana" visível de um lugar só.
@@ -839,6 +860,11 @@ coleção `journal` de antes.
 `journal`. O bloco do Hoje e o "fechar o dia" ficam como estão, e a busca leva ao cartão do
 dia. Texto de diário nunca vai ao retrato (`docs/prd/saude-completa.md`, D3).
 
+**Atualização de 20/10/2026, mais tarde:** o plano também voltou, como a primeira aba de meu
+negócio (`plans.html`), e não como o checklist que saiu: ano, semestre e até três metas no
+trimestre, cada uma com número que se mede sozinho (§4.10; `docs/prd/meu-negocio.md`, D4). A
+coleção é a mesma `plans`; os documentos antigos ficam guardados e não aparecem.
+
 ### 9.4 Uma regra só para escrever
 
 O `Ctrl+K` virou o campo de tudo, em qualquer tela (`routeLine` no `tasks.js`, com teste):
@@ -1043,6 +1069,7 @@ entregou a landing"): cadastro leve de quem trabalha com você, com o custo, que
 caixa da empresa, e as entregas que o dono anota. Sem horas, ponto, ranking nem login; "saiu do
 time" arquiva e mantém as entregas. O plano e a operação entram na mesma área, na ordem plano,
 caixa, time, operação; vendas continua no inbox (D1).
+O **plano** entrou no mesmo dia, como a primeira aba (D4, §4.10).
 
 A **operação** (D6) é a última aba: os processos recorrentes da empresa ("emitir notas · todo dia
 5"), e marcar feito vale pelo período. Operação é **prazo, não tempo**: a rotina diz quando se

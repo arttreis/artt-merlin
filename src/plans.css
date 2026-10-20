@@ -1,0 +1,24 @@
+/* merlin · o CSS desta pagina
+   importado logo depois do base.css: primeiro o comum, depois o da pagina. */
+
+/* uma meta: a frase (que abre a caixa) e de onde vem o número, e embaixo a
+   barra com "6/10". em 390px a frase quebra e a barra encolhe; nada rola
+   para o lado */
+.pl-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+.pl-north{margin-bottom:var(--pd)}
+.pl-goal{display:flex;flex-direction:column;gap:8px;padding:11px 12px;border:1px solid var(--line-soft);border-radius:var(--br2);background:var(--fill);min-width:0}
+.pl-goal--empty{background:none;border-style:dashed}
+.pl-goal__head{display:flex;align-items:baseline;gap:8px;min-width:0}
+.pl-goal--empty .pl-goal__head{align-items:center}
+.pl-goal__when{flex:none;font-size:11px;color:var(--ink-50);white-space:nowrap}
+.pl-goal__open{flex:1;min-width:0;padding:0;border:0;background:none;color:var(--ink);font:inherit;text-align:left;overflow-wrap:anywhere;cursor:pointer}
+.pl-goal__open:hover{text-decoration:underline;text-underline-offset:3px}
+.pl-goal__none{flex:1;min-width:0;font-size:13px;color:var(--ink-30)}
+.pl-goal__src{flex:none;font-size:11px;color:var(--ink-30);white-space:nowrap}
+.pl-goal__meter{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:10px}
+.pl-goal__num{font-size:12px;color:var(--ink);font-variant-numeric:tabular-nums;white-space:nowrap}
+/* "à mão": a marca de que o número não se mede sozinho */
+.pl-tag{flex:none;padding:1px 7px;border:1px dashed var(--line);border-radius:var(--br-pill);font-size:11px;color:var(--ink-50);white-space:nowrap}
+.pl-full{font-size:12px;color:var(--ink-50)}
+.pl-check{align-self:end;min-height:38px}
+@media (max-width:480px){.pl-goal__src{display:none}}

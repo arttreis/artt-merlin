@@ -1159,6 +1159,45 @@ check("conversa: a instrução cita team-add e team-delivery", /team-add/.test(c
   check("catálogo: as duas ações do time gravam na coleção team", spec("team-add") === "team" && spec("team-delivery") === "team", spec("team-add") + " " + spec("team-delivery"));
 }
 
+/* a conversa: o catálogo ganha goal-set (a meta de ano, semestre ou trimestre).
+   o horizonte e a fonte são listas fechadas: o que a IA mandar fora delas vira
+   "quarter" e "manual"; o período não vem da IA, é o de hoje, na tela */
+const askGoal = async (payload) => {
+  claudeAnswer = { stop_reason: "end_turn", content: [{ type: "text", text: JSON.stringify({ suggestions: [{ actionType: "goal-set", title: "meta do tri · 10 clientes", note: "", payload }], clarify: "" }) }] };
+  const res = await call("POST", "/merlin", { task: "assistant", context: { message: "minha meta do tri é fechar 10 clientes" } }, mealCookie);
+  return { status: res.status, body: await res.json() };
+};
+let goal13 = await askGoal({ kind: "quarter", source: "clients", target: 10, text: "dez clientes", id: "g1", period: "2020-Q1", hack: "<script>", amount: 4500 });
+check("conversa: goal-set entra no catálogo", goal13.status === 200 && goal13.body.suggestions.length === 1 && goal13.body.suggestions[0].actionType === "goal-set", JSON.stringify(goal13.body));
+check("conversa: a proposta só tem kind, source, target e text (id, period e lixo somem)", goal13.body.suggestions[0] && Object.keys(goal13.body.suggestions[0].payload).sort().join() === "kind,source,target,text", JSON.stringify(goal13.body.suggestions[0] && goal13.body.suggestions[0].payload));
+const gp = goal13.body.suggestions[0] && goal13.body.suggestions[0].payload;
+check("conversa: os campos guardam o que a IA propôs", gp && gp.kind === "quarter" && gp.source === "clients" && gp.target === 10 && gp.text === "dez clientes", JSON.stringify(gp));
+check("conversa: a instrução cita goal-set e a meta do tri", /goal-set/.test(claudeAsked) && /meta do tri/.test(claudeAsked), String(claudeAsked).slice(0, 300));
+check("conversa: os outros tipos continuam no catálogo", ["workout-log", "sleep-log", "finance-entry", "meal-log", "habit-mark", "lead-update"].every((t) => claudeAsked.includes(t)));
+for (const k of ["year", "half", "quarter"]) {
+  goal13 = await askGoal({ kind: k, source: "manual", target: 3, text: "x" });
+  check("meta: kind " + k + " fica", goal13.body.suggestions[0] && goal13.body.suggestions[0].payload.kind === k, JSON.stringify(goal13.body.suggestions[0] && goal13.body.suggestions[0].payload));
+}
+for (const k of ["month", "week", "decade", "", 7]) {
+  goal13 = await askGoal({ kind: k, source: "clients", target: 3, text: "x" });
+  check("meta: kind fora de year/half/quarter (" + JSON.stringify(k) + ") vira quarter", goal13.body.suggestions[0] && goal13.body.suggestions[0].payload.kind === "quarter", JSON.stringify(goal13.body.suggestions[0] && goal13.body.suggestions[0].payload));
+}
+for (const s of ["clients", "revenue", "won", "launched", "team", "manual"]) {
+  goal13 = await askGoal({ kind: "quarter", source: s, target: 3, text: "x" });
+  check("meta: source " + s + " fica", goal13.body.suggestions[0] && goal13.body.suggestions[0].payload.source === s, JSON.stringify(goal13.body.suggestions[0] && goal13.body.suggestions[0].payload));
+}
+for (const s of ["magia", "", 3]) {
+  goal13 = await askGoal({ kind: "quarter", source: s, target: 3, text: "x" });
+  check("meta: source desconhecida (" + JSON.stringify(s) + ") vira manual", goal13.body.suggestions[0] && goal13.body.suggestions[0].payload.source === "manual", JSON.stringify(goal13.body.suggestions[0] && goal13.body.suggestions[0].payload));
+}
+goal13 = await askGoal({ kind: "quarter", source: "clients", target: "12", text: "x" });
+check("meta: target em texto vira número", goal13.body.suggestions[0] && goal13.body.suggestions[0].payload.target === 12, JSON.stringify(goal13.body.suggestions[0] && goal13.body.suggestions[0].payload));
+for (const t of [-5, "abc"]) {
+  goal13 = await askGoal({ kind: "quarter", source: "clients", target: t, text: "x" });
+  const tp = goal13.body.suggestions[0] && goal13.body.suggestions[0].payload;
+  check("meta: target inválido (" + JSON.stringify(t) + ") vira número >= 0", tp && typeof tp.target === "number" && tp.target >= 0 && !Number.isNaN(tp.target), JSON.stringify(tp));
+}
+
 /* ---- 13f. o teto do conselheiro ----
    a chave da Anthropic e uma so para o time. o teto e por pessoa e por hora:
    quem gastou espera, e quem esta ao lado nao paga por isso. */

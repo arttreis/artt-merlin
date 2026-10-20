@@ -1292,7 +1292,7 @@ const dataLeft = () => globalThis.localStorage.keys().filter((k) => k in DATA);
       ["apps", "produtos", "apps.html"], ["content", "conteúdo", "content.html"],
       ["funnels", "funis", "funnels.html"], ["maps", "mapas", "maps.html"]
     ]],
-    ["business", "meu negócio", "business", [["cash", "caixa", "cash.html"], ["team", "time", "team.html"], ["ops", "operação", "ops.html"]]],
+    ["business", "meu negócio", "business", [["plans", "plano", "plans.html"], ["cash", "caixa", "cash.html"], ["team", "time", "team.html"], ["ops", "operação", "ops.html"]]],
     ["organization", "organização", "calendar", [
       ["calendar", "calendário", "calendar.html"], ["routine", "rotina", "routine.html"], ["notes", "notas", "notes.html"]
     ]],
@@ -1309,7 +1309,7 @@ const dataLeft = () => globalThis.localStorage.keys().filter((k) => k in DATA);
     const got = (SECTIONS.find((s) => s.id === id) || { pages: [] }).pages.map((p) => [p.id, p.label, p.href]);
     check("áreas: as abas de " + id + ", na ordem", JSON.stringify(got) === JSON.stringify(tabs), JSON.stringify(got));
   });
-  check("áreas: são dezenove abas", PAGES.length === 19, String(PAGES.length));
+  check("áreas: são vinte abas", PAGES.length === 20, String(PAGES.length));
   check("áreas: o diário é uma aba de saúde", sectionOf("journal")?.id === "health", String(sectionOf("journal")?.id));
   check("áreas: só o diário sai do dock no celular (spare), e a alimentação fica", PAGES.filter((p) => p.spare).map((p) => p.id).join() === "journal", PAGES.filter((p) => p.spare).map((p) => p.id).join());
   check("áreas: a vitrine não está em nenhuma", !PAGES.some((p) => p.id === "wishlist") && !PAGES.some((p) => /wishlist/.test(p.href)));
@@ -1322,6 +1322,7 @@ const dataLeft = () => globalThis.localStorage.keys().filter((k) => k in DATA);
   check("áreas: finanças fica em money", sectionOf("finance")?.id === "money", String(sectionOf("finance")?.id));
   check("áreas: o caixa fica em meu negócio", sectionOf("cash")?.id === "business", String(sectionOf("cash")?.id));
   check("áreas: o time fica em meu negócio", sectionOf("team")?.id === "business", String(sectionOf("team")?.id));
+  check("áreas: o plano abre meu negócio", sectionOf("plans")?.id === "business" && sectionOf("plans").pages[0].id === "plans", String(sectionOf("plans")?.id));
   check("áreas: conteúdo fica em trabalho", sectionOf("content")?.id === "work", String(sectionOf("content")?.id));
   check("áreas: clientes fica no inbox", sectionOf("clients")?.id === "inbox", String(sectionOf("clients")?.id));
   check("áreas: rotina fica em organização", sectionOf("routine")?.id === "organization", String(sectionOf("routine")?.id));
