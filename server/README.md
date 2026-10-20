@@ -74,11 +74,12 @@ Essa chave é **uma só para o time**, e por isso a rota tem teto, por pessoa e
 por hora, contado na tabela `advice` em três cotas separadas (`QUOTA`, no worker):
 
 - **conselho**: 30 (`ADVICE_PER_HOUR`), no Opus. Inclui as perguntas antes de
-  montar um funil, app, mapa ou planilha: o fluxo de montagem inteiro gasta uma vez daqui.
+  montar um funil, app, mapa, planilha ou apresentação: o fluxo de montagem inteiro gasta uma vez daqui.
 - **leitura do início**: 60 (`CAPTURE_PER_HOUR`), no Haiku: o campo da home
   separando tarefa, data, hora, nota e dinheiro (gasto ou entrada).
 - **montagem**: 40 (`BUILD_PER_HOUR`), no Opus: o rascunho e cada ajuste de um
-  funil, app, mapa ou planilha montado na conversa.
+  funil, app, mapa, planilha ou apresentação montado na conversa, e cada ajuste de uma
+  apresentação ou planilha aberta pedido pelo "pedir ao Merlin" do editor.
 
 Quem estourar espera; quem está ao lado não paga por isso.
 
@@ -91,7 +92,13 @@ navegador (`src/shared/portrait.js`) e mandado em `context.portrait`. O Worker c
 retrato em 6.000 caracteres (o `pageContext` continua com 1.200), descarta-o em qualquer
 outra tarefa e não lê documento nenhum para montá-lo. A exceção é a montagem de um tipo com
 `cash` em `BUILD_KINDS` (a planilha): quando o pedido cita o caixa, a tela manda só as seções
-dinheiro e negócio, e o Worker as aceita cortadas em 1.500 caracteres (`BUILD_PORTRAIT_MAX`). A resposta traz `sources`, filtrado
+dinheiro e negócio, e o Worker as aceita cortadas em 1.500 caracteres (`BUILD_PORTRAIT_MAX`).
+O mesmo vale para `product` em `BUILD_KINDS` (a apresentação): quando o pedido nomeia um
+produto, a tela manda em `context.product` o que se sabe dele (o projeto de app, o funil e a
+oferta ligados, as metas do plano), cortado em 6.000 caracteres (`PRODUCT_MAX`) e descartado
+em qualquer outra tarefa. A apresentação montada tem de 3 a 12 slides (`DECK_MIN`,
+`DECK_MAX`; menos de 3 é 502); com `context.open` (o ajuste de um documento que já existe) o
+mínimo é 1. A resposta traz `sources`, filtrado
 por uma lista fechada, e o tamanho do retrato que foi (o já cortado) entra no
 `portrait=` da linha de medição de cada pedido, no `wrangler tail` (ver "A medição", abaixo).
 
@@ -246,8 +253,8 @@ com a pessoa). É a conta que diz o que cada tarefa custa; o teto (`advice`) só
 - **`task` é o que a pessoa fez, não só a rota**: `assistant:action` (a resposta trouxe
   proposta) ou `assistant:answer` (só `clarify`); `capture:<kind>`, uma linha por tipo de item
   devolvido (`capture:task`, `capture:note`), ou `capture:none` quando a lista vem vazia;
-  `build:<step>:<kind>` (`brief`, `draft`, `revise` × `funnel`, `app`, `map`, `sheet`:
-  `build:draft:sheet`); para as outras, o nome da tarefa (`week`, `app`…).
+  `build:<step>:<kind>` (`brief`, `draft`, `revise` × `funnel`, `app`, `map`, `sheet`, `deck`:
+  `build:draft:deck`); para as outras, o nome da tarefa (`week`, `app`…).
 - **Os tokens vêm do `usage` da resposta** e, numa captura que grava mais de uma linha, entram
   só na primeira, para a soma de tokens não contar o mesmo pedido duas vezes. Resposta sem
   `usage` soma o pedido e deixa os tokens como estavam.

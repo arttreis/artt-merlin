@@ -10,18 +10,25 @@
    aqui pelo askMerlin(), que traz a pergunta e o que aquela tela sabia.
 
    desde 10/10/2026 é aqui também que se monta com o Merlin um funil, um app,
-   um mapa ou uma planilha (shared/build.js): o pedido de montar vira uma
-   conversa curta — as perguntas que mudam o desenho, o rascunho, o ajuste em
-   palavras — e só vira documento quando a pessoa cria. */
+   um mapa, uma planilha ou uma apresentação (shared/build.js): o pedido de
+   montar vira uma conversa curta — as perguntas que mudam o desenho, o
+   rascunho, o ajuste em palavras — e só vira documento quando a pessoa cria.
+   e o "pedir ao Merlin" do editor da apresentação e da planilha chega aqui
+   com "na apresentação X, slide 3: " no campo: o ajuste daquele documento
+   aparece com o antes e o depois, e só vai para o editor com o toque. */
 import "./shared/base.css";
 import "./assistant.css";
-import { initPage, newId, notify, api, takeAsk, getCurrentPage, collection } from "./shared/core.js";
+import { initPage, newId, notify, api, takeAsk, getCurrentPage, collection, sendChange, dayOf } from "./shared/core.js";
 import { useState, useEffect, useRef } from "react";
 import { mount, useCollection, useHash, setHash, Markdown, ProposalDialog, HabitProposal, Hat, icon } from "./shared/ui.jsx";
 import { chatMood } from "./shared/hat.js";
 import { NAV_ICONS } from "./shared/icons.jsx";
 import { MAX_TURNS, normalizeChat, chatTitle, turnsOf, markProposal, atBottom } from "./shared/assistant-actions.js";
-import { BUILD, buildIntent, answersText, draftView, docFromDraft, builtLine, citesCash, cashPortrait } from "./shared/build.js";
+import {
+  BUILD, buildIntent, answersText, draftView, docFromDraft, builtLine, citesCash, cashPortrait,
+  productNamed, productContext, adjustOf, draftOfDoc, fitsAdjust, applyDraft, adjustView
+} from "./shared/build.js";
+import { normalize as normalizeFinance } from "./shared/finance-data.js";
 /* o retrato vai em toda pergunta: é ele que faz "continuar na conversa"
    chegar sabendo o dia, "o que tenho quinta?" ter resposta e "posso gastar
    x?" sair pelo saldo sem abrir o financeiro antes */
@@ -180,8 +187,51 @@ function DraftCard({ draft, live, onCreate }) {
   );
 }
 
+/* o ajuste de um documento aberto: o antes e o depois do que mudou, e o
+   "aplicar", que leva a mudança para o editor. só o último é vivo; aplicado,
+   vira a linha "✓ o Merlin mudou o slide 3 · abrir" */
+function AdjustCard({ adjust, live, onApply }) {
+  const b = BUILD[adjust.kind];
+  if (adjust.applied) return <p className="chat__done">✓ {adjust.line} · <a href={b.href + adjust.id}>abrir</a></p>;
+  if (!live || !adjust.before || !adjust.after) {
+    return <p className="build__old">ajuste {b.of} {adjust.name}{adjust.summary ? " — " + adjust.summary : ""}</p>;
+  }
+  const v = adjustView(adjust.kind, adjust.before, adjust.after);
+  return (
+    <div className="build is-draft">
+      <p className="build__eyebrow t-mono">{icon("spark")}ajuste {b.of}</p>
+      <h3 className="build__title">{adjust.name}</h3>
+      <dl className="build__lines build__diff">
+        {v.pairs.map((p, i) => (
+          <div key={i}>
+            <dt>{p.label}</dt>
+            <dd>
+              <span className="build__before">antes: {p.before || "—"}</span>
+              <span className="build__after">depois: {p.after || (adjust.kind === "deck" ? "sai" : "—")}</span>
+            </dd>
+          </div>
+        ))}
+      </dl>
+      {v.more > 0 && <p className="build__more">e mais {v.more} {v.more === 1 ? "mudança" : "mudanças"}</p>}
+      {adjust.summary && <p className="build__summary">{adjust.summary}</p>}
+      <div className="build__actions">
+        <span className="build__hint">nada muda até você aplicar</span>
+        <button type="button" className="pill pill--accent" onClick={onApply}>{icon("check")}aplicar</button>
+      </div>
+    </div>
+  );
+}
+
 function Assistant() {
   const chats = useCollection("chats", { normalize: normalizeChat });
+  /* o que o Merlin sabe de um produto, para a apresentação dele: o projeto
+     de app, o funil e a oferta ligados e as metas do plano (shared/build.js) */
+  const apps = useCollection("apps");
+  const funnels = useCollection("funnels");
+  const plans = useCollection("plans");
+  const finance = useCollection("finance", { normalize: normalizeFinance });
+  const clients = useCollection("clients");
+  const team = useCollection("team");
   /* o cartão do "o que falta hoje?" lê as mesmas coleções do início */
   const tasks = useCollection("tasks", { normalize: normalizeTask });
   const sessions = useCollection("sessions");
@@ -211,6 +261,7 @@ function Assistant() {
   const flow = flowOn ? flowOf(messages) : null;
   /* só o último cartão da conversa é ao vivo: o de ontem não mostra a lista de hoje */
   const lastCard = messages.map((m) => m.show === "quests").lastIndexOf(true);
+  const lastAdjust = messages.map((m) => !!m.adjust).lastIndexOf(true);
 
   /* o chapéu reage ao que acabou de chegar por um instante e volta */
   const feelTimer = useRef(0);
@@ -228,7 +279,10 @@ function Assistant() {
     /* só o último rascunho guarda o desenho inteiro: um app são dezenas de
        KB, e a conversa é um documento que sobe para a nuvem */
     const lastDraft = all.map((m) => !!m.draft).lastIndexOf(true);
-    const list = all.map((m, i) => (m.draft && i !== lastDraft && m.draft.data ? { ...m, draft: { ...m.draft, data: null } } : m));
+    const lastAdjust = all.map((m) => !!m.adjust).lastIndexOf(true);
+    const list = all.map((m, i) => (m.draft && i !== lastDraft && m.draft.data ? { ...m, draft: { ...m.draft, data: null } }
+      : m.adjust && i !== lastAdjust && (m.adjust.before || m.adjust.after) ? { ...m, adjust: { ...m.adjust, before: null, after: null } }
+      : m));
     setMessages(list);
     if (!list.length) return;
     if (!idRef.current) { idRef.current = newId(); setHash(idRef.current); }
@@ -258,9 +312,13 @@ function Assistant() {
   /* ---------- montar com o Merlin ---------- */
   /* a planilha que cita o caixa leva o dinheiro e o negócio do retrato, e só
      eles (shared/build.js) */
+  const productOf = (app) => productContext(app, { funnels: funnels.all(), plans: plans.all(), finance: finance.all(), clients: clients.all(), team: team.all() }, dayOf(new Date()));
   const callBuild = async (context) => {
     try {
       if (BUILD[context.kind].cash && citesCash(context.request)) context = { ...context, portrait: cashPortrait(await portrait()) };
+      /* a apresentação que nomeia um produto leva o que se sabe dele */
+      const named = BUILD[context.kind].product && !context.product ? productNamed(context.request, apps.all()) : null;
+      if (named) context = { ...context, product: productOf(named) };
       const r = await api("/merlin", { method: "POST", body: JSON.stringify({ task: "build", context }) });
       if (r.ok) return { body: r.body };
       return { error: r.status === 401 ? "entre para usar o Merlin" : (r.body && r.body.error) || "não consegui montar isso agora" };
@@ -314,7 +372,9 @@ function Assistant() {
   /* com linha de pronto (a planilha), a conversa fica e a linha abre o que
      foi criado; sem ela, vai direto para a tela dele */
   const create = (d) => {
-    const { collection: name, doc, href } = docFromDraft(d.kind, d.data, newId);
+    /* a apresentação já nasce ligada ao produto que o pedido nomeou */
+    const named = BUILD[d.kind].product ? productNamed(d.request, apps.all()) : null;
+    const { collection: name, doc, href } = docFromDraft(d.kind, named ? { ...d.data, app: String(named.id || "") } : d.data, newId);
     collection(name).save(doc);
     const line = builtLine(d.kind, doc);
     keep(messages.concat([{ from: "merlin", built: { kind: d.kind, id: doc.id, name: doc.name, line } }]));
@@ -322,9 +382,57 @@ function Assistant() {
     else location.href = href;
   };
 
+  /* ---------- ajustar o documento aberto ("pedir ao Merlin") ---------- */
+  /* o documento do "na apresentação X": o que o editor mandou, se o nome
+     confere, ou o mais recente com aquele nome */
+  const docOf = (adj) => {
+    const all = collection(BUILD[adj.kind].collection).all();
+    const same = (d) => String(d.name || "").trim().toLowerCase() === adj.name.toLowerCase();
+    const t = fromRef.current && fromRef.current.target;
+    return (t && t.kind === adj.kind && all.find((d) => d.id === t.id && same(d)))
+      || all.filter(same).sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0))[0] || null;
+  };
+  const adjust = async (doc, adj, message) => {
+    const kind = adj.kind;
+    const mine = messages.concat([{ from: "me", text: message }]);
+    keep(mine);
+    setInput("");
+    if (!fitsAdjust(kind, doc)) {
+      keep(mine.concat([{ from: "merlin", text: kind === "deck"
+        ? "essa apresentação passou de 12 slides: por enquanto o Merlin só ajusta pela conversa uma de até 12"
+        : "essa planilha passou de 40 linhas ou 10 colunas: por enquanto o Merlin só ajusta pela conversa uma até esse tamanho" }]));
+      feel("confused");
+      return;
+    }
+    setThinking(WAIT.revise);
+    const app = kind === "deck" && doc.app ? apps.get(doc.app) : null;
+    const r = await callBuild({ kind, step: "revise", request: message, draft: draftOfDoc(kind, doc), change: message, open: true, ...(app ? { product: productOf(app) } : {}) });
+    setThinking(false);
+    if (r.error) { keep(mine.concat([{ from: "merlin", text: r.error }])); feel("confused"); return; }
+    const after = applyDraft(kind, doc, r.body.draft, newId);
+    const v = adjustView(kind, doc, after);
+    if (!v.pairs.length) { keep(mine.concat([{ from: "merlin", text: "o Merlin não achou o que mudar " + BUILD[kind].the.replace(/^(.)/, "n$1") + "; pode dizer de outro jeito?" }])); feel("confused"); return; }
+    keep(mine.concat([{ from: "merlin", adjust: { kind, id: doc.id, name: doc.name, slide: adj.slide, summary: r.body.summary || "", line: v.line, applied: false, before: doc, after } }]));
+    feel("done");
+  };
+  /* o toque em "aplicar": a mudança vai para o editor, que a aplica como um
+     passo do desfazer e avisa (shared/core.js, sendChange) */
+  const applyAdjust = (i) => {
+    const a = messages[i].adjust;
+    const v = adjustView(a.kind, a.before, a.after);
+    sendChange(a.kind, a.id, a.after, v.line, v.at);
+    keep(messages.map((m, j) => (j === i ? { ...m, adjust: { ...a, applied: true } } : m)));
+    location.href = BUILD[a.kind].href + a.id;
+  };
+
   const ask = async (text, mode) => {
     const message = String(text || "").trim();
     if (!message || thinking) return;
+    /* "na apresentação X, slide 3: …" de um documento que existe é o ajuste
+       dele, antes de tudo; sem documento com esse nome, é conversa */
+    const adj = adjustOf(message);
+    const target = adj && docOf(adj);
+    if (target) { adjust(target, adj, message); return; }
     const said = mode !== undefined ? mode : start;
     /* o que está em montagem pega o texto antes de tudo: é a resposta às
        perguntas ou o ajuste do rascunho. sair da montagem é o x do selo */
@@ -417,7 +525,7 @@ function Assistant() {
     if (started.current) return;
     started.current = true;
     const from = takeAsk();
-    if (from && from.message && from.message.trim()) {
+    if (from && from.message && from.message.trim() && !from.prefill) {
       fromRef.current = from;
       ask(from.message);
       return;
@@ -503,6 +611,8 @@ function Assistant() {
                   <div key={i} className={"chat__msg" + (m.from === "me" ? " is-me" : "")}>
                     {m.brief
                       ? <BriefCard brief={m.brief} live={!!flow && flow.at === i && !thinking} onAnswer={(a) => answerBrief(i, a)} />
+                      : m.adjust
+                      ? <AdjustCard adjust={m.adjust} live={i === lastAdjust && !thinking} onApply={() => applyAdjust(i)} />
                       : m.draft
                       ? <DraftCard draft={m.draft} live={!!flow && flow.at === i && !thinking} onCreate={() => create(m.draft)} />
                       : m.built

@@ -625,6 +625,10 @@ Não é Excel: a conversa monta, a página ajusta.
   conversa. Teto de 40 linhas × 10 colunas: a conversa monta o começo, a página cresce. Quando o
   pedido cita o caixa ("planilha do meu fluxo de caixa"), vão junto só as seções dinheiro e
   negócio do retrato, como valor inicial: é cópia, não ligação.
+- **Pedir ao Merlin** no topo do editor abre a conversa com "na planilha X: " no campo. O ajuste
+  volta com as células que mudaram, antes e depois, e só entra com o toque em "aplicar": no
+  editor ele é um passo do desfazer, com o aviso "o Merlin mudou a planilha · desfazer". Até 40
+  linhas × 10 colunas; uma maior ainda não se ajusta pela conversa.
 - Sem gráfico, formatação de célula, várias folhas, `.xlsx`, importar CSV nem ligação viva com o
   caixa.
 
@@ -654,6 +658,16 @@ PowerPoint: a conversa monta, a página ajusta.
   partir de 600px.
 - **Modelos** na tela vazia (D5): pitch do produto, lançamento, resultado do mês e proposta para
   cliente, um slide por pergunta; ou "em branco: uma capa, e só".
+- **Pela conversa** (D6): "monta uma apresentação do produto X em 6 slides" monta o rascunho na
+  conversa, que se confere pelos títulos dos slides, e "criar a apresentação" deixa a linha
+  "✓ apresentação pronta · 6 slides · abrir". De 3 a 12 slides, só os quatro layouts. Quando o
+  pedido nomeia um produto, vão junto o conceito e a primeira versão do projeto de app, o funil
+  e a oferta ligados e as metas do plano (até 6.000 caracteres), e a apresentação já nasce ligada
+  ao produto. O que o Merlin não sabe ele não inventa: deixa "…" para preencher.
+- **Pedir ao Merlin** no topo do editor abre a conversa com "na apresentação X, slide 3: " no
+  campo (o slide aberto). O ajuste volta com os slides que mudaram, antes e depois, e só entra
+  com o toque em "aplicar": no editor é um passo do desfazer (`Ctrl+Z`), com o aviso "o Merlin
+  mudou o slide 3 · desfazer". Até 12 slides.
 - Sem posição livre, imagem, animação, transição, temas, `.pptx` nem link para compartilhar.
 
 ## 5. Ordem de construção
