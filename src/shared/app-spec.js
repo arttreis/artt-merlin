@@ -528,6 +528,7 @@ export function toPrompt(app) {
     "---",
     "",
     toMarkdown(app),
+    ...[toWireframes(app)].filter(Boolean),
     "## SQL inicial (Postgres)",
     "",
     "```sql",
@@ -541,4 +542,80 @@ export function toPrompt(app) {
    o pedido tem teto e a especificacao inteira pode ser grande */
 export function digestOf(app) {
   return toMarkdown(app).slice(0, 9000);
+}
+
+/* ---------- o wireframe ----------
+   cada linha do que a tela tem vira um bloco desenhado, por palavra-chave e
+   sem IA (PRD desenhos, D2): "botão pagar" e botao, "lista de pedidos" e
+   lista, "filtro por status" e campo. o resto e texto. nao se edita o
+   wireframe: edita-se `parts`, e o desenho acompanha. */
+export const FRAME_W = 220, FRAME_H = 420;
+export const BLOCK_KINDS = [
+  { id: "button", label: "botão" },
+  { id: "list", label: "lista" },
+  { id: "input", label: "campo" },
+  { id: "heading", label: "título" },
+  { id: "image", label: "imagem" },
+  { id: "text", label: "texto" }
+];
+export const blockLabel = (id) => (BLOCK_KINDS.find((k) => k.id === id) || BLOCK_KINDS[5]).label;
+
+/* a ordem e a regra: "botão filtrar" e botao, nao campo. as palavras ja
+   vem sem acento, e casam no comeco da palavra ("fotos", "buscar"), nunca
+   no meio ("subtítulo" nao e titulo). */
+const BLOCK_RULES = [
+  ["button", ["botao", "btn"]],
+  ["list", ["lista", "tabela", "feed"]],
+  ["input", ["campo", "filtro", "busca", "input", "formulario"]],
+  ["heading", ["titulo", "cabecalho"]],
+  ["image", ["imagem", "foto", "avatar"]]
+];
+const plain = (s) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+
+export function wireframeOf(parts) {
+  const text = Array.isArray(parts) ? parts.map(String).join("\n") : typeof parts === "string" ? parts : "";
+  return text.split(/\r?\n/)
+    .map((line) => line.trim().replace(/^[-*•]\s+/, "").trim())
+    .filter(Boolean)
+    .map((line) => {
+      const words = plain(line).split(/[^a-z0-9]+/);
+      const rule = BLOCK_RULES.find(([, keys]) => keys.some((k) => words.some((w) => w.startsWith(k))));
+      return { kind: rule ? rule[0] : "text", label: line.slice(0, 120) };
+    });
+}
+
+/* a altura de cada bloco no desenho e o respiro entre eles; a moldura tem a
+   barra de status em cima e uma margem embaixo. o que nao cabe nao some em
+   silencio: vira "+ N" no pe da tela. */
+const BLOCK_H = { heading: 26, text: 18, input: 32, button: 34, image: 84, list: 82 };
+export const WIRE_PAD = 14, WIRE_TOP = 40, WIRE_GAP = 8, WIRE_BOTTOM = 28;
+export function placeWireframe(blocks) {
+  const items = [];
+  let y = WIRE_TOP;
+  for (const b of blocks) {
+    const h = BLOCK_H[b.kind] || BLOCK_H.text;
+    if (y + h > FRAME_H - WIRE_BOTTOM) break;
+    items.push({ ...b, y, h });
+    y += h + WIRE_GAP;
+  }
+  return { items, hidden: blocks.length - items.length };
+}
+
+/* o que o leitor de tela ouve: "tela Checkout: botão pagar, lista de pedidos" */
+export function wireframeLabel(screen) {
+  const labels = wireframeOf(screen.parts).map((b) => b.label);
+  return "tela " + screen.name + ": " + (labels.length ? labels.join(", ") : "vazia");
+}
+
+/* os blocos de cada tela, para o prompt: quem constroi ve o que vai onde */
+export function toWireframes(app) {
+  const screens = app.screens.map((s) => [s, wireframeOf(s.parts)]).filter(([, bs]) => bs.length);
+  if (!screens.length) return "";
+  const lines = ["## Wireframe das telas", "", "Cada tela de cima para baixo, como foi desenhada no Merlin.", ""];
+  screens.forEach(([s, bs]) => {
+    lines.push("### " + s.name, "");
+    bs.forEach((b) => lines.push("- [" + blockLabel(b.kind) + "] " + b.label));
+    lines.push("");
+  });
+  return lines.join("\n");
 }

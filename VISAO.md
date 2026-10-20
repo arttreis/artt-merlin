@@ -557,6 +557,13 @@ construir. O projeto de app é o mesmo desenho **com forma**.
   para outra entidade). Num palco: a seta sai do campo e chega na tabela apontada.
 - **Fluxos**: telas (o que é, o que tem, que dados usa, qual é a entrada) e as **ações** que levam
   de uma à outra. Puxar a bolinha de uma tela até outra cria a ação.
+- **Protótipo** (20/10/2026, PRD [desenhos](docs/prd/desenhos.md), D2): na aba fluxos, o
+  interruptor **caixas · telas** mostra cada tela como wireframe de baixa fidelidade, numa
+  moldura de celular. Cada linha do que a tela tem vira um bloco por palavra-chave, sem IA:
+  "botão…" é botão, "lista/tabela/feed…" são linhas, "campo/filtro/busca…" é campo,
+  "título…" é título, "imagem/foto…" é imagem, o resto é texto. **Navegar** começa na entrada e
+  as ações viram botões até o "fim deste caminho"; a tela em foco sai em PNG, e os blocos vão no
+  prompt do Claude Code. Não se edita o wireframe: edita-se o texto.
 - **Exportar**: o que falta antes de construir (relação sem alvo, tela que nenhum caminho
   alcança…) e cinco saídas — o prompt para o Claude Code, a especificação em markdown, o SQL do
   Postgres, o mermaid do banco e o dos fluxos.

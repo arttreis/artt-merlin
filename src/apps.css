@@ -238,6 +238,34 @@
 .ap-pieces a{font-size:13.5px;color:var(--ink)}
 .ap-pieces a:hover{color:var(--accent-ink)}
 
+/* ---------- caixas · telas: o interruptor de como ver os fluxos ---------- */
+.ap-seg{
+  display:inline-flex;padding:2px;gap:2px;
+  background:var(--fill);border:1px solid var(--line-soft);border-radius:var(--br-pill);
+}
+.ap-seg button{
+  height:28px;padding:0 13px;border-radius:var(--br-pill);border:0;background:none;
+  font-size:12.5px;color:var(--ink-30);cursor:pointer;transition:background var(--t),color var(--t);
+}
+.ap-seg button:hover{color:var(--ink-70)}
+.ap-seg button[aria-pressed="true"]{background:var(--surface);color:var(--ink);box-shadow:var(--sombra)}
+
+/* ---------- o wireframe: cada tela como celular ---------- */
+.ap-wires{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:clamp(14px,2.4vw,24px);align-items:start}
+.ap-wire{margin:0;display:flex;flex-direction:column;align-items:center;gap:8px;min-width:0}
+.ap-wire__open{display:block;width:100%;max-width:220px;padding:0;border:0;background:none;border-radius:26px;cursor:pointer;transition:transform var(--t)}
+.ap-wire__open:hover{transform:translateY(-2px)}
+.ap-wire__open:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+.ap-wire__svg{display:block;width:100%;height:auto;filter:drop-shadow(0 1px 2px rgba(0,0,0,.08))}
+.ap-wire__name{display:flex;align-items:center;gap:6px;max-width:100%;font-size:13px;font-weight:500;color:var(--ink-70);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ap-wire--focus .ap-wire__svg{width:min(300px,78vw)}
+
+.ap-nav{display:flex;flex-direction:column;align-items:center;gap:14px}
+.ap-nav__bar{display:flex;align-items:center;gap:var(--pd2);flex-wrap:wrap;width:100%}
+.ap-nav__path{font-size:12px;color:var(--ink-30);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ap-nav__actions{display:flex;flex-wrap:wrap;justify-content:center;gap:8px;max-width:520px}
+.ap-nav__end{margin:0;padding:6px 14px;border:1px dashed var(--line);border-radius:var(--br-pill);font-size:12.5px;color:var(--ink-50)}
+
 /* os dialogos daqui sao largos (a tabela de campos, o rascunho em tres
    colunas): centrados na tela inteira, a beirada esquerda caia embaixo da
    sidebar, que pinta por cima do <main>. aqui eles centram no conteudo. */
