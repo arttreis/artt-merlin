@@ -834,6 +834,11 @@ Nenhum dos dois teve um documento em produção. Os endereços encaminham para o
 coleções não foram apagadas. Do diário ficou a pergunta do fim do dia, que grava na mesma
 coleção `journal` de antes.
 
+**Atualização de 20/10/2026:** o diário voltou, como aba de saúde (`journal.html`). A página
+é o histórico: a semana em cartões, um por dia, editáveis ali, gravando na mesma coleção
+`journal`. O bloco do Hoje e o "fechar o dia" ficam como estão, e a busca leva ao cartão do
+dia. Texto de diário nunca vai ao retrato (`docs/prd/saude-completa.md`, D3).
+
 ### 9.4 Uma regra só para escrever
 
 O `Ctrl+K` virou o campo de tudo, em qualquer tela (`routeLine` no `tasks.js`, com teste):

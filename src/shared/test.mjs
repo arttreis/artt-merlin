@@ -551,6 +551,7 @@ const dataLeft = () => globalThis.localStorage.keys().filter((k) => k in DATA);
     check("o index.html decide a porta no <head>", !!door);
     const core = fs.readFileSync(path.join(root, "src", "shared", "core.js"), "utf8");
     const types = JSON.parse(core.match(/const PURGE_TYPES = (\[[^\]]*\])/)[1]);
+    check("o expurgo das frentes alcança o diário", types.includes("journal"), types.join(","));
     const headOpens = (seed) => {
       const added = [];
       const doc = { documentElement: { classList: { add: (c) => added.push(c) }, setAttribute: () => {} } };
@@ -1237,6 +1238,18 @@ const dataLeft = () => globalThis.localStorage.keys().filter((k) => k in DATA);
   check("a vitrine: buscar não regrava a coleção", globalThis.localStorage.getItem("merlin:wishlist") === wish);
 }
 
+/* ---- o diário na busca (ticket #62) ----
+   achar uma palavra do "como foi o dia" leva ao cartão daquele dia na página
+   do diário: journal.html#AAAA-MM-DD, e a página abre na semana certa. */
+{
+  const entry = (doc) => ({ v: 1000, doc: { createdAt: 1, updatedAt: 1, ...doc } });
+  const journal = JSON.stringify({ items: { "2026-10-19": entry({ id: "2026-10-19", body: "corri cedo, dia leve" }) }, serverV: 0, dirty: [], refused: {} });
+  const { search } = await fresh({ "merlin:journal": journal });
+  const hits = search("corri");
+  check("diário na busca: acha a palavra", hits.length === 1 && hits[0].label === "diário", JSON.stringify(hits));
+  check("diário na busca: leva ao cartão do dia", hits[0] && hits[0].href === "journal.html#2026-10-19", JSON.stringify(hits));
+}
+
 /* ---- as cinco áreas do menu (ticket #36) ----
    SECTIONS alimenta o menu do alto, o dock e o Ctrl+K. se uma página sumir de
    lá, ela fica sem porta; se estiver em duas áreas, o dock e o menu discordam
@@ -1250,7 +1263,7 @@ const dataLeft = () => globalThis.localStorage.keys().filter((k) => k in DATA);
   const { SECTIONS, PAGES, sectionOf } = await fresh({});
 
   const wanted = [
-    ["health", "saúde", "habits", [["habits", "hábitos", "habits.html"]]],
+    ["health", "saúde", "habits", [["habits", "hábitos", "habits.html"], ["journal", "diário", "journal.html"]]],
     ["work", "trabalho", "apps", [
       ["apps", "produtos", "apps.html"], ["content", "conteúdo", "content.html"],
       ["funnels", "funis", "funnels.html"], ["maps", "mapas", "maps.html"]
@@ -1271,7 +1284,8 @@ const dataLeft = () => globalThis.localStorage.keys().filter((k) => k in DATA);
     const got = (SECTIONS.find((s) => s.id === id) || { pages: [] }).pages.map((p) => [p.id, p.label, p.href]);
     check("áreas: as abas de " + id + ", na ordem", JSON.stringify(got) === JSON.stringify(tabs), JSON.stringify(got));
   });
-  check("áreas: são doze abas", PAGES.length === 12, String(PAGES.length));
+  check("áreas: são treze abas", PAGES.length === 13, String(PAGES.length));
+  check("áreas: o diário é uma aba de saúde", sectionOf("journal")?.id === "health", String(sectionOf("journal")?.id));
   check("áreas: a vitrine não está em nenhuma", !PAGES.some((p) => p.id === "wishlist") && !PAGES.some((p) => /wishlist/.test(p.href)));
 
   const pageIds = PAGES.map((p) => p.id);

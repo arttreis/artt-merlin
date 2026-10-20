@@ -1,8 +1,8 @@
 # O menu por área · os módulos saem da frente da conversa
 
-**Status:** 📝 Rascunho, decisões a revisar. A descoberta foi feita pelo orquestrador em
-2026-10-19, com autonomia dada pelo Arthur. Toda decisão marcada com **(orq.)** foi decidida pelo
-orquestrador e está **a revisar pelo Arthur**. As marcadas com **(Arthur)** já vieram decididas.
+**Status:** ✅ No ar e testado. A descoberta foi feita pelo orquestrador em 2026-10-19, com
+autonomia dada pelo Arthur. As decisões marcadas com **(orq.)** foram confirmadas pelo Arthur em
+2026-10-20, depois do teste em produção e no iPhone. As marcadas com **(Arthur)** já vieram decididas.
 Tickets publicados no milestone "o menu por área" (#36 a #39). As decisões viraram a seção 13 da
 [VISAO](../../VISAO.md), com notas nas seções 2, 9.1, 9.2, 9.4 e 10.
 **Owner:** Arthur Reis
