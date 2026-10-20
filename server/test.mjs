@@ -673,6 +673,136 @@ dk = await askDeck([], { step: "revise", open: true, draft: deckDraft1, change: 
 check("apresentação aberta: sem nenhum slide ainda é erro", dk.status === 502 && /rascunho vazio/.test(dk.body.error || ""), dk.status + " " + JSON.stringify(dk.body));
 db.advice.splice(0, db.advice.length, ...adviceSnapDeck);
 
+/* o protótipo na conversa (ticket #95): telas e ações de um trecho de um app que
+   já existe. cleanDraft devolve só { screens, flows }, com o teto de 12 telas, e o
+   app atual (context.spec) só sobe na montagem dele */
+const adviceSnapProto = db.advice.map((x) => ({ ...x }));
+claudeAnswer = { stop_reason: "end_turn", content: [{ type: "text", text: JSON.stringify({ questions: [{ q: "Qual trecho?", options: ["cadastro", "checkout"] }] }) }] };
+r = await call("POST", "/merlin", { task: "build", context: { kind: "prototype", step: "brief", request: "desenha o protótipo do cadastro do app Agenda", spec: "app: Agenda" } }, cookie);
+body = await r.json();
+check("protótipo: o passo brief pergunta antes", r.status === 200 && body.questions && body.questions.length === 1 && body.questions[0].options.length === 2, r.status + " " + JSON.stringify(body));
+check("protótipo: a pergunta leva o pedido e vai no Haiku", /protótipo do cadastro/.test(claudeAsked) && claudeModel === "claude-haiku-5-5/low", String(claudeAsked).slice(0, 200) + " " + claudeModel);
+
+const messyProtoScreen = {
+  name: "n".repeat(100), goal: "g".repeat(500), start: true, extra: "campo de fora", id: "inventado", x: 40,
+  parts: ["um", 5, null, "dois", { a: 1 }, "y".repeat(200), ...Array.from({ length: 30 }, (_, i) => "p" + i)]
+};
+const protoAnswer = {
+  screens: [
+    messyProtoScreen,
+    { name: "Cadastro", goal: "criar conta", parts: ["campo e-mail", "botão criar conta"] },
+    { name: "Confirmação" },
+    ...Array.from({ length: 14 }, (_, i) => ({ name: "extra " + i, parts: ["a"] })),
+    { name: "", goal: "sem nome", parts: ["x"] }, { goal: "sem nome nenhum" }, "texto solto", null, [1, 2], 7
+  ],
+  flows: [
+    { from: "f".repeat(100), to: "t".repeat(100), action: "a".repeat(200), id: "inventado", extra: 1 },
+    { from: "Cadastro", to: "Confirmação", action: "enviou" },
+    { from: "Cadastro", to: "Confirmação" },
+    ...Array.from({ length: 50 }, (_, i) => ({ from: "A" + i, to: "B" + i, action: "ação " + i })),
+    { from: "", to: "Cadastro", action: "sem origem" }, "texto solto", null
+  ],
+  summary: "trecho do cadastro"
+};
+claudeAnswer = { stop_reason: "end_turn", content: [{ type: "text", text: JSON.stringify(protoAnswer) }] };
+const protoBefore = spent(2);
+r = await call("POST", "/merlin", { task: "build", context: { kind: "prototype", step: "draft", request: "desenha o protótipo do cadastro do app Agenda", answers: "Qual trecho? cadastro", spec: "app: Agenda\ntela: Início (entrada)\nMARCA-DO-APP" } }, cookie);
+body = await r.json();
+const pScreens = (body.draft && body.draft.screens) || [];
+const pFlows = (body.draft && body.draft.flows) || [];
+check("protótipo: o passo draft devolve rascunho e resumo", r.status === 200 && body.draft && body.summary === "trecho do cadastro", r.status + " " + JSON.stringify(body).slice(0, 300));
+check("protótipo: o rascunho tem só screens e flows", body.draft && Object.keys(body.draft).sort().join() === "flows,screens", JSON.stringify(Object.keys(body.draft || {})));
+check("protótipo: o teto é de 12 telas", pScreens.length === 12, String(pScreens.length));
+check("protótipo: cada tela tem exatamente name, goal, parts e start", pScreens.every((s) => Object.keys(s).sort().join() === "goal,name,parts,start"), JSON.stringify(pScreens[1]));
+check("protótipo: o que o modelo inventou na tela não passa", !("extra" in pScreens[0]) && !("id" in pScreens[0]) && !("x" in pScreens[0]), JSON.stringify(Object.keys(pScreens[0] || {})));
+check("protótipo: nome até 60 e objetivo até 300", pScreens[0].name.length === 60 && pScreens[0].goal.length === 300, pScreens[0].name.length + "," + pScreens[0].goal.length);
+check("protótipo: start é booleano, e sem start é false", pScreens[0].start === true && pScreens[1].start === false && pScreens.every((s) => typeof s.start === "boolean"), JSON.stringify(pScreens.map((s) => s.start)));
+check("protótipo: parts fica só com as strings, até 20, cada uma até 120",
+  pScreens[0].parts.length === 20 && pScreens[0].parts[0] === "um" && pScreens[0].parts[1] === "dois" && pScreens[0].parts[2].length === 120 && pScreens[0].parts[3] === "p0"
+  && pScreens.every((s) => Array.isArray(s.parts) && s.parts.every((x) => typeof x === "string" && x.length <= 120 && x.length > 0 || x === "")), JSON.stringify(pScreens[0].parts.map((x) => x.slice(0, 6))));
+check("protótipo: tela sem parts fica com lista vazia", Array.isArray(pScreens[2].parts) && pScreens[2].parts.length === 0 && pScreens[2].name === "Confirmação", JSON.stringify(pScreens[2]));
+check("protótipo: as telas boas ficam na ordem em que vieram", pScreens[1].name === "Cadastro" && pScreens[2].name === "Confirmação" && pScreens[3].name === "extra 0" && pScreens.every((s) => s.name.trim()), pScreens.map((s) => s.name.slice(0, 8)).join("|"));
+check("protótipo: o teto é de 40 ações", pFlows.length === 40, String(pFlows.length));
+check("protótipo: cada ação tem exatamente from, to e action", pFlows.every((f) => Object.keys(f).sort().join() === "action,from,to" && typeof f.action === "string"), JSON.stringify(pFlows[1]));
+check("protótipo: from e to até 60, action até 120, e o campo de fora não passa", pFlows[0].from.length === 60 && pFlows[0].to.length === 60 && pFlows[0].action.length === 120 && !("id" in pFlows[0]) && !("extra" in pFlows[0]), JSON.stringify(pFlows[0]).slice(0, 120));
+check("protótipo: a ação sem gesto fica com action vazia", pFlows[2].from === "Cadastro" && pFlows[2].to === "Confirmação" && pFlows[2].action === "", JSON.stringify(pFlows[2]));
+check("protótipo: nenhuma ação sai sem origem ou sem destino", pFlows.every((f) => f.from && f.to), JSON.stringify(pFlows.slice(0, 5)));
+check("protótipo: o rascunho vai no Opus e conta na montagem", claudeModel === "claude-opus-5-5/medium" && spent(2) === protoBefore + 1, claudeModel + " " + spent(2));
+check("protótipo: a linha de log traz o tipo", /^merlin build:draft:prototype in=/.test(logged.at(-1)), logged.at(-1));
+check("protótipo: o pedido do rascunho leva o pedido e as respostas", /protótipo do cadastro do app Agenda/.test(claudeAsked) && /Qual trecho\? cadastro/.test(claudeAsked), String(claudeAsked).slice(0, 300));
+check("protótipo: o pedido fala em 12 (o teto de telas)", /12/.test(claudeMessages.at(-1).content), String(claudeMessages.at(-1).content).slice(0, 400));
+check("protótipo: o app atual sobe na montagem dele", claudeAsked.includes("MARCA-DO-APP") && claudeAsked.includes("tela: Início (entrada)"), String(claudeAsked).slice(0, 300));
+const protoDraft1 = body.draft;
+
+/* o texto do app sobe cortado em 8000 */
+claudeAnswer = { stop_reason: "end_turn", content: [{ type: "text", text: JSON.stringify(protoAnswer) }] };
+await call("POST", "/merlin", { task: "build", context: { kind: "prototype", step: "draft", request: "desenha o protótipo", spec: "§".repeat(9000) } }, cookie);
+check("protótipo: o app atual é cortado em 8000 caracteres", claudeAsked.includes("§".repeat(8000)) && !claudeAsked.includes("§".repeat(8001)), String((claudeAsked.match(/§+/) || [""])[0].length));
+
+/* o ajuste: o rascunho atual e o pedido, e o app também */
+claudeAnswer = { stop_reason: "end_turn", content: [{ type: "text", text: JSON.stringify({ screens: [{ name: "Cadastro", parts: ["campo e-mail"] }, { name: "Confirmação", parts: ["aviso"] }], flows: [{ from: "Cadastro", to: "Confirmação", action: "enviou" }], summary: "tirei o resto" }) }] };
+r = await call("POST", "/merlin", { task: "build", context: { kind: "prototype", step: "revise", request: "desenha o protótipo do cadastro", draft: protoDraft1, change: "deixa só o cadastro", spec: "MARCA-DO-APP" } }, cookie);
+body = await r.json();
+check("protótipo: o passo revise devolve outro rascunho", r.status === 200 && body.draft && body.draft.screens.length === 2 && body.draft.flows.length === 1 && body.summary === "tirei o resto", r.status + " " + JSON.stringify(body).slice(0, 300));
+check("protótipo: o ajuste manda o rascunho atual e o pedido", /Rascunho atual/.test(claudeAsked) && /extra 3/.test(claudeAsked) && /Ajuste pedido: deixa só o cadastro/.test(claudeAsked) && /AJUSTE/.test(claudeMessages.at(-1).content), String(claudeAsked).slice(0, 200));
+check("protótipo: o ajuste também leva o app", claudeAsked.includes("MARCA-DO-APP"));
+check("protótipo: a linha de log do ajuste traz o tipo", /^merlin build:revise:prototype in=/.test(logged.at(-1)), logged.at(-1));
+
+/* o piso e o teto: nenhum piso (1 tela basta), teto de 12 */
+const protoOf = (screens, flows, over) => async () => {
+  claudeAnswer = { stop_reason: "end_turn", content: [{ type: "text", text: JSON.stringify({ screens, flows: flows || [], summary: "ok" }) }] };
+  const res = await call("POST", "/merlin", { task: "build", context: { kind: "prototype", step: "draft", request: "desenha o protótipo", ...over } }, cookie);
+  return { status: res.status, body: await res.json() };
+};
+const tela = (len) => Array.from({ length: len }, (_, i) => ({ name: "tela " + i, parts: ["x"] }));
+let pr = await protoOf([])();
+check("protótipo: sem telas é erro de rascunho vazio", pr.status === 502 && /o Merlin devolveu um rascunho vazio; tente de novo/.test(pr.body.error || ""), pr.status + " " + JSON.stringify(pr.body));
+pr = await protoOf(["texto", null, 5, [1], { name: "" }, { goal: "só objetivo" }])();
+check("protótipo: só o que não é tela também é rascunho vazio", pr.status === 502 && /rascunho vazio/.test(pr.body.error || ""), pr.status + " " + JSON.stringify(pr.body));
+pr = await protoOf([], [{ from: "A", to: "B", action: "x" }])();
+check("protótipo: só ações, sem telas, é rascunho vazio", pr.status === 502 && /rascunho vazio/.test(pr.body.error || ""), pr.status + " " + JSON.stringify(pr.body));
+pr = await protoOf([{ name: "", goal: "sem nome", parts: ["x"] }, { goal: "sem nome nenhum" }, "texto", null, { name: "Só esta", parts: ["a"] }, 7])();
+check("protótipo: tela sem nome, ou que não é objeto, sai", pr.status === 200 && pr.body.draft.screens.length === 1 && pr.body.draft.screens[0].name === "Só esta", pr.status + " " + JSON.stringify(pr.body).slice(0, 200));
+pr = await protoOf([{ name: "A" }, { name: "B" }], [{ from: "", to: "B", action: "sem origem" }, { from: "A", to: "", action: "sem destino" }, { to: "B", action: "sem from" }, "texto", null, { from: "A", to: "B", action: "ok" }])();
+check("protótipo: ação sem origem ou sem destino, ou que não é objeto, sai", pr.status === 200 && pr.body.draft.flows.length === 1 && pr.body.draft.flows[0].action === "ok", pr.status + " " + JSON.stringify(pr.body).slice(0, 200));
+pr = await protoOf(tela(1))();
+check("protótipo: 1 tela passa", pr.status === 200 && pr.body.draft.screens.length === 1 && pr.body.draft.flows.length === 0, pr.status + " " + JSON.stringify(pr.body).slice(0, 200));
+pr = await protoOf(tela(12))();
+check("protótipo: 12 telas passam inteiras", pr.status === 200 && pr.body.draft.screens.length === 12, pr.status + " " + (pr.body.draft && pr.body.draft.screens.length));
+pr = await protoOf(tela(13))();
+check("protótipo: 13 telas voltam cortadas em 12", pr.status === 200 && pr.body.draft.screens.length === 12 && pr.body.draft.screens[11].name === "tela 11", pr.status + " " + (pr.body.draft && pr.body.draft.screens.length));
+pr = await protoOf(tela(30))();
+check("protótipo: 30 telas voltam cortadas em 12, as primeiras ficam", pr.status === 200 && pr.body.draft.screens.length === 12 && pr.body.draft.screens[0].name === "tela 0", pr.status + " " + (pr.body.draft && pr.body.draft.screens.length));
+pr = await protoOf(["lixo", ...tela(14)])();
+check("protótipo: o que não é tela, no começo da lista, não ocupa vaga das 12", pr.status === 200 && pr.body.draft.screens.length === 12 && pr.body.draft.screens[0].name === "tela 0", pr.status + " " + (pr.body.draft && pr.body.draft.screens.map((s) => s.name).join()));
+pr = await protoOf(tela(2), [], { step: "revise", draft: protoDraft1, change: "tira uma" })();
+check("protótipo: o ajuste também passa com poucas telas", pr.status === 200 && pr.body.draft.screens.length === 2, pr.status + " " + JSON.stringify(pr.body).slice(0, 200));
+db.advice.splice(0, db.advice.length, ...adviceSnapProto);
+
+/* o app atual só sobe na montagem do protótipo */
+const SEGREDO_APP = "SEGREDO-DO-APP-ATUAL-XYZ";
+const spec = { spec: SEGREDO_APP };
+const sends = async (kind, answer, step) => {
+  claudeAnswer = { stop_reason: "end_turn", content: [{ type: "text", text: JSON.stringify(answer) }] };
+  const res = await call("POST", "/merlin", { task: "build", context: { kind, step: step || "draft", request: "monta " + kind, ...spec } }, cookie);
+  return { status: res.status, leaked: JSON.stringify(claudeMessages).includes(SEGREDO_APP) || String(claudeSystem).includes(SEGREDO_APP) };
+};
+let leak = await sends("prototype", { screens: [{ name: "Início" }] });
+check("o app atual sobe na montagem do protótipo (a prova de que os testes abaixo enxergam)", leak.status === 200 && leak.leaked, String(leak.status));
+leak = await sends("funnel", { name: "Funil", stages: [{ nodeType: "ad", title: "anúncio" }, { nodeType: "lp", title: "página" }] });
+check("o app atual não sobe na montagem do funil", leak.status === 200 && !leak.leaked, String(leak.status));
+leak = await sends("sheet", { name: "Custos", cols: [{ name: "a", type: "text" }], rows: [["x"]] });
+check("o app atual não sobe na montagem da planilha", leak.status === 200 && !leak.leaked, String(leak.status));
+leak = await sends("deck", { name: "Pitch", slides: slidesOf(3) });
+check("o app atual não sobe na montagem da apresentação", leak.status === 200 && !leak.leaked, String(leak.status));
+leak = await sends("map", { name: "Mapa", tree: { title: "x", children: [{ title: "a" }] } });
+check("o app atual não sobe na montagem do mapa", leak.status === 200 && !leak.leaked, String(leak.status));
+leak = await sends("app", { name: "App", features: [{ title: "x" }], entities: [], screens: [], flows: [] });
+check("o app atual não sobe na montagem de um app novo (tipo app)", leak.status === 200 && !leak.leaked, String(leak.status));
+leak = await sends("funnel", { questions: [] }, "brief");
+check("o app atual não sobe nas perguntas do funil", leak.status === 200 && !leak.leaked, String(leak.status));
+db.advice.splice(0, db.advice.length, ...adviceSnapProto);
+
 /* o produto só sobe na montagem da apresentação */
 const SEGREDO = "SEGREDO-DO-PRODUTO-XYZ";
 claudeAnswer = { stop_reason: "end_turn", content: [{ type: "text", text: JSON.stringify({ name: "Funil", stages: [{ nodeType: "ad", title: "anúncio" }, { nodeType: "lp", title: "página" }] }) }] };
@@ -1584,6 +1714,22 @@ check("a apresentação grava build:draft:deck, com os tokens dela", !!usageOf(m
 check("a apresentação grava os outros dois passos também", !!usageOf(meterId, "build:revise:deck") && usageOf(meterId, "build:revise:deck").tokens_in === 800 && !!usageOf(meterId, "build:brief:deck") && usageOf(meterId, "build:brief:deck").tokens_in === 150, JSON.stringify(usageRows(meterId).map((x) => x.task)));
 check("a apresentação não mexe na linha da planilha", usageOf(meterId, "build:draft:sheet").n === 1 && usageOf(meterId, "build:draft:sheet").tokens_in === 600);
 check("a medição da apresentação não grava o nome sem tipo", !usageRows(meterId).some((x) => x.task === "build:draft" || x.task === "build:revise" || x.task === "build:brief"), JSON.stringify(usageRows(meterId).map((x) => x.task)));
+
+/* o protótipo grava build:<passo>:prototype, uma linha por passo (ticket #95) */
+const protoScreens = [{ name: "Início", parts: ["botão novo"] }, { name: "Cadastro", parts: ["campo e-mail"] }];
+claudeAnswer = answerWith({ screens: protoScreens, flows: [{ from: "Início", to: "Cadastro", action: "tocou" }] }, { input_tokens: 650, output_tokens: 210 });
+await ask("build", { kind: "prototype", step: "draft", request: "um protótipo", spec: "app: Agenda" }, meterCookie);
+check("a linha de log do protótipo traz o tipo", /^merlin build:draft:prototype in=650 out=210 portrait=0$/.test(logged.at(-1)), logged.at(-1));
+claudeAnswer = answerWith({ screens: protoScreens, flows: [] }, { input_tokens: 750, output_tokens: 90 });
+await ask("build", { kind: "prototype", step: "revise", request: "um protótipo", draft: { screens: protoScreens, flows: [] }, change: "tira uma tela", spec: "app: Agenda" }, meterCookie);
+check("a linha de log do ajuste do protótipo traz o tipo", /^merlin build:revise:prototype in=750 out=90 portrait=0$/.test(logged.at(-1)), logged.at(-1));
+claudeAnswer = answerWith({ questions: [] }, { input_tokens: 130, output_tokens: 12 });
+await ask("build", { kind: "prototype", step: "brief", request: "um protótipo" }, meterCookie);
+check("a linha de log das perguntas do protótipo traz o tipo", /^merlin build:brief:prototype in=130 out=12 portrait=0$/.test(logged.at(-1)), logged.at(-1));
+check("o protótipo grava build:draft:prototype, com os tokens dele", !!usageOf(meterId, "build:draft:prototype") && usageOf(meterId, "build:draft:prototype").n === 1 && usageOf(meterId, "build:draft:prototype").tokens_in === 650 && usageOf(meterId, "build:draft:prototype").tokens_out === 210, JSON.stringify(usageRows(meterId).map((x) => x.task)));
+check("o protótipo grava os outros dois passos também", !!usageOf(meterId, "build:revise:prototype") && usageOf(meterId, "build:revise:prototype").tokens_in === 750 && !!usageOf(meterId, "build:brief:prototype") && usageOf(meterId, "build:brief:prototype").tokens_in === 130, JSON.stringify(usageRows(meterId).map((x) => x.task)));
+check("o protótipo não mexe nas linhas da planilha nem da apresentação", usageOf(meterId, "build:draft:sheet").n === 1 && usageOf(meterId, "build:draft:sheet").tokens_in === 600 && usageOf(meterId, "build:draft:deck").n === 1 && usageOf(meterId, "build:draft:deck").tokens_in === 700);
+check("a medição do protótipo não grava o nome sem tipo", !usageRows(meterId).some((x) => x.task === "build:draft" || x.task === "build:revise" || x.task === "build:brief"), JSON.stringify(usageRows(meterId).map((x) => x.task)));
 
 claudeAnswer = answerWith({ text: "## semana\n- foi" }, { input_tokens: 700, output_tokens: 80 });
 await ask("week", { range: "1-7 set", cards: [] }, meterCookie);

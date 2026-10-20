@@ -392,7 +392,7 @@ export function markProposal(list, i, line) {
    "planilha pronta · 14 linhas · 5 colunas"). o rascunho pode ser um app
    inteiro, e so o ultimo vale — os anteriores chegam aqui sem `data` (quem grava a conversa
    tira), e ficam so com o titulo e o resumo do que mudou */
-const BUILD_KINDS = ["funnel", "app", "map", "sheet", "deck"];
+const BUILD_KINDS = ["funnel", "app", "map", "sheet", "deck", "prototype"];
 /* o ajuste de um documento aberto, pedido de dentro do editor (o "pedir ao
    Merlin" da apresentação e da planilha): o antes e o depois, e se a pessoa
    já aplicou. como o rascunho, só o último guarda os documentos */
@@ -404,6 +404,9 @@ function normalizeBuildMsg(m) {
     const b = m.brief;
     return { from: "merlin", brief: {
       kind: b.kind, request: str(b.request, 1500), answered: !!b.answered,
+      /* o protótipo guarda o app em que vai entrar; `pick` é a pergunta "de
+         qual app?", feita pela tela, sem o Merlin */
+      ...(b.app ? { app: str(b.app, 60) } : {}), ...(b.pick ? { pick: true } : {}),
       questions: (Array.isArray(b.questions) ? b.questions : []).slice(0, 6).map((q) => ({
         q: str(q && q.q, 200), options: (Array.isArray(q && q.options) ? q.options : []).slice(0, 4).map((o) => str(o, 60))
       }))
@@ -414,6 +417,7 @@ function normalizeBuildMsg(m) {
     return { from: "merlin", draft: {
       kind: d.kind, request: str(d.request, 1500), answers: str(d.answers, 1500),
       title: str(d.title, 120), summary: str(d.summary, 400),
+      ...(d.app ? { app: str(d.app, 60) } : {}),
       data: d.data && typeof d.data === "object" ? d.data : null
     } };
   }
@@ -452,6 +456,9 @@ export function normalizeChat(d) {
     /* o cartão do "o que falta hoje?": guarda só o pedido, e o cartão é
        desenhado ao vivo a partir das coleções. o texto fica como a linha */
     if (m && SHOWS.includes(m.show)) msg.show = m.show;
+    /* "Você ainda não tem um app. Quer que eu monte um?": o botão que segue
+       pelo tipo app, com o pedido de antes */
+    if (m && m.offer && m.offer.kind === "app") msg.offer = { kind: "app", request: str(m.offer.request, 1500) };
     return msg;
   });
   return {

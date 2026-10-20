@@ -74,11 +74,11 @@ Essa chave é **uma só para o time**, e por isso a rota tem teto, por pessoa e
 por hora, contado na tabela `advice` em três cotas separadas (`QUOTA`, no worker):
 
 - **conselho**: 30 (`ADVICE_PER_HOUR`), no Opus. Inclui as perguntas antes de
-  montar um funil, app, mapa, planilha ou apresentação: o fluxo de montagem inteiro gasta uma vez daqui.
+  montar um funil, app, mapa, planilha, apresentação ou protótipo: o fluxo de montagem inteiro gasta uma vez daqui.
 - **leitura do início**: 60 (`CAPTURE_PER_HOUR`), no Haiku: o campo da home
   separando tarefa, data, hora, nota e dinheiro (gasto ou entrada).
 - **montagem**: 40 (`BUILD_PER_HOUR`), no Opus: o rascunho e cada ajuste de um
-  funil, app, mapa, planilha ou apresentação montado na conversa, e cada ajuste de uma
+  funil, app, mapa, planilha, apresentação ou protótipo montado na conversa, e cada ajuste de uma
   apresentação ou planilha aberta pedido pelo "pedir ao Merlin" do editor.
 
 Quem estourar espera; quem está ao lado não paga por isso.
@@ -98,7 +98,12 @@ produto, a tela manda em `context.product` o que se sabe dele (o projeto de app,
 oferta ligados, as metas do plano), cortado em 6.000 caracteres (`PRODUCT_MAX`) e descartado
 em qualquer outra tarefa. A apresentação montada tem de 3 a 12 slides (`DECK_MIN`,
 `DECK_MAX`; menos de 3 é 502); com `context.open` (o ajuste de um documento que já existe) o
-mínimo é 1. A resposta traz `sources`, filtrado
+mínimo é 1. E `spec` em `BUILD_KINDS` (o protótipo, ticket #95): a tela manda em `context.spec`
+o app como está (telas, o que cada uma tem, ações e entidades), cortado em 8.000 caracteres
+(`SPEC_MAX`) e apagado de qualquer outra montagem (as tarefas `app` e `appReview`, que não
+são montagem, continuam lendo o `spec` delas). O rascunho volta só com `screens` (até 12,
+`PROTOTYPE_MAX`; o que não é tela não ocupa vaga) e `flows` (até 40), pelos nomes; quem resolve
+nome em id e descarta a ação para tela que não existe é a tela. A resposta traz `sources`, filtrado
 por uma lista fechada, e o tamanho do retrato que foi (o já cortado) entra no
 `portrait=` da linha de medição de cada pedido, no `wrangler tail` (ver "A medição", abaixo).
 
@@ -253,8 +258,8 @@ com a pessoa). É a conta que diz o que cada tarefa custa; o teto (`advice`) só
 - **`task` é o que a pessoa fez, não só a rota**: `assistant:action` (a resposta trouxe
   proposta) ou `assistant:answer` (só `clarify`); `capture:<kind>`, uma linha por tipo de item
   devolvido (`capture:task`, `capture:note`), ou `capture:none` quando a lista vem vazia;
-  `build:<step>:<kind>` (`brief`, `draft`, `revise` × `funnel`, `app`, `map`, `sheet`, `deck`:
-  `build:draft:deck`); para as outras, o nome da tarefa (`week`, `app`…).
+  `build:<step>:<kind>` (`brief`, `draft`, `revise` × `funnel`, `app`, `map`, `sheet`, `deck`,
+  `prototype`: `build:draft:prototype`); para as outras, o nome da tarefa (`week`, `app`…).
 - **Os tokens vêm do `usage` da resposta** e, numa captura que grava mais de uma linha, entram
   só na primeira, para a soma de tokens não contar o mesmo pedido duas vezes. Resposta sem
   `usage` soma o pedido e deixa os tokens como estavam.

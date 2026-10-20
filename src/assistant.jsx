@@ -15,7 +15,10 @@
    rascunho, o ajuste em palavras — e só vira documento quando a pessoa cria.
    e o "pedir ao Merlin" do editor da apresentação e da planilha chega aqui
    com "na apresentação X, slide 3: " no campo: o ajuste daquele documento
-   aparece com o antes e o depois, e só vai para o editor com o toque. */
+   aparece com o antes e o depois, e só vai para o editor com o toque.
+   o protótipo ("desenha o protótipo do cadastro do app Y", ticket #95) não
+   cria documento: as telas e as ações entram num app que já existe, pelo
+   mergeDraft restrito, e o desfazer fica na aba fluxos do app. */
 import "./shared/base.css";
 import "./assistant.css";
 import { initPage, newId, notify, api, takeAsk, getCurrentPage, collection, sendChange, dayOf } from "./shared/core.js";
@@ -26,8 +29,10 @@ import { NAV_ICONS } from "./shared/icons.jsx";
 import { MAX_TURNS, normalizeChat, chatTitle, turnsOf, markProposal, atBottom } from "./shared/assistant-actions.js";
 import {
   BUILD, buildIntent, answersText, draftView, docFromDraft, builtLine, citesCash, cashPortrait,
-  productNamed, productContext, adjustOf, draftOfDoc, fitsAdjust, applyDraft, adjustView
+  productNamed, productContext, adjustOf, draftOfDoc, fitsAdjust, applyDraft, adjustView, prototypeContext
 } from "./shared/build.js";
+import { normalizeApp, mergePrototype, wireframeLabel } from "./shared/app-spec.js";
+import { Wireframe } from "./shared/wireframe.jsx";
 import { normalize as normalizeFinance } from "./shared/finance-data.js";
 /* o retrato vai em toda pergunta: é ele que faz "continuar na conversa"
    chegar sabendo o dia, "o que tenho quinta?" ter resposta e "posso gastar
@@ -138,7 +143,7 @@ function BriefCard({ brief, live, onAnswer }) {
       ))}
       {live && (
         <div className="build__actions">
-          <button type="button" className="pill" onClick={() => onAnswer(null)}>decide você</button>
+          {!brief.pick && <button type="button" className="pill" onClick={() => onAnswer(null)}>decide você</button>}
           <button type="button" className="pill pill--accent" onClick={() => onAnswer(answers)}>{icon("spark")}montar</button>
         </div>
       )}
@@ -148,11 +153,11 @@ function BriefCard({ brief, live, onAnswer }) {
 
 /* o rascunho: o bastante para conferir de relance. só o último é vivo — os
    de antes ficam como uma linha, com o que mudou */
-function DraftCard({ draft, live, onCreate }) {
+function DraftCard({ draft, live, onCreate, app }) {
   if (!live || !draft.data) {
     return <p className="build__old">{BUILD[draft.kind].label} · {draft.title}{draft.summary ? " — " + draft.summary : ""}</p>;
   }
-  const v = draftView(draft.kind, draft.data);
+  const v = draftView(draft.kind, draft.data, app);
   return (
     <div className="build is-draft">
       <p className="build__eyebrow t-mono">{icon("spark")}rascunho {BUILD[draft.kind].of}</p>
@@ -170,6 +175,21 @@ function DraftCard({ draft, live, onCreate }) {
           </div>
           {v.table.more > 0 && <p className="build__more">e mais {v.table.more} {v.table.more === 1 ? "linha" : "linhas"}</p>}
         </>
+      )}
+      {/* o protótipo se confere desenhado: cada tela como fica depois de
+          juntar, com o que muda nela */}
+      {v.wires && (
+        <div className="build__wires" tabIndex={0} role="region" aria-label={"telas do rascunho " + BUILD[draft.kind].of + ": " + v.title}>
+          {v.wires.map((s, i) => (
+            <figure key={i} className="build__wire" aria-label={wireframeLabel(s)}>
+              <Wireframe screen={s} className="build__wire-svg" />
+              <figcaption>
+                <b>{s.name}</b>
+                <span>{s.status === "new" ? "nova" : s.status === "more" ? "+ " + s.added + (s.added === 1 ? " linha" : " linhas") : "já tem tudo"}</span>
+              </figcaption>
+            </figure>
+          ))}
+        </div>
       )}
       {v.lines.length > 0 && (
         <dl className="build__lines">
@@ -315,6 +335,13 @@ function Assistant() {
   const productOf = (app) => productContext(app, { funnels: funnels.all(), plans: plans.all(), finance: finance.all(), clients: clients.all(), team: team.all() }, dayOf(new Date()));
   const callBuild = async (context) => {
     try {
+      /* o protótipo leva o app como está agora; na conversa fica só o id */
+      if (BUILD[context.kind].spec) {
+        const { app: id, ...rest } = context;
+        const app = id ? apps.get(id) : null;
+        if (!app) return { error: "não achei mais esse app; ele foi apagado?" };
+        context = { ...rest, spec: prototypeContext(app) };
+      }
       if (BUILD[context.kind].cash && citesCash(context.request)) context = { ...context, portrait: cashPortrait(await portrait()) };
       /* a apresentação que nomeia um produto leva o que se sabe dele */
       const named = BUILD[context.kind].product && !context.product ? productNamed(context.request, apps.all()) : null;
@@ -324,27 +351,47 @@ function Assistant() {
       return { error: r.status === 401 ? "entre para usar o Merlin" : (r.body && r.body.error) || "não consegui montar isso agora" };
     } catch (e) { return { error: "não consegui falar com o Merlin" }; }
   };
-  const runDraft = async (kind, request, answers, base) => {
+  /* `app`: o id do app em que o protótipo vai entrar */
+  const runDraft = async (kind, request, answers, base, app) => {
     setThinking(WAIT.draft);
-    const r = await callBuild({ kind, step: "draft", request, answers });
+    const r = await callBuild({ kind, step: "draft", request, answers, ...(app ? { app } : {}) });
     setThinking(false);
     if (r.error) { keep(base.concat([{ from: "merlin", text: r.error }])); feel("confused"); return; }
     const data = r.body.draft;
-    keep(base.concat([{ from: "merlin", draft: { kind, request, answers, data, title: draftView(kind, data).title, summary: r.body.summary || "" } }]));
+    keep(base.concat([{ from: "merlin", draft: { kind, request, answers, data, title: draftView(kind, data, app && apps.get(app)).title, summary: r.body.summary || "", ...(app ? { app } : {}) } }]));
     feel("done");
   };
-  const startBuild = async (kind, request) => {
-    const mine = messages.concat([{ from: "me", text: request }]);
+  const askBrief = async (kind, request, base, app) => {
+    setThinking(WAIT.brief);
+    const r = await callBuild({ kind, step: "brief", request, ...(app ? { app } : {}) });
+    setThinking(false);
+    if (r.error) { keep(base.concat([{ from: "merlin", text: r.error }])); feel("confused"); return; }
+    const questions = r.body.questions || [];
+    if (questions.length) { keep(base.concat([{ from: "merlin", brief: { kind, request, questions, answered: false, ...(app ? { app } : {}) } }])); feel("talking"); }
+    else runDraft(kind, request, "", base, app);
+  };
+  /* "de qual app?": a pergunta é da tela, sem o Merlin, com os apps mais
+     recentes para clicar */
+  const pickApp = (request, again) => ({ from: "merlin", brief: {
+    kind: "prototype", request, pick: true, answered: false,
+    questions: [{ q: again ? "Não achei esse app. De qual é?" : "De qual app?", options: apps.all().sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0)).slice(0, 4).map((a) => String(a.name || "")) }]
+  } });
+  /* `said`: o que aparece como fala da pessoa, quando não é o próprio pedido */
+  const startBuild = async (kind, request, said) => {
+    const mine = messages.concat([{ from: "me", text: said || request }]);
     keep(mine);
     setInput("");
     setStartKey("");
-    setThinking(WAIT.brief);
-    const r = await callBuild({ kind, step: "brief", request });
-    setThinking(false);
-    if (r.error) { keep(mine.concat([{ from: "merlin", text: r.error }])); feel("confused"); return; }
-    const questions = r.body.questions || [];
-    if (questions.length) { keep(mine.concat([{ from: "merlin", brief: { kind, request, questions, answered: false } }])); feel("talking"); }
-    else runDraft(kind, request, "", mine);
+    /* o protótipo entra num app que já existe: o que o pedido nomeia, ou o
+       que a pessoa escolhe. sem nenhum, o caminho é montar um */
+    if (kind === "prototype") {
+      if (!apps.all().length) { keep(mine.concat([{ from: "merlin", text: "Você ainda não tem um app. Quer que eu monte um?", offer: { kind: "app", request } }])); feel("talking"); return; }
+      const app = productNamed(request, apps.all());
+      if (!app) { keep(mine.concat([pickApp(request)])); feel("talking"); return; }
+      askBrief(kind, request, mine, String(app.id));
+      return;
+    }
+    askBrief(kind, request, mine);
   };
   /* a resposta às perguntas: as escolhas do cartão, o texto livre do campo,
      ou nada ("decide você") */
@@ -355,23 +402,32 @@ function Assistant() {
       .concat([{ from: "me", text: text || "decide você" }]);
     keep(list);
     setInput("");
-    runDraft(b.kind, b.request, text, list);
+    /* a resposta ao "de qual app?" acha o app pelo nome, e só então o
+       Merlin pergunta o que falta do trecho */
+    if (b.pick) {
+      const app = productNamed(free != null ? free : answers ? answers[0] || "" : "", apps.all());
+      if (!app) { keep(list.concat([pickApp(b.request, true)])); feel("confused"); return; }
+      askBrief(b.kind, b.request, list, String(app.id));
+      return;
+    }
+    runDraft(b.kind, b.request, text, list, b.app);
   };
   const revise = async (d, change) => {
     const mine = messages.concat([{ from: "me", text: change }]);
     keep(mine);
     setInput("");
     setThinking(WAIT.revise);
-    const r = await callBuild({ kind: d.kind, step: "revise", request: d.request, answers: d.answers, draft: d.data, change });
+    const r = await callBuild({ kind: d.kind, step: "revise", request: d.request, answers: d.answers, draft: d.data, change, ...(d.app ? { app: d.app } : {}) });
     setThinking(false);
     if (r.error) { keep(mine.concat([{ from: "merlin", text: r.error }])); feel("confused"); return; }
     const data = r.body.draft;
-    keep(mine.concat([{ from: "merlin", draft: { ...d, data, title: draftView(d.kind, data).title, summary: r.body.summary || "" } }]));
+    keep(mine.concat([{ from: "merlin", draft: { ...d, data, title: draftView(d.kind, data, d.app && apps.get(d.app)).title, summary: r.body.summary || "" } }]));
     feel("done");
   };
   /* com linha de pronto (a planilha), a conversa fica e a linha abre o que
      foi criado; sem ela, vai direto para a tela dele */
   const create = (d) => {
+    if (d.kind === "prototype") { join(d); return; }
     /* a apresentação já nasce ligada ao produto que o pedido nomeou */
     const named = BUILD[d.kind].product ? productNamed(d.request, apps.all()) : null;
     const { collection: name, doc, href } = docFromDraft(d.kind, named ? { ...d.data, app: String(named.id || "") } : d.data, newId);
@@ -380,6 +436,21 @@ function Assistant() {
     keep(messages.concat([{ from: "merlin", built: { kind: d.kind, id: doc.id, name: doc.name, line } }]));
     if (line) feel("done");
     else location.href = href;
+  };
+
+  /* o protótipo junta telas e ações ao app, sem trocar nada do que a pessoa
+     escreveu (app-spec.js, mergePrototype), e abre o app no modo telas da aba
+     fluxos. o desfazer é um passo só e mora lá: o app de antes vai junto
+     (shared/core.js, sendChange), e o aviso "o Merlin mudou o protótipo ·
+     desfazer" aparece onde se veem as telas */
+  const join = (d) => {
+    const before = d.app ? apps.get(d.app) : null;
+    if (!before) { keep(messages.concat([{ from: "merlin", text: "não achei mais esse app; ele foi apagado?" }])); feel("confused"); return; }
+    const next = mergePrototype(normalizeApp(before, newId), d.data, newId);
+    apps.save({ ...next, updatedAt: Date.now() });
+    keep(messages.concat([{ from: "merlin", built: { kind: d.kind, id: before.id, name: before.name, line: builtLine(d.kind, d.data) } }]));
+    sendChange("prototype", before.id, before, "o Merlin mudou o protótipo");
+    location.href = BUILD.prototype.href + before.id;
   };
 
   /* ---------- ajustar o documento aberto ("pedir ao Merlin") ---------- */
@@ -614,7 +685,8 @@ function Assistant() {
                       : m.adjust
                       ? <AdjustCard adjust={m.adjust} live={i === lastAdjust && !thinking} onApply={() => applyAdjust(i)} />
                       : m.draft
-                      ? <DraftCard draft={m.draft} live={!!flow && flow.at === i && !thinking} onCreate={() => create(m.draft)} />
+                      ? <DraftCard draft={m.draft} live={!!flow && flow.at === i && !thinking} onCreate={() => create(m.draft)}
+                                   app={m.draft.app ? apps.get(m.draft.app) : null} />
                       : m.built
                       ? m.built.line
                         ? <p className="chat__done">✓ {m.built.line} · <a href={BUILD[m.built.kind].href + m.built.id}>abrir</a></p>
@@ -639,6 +711,12 @@ function Assistant() {
                         : <>
                             <Markdown className="chat__body" text={m.text} />
                             {sourcesLine(m.sources) && <p className="chat__seen">{sourcesLine(m.sources)}</p>}
+                            {/* "Quer que eu monte um?": segue pelo tipo app, com o pedido de antes */}
+                            {m.offer && i === messages.length - 1 && !thinking && (
+                              <button type="button" className="pill pill--accent" onClick={() => { setFlowOn(true); startBuild("app", m.offer.request, "sim, monta um app"); }}>
+                                {icon("spark")}montar um app
+                              </button>
+                            )}
                           </>}
                   </div>
                 ))}

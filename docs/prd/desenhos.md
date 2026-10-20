@@ -1,7 +1,7 @@
 # Desenhos · planilha, apresentação e protótipo no trabalho
 
-**Status:** 🚧 Em execução. Descoberta feita pelo orquestrador em 2026-10-20, com autonomia dada
-pelo Arthur. Decisões **(orq.)** ficam para revisão; as **(Arthur)** vieram dele.
+**Status:** ✅ No ar com o merge do #95, o último ticket do milestone "desenhos" (os seis
+mergeados). Descoberta feita pelo orquestrador em 2026-10-20, com autonomia dada pelo Arthur. Decisões **(orq.)** ficam para revisão; as **(Arthur)** vieram dele.
 **Owner:** Arthur Reis
 **Criado em:** 2026-10-20
 **Origem:** o desenho de 20/10: trabalho → desenhos → planilha, apresentação (mapa mental, ppt) e

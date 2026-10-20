@@ -1513,6 +1513,128 @@ const dataLeft = () => globalThis.localStorage.keys().filter((k) => k in DATA);
     check("conversa: o slide do ajuste é inteiro, e antes e depois que não são objeto viram nulo", !!M[6].adjust && M[6].adjust.slide === 0 && M[6].adjust.applied === false && M[6].adjust.before === null && M[6].adjust.after === null, JSON.stringify(M[6]));
     check("conversa: ajuste sem slide fica no slide 0, e sem applied fica não aplicado", !!M[7].adjust && M[7].adjust.slide === 0 && M[7].adjust.applied === false, JSON.stringify(M[7]));
   }
+
+  /* o protótipo na conversa (ticket #95) */
+  {
+    const AS = await import("./app-spec.js?n=" + (++n));
+    let pk = 0;
+    const pid = () => "p" + (++pk);
+
+    /* o pedido */
+    const intents = (xs) => xs.map((x) => B.buildIntent(x)).join();
+    check("protótipo: o pedido do protótipo, do wireframe ou do fluxo vira prototype",
+      B.buildIntent("desenha o protótipo do cadastro") === "prototype" && B.buildIntent("faz o wireframe do checkout") === "prototype"
+      && B.buildIntent("monta um protótipo do app Agenda") === "prototype" && B.buildIntent("desenha o protótipo do fluxo de cadastro do app Agenda") === "prototype",
+      intents(["desenha o protótipo do cadastro", "faz o wireframe do checkout", "monta um protótipo do app Agenda", "desenha o protótipo do fluxo de cadastro do app Agenda"]));
+    check("protótipo: com o app no meio da frase, o protótipo continua sendo o pedido", B.buildIntent("Desenha o protótipo do fluxo de cadastro do app Agenda") === "prototype", String(B.buildIntent("Desenha o protótipo do fluxo de cadastro do app Agenda")));
+    check("protótipo: falar dele, ou dar duração, não é pedir um", B.buildIntent("revisar o protótipo") === null && B.buildIntent("protótipo") === null && B.buildIntent("protótipo 1h") === null && B.buildIntent("wireframe") === null,
+      intents(["revisar o protótipo", "protótipo", "protótipo 1h", "wireframe"]));
+    check("protótipo: app, funil, mapa, planilha e apresentação continuam como eram",
+      B.buildIntent("quero um app de agenda") === "app" && B.buildIntent("monta um funil") === "funnel" && B.buildIntent("monta um mapa do funil de vendas") === "map"
+      && B.buildIntent("faz uma planilha de custos do meu app") === "sheet" && B.buildIntent("monta uma apresentação do app Agenda") === "deck" && B.buildIntent("desenha o SaaS de cobrança") === "app",
+      intents(["quero um app de agenda", "monta um funil", "monta um mapa do funil de vendas", "faz uma planilha de custos do meu app", "monta uma apresentação do app Agenda", "desenha o SaaS de cobrança"]));
+    const bp = B.BUILD.prototype || {};
+    check("protótipo: BUILD.prototype aponta para apps, abre nas telas e pede o app atual",
+      JSON.stringify(bp) === JSON.stringify({ label: "protótipo", collection: "apps", href: "apps.html?ver=telas#", create: "juntar ao app", the: "o protótipo", of: "do protótipo", spec: true }), JSON.stringify(bp));
+    check("protótipo: só o protótipo pede o app atual (spec)", !B.BUILD.funnel.spec && !B.BUILD.app.spec && !B.BUILD.map.spec && !B.BUILD.sheet.spec && !B.BUILD.deck.spec);
+    check("protótipo: o adjustPrefix, o do deck e o da planilha seguem iguais", B.adjustPrefix("deck", "Pitch", 3) === "na apresentação Pitch, slide 3: " && B.adjustPrefix("sheet", "Custos") === "na planilha Custos: ");
+
+    /* o app como o Merlin o lê */
+    const pApp = AS.normalizeApp({
+      id: "ag", name: "Agenda", pitch: "agenda para salão",
+      entities: [{ id: "e1", name: "Cliente", fields: [{ name: "nome", type: "text" }] }, { id: "e2", name: "Agendamento", fields: [] }],
+      screens: [
+        { id: "in", name: "Início", goal: "ver o dia", start: true, x: 0, y: 0, parts: "lista de horários\nbotão novo" },
+        { id: "aj", name: "Ajustes", x: 300, y: 0, parts: "tema escuro" }
+      ],
+      flows: [{ id: "f1", from: "in", to: "aj", action: "abriu ajustes" }]
+    }, pid);
+    const pAppJson = JSON.stringify(pApp);
+    const ctx = B.prototypeContext(pApp);
+    check("protótipo: o contexto leva o nome do app", /Agenda/.test(ctx), ctx);
+    check("protótipo: o contexto leva as entidades", /Cliente/.test(ctx) && /Agendamento/.test(ctx), ctx);
+    check("protótipo: o contexto leva cada tela, com o objetivo e as linhas", /Início/.test(ctx) && /Ajustes/.test(ctx) && /ver o dia/.test(ctx) && /lista de horários/.test(ctx) && /botão novo/.test(ctx) && /tema escuro/.test(ctx), ctx);
+    check("protótipo: o contexto marca só a entrada", (ctx.match(/\(entrada\)/g) || []).length === 1 && /Início[^\n]*\(entrada\)/.test(ctx), ctx);
+    check("protótipo: o contexto leva as ações como \"A → B: ação\"", /Início → Ajustes: abriu ajustes/.test(ctx), ctx);
+    check("protótipo: sem app, o contexto é vazio", B.prototypeContext(null) === "" && B.prototypeContext(undefined) === "");
+    check("protótipo: o contexto não mexe no app", JSON.stringify(pApp) === pAppJson);
+    const hugeApp = AS.normalizeApp({ id: "g", name: "Grande", screens: Array.from({ length: 60 }, (_, i) => ({ id: "s" + i, name: "Tela " + i, parts: Array.from({ length: 40 }, (_, j) => "linha " + j + " " + "x".repeat(40)).join("\n") })) }, pid);
+    check("protótipo: o contexto tem no máximo 8000 caracteres", B.prototypeContext(hugeApp).length === 8000, String(B.prototypeContext(hugeApp).length));
+    check("protótipo: o contexto de app sem tela ainda diz o nome", /Vazio/.test(B.prototypeContext(AS.normalizeApp({ id: "v", name: "Vazio" }, pid))));
+
+    /* a carta do rascunho */
+    const protoDraft = {
+      screens: [
+        { name: "Início", goal: "", parts: ["lista de horários", "BOTÃO NOVO", "- filtro por dia", "busca"], start: false },
+        { name: "Ajustes", goal: "", parts: ["Tema escuro"], start: false },
+        { name: "Cadastro", goal: "criar conta", parts: ["campo e-mail", "botão criar conta"], start: false }
+      ],
+      flows: [
+        { from: "Início", to: "Cadastro", action: "tocou em criar conta" },
+        { from: "Cadastro", to: "Ajustes", action: "" },
+        { from: "Início", to: "Ajustes", action: "abriu ajustes" },
+        { from: "Fantasma", to: "Cadastro", action: "x" },
+        { from: "Cadastro", to: "Não existe", action: "y" }
+      ]
+    };
+    const pv = B.prototypeView(pApp, protoDraft);
+    check("protótipo: a carta tem título, resumo, telas e ações", Object.keys(pv).sort().join() === "actions,screens,sub,title", Object.keys(pv).join());
+    check("protótipo: o título é o nome do app e o resumo conta telas e ações que entram", pv.title === "Agenda" && pv.sub === "3 telas · 2 ações", JSON.stringify([pv.title, pv.sub]));
+    check("protótipo: uma tela por tela do rascunho, na ordem, com nome, partes, status e added",
+      pv.screens.length === 3 && pv.screens.map((s) => s.name).join() === "Início,Ajustes,Cadastro" && pv.screens.every((s) => ["added", "name", "parts", "status"].every((k) => k in s)), JSON.stringify(pv.screens));
+    check("protótipo: a tela que existe e ganha linhas é \"more\", com quantas", pv.screens[0].status === "more" && pv.screens[0].added === 2, JSON.stringify(pv.screens[0]));
+    check("protótipo: as partes são o que a tela terá depois de juntar (o antigo primeiro, o que falta no fim)", pv.screens[0].parts.startsWith("lista de horários\nbotão novo") && /filtro por dia/.test(pv.screens[0].parts) && /busca/.test(pv.screens[0].parts) && pv.screens[0].parts.split("\n").length === 4, JSON.stringify(pv.screens[0].parts));
+    check("protótipo: a tela que existe e já tem tudo é \"same\", com 0", pv.screens[1].status === "same" && pv.screens[1].added === 0 && pv.screens[1].parts === "tema escuro", JSON.stringify(pv.screens[1]));
+    check("protótipo: a tela nova é \"new\", e as partes são as do rascunho", pv.screens[2].status === "new" && pv.screens[2].parts === "campo e-mail\nbotão criar conta", JSON.stringify(pv.screens[2]));
+    check("protótipo: as ações são as que entram de fato, com o gesto", pv.actions.join("|") === "Início → Cadastro · tocou em criar conta|Cadastro → Ajustes", JSON.stringify(pv.actions));
+    check("protótipo: a ação que já existe e as descartadas não aparecem", !pv.actions.some((a) => /abriu ajustes|Fantasma|Não existe/.test(a)), JSON.stringify(pv.actions));
+    const joined = AS.mergePrototype(pApp, protoDraft, pid);
+    check("protótipo: a carta mostra o mesmo que o juntar de verdade deixa", pv.screens.every((s) => (joined.screens.find((x) => AS.snake(x.name) === AS.snake(s.name)) || {}).parts === s.parts) && joined.flows.length - pApp.flows.length === pv.actions.length, JSON.stringify(pv.screens.map((s) => s.parts)));
+    check("protótipo: a carta não mexe no app", JSON.stringify(pApp) === pAppJson);
+    const dvp = B.draftView("prototype", protoDraft, pApp);
+    check("protótipo: draftView do protótipo usa a carta do prototypeView (mesmo título e resumo, com as ações)", dvp.title === pv.title && dvp.sub === pv.sub && JSON.stringify(dvp).includes("tocou em criar conta"), JSON.stringify(dvp).slice(0, 200));
+    const pvAgain = B.prototypeView(joined, protoDraft);
+    check("protótipo: depois de juntar, tudo vira \"same\" e nenhuma ação entra", pvAgain.screens.every((s) => s.status === "same" && s.added === 0) && pvAgain.actions.length === 0 && pvAgain.sub === "3 telas · 0 ações", JSON.stringify(pvAgain));
+    const pvNone = B.prototypeView(null, protoDraft);
+    check("protótipo: sem app, o título é protótipo e toda tela é nova", pvNone.title === "protótipo" && pvNone.screens.length === 3 && pvNone.screens.every((s) => s.status === "new"), JSON.stringify(pvNone).slice(0, 300));
+    const pvOne = B.prototypeView(pApp, { screens: [{ name: "Cadastro", parts: ["botão"] }], flows: [{ from: "Início", to: "Cadastro", action: "" }] });
+    check("protótipo: o singular de tela e de ação", pvOne.sub === "1 tela · 1 ação" && pvOne.actions.join() === "Início → Cadastro", JSON.stringify(pvOne));
+    check("protótipo: a carta de rascunho sem telas não quebra", B.prototypeView(pApp, { screens: [], flows: [] }).screens.length === 0 && B.prototypeView(pApp, {}).sub === "0 telas · 0 ações");
+
+    /* o "criei" */
+    check("protótipo pronto: a linha de 'criei' conta as telas do rascunho", B.builtLine("prototype", { screens: [1, 2, 3, 4].map((i) => ({ name: "t" + i })) }) === "protótipo pronto · 4 telas", B.builtLine("prototype", { screens: [1, 2, 3, 4].map((i) => ({ name: "t" + i })) }));
+    check("protótipo pronto: o singular", B.builtLine("prototype", { screens: [{ name: "t" }] }) === "protótipo pronto · 1 tela", B.builtLine("prototype", { screens: [{ name: "t" }] }));
+    check("protótipo pronto: as outras linhas não mudam", B.builtLine("deck", { slides: [] }) !== "protótipo pronto · 0 telas" && B.builtLine("app", {}) === "" && B.builtLine("funnel", {}) === "");
+
+    /* a conversa guarda o protótipo, o app e o convite */
+    const pchat = normalizeChat({ id: "c3", messages: [
+      { from: "merlin", brief: { kind: "prototype", request: "desenha o protótipo do cadastro", answered: false, app: "ag", pick: true, questions: [{ q: "De qual app?", options: ["Agenda", "Loja"] }] } },
+      { from: "merlin", brief: { kind: "prototype", request: "x", answered: true, app: "a".repeat(100), pick: false, questions: [] } },
+      { from: "merlin", brief: { kind: "prototype", request: "sem os campos novos", answered: false, questions: [] } },
+      { from: "merlin", draft: { kind: "prototype", request: "desenha o protótipo do cadastro", answers: "", title: "Agenda", summary: "4 telas", app: "ag", data: protoDraft } },
+      { from: "merlin", draft: { kind: "prototype", request: "y", answers: "", title: "", summary: "", app: "b".repeat(100), data: null } },
+      { from: "merlin", built: { kind: "prototype", id: "ag", name: "Agenda", line: "protótipo pronto · 4 telas" } },
+      { from: "merlin", text: "Você ainda não tem um app. Quer que eu monte um?", offer: { kind: "app", request: "desenha o protótipo do cadastro" } },
+      { from: "merlin", text: "convite de outro tipo", offer: { kind: "deck", request: "x" } },
+      { from: "merlin", text: "convite enorme", offer: { kind: "app", request: "r".repeat(2000) } },
+      { from: "merlin", text: "convite sem pedido", offer: { kind: "app" } },
+      { from: "merlin", text: "sem convite" }
+    ] });
+    const PM = pchat.messages;
+    const BR = (i) => PM[i].brief || { app: "", questions: [] }, DR = (i) => PM[i].draft || { app: "" };
+    check("conversa: o brief do protótipo sobrevive, com o app e o pick", !!PM[0].brief && BR(0).kind === "prototype" && BR(0).app === "ag" && BR(0).pick === true && BR(0).questions.length === 1 && BR(0).questions[0].options.length === 2, JSON.stringify(PM[0]));
+    check("conversa: o app do brief tem teto de 60, e o pick que é falso não vale", BR(1).app.length === 60 && !BR(1).pick && BR(1).answered === true, JSON.stringify(PM[1]));
+    check("conversa: brief do protótipo sem app nem pick fica sem app e sem pick", !BR(2).app && !BR(2).pick, JSON.stringify(PM[2]));
+    check("conversa: o rascunho do protótipo sobrevive, com o app e os dados", !!PM[3].draft && DR(3).kind === "prototype" && DR(3).app === "ag" && DR(3).data && DR(3).data.screens.length === 3 && DR(3).data.flows.length === 5, JSON.stringify(PM[3]).slice(0, 200));
+    check("conversa: o app do rascunho tem teto de 60", !!PM[4].draft && DR(4).app.length === 60, JSON.stringify(PM[4]).slice(0, 200));
+    check("conversa: o 'criei' do protótipo guarda a linha", PM[5].built && PM[5].built.kind === "prototype" && PM[5].built.id === "ag" && PM[5].built.line === "protótipo pronto · 4 telas", JSON.stringify(PM[5]));
+    check("conversa: o convite para montar um app sobrevive, com o texto e o pedido", PM[6].from === "merlin" && PM[6].text === "Você ainda não tem um app. Quer que eu monte um?" && !!PM[6].offer && PM[6].offer.kind === "app" && PM[6].offer.request === "desenha o protótipo do cadastro", JSON.stringify(PM[6]));
+    check("conversa: convite de outro tipo é descartado, e o texto fica", !PM[7].offer && PM[7].text === "convite de outro tipo", JSON.stringify(PM[7]));
+    check("conversa: o pedido do convite tem teto de 1500", !!PM[8].offer && PM[8].offer.kind === "app" && PM[8].offer.request.length === 1500, JSON.stringify(PM[8]).slice(0, 120));
+    check("conversa: convite sem pedido fica com pedido vazio", !!PM[9].offer && PM[9].offer.kind === "app" && PM[9].offer.request === "", JSON.stringify(PM[9]));
+    check("conversa: fala comum não ganha convite", !PM[10].offer && PM[10].text === "sem convite", JSON.stringify(PM[10]));
+    check("conversa: o brief da apresentação não ganhou o app dos outros", !normalizeChat({ id: "c4", messages: [{ from: "merlin", brief: { kind: "deck", request: "x", answered: false, questions: [] } }] }).messages[0].brief.pick);
+  }
 }
 
 /* ---- a vitrine saiu da busca (PRD o-menu-por-area, D7) ----

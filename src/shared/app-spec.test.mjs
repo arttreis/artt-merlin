@@ -2,7 +2,7 @@
    puro: roda em node, sem navegador. `node src/shared/app-spec.test.mjs` */
 import {
   normalizeApp, snake, problemsOf, unreachable, layoutEntities, layoutScreens,
-  fromBlueprint, mergeDraft, toSQL, toMermaidER, toMermaidFlow, toMarkdown, toPrompt,
+  fromBlueprint, fromPrototype, mergeDraft, mergePrototype, toSQL, toMermaidER, toMermaidFlow, toMarkdown, toPrompt,
   FRAME_W, FRAME_H, BLOCK_KINDS, wireframeOf, placeWireframe, wireframeLabel, toWireframes
 } from "./app-spec.js";
 
@@ -154,6 +154,127 @@ check("juntar não duplica tela e mantém uma entrada só", merged.screens.filte
 check("juntar repassa a ação para a tela que já existia", merged.flows.length === 1 && merged.flows[0].from === "h0");
 check("juntar não duplica funcionalidade", merged.features.length === 1);
 check("juntar duas vezes não duplica ação", mergeDraft(merged, draft).flows.length === 1);
+
+/* ---- o protótipo: só telas e ações (ticket #95) ---- */
+const protoApp = () => normalizeApp({
+  id: "ag", name: "Agenda", pitch: "o que eu escrevi", problem: "meu problema", audience: "salões", value: "menos faltas",
+  stack: "react", notes: "anotação minha", funnel: "f1", client: "c1", createdAt: 1000, updatedAt: 2000,
+  features: [{ id: "ft1", title: "Agendar", note: "n" }],
+  entities: [{ id: "e1", name: "Cliente", x: 10, y: 20, fields: [{ name: "nome", type: "text" }] }],
+  screens: [
+    { id: "in", name: "Início", goal: "ver o dia", start: true, x: 0, y: 0, entities: ["e1"], parts: "- Lista de Horários\nbotão novo" },
+    { id: "cfg", name: "Ajustes", x: 300, y: 40, parts: "Tema escuro" }
+  ],
+  flows: [{ id: "fl1", from: "in", to: "cfg", action: "abriu ajustes" }]
+}, makeId);
+const protoData = () => ({
+  screens: [
+    { name: "inicio", goal: "outro objetivo", parts: ["lista de horários", "BOTÃO NOVO", "• filtro por dia", "busca"], start: true },
+    { name: "Cadastro", goal: "criar conta", parts: ["campo e-mail", "botão criar conta"], start: true },
+    { name: "Confirmação", goal: "", parts: "mensagem de sucesso" }
+  ],
+  flows: [
+    { from: "Início", to: "Cadastro", action: "tocou em criar conta" },
+    { from: "Cadastro", to: "Confirmação", action: "enviou" },
+    { from: "Cadastro", to: "Não existe", action: "x" },
+    { from: "Fantasma", to: "Cadastro", action: "y" },
+    { from: "Ajustes", to: "Cadastro", action: "foi se cadastrar" },
+    { from: "Início", to: "Cadastro", action: "tocou em criar conta" },
+    { from: "Início", to: "Ajustes", action: "abriu ajustes" }
+  ]
+});
+const nonScreens = (a) => JSON.stringify({ ...a, screens: undefined, flows: undefined });
+const pa = protoApp();
+const paBefore = JSON.stringify(pa);
+
+const pd = fromPrototype(protoData(), pa, makeId);
+check("fromPrototype devolve só telas e ações", Object.keys(pd).sort().join() === "flows,screens", Object.keys(pd).join());
+check("fromPrototype traz uma tela por tela do rascunho", pd.screens.length === 3 && pd.screens.map((s) => s.name).join() === "inicio,Cadastro,Confirmação", pd.screens.map((s) => s.name).join());
+check("fromPrototype junta as partes em linhas", pd.screens[1].parts === "campo e-mail\nbotão criar conta" && pd.screens[2].parts === "mensagem de sucesso", JSON.stringify(pd.screens.map((s) => s.parts)));
+check("fromPrototype descarta a ação para tela que não existe, de qualquer ponta", pd.flows.every((f) => f.action !== "x" && f.action !== "y"), JSON.stringify(pd.flows));
+const protoIds = new Set(pd.screens.map((s) => s.id).concat(pa.screens.map((s) => s.id)));
+check("fromPrototype só deixa ação com as duas pontas em tela conhecida", pd.flows.length >= 3 && pd.flows.every((f) => protoIds.has(f.from) && protoIds.has(f.to)), JSON.stringify(pd.flows));
+check("fromPrototype liga a tela que só existe no app (Ajustes → Cadastro)", pd.flows.some((f) => f.from === "cfg" && f.to === pd.screens[1].id && f.action === "foi se cadastrar"), JSON.stringify(pd.flows));
+check("fromPrototype não mexe no app que recebeu", JSON.stringify(pa) === paBefore);
+check("fromPrototype: com entrada no app, não inventa outra", pd.screens.filter((s) => s.start).length <= 2 && !pd.screens[2].start);
+check("fromPrototype de nada", JSON.stringify(fromPrototype(null, pa, makeId)) === JSON.stringify({ screens: [], flows: [] }) && fromPrototype({}, pa, makeId).screens.length === 0);
+check("fromPrototype larga tela sem objeto e com no máximo 12", fromPrototype({ screens: Array.from({ length: 15 }, (_, i) => ({ name: "t" + i })) }, pa, makeId).screens.length === 12);
+const noEntry = normalizeApp({ id: "ne", name: "Sem entrada", screens: [{ id: "x1", name: "Solta" }] }, makeId);
+const noEntryDraft = fromPrototype({ screens: [{ name: "Primeira" }, { name: "Segunda" }] }, noEntry, makeId);
+check("sem entrada no rascunho nem no app, a primeira tela vira a entrada", noEntryDraft.screens[0].start === true && noEntryDraft.screens[1].start === false, JSON.stringify(noEntryDraft.screens.map((s) => s.start)));
+const hasEntryDraft = fromPrototype({ screens: [{ name: "Primeira" }, { name: "Segunda", start: true }] }, noEntry, makeId);
+check("o rascunho que já marca uma entrada não ganha outra", hasEntryDraft.screens[0].start === false && hasEntryDraft.screens[1].start === true, JSON.stringify(hasEntryDraft.screens.map((s) => s.start)));
+const draftOnlyFlow = fromPrototype({ screens: [{ name: "A" }, { name: "B" }], flows: [{ from: "a", to: "b", action: "foi" }] }, null, makeId);
+check("fromPrototype sem app resolve só entre as telas do rascunho", draftOnlyFlow.flows.length === 1 && draftOnlyFlow.flows[0].action === "foi", JSON.stringify(draftOnlyFlow));
+
+/* juntar: telas novas entram, a de mesmo nome ganha só o que falta */
+const pm = mergePrototype(pa, protoData(), makeId);
+const byName = (a, name) => a.screens.find((s) => snake(s.name) === snake(name));
+check("protótipo: nada fora de telas e ações muda", nonScreens(pm) === nonScreens(pa), nonScreens(pm).slice(0, 200));
+check("protótipo: o app de antes não é mexido", JSON.stringify(pa) === paBefore);
+check("protótipo: entram as duas telas novas e a de mesmo nome não duplica", pm.screens.length === 4 && pm.screens.filter((s) => snake(s.name) === "inicio").length === 1, pm.screens.map((s) => s.name).join());
+const pIn = byName(pm, "Início");
+check("protótipo: a tela existente mantém id, nome, objetivo, entrada, lugar e entidades", pIn.id === "in" && pIn.name === "Início" && pIn.goal === "ver o dia" && pIn.start === true && pIn.x === 0 && pIn.y === 0 && pIn.entities.join() === "e1", JSON.stringify(pIn));
+const inLines = pIn.parts.split("\n");
+check("protótipo: o texto antigo continua sendo o começo exato do novo", pIn.parts.startsWith("- Lista de Horários\nbotão novo"), JSON.stringify(pIn.parts));
+check("protótipo: a tela existente ganha só as linhas que faltam, no fim", inLines.length === 4 && /filtro por dia/.test(inLines[2]) && inLines[3] === "busca", JSON.stringify(inLines));
+check("protótipo: a linha repetida (caixa, acento e marcador à parte) não entra de novo", !/BOTÃO NOVO/.test(pIn.parts) && pIn.parts.toLowerCase().split("lista de horários").length === 2, JSON.stringify(pIn.parts));
+const pCfg = byName(pm, "Ajustes");
+check("protótipo: a tela que o rascunho não cita fica igual", JSON.stringify(pCfg) === JSON.stringify(pa.screens[1]), JSON.stringify(pCfg));
+const pCad = byName(pm, "Cadastro"), pCon = byName(pm, "Confirmação");
+check("protótipo: a tela nova leva nome, objetivo e partes", pCad && pCad.goal === "criar conta" && pCad.parts === "campo e-mail\nbotão criar conta" && pCon && pCon.parts === "mensagem de sucesso", JSON.stringify([pCad, pCon]));
+check("protótipo: a tela nova ganha id próprio", pCad.id && pCon.id && pCad.id !== pCon.id && !["in", "cfg"].includes(pCad.id) && !["in", "cfg"].includes(pCon.id));
+check("protótipo: a tela nova entra à direita de tudo o que já estava no palco", pCad.x > 300 && pCon.x > 300, pCad.x + "," + pCon.x);
+check("protótipo: tela nova não vira entrada se o app já tem uma", pm.screens.filter((s) => s.start).length === 1 && pIn.start === true && pCad.start === false, JSON.stringify(pm.screens.map((s) => [s.name, s.start])));
+check("protótipo: as ações antigas ficam, na ordem, antes das novas", pm.flows[0].id === "fl1" && pm.flows[0].from === "in" && pm.flows[0].to === "cfg" && pm.flows[0].action === "abriu ajustes", JSON.stringify(pm.flows[0]));
+const flowOf = (a, from, to, action) => a.flows.filter((f) => f.from === from && f.to === to && f.action === action);
+check("protótipo: a ação que saía da tela do rascunho sai da que já existia", flowOf(pm, "in", pCad.id, "tocou em criar conta").length === 1, JSON.stringify(pm.flows));
+check("protótipo: ação entre duas telas novas entra", flowOf(pm, pCad.id, pCon.id, "enviou").length === 1);
+check("protótipo: ação de uma tela que só existe no app para uma nova entra", flowOf(pm, "cfg", pCad.id, "foi se cadastrar").length === 1);
+check("protótipo: ação repetida no rascunho, ou já existente, não duplica", flowOf(pm, "in", "cfg", "abriu ajustes").length === 1 && pm.flows.length === 4, pm.flows.length + " " + JSON.stringify(pm.flows.map((f) => f.action)));
+check("protótipo: ação para tela que não existe não entra", !pm.flows.some((f) => f.action === "x" || f.action === "y"));
+const screenSet = new Set(pm.screens.map((s) => s.id));
+check("protótipo: toda ação juntada liga duas telas do app", pm.flows.every((f) => screenSet.has(f.from) && screenSet.has(f.to)), JSON.stringify(pm.flows));
+check("protótipo: o resultado é um app válido (normalizeApp não muda nada)", JSON.stringify(normalizeApp(pm, makeId)) === JSON.stringify(pm));
+
+/* juntar duas vezes o mesmo rascunho não muda nada */
+const pm2 = mergePrototype(pm, protoData(), makeId);
+check("protótipo: juntar duas vezes não duplica tela, linha nem ação", JSON.stringify(pm2.screens) === JSON.stringify(pm.screens) && JSON.stringify(pm2.flows) === JSON.stringify(pm.flows), pm2.screens.length + " telas, " + pm2.flows.length + " ações");
+
+/* mergeDraft com a opção: o que o rascunho trouxer fora de telas e ações não entra */
+const loud = { ...fromBlueprint({
+  pitch: "invadiu", problem: "invadiu", audience: "invadiu", value: "invadiu", stack: "invadiu",
+  features: [{ title: "Intrusa" }], entities: [{ name: "Intrusa", fields: [{ name: "x", type: "text" }] }],
+  screens: [{ name: "Cadastro", parts: ["campo e-mail"], entities: ["Intrusa"] }, { name: "Início", parts: ["linha nova"] }]
+}, makeId), name: "invadiu", funnel: "outro", client: "outro" };
+const lm = mergeDraft(pa, loud, { screensOnly: true });
+check("screensOnly: pitch, conceito, stack, funcionalidades e entidades ficam idênticos", nonScreens(lm) === nonScreens(pa), nonScreens(lm).slice(0, 200));
+check("screensOnly: ainda junta as telas", lm.screens.length === 3 && /linha nova/.test(byName(lm, "Início").parts) && !!byName(lm, "Cadastro"));
+check("screensOnly: tela nova não carrega entidade do rascunho", byName(lm, "Cadastro").entities.length === 0, JSON.stringify(byName(lm, "Cadastro").entities));
+check("sem a opção, o mergeDraft segue juntando tudo", mergeDraft(pa, loud).entities.length === 2 && mergeDraft(pa, loud).features.length === 2 && mergeDraft(pa, loud).pitch === "o que eu escrevi");
+check("sem a opção, a tela de mesmo nome não ganha linha", byName(mergeDraft(pa, loud), "Início").parts === "- Lista de Horários\nbotão novo", JSON.stringify(byName(mergeDraft(pa, loud), "Início").parts));
+
+/* bordas */
+check("protótipo vazio não muda o app", JSON.stringify(mergePrototype(pa, { screens: [], flows: [] }, makeId)) === paBefore && JSON.stringify(mergePrototype(pa, null, makeId)) === paBefore);
+const flowsOnly = mergePrototype(pa, { flows: [{ from: "Ajustes", to: "Início", action: "voltou" }] }, makeId);
+check("protótipo só com ação liga telas que já existem", flowsOnly.screens.length === 2 && flowOf(flowsOnly, "cfg", "in", "voltou").length === 1 && flowsOnly.flows.length === 2, JSON.stringify(flowsOnly.flows));
+const blankApp = normalizeApp({ id: "vz", name: "Vazio" }, makeId);
+const blankMerged = mergePrototype(blankApp, { screens: [{ name: "Primeira", parts: ["botão ok"] }, { name: "Segunda" }], flows: [{ from: "Primeira", to: "Segunda", action: "ok" }] }, makeId);
+check("app sem telas: as do rascunho entram e a primeira vira a entrada", blankMerged.screens.length === 2 && blankMerged.screens.filter((s) => s.start).length === 1 && blankMerged.screens[0].start === true && blankMerged.flows.length === 1, JSON.stringify(blankMerged.screens.map((s) => [s.name, s.start])));
+const loneStart = mergePrototype(protoApp(), { screens: [{ name: "Cadastro", start: true }, { name: "Ajustes", start: true, parts: ["tema escuro", "avisos"] }] }, makeId);
+check("o rascunho que marca entrada não tira nem troca a que o app tem", loneStart.screens.filter((s) => s.start).map((s) => s.name).join() === "Início", JSON.stringify(loneStart.screens.map((s) => [s.name, s.start])));
+check("a tela existente que não é entrada continua não sendo", byName(loneStart, "Ajustes").start === false && byName(loneStart, "Ajustes").parts === "Tema escuro\navisos", JSON.stringify(byName(loneStart, "Ajustes")));
+const fullParts = Array.from({ length: 19 }, (_, i) => String(i % 10).repeat(99)).join("\n") + "\n" + "k".repeat(90);
+const fullApp = normalizeApp({ id: "fu", name: "Cheio", screens: [{ id: "f1", name: "Cheia", start: true, parts: fullParts }] }, makeId);
+check("(preparo) a tela cheia tem 1990 caracteres", fullApp.screens[0].parts.length === 1990, String(fullApp.screens[0].parts.length));
+const fullMerged = mergePrototype(fullApp, { screens: [{ name: "Cheia", parts: ["z".repeat(60)] }] }, makeId);
+check("a linha que não cabe em 2000 caracteres não entra", fullMerged.screens[0].parts === fullApp.screens[0].parts, String(fullMerged.screens[0].parts.length));
+const roomMerged = mergePrototype(fullApp, { screens: [{ name: "Cheia", parts: ["curta"] }] }, makeId);
+check("a linha que cabe entra, e o total nunca passa de 2000", roomMerged.screens[0].parts === fullApp.screens[0].parts + "\ncurta" && roomMerged.screens[0].parts.length <= 2000, String(roomMerged.screens[0].parts.length));
+const emptyParts = mergePrototype(normalizeApp({ id: "ep", name: "x", screens: [{ id: "e1", name: "Vazia", start: true }] }, makeId), { screens: [{ name: "Vazia", parts: ["botão salvar", "lista de itens"] }] }, makeId);
+check("a tela existente sem partes ganha todas as linhas", emptyParts.screens[0].parts === "botão salvar\nlista de itens", JSON.stringify(emptyParts.screens[0].parts));
+const dupInDraft = mergePrototype(protoApp(), { screens: [{ name: "Ajustes", parts: ["avisos", "- Avisos", "AVISOS "] }] }, makeId);
+check("linha repetida dentro do próprio rascunho entra uma vez só", byName(dupInDraft, "Ajustes").parts === "Tema escuro\navisos", JSON.stringify(byName(dupInDraft, "Ajustes").parts));
 
 /* ---- markdown e prompt ---- */
 const md = toMarkdown(app);
