@@ -5,7 +5,7 @@ entra pelo mesmo endereço e cada um ganha um Merlin inteiro, que ninguém mais 
 o `artt · planner` — um controle
 de tarefas de um dia — e virou um conjunto de módulos ligados entre si. O início é só a
 conversa com o Merlin; o resto mora num **menu** que se abre do alto, organizado em **cinco
-áreas** da vida: **saúde** (os hábitos, o sono, o treino e o diário), **trabalho** (produtos, conteúdo, funis e mapas),
+áreas** da vida: **saúde** (os hábitos, o sono, o treino, a alimentação e o diário), **trabalho** (produtos, conteúdo, funis e mapas),
 **organização** (o calendário, a rotina e as notas), **finanças** (o financeiro) e **inbox**
 (o que falta, leads e clientes). O `Ctrl+K` é o campo de tudo: com duração vai para hoje,
 sem duração vira nota, com "?" pergunta ao Merlin, e vazio lista todas as abas. A visão
@@ -47,6 +47,7 @@ está em [MIGRATION.md](MIGRATION.md).
 | `habits.html` | a grade do mês: hábitos nas linhas, dias nas colunas, uma marca por dia. Sequência e taxa do mês. |
 | `sleep.html` | o sono: a semana com uma barra por noite e a linha da meta. "dormi 7h", no início ou na conversa, grava a noite aqui. |
 | `training.html` | o treino: a semana com os treinos de cada dia e o total. "treinei perna 40min", no início ou na conversa, grava o treino aqui e marca o hábito de treino. |
+| `meals.html` | a alimentação: a semana com as refeições de cada dia, na ordem do dia, sem caloria nem nota. "almocei salada", no início ou na conversa, anota a refeição aqui. |
 | `journal.html` | o diário: a semana em cartões, um por dia, com o texto do "como foi o dia" editável ali (a mesma coleção do Hoje). |
 | `share.html` | a leitura de um mapa ou funil por link público (`share.html#<token>`), sem conta. |
 | `tracker.html` | o rastreador: o número grande, a barra, o que é agora e o que vem depois, e um campo para pôr mais coisa na fila. É a janela pequena do app de desktop ([desktop/](desktop/README.md)), mas abre no navegador também. |
