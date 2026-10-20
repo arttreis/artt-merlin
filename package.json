@@ -9,7 +9,7 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview --port 8765 --strictPort",
-    "test": "node src/shared/test.mjs && node src/shared/board.test.mjs && node src/shared/content.test.mjs && node src/shared/finance.test.mjs && node src/shared/habits.test.mjs && node src/shared/journal.test.mjs && node src/shared/app-spec.test.mjs && node src/shared/hat.test.mjs && node src/shared/portrait.test.mjs && node src/shared/quests.test.mjs"
+    "test": "node src/shared/test.mjs && node src/shared/board.test.mjs && node src/shared/content.test.mjs && node src/shared/finance.test.mjs && node src/shared/habits.test.mjs && node src/shared/journal.test.mjs && node src/shared/sleep.test.mjs && node src/shared/app-spec.test.mjs && node src/shared/hat.test.mjs && node src/shared/portrait.test.mjs && node src/shared/quests.test.mjs"
   },
   "dependencies": {
     "react": "^19.2.8",

@@ -820,6 +820,75 @@ body = await r.json();
 check("conversa: wishlist-item saiu do catálogo", r.status === 200 && Array.isArray(body.suggestions) && body.suggestions.length === 0, JSON.stringify(body));
 check("conversa: a instrução não cita wishlist-item", !/wishlist-item/.test(claudeAsked), String(claudeAsked).slice(0, 300));
 
+/* ---- 13e-quinquies. o sono ----
+   "dormi 7h" escrito no início, ou dito na conversa, vira uma noite. o que o
+   Worker garante: as horas são um inteiro entre 0 e 1440, a data é um dia de
+   verdade (senão, o de hoje), e nada de outro tipo vaza para o item. horas que
+   a IA não leu NÃO derrubam o item: ele volta com min 0, e a tela pede as horas
+   (como o gasto sem valor). */
+const sleepCtx = { today: "2026-10-18 (domingo)", hour: "08:10", clients: [], habits: [] };
+const sleepItem = (over) => ({ kind: "sleep", min: 420, date: "2026-10-18", ...over });
+const readSleep = async (text, items, ctx) => {
+  claudeAnswer = { stop_reason: "end_turn", content: [{ type: "text", text: JSON.stringify({ items }) }] };
+  const res = await call("POST", "/merlin", { task: "capture", context: { ...(ctx || sleepCtx), text } }, cookie);
+  return { status: res.status, body: await res.json() };
+};
+
+let sl13 = await readSleep("dormi 7h", [sleepItem()]);
+check("sono: a leitura devolve um item", sl13.status === 200 && sl13.body.items.length === 1, JSON.stringify(sl13.body));
+check("sono: 'dormi 7h' volta como sleep, 420, no dia dito", sl13.body.items[0].kind === "sleep" && sl13.body.items[0].min === 420 && sl13.body.items[0].date === "2026-10-18", JSON.stringify(sl13.body.items[0]));
+check("sono: o item só tem kind, min e date", Object.keys(sl13.body.items[0] || {}).sort().join() === "date,kind,min", JSON.stringify(sl13.body.items[0]));
+check("sono: a instrução da captura cita sleep", /sleep/.test(claudeAsked), String(claudeAsked).slice(0, 400));
+check("sono: a instrução ainda cita habit (os tipos antigos continuam)", /habit/.test(claudeAsked));
+check("sono: a leitura grava capture:sleep na usage", db.usage.some((x) => x.task === "capture:sleep" && x.n >= 1), JSON.stringify(db.usage.map((x) => x.task)));
+
+/* as horas */
+sl13 = await readSleep("dormi 9999", [sleepItem({ min: 9999 })]);
+check("sono: min 9999 vira o teto de 1440", sl13.body.items[0].min === 1440, JSON.stringify(sl13.body.items));
+sl13 = await readSleep("dormi 7h30", [sleepItem({ min: 450.4 })]);
+check("sono: min fracionado é arredondado para inteiro", sl13.body.items[0].min === 450, JSON.stringify(sl13.body.items));
+sl13 = await readSleep("dormi 7h30", [sleepItem({ min: "450" })]);
+check("sono: min em texto numérico vira número", sl13.body.items[0].min === 450, JSON.stringify(sl13.body.items));
+sl13 = await readSleep("dormi", [sleepItem({ min: undefined })]);
+check("sono: sem min o item fica, com min 0 (a tela pede as horas)", sl13.body.items.length === 1 && sl13.body.items[0].kind === "sleep" && sl13.body.items[0].min === 0, JSON.stringify(sl13.body.items));
+sl13 = await readSleep("dormi", [sleepItem({ min: "muito" })]);
+check("sono: min inválido vira 0 e o item fica", sl13.body.items.length === 1 && sl13.body.items[0].min === 0, JSON.stringify(sl13.body.items));
+sl13 = await readSleep("dormi", [sleepItem({ min: -30 })]);
+check("sono: min negativo vira 0 e o item fica", sl13.body.items.length === 1 && sl13.body.items[0].min === 0, JSON.stringify(sl13.body.items));
+
+/* a data */
+sl13 = await readSleep("ontem dormi 6h", [sleepItem({ min: 360, date: "2026-10-17" })]);
+check("sono: a data dita (ontem) fica", sl13.body.items[0].date === "2026-10-17" && sl13.body.items[0].min === 360, JSON.stringify(sl13.body.items[0]));
+sl13 = await readSleep("dormi 7h", [sleepItem({ date: "ontem" })]);
+check("sono: data inválida vira o dia de context.today", sl13.body.items[0].date === "2026-10-18", JSON.stringify(sl13.body.items[0]));
+sl13 = await readSleep("dormi 7h", [sleepItem({ date: undefined })]);
+check("sono: sem data vira o dia de context.today", sl13.body.items[0].date === "2026-10-18", JSON.stringify(sl13.body.items[0]));
+sl13 = await readSleep("dormi 7h", [sleepItem({ date: "2026-10-1" })]);
+check("sono: data fora do formato AAAA-MM-DD vira hoje", sl13.body.items[0].date === "2026-10-18", JSON.stringify(sl13.body.items[0]));
+
+/* a IA manda campo a mais e ele não passa */
+sl13 = await readSleep("dormi 7h", [sleepItem({ title: "dormir", amount: 4500, habit: "treinar", name: "x", hack: "<script>" })]);
+check("sono: campo de outro tipo não vaza para o item", Object.keys(sl13.body.items[0]).sort().join() === "date,kind,min", JSON.stringify(sl13.body.items[0]));
+
+/* uma linha com várias coisas: a ordem fica */
+sl13 = await readSleep("dormi 7h, gastei 45 no almoço e treinei", [sleepItem(), money(), habitItem()]);
+check("sono: sono, gasto e hábito mantêm a ordem", sl13.body.items.map((x) => x.kind).join() === "sleep,money,habit", sl13.body.items.map((x) => x.kind).join());
+check("sono: o gasto e o hábito continuam limpos", sl13.body.items[1].amount === 4500 && sl13.body.items[2].habit === "" && !("min" in sl13.body.items[1]) && !("amount" in sl13.body.items[0]), JSON.stringify(sl13.body.items));
+sl13 = await readSleep("ligar pro João e dormi 6h", [{ kind: "task", title: "ligar pro João", min: 30, date: "2026-10-18" }, sleepItem({ min: 360 })]);
+check("sono: tarefa e sono mantêm a ordem, e o min da tarefa não se mistura", sl13.body.items.map((x) => x.kind).join() === "task,sleep" && sl13.body.items[0].min === 30 && sl13.body.items[1].min === 360, JSON.stringify(sl13.body.items));
+
+/* a conversa: o catálogo ganha sleep-log, com os campos fechados */
+claudeAnswer = { stop_reason: "end_turn", content: [{ type: "text", text: JSON.stringify({ suggestions: [{ actionType: "sleep-log", title: "7h de sono", note: "hoje", payload: {
+  min: 450, date: "2026-10-18", amount: 4500, habit: "treinar", id: "s1", hack: "<script>"
+} }], clarify: "" }) }] };
+r = await call("POST", "/merlin", { task: "assistant", context: { message: "dormi 7h e meia" } }, cookie);
+body = await r.json();
+check("conversa: sleep-log entra no catálogo", r.status === 200 && body.suggestions.length === 1 && body.suggestions[0].actionType === "sleep-log", JSON.stringify(body));
+check("conversa: a proposta só tem min e date", body.suggestions[0] && Object.keys(body.suggestions[0].payload).sort().join() === "date,min" && !("hack" in body.suggestions[0].payload) && !("amount" in body.suggestions[0].payload), JSON.stringify(body.suggestions[0] && body.suggestions[0].payload));
+check("conversa: os campos guardam o que a IA propôs", body.suggestions[0] && body.suggestions[0].payload.min === 450 && body.suggestions[0].payload.date === "2026-10-18", JSON.stringify(body.suggestions[0] && body.suggestions[0].payload));
+check("conversa: a instrução cita sleep-log", /sleep-log/.test(claudeAsked), String(claudeAsked).slice(0, 300));
+check("conversa: habit-mark e finance-entry continuam no catálogo", /habit-mark/.test(claudeAsked) && /finance-entry/.test(claudeAsked));
+
 /* ---- 13f. o teto do conselheiro ----
    a chave da Anthropic e uma so para o time. o teto e por pessoa e por hora:
    quem gastou espera, e quem esta ao lado nao paga por isso. */

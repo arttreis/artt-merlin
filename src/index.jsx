@@ -35,6 +35,7 @@ import { MAX_TURNS, normalizeChat, chatTitle, turnsOf, markProposal } from "./sh
 import { normalize as normalizeFinance, configOf, contextOf as financeContext, newEntry, undoEntry, entryLine, captureContext } from "./shared/finance-data.js";
 import { BUILD, buildIntent } from "./shared/build-intent.js";
 import { normalize as normalizeHabit, habitStatus, markOn, undoHabit, markWhen } from "./shared/habits-data.js";
+import { normalize as normalizeSleep, sleepDoc, sleepLabel, sleepLine, nightOf, undoSleep } from "./shared/sleep-data.js";
 import { distribute, fmt, clock, costOf } from "./shared/day.js";
 import { Forest, phaseOf } from "./shared/forest.jsx";
 import { githubDay } from "./shared/focus.js";
@@ -257,6 +258,11 @@ function Onboarding({ profile, apps, habits, veteran, onDone }) {
    que já estava marcado só diz isso; o que não existe espera no cartão o
    "criar e marcar", que abre a caixa de novo hábito preenchida.
 
+   desde 20/10/2026 também devolve sono ("dormi 7h", "ontem dormi 6h"): o
+   Enter grava a noite na aba sono, no dia em que se acordou, com o mesmo
+   desfazer (que devolve a noite de antes, se substituiu). o que veio sem as
+   horas espera no cartão e se registra pela caixa de proposta.
+
    o pedido de montar ("monta um funil pra consultoria", "quero um app de
    agenda") não é tarefa nem pergunta: vai para a conversa do assistente, que
    pergunta o que falta e mostra o rascunho (shared/build.js). a duração
@@ -285,13 +291,22 @@ function dayLabel(date, base) {
 /* o hábito lido, do jeito que o cartão o mostra: "marca hoje", "já estava
    marcado" ou "não existe" */
 const habitMeta = (st, base) => st.error ? st.error : !st.habit ? "não existe" : st.already ? "✓ já estava marcado" + (st.day === base ? "" : " · " + markWhen(st.day, base)) : "marca " + markWhen(st.day, base);
+/* a noite lida: "noite de hoje", "noite de 19/10", ou o que falta */
+function sleepMeta(it, base) {
+  const { day, error } = nightOf(it, base);
+  if (error) return error;
+  if (!it.min) return "faltam as horas";
+  return "noite de " + (day === base ? "hoje" : day.slice(8, 10) + "/" + day.slice(5, 7));
+}
 const draftMeta = (it, base, money, habitsNow) => it.kind === "note" ? "nota"
   : it.kind === "money" ? entryLine(it, base, money)
   : it.kind === "habit" ? habitMeta(habitStatus(habitsNow, it, base), base)
+  : it.kind === "sleep" ? sleepMeta(it, base)
   : [dayLabel(it.date, base), it.at, it.min ? (it.guess ? "~" : "") + fmt(it.min) : "", it.client].filter(Boolean).join(" · ");
-const DRAFT_ICON = { task: "check", note: "pencil", money: "finance", habit: "habits" };
+const DRAFT_ICON = { task: "check", note: "pencil", money: "finance", habit: "habits", sleep: "sleep" };
 /* o hábito que existe aparece com o nome dele; o que não existe, como foi dito */
-const draftTitle = (it, habitsNow, base) => it.kind !== "habit" ? it.title : (habitStatus(habitsNow, it, base).habit || it).name;
+const draftTitle = (it, habitsNow, base) => it.kind === "sleep" ? (it.min ? sleepLabel(it.min) + " de sono" : "sono")
+  : it.kind !== "habit" ? it.title : (habitStatus(habitsNow, it, base).habit || it).name;
 
 /* o gasto ou a entrada lidos na linha, como a caixa de proposta os recebe: é
    por ela que se lança o que veio sem valor */
@@ -299,6 +314,8 @@ const moneyProposal = (it) => ({
   actionType: "finance-entry", title: it.title, note: "",
   payload: { name: it.title, amount: it.amount, kind: it.flow, day: it.date, category: it.category, paid: it.paid, confirm: it.confirm, fixed: it.fixed }
 });
+/* o sono lido sem as horas, como a caixa de proposta o recebe */
+const sleepProposal = (it) => ({ actionType: "sleep-log", title: "registrar sono", note: "", payload: { min: it.min, date: it.date } });
 
 /* o cliente volta da IA pelo nome; a tarefa guarda o id, como a @menção */
 function clientId(name) {
@@ -330,14 +347,20 @@ function Composer({ tasks, habits, b, smart, onAsk, onIntent, readContext }) {
   const money = financeContext(finance);
   const habitsNow = habits.all();
   const habitOf = (it) => habitStatus(habitsNow, it, date);
+  const sleep = useCollection("sleep", { normalize: normalizeSleep });
   /* o que ainda não pode ser criado: o gasto sem valor só se lança pela caixa,
-     e o hábito que não existe, pela caixa de novo hábito */
+     o hábito que não existe, pela caixa de novo hábito, e o sono sem as
+     horas, pela caixa de proposta */
   const missing = (it) => it.kind === "money" ? !!newEntry(it, configOf(finance), money, date).error
     : it.kind === "habit" ? !habitOf(it).error && !habitOf(it).habit
+    : it.kind === "sleep" ? !nightOf(it, date).error && !it.min
     : false;
-  /* o que não tem o que fazer: o hábito que já estava marcado, ou o de um dia
-     que ainda não chegou. o Enter o tira do cartão sem gravar nada */
-  const idle = (it) => it.kind === "habit" && (!!habitOf(it).error || habitOf(it).already);
+  /* o que não tem o que fazer: o hábito que já estava marcado, ou o hábito e
+     a noite de um dia que ainda não chegou. o Enter o tira do cartão sem
+     gravar nada */
+  const idle = (it) => it.kind === "habit" ? !!habitOf(it).error || habitOf(it).already
+    : it.kind === "sleep" ? !!nightOf(it, date).error
+    : false;
   const route = routeLine(text);
   const build = !intent && route && route.kind !== "task" ? buildIntent(text) : null;
   const willRead = smart && !intent && !build && needsReading(text, route);
@@ -369,6 +392,7 @@ function Composer({ tasks, habits, b, smart, onAsk, onIntent, readContext }) {
     if (!ready.length) { if (waiting.length) setBoxed(draft.items.indexOf(waiting[0])); else clear(); return; }
     const undo = [];
     const marked = [];
+    const slept = [];
     let nTasks = 0, nNotes = 0, nMoney = 0;
     ready.forEach((it) => {
       const client = clientId(it.client);
@@ -381,6 +405,15 @@ function Composer({ tasks, habits, b, smart, onAsk, onIntent, readContext }) {
         habits.save(doc);
         undo.push(() => habits.save({ ...back.save, updatedAt: Date.now() }));
         marked.push(doc.name + " marcado " + markWhen(st.day, date));
+      } else if (it.kind === "sleep") {
+        /* um documento por noite: a segunda leitura do mesmo dia substitui */
+        const before = sleep.get(nightOf(it, date).day);
+        const { doc } = sleepDoc(it, before, date);
+        if (!doc) return;
+        sleep.save(doc);
+        const back = undoSleep(before, doc);
+        undo.push(() => { if (back.remove) sleep.remove(back.remove); else sleep.save({ ...back.save, updatedAt: Date.now() }); });
+        slept.push("✓ registrado · " + sleepLine(doc.min, doc.id, date));
       } else if (it.kind === "money") {
         const { doc } = newEntry({ ...it, chat: "home" }, configOf(finance), financeContext(finance), date);
         const before = finance.get(doc.id);
@@ -404,9 +437,11 @@ function Composer({ tasks, habits, b, smart, onAsk, onIntent, readContext }) {
     const said = [
       parts.length && parts.join(" e ") + (nTasks + nNotes === 1 ? " criada" : " criadas"),
       nMoney && (nMoney === 1 ? "lançado no financeiro" : nMoney + " lançados no financeiro"),
-      marked.length && (marked.length === 1 ? marked[0] : marked.length + " hábitos marcados")
+      marked.length && (marked.length === 1 ? marked[0] : marked.length + " hábitos marcados"),
+      slept.length && (slept.length === 1 ? slept[0] : slept.length + " noites registradas")
     ].filter(Boolean);
-    if (said.length) notify(said.join(" · "), () => undo.forEach((f) => f()));
+    /* do último para o primeiro: a mesma noite lida duas vezes volta à de antes */
+    if (said.length) notify(said.join(" · "), () => undo.slice().reverse().forEach((f) => f()));
     if (waiting.length) setDraft({ ...draft, items: waiting });
     else clear();
   };
@@ -448,10 +483,11 @@ function Composer({ tasks, habits, b, smart, onAsk, onIntent, readContext }) {
   const readyN = draft ? draft.items.length - lacking - draft.items.filter(idle).length : 0;
   const firstLacking = draft ? draft.items.find(missing) : null;
   const toCreate = firstLacking && firstLacking.kind === "habit";
+  const toHours = firstLacking && firstLacking.kind === "sleep";
   const hint = reading ? "o Merlin está lendo…"
     : draft && !readyN && !lacking ? "nada a marcar · Enter fecha · Esc volta ao texto"
-    : draft && !readyN ? "Enter abre a caixa para " + (toCreate ? "criar o hábito" : "pôr o valor") + " · Esc volta ao texto"
-    : draft && lacking ? "Enter cria o que está pronto · " + (toCreate ? "o hábito novo espera a caixa" : "o que falta o valor fica") + " · Esc volta ao texto"
+    : draft && !readyN ? "Enter abre a caixa para " + (toCreate ? "criar o hábito" : toHours ? "pôr as horas" : "pôr o valor") + " · Esc volta ao texto"
+    : draft && lacking ? "Enter cria o que está pronto · " + (toCreate ? "o hábito novo espera a caixa" : toHours ? "o sono sem as horas fica" : "o que falta o valor fica") + " · Esc volta ao texto"
     : draft ? "Enter cria · Esc volta ao texto"
     : intent ? INTENT_HINT[intent.period || intent.kind]
     : !route ? (smart ? "escreva do seu jeito: o Merlin separa tarefa, data, hora e nota · a pergunta ele responde aqui em cima"
@@ -487,8 +523,8 @@ function Composer({ tasks, habits, b, smart, onAsk, onIntent, readContext }) {
                 {icon(DRAFT_ICON[it.kind] || "pencil")}
                 <span className="hm-draft__title">{draftTitle(it, habitsNow, date)}</span>
                 <span className="hm-draft__meta t-mono">{draftMeta(it, date, money, habitsNow)}</span>
-                {missing(it) && <button type="button" className="pill pill--mini" onClick={() => setBoxed(i)}>{it.kind === "habit" ? "criar e marcar" : "abrir a caixa"}</button>}
-                <button type="button" className="hm-draft__drop" aria-label={"Tirar " + it.title} title="tirar" onClick={() => drop(i)}>{icon("x")}</button>
+                {missing(it) && <button type="button" className="pill pill--mini" onClick={() => setBoxed(i)}>{it.kind === "habit" ? "criar e marcar" : it.kind === "sleep" ? "pôr as horas" : "abrir a caixa"}</button>}
+                <button type="button" className="hm-draft__drop" aria-label={"Tirar " + draftTitle(it, habitsNow, date)} title="tirar" onClick={() => drop(i)}>{icon("x")}</button>
               </li>
             ))}
           </ul>
@@ -506,7 +542,7 @@ function Composer({ tasks, habits, b, smart, onAsk, onIntent, readContext }) {
     {draft && boxed >= 0 && draft.items[boxed] && (draft.items[boxed].kind === "habit"
       ? <HabitForm habits={habits} draft={{ name: draft.items[boxed].name, mark: draft.items[boxed].date }} onClose={() => setBoxed(-1)}
                    onDone={(line) => { if (line) { if (draft.items.length === 1) clear(); else drop(boxed); } }} />
-      : <ProposalDialog proposal={moneyProposal(draft.items[boxed])} onClose={() => setBoxed(-1)}
+      : <ProposalDialog proposal={draft.items[boxed].kind === "sleep" ? sleepProposal(draft.items[boxed]) : moneyProposal(draft.items[boxed])} onClose={() => setBoxed(-1)}
                         onDone={(line) => { if (line) { if (draft.items.length === 1) clear(); else drop(boxed); } }} />
     )}
     </>

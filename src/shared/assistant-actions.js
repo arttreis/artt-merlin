@@ -11,6 +11,7 @@ import { layoutNodes } from "./funnel-layout.js";
 import { newEntry, entryLine, paidOf, configOf, contextOf } from "./finance-data.js";
 import { SOURCES } from "./portrait.js";
 import { normalize as normalizeHabit, habitStatus, markOn } from "./habits-data.js";
+import { sleepLabel, sleepLine, readHours, sleepDoc, nightOf } from "./sleep-data.js";
 
 export const ACTION_COLLECTIONS = {
   task: "tasks",
@@ -21,7 +22,8 @@ export const ACTION_COLLECTIONS = {
   "onboarding-funnel": "funnels",
   script: "content",
   "finance-entry": "finance",
-  "habit-mark": "habits"
+  "habit-mark": "habits",
+  "sleep-log": "sleep"
 };
 
 export const ACTION_LABELS = {
@@ -33,11 +35,12 @@ export const ACTION_LABELS = {
   "onboarding-funnel": "novo funil de onboarding",
   script: "roteiro",
   "finance-entry": "novo lançamento",
-  "habit-mark": "marcar hábito"
+  "habit-mark": "marcar hábito",
+  "sleep-log": "registrar sono"
 };
 
 /* o que a pílula confirmada diz no lugar do título: "✓ lançado · …" */
-export const ACTION_DONE = { "finance-entry": "lançado", "habit-mark": "marcado", task: "criada", note: "criada", "lead-update": "aplicado", script: "aplicado" };
+export const ACTION_DONE = { "finance-entry": "lançado", "habit-mark": "marcado", "sleep-log": "registrado", task: "criada", note: "criada", "lead-update": "aplicado", script: "aplicado" };
 
 /* so os campos que fazem sentido editar antes de confirmar — o resto do
    payload (arvore do mapa, etapas do funil, id do cliente/conteudo) segue
@@ -81,8 +84,18 @@ export const ACTION_FIELDS = {
       initial: (p, store) => (configOf(store).categories.includes(p.category) ? p.category : ""),
       options: (store) => [["", "sem categoria"], ...configOf(store).categories] },
     { key: "paid", label: "já aconteceu", type: "check", initial: (p) => paidOf(p.day || today(), p.paid, today()) }
+  ],
+  /* as horas como se escrevem ("7h30"): a IA manda minutos, e a caixa os
+     mostra do jeito que se lê. sem as horas, a caixa as pede antes de gravar */
+  "sleep-log": [
+    { key: "hours", label: "horas dormidas", initial: (p) => sleepLabel(p.min) },
+    { key: "date", label: "dia em que acordou", type: "date", initial: () => today() }
   ]
 };
+
+/* os minutos de uma proposta de sono: o que a pessoa escreveu na caixa, ou o
+   que a IA propôs */
+const sleepMin = (p) => (p.hours != null && p.hours !== "" ? readHours(p.hours) : Math.max(0, Math.round(+p.min || 0)));
 
 /* a linha extra debaixo do titulo do dialogo — o que da pra ver do payload
    sem abrir os campos, tipo "12/09/2026 · 30 min · cliente x". `ctx` (o do
@@ -99,6 +112,11 @@ export function previewOf(actionType, payload, ctx) {
     case "script": return "entra no roteiro da peça de conteúdo";
     case "finance-entry": return entryLine({ ...p, flow: p.kind, date: p.day }, today(), ctx);
     case "habit-mark": return [p.habit || p.name, p.date && p.date !== today() ? p.date.slice(8, 10) + "/" + p.date.slice(5, 7) : ""].filter(Boolean).join(" · ");
+    case "sleep-log": {
+      const t = today(), { day, error } = nightOf(p, t);
+      if (error) return error;
+      return sleepMin(p) ? sleepLine(sleepMin(p), day, t) : "faltam as horas";
+    }
     default: return "";
   }
 }
@@ -161,6 +179,12 @@ export function buildDoc(actionType, payload, v, store, opts) {
       if (error) return { error };
       if (!habit) return { error: "não achei esse hábito" };
       return markOn(habit, day, today());
+    }
+    /* um documento por noite, com o id no dia em que acordou: registrar de
+       novo substitui, e o desfazer da caixa devolve a noite de antes */
+    case "sleep-log": {
+      const t = today(), { day } = nightOf({ date: v.date || p.date }, t);
+      return sleepDoc({ date: day, min: sleepMin({ ...p, ...v }) }, store.get(day), t);
     }
     default:
       return { error: "tipo de ação desconhecido" };

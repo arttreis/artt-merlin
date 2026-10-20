@@ -932,6 +932,8 @@ const dataLeft = () => globalThis.localStorage.keys().filter((k) => k in DATA);
   check("leitura: data por extenso passa pelo Merlin", reads("ligar pro João amanhã 30m") && reads("call com a Ana às 15h 1h") && reads("entregar o deck sexta 2h"));
   check("leitura: duas durações na mesma linha passam pelo Merlin", reads("revisar landing 45m, responder e-mails 30m"));
   check("leitura: pergunta não passa pela leitura", !reads("como precifico o plano anual"));
+  check("leitura: 'dormi 7h' passa pelo Merlin (senão viraria tarefa de 7h)", reads("dormi 7h") && reads("dormi 6h30") && reads("ontem dormi 6h"), [reads("dormi 7h"), reads("dormi 6h30"), reads("ontem dormi 6h")].join());
+  check("leitura: tarefa com duração segue direto mesmo depois do sono", !reads("revisar landing 45m"));
 
   /* a janela anda com o relógio de verdade: começa uma hora atrás e acaba em
      quatro, então a conta é a mesma a qualquer hora em que o teste rodar */
@@ -1263,7 +1265,7 @@ const dataLeft = () => globalThis.localStorage.keys().filter((k) => k in DATA);
   const { SECTIONS, PAGES, sectionOf } = await fresh({});
 
   const wanted = [
-    ["health", "saúde", "habits", [["habits", "hábitos", "habits.html"], ["journal", "diário", "journal.html"]]],
+    ["health", "saúde", "habits", [["habits", "hábitos", "habits.html"], ["sleep", "sono", "sleep.html"], ["journal", "diário", "journal.html"]]],
     ["work", "trabalho", "apps", [
       ["apps", "produtos", "apps.html"], ["content", "conteúdo", "content.html"],
       ["funnels", "funis", "funnels.html"], ["maps", "mapas", "maps.html"]
@@ -1284,7 +1286,7 @@ const dataLeft = () => globalThis.localStorage.keys().filter((k) => k in DATA);
     const got = (SECTIONS.find((s) => s.id === id) || { pages: [] }).pages.map((p) => [p.id, p.label, p.href]);
     check("áreas: as abas de " + id + ", na ordem", JSON.stringify(got) === JSON.stringify(tabs), JSON.stringify(got));
   });
-  check("áreas: são treze abas", PAGES.length === 13, String(PAGES.length));
+  check("áreas: são catorze abas", PAGES.length === 14, String(PAGES.length));
   check("áreas: o diário é uma aba de saúde", sectionOf("journal")?.id === "health", String(sectionOf("journal")?.id));
   check("áreas: a vitrine não está em nenhuma", !PAGES.some((p) => p.id === "wishlist") && !PAGES.some((p) => /wishlist/.test(p.href)));
 

@@ -1,0 +1,21 @@
+/* merlin · o CSS desta pagina
+   importado logo depois do base.css: primeiro o comum, depois o da pagina. */
+
+/* a semana: uma linha por noite, o dia, a barra e as horas. a barra usa a
+   tinta secundaria; o roxo e so a linha da meta. em 390px a coluna do meio
+   encolhe e nada rola para o lado */
+.sl-week{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:4px}
+.sl-night{
+  display:grid;grid-template-columns:68px minmax(0,1fr) 46px;align-items:center;gap:10px;width:100%;
+  padding:9px 8px;border:1px solid transparent;border-radius:var(--br2);background:none;color:inherit;font:inherit;text-align:left;cursor:pointer;
+  transition:background var(--t),border-color var(--t);
+}
+.sl-night:hover:not(:disabled){background:var(--fill);border-color:var(--line-soft)}
+.sl-night:disabled{cursor:default;opacity:.45}
+.sl-night__day{font-size:11px;color:var(--ink-50);white-space:nowrap}
+.sl-night.is-today .sl-night__day{color:var(--ink)}
+.sl-night__track{position:relative;height:14px;border-radius:4px;background:var(--fill)}
+.sl-night__bar{position:absolute;left:0;top:0;bottom:0;border-radius:4px;background:var(--ink-30)}
+.sl-night__goal{position:absolute;top:-4px;bottom:-4px;width:2px;margin-left:-1px;border-radius:1px;background:var(--accent)}
+.sl-night__label{font-size:12px;color:var(--ink);text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.sl-goal{width:auto}
