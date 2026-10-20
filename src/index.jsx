@@ -902,7 +902,8 @@ function Today({ c, tasks, habits, journal, closes, reviews, sessions, me, h, ph
      coleções; a linha de texto é o que a conversa guarda e o Merlin lê depois.
      as contas previstas que passaram também estão na lista */
   const finance = useCollection("finance", { normalize: normalizeFinance });
-  const questsMsg = () => ({ from: "merlin", show: "quests", text: questsText(questsOf({ tasks: tasks.all(), sessions: sessions.all(), entries: finance.all() })) });
+  const workouts = useCollection("workouts", { normalize: normalizeWorkout });
+  const questsMsg = () => ({ from: "merlin", show: "quests", text: questsText(questsOf({ tasks: tasks.all(), sessions: sessions.all(), entries: finance.all(), habits: habits.all(), workouts: workouts.all() })) });
   const ask = async (q) => {
     if (!c.signedIn) { askMerlin(q); return; }
     if (asking) return;

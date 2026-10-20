@@ -44,7 +44,9 @@ const { normalize, tasks, askIntent } = await import("./tasks.js");
 const { runningOf, startSession, stopSession } = await import("./focus.js");
 const { normalize: normalizeFinance } = await import("./finance-data.js");
 const { collection } = await import("./core.js");
-const { questsOf, nextQuest, countLine, moveTask, dropTask, doneTask, paidEntry, moveEntry, SOON, DAY_HREF, FINANCE_HREF, SOURCES } = await import("./quests.js");
+const { normalize: normalizeHabit } = await import("./habits-data.js");
+const { normalize: normalizeWorkout } = await import("./workouts-data.js");
+const { questsOf, questsText, nextQuest, countLine, moveTask, dropTask, doneTask, paidEntry, moveEntry, SOON, DAY_HREF, FINANCE_HREF, SOURCES } = await import("./quests.js");
 
 /* ---- os ingredientes ---- */
 
@@ -652,6 +654,72 @@ const billIds = (q) => q.behind.map((x) => x.id);
   check("sessão rodando e conta passada: a conta está em para trás, não em agora", q.now.length === 1 && billIds(q).join() === "entry:rent", JSON.stringify([ids(q.now), billIds(q)]));
   const skipped = nextQuest(q, new Set(["session:s1"]));
   check("pulada a sessão: a conta aparece", skipped.quest && skipped.quest.id === "entry:rent", JSON.stringify(skipped.quest && skipped.quest.id));
+}
+
+/* ---- agora: o treino do dia (D8 do PRD saude-completa) ----
+   a única exceção entre os hábitos: só o treino entra, e só quando é dia dele
+   e ainda não houve treino nem marca hoje. o dia é fixo (sexta, 23/10/2026,
+   numa semana de seg 19 a dom 25), para a conta da semana não depender de
+   quando o teste roda */
+{
+  const FRI = new Date(2026, 9, 23, 9, 0);
+  const DAY = "2026-10-23";
+  let hseq = 0;
+  const habit = (over = {}) => normalizeHabit({ id: "h" + (++hseq), name: "treinar", schedule: { type: "daily" }, min: 45, createdAt: 1000 + hseq, ...over });
+  const workout = (over = {}) => normalizeWorkout({ id: "w" + (++hseq), day: DAY, title: "perna", min: 40, ...over });
+  const marks = (...days) => Object.fromEntries(days.map((d) => ["2026-10-" + d, true]));
+  const onFri = (data, now) => quests({ workouts: [], ...data }, now || FRI);
+  const wk = (q) => q.now.find((x) => x.type === "workout");
+  const types = (q) => q.now.map((x) => x.type).join();
+
+  const daily = habit();
+  const q = onFri({ habits: [daily] });
+  const w = wk(q);
+  check("treino: hábito diário, nada hoje: está em agora", !!w, JSON.stringify(q.now));
+  check("treino: o id é o do dia, o título é treinar", !!w && w.id === "workout:" + DAY && w.title === "treinar", JSON.stringify(w));
+  check("treino: carrega o hábito e os minutos dele", !!w && w.habit.id === daily.id && w.min === 45, JSON.stringify(w && [w.habit.id, w.min]));
+  check("treino: conta em left", q.left === 1, String(q.left));
+  check("treino: nextQuest o devolve, pelo título", nextQuest(q, []).quest.title === "treinar");
+  check("treino: a linha de texto diz agora: treinar", questsText(q) === "agora: treinar · faltam 1 · 0 feitas", questsText(q));
+
+  check("treino: com marca hoje, não aparece", !wk(onFri({ habits: [habit({ marks: marks(23) })] })));
+  check("treino: com um treino hoje, não aparece", !wk(onFri({ habits: [daily], workouts: [workout()] })));
+  check("treino: o treino de ontem não conta", !!wk(onFri({ habits: [daily], workouts: [workout({ day: "2026-10-22" })] })));
+  check("treino: o treino apagado não conta", !!wk(onFri({ habits: [daily], workouts: [{ ...workout(), deleted: true }] })));
+  check("treino: a marca de ontem não conta", !!wk(onFri({ habits: [habit({ marks: marks(22) })] })));
+  check("treino: sem hábito de treino, não aparece", !wk(onFri({ habits: [] })));
+  check("treino: sem as coleções, não aparece nem quebra", !wk(quests({}, FRI)));
+  check("treino: hábito arquivado, não aparece", !wk(onFri({ habits: [habit({ archived: true })] })));
+  check("treino: o nome que começa com trein (Treino de força) vale", !!wk(onFri({ habits: [habit({ name: "Treino de força" })] })));
+
+  check("treino: dias da semana, hoje é um deles: aparece", !!wk(onFri({ habits: [habit({ schedule: { type: "weekdays", weekdays: [1, 3, 5] } })] })));
+  check("treino: dias da semana, hoje fora: não aparece", !wk(onFri({ habits: [habit({ schedule: { type: "weekdays", weekdays: [1, 3] } })] })));
+  check("treino: seg/qua/sex numa terça: não aparece", !wk(onFri({ habits: [habit({ schedule: { type: "weekdays", weekdays: [1, 3, 5] } })] }, new Date(2026, 9, 20, 9, 0))));
+
+  const three = { type: "perWeek", times: 3 };
+  const open = wk(onFri({ habits: [habit({ schedule: three, marks: marks(20) })] }));
+  check("treino: 3 por semana com 1 marca: aparece, com o andamento", !!open && open.week.done === 1 && open.week.goal === 3, JSON.stringify(open && open.week));
+  check("treino: 3 por semana com 3 marcas na semana: não aparece", !wk(onFri({ habits: [habit({ schedule: three, marks: marks(19, 21, 22) })] })));
+  check("treino: a marca da semana passada não conta", !!wk(onFri({ habits: [habit({ schedule: three, marks: marks(12, 14, 16) })] })));
+  check("treino: 3 por semana, meta batida, mas sem a marca de hoje: não aparece", !wk(onFri({ habits: [habit({ schedule: three, marks: marks(19, 20, 21) })] })));
+
+  const reading = habit({ name: "ler" });
+  check("treino: outro hábito diário sem marca não vira quest", !wk(onFri({ habits: [reading] })) && onFri({ habits: [reading] }).left === 0, JSON.stringify(onFri({ habits: [reading] }).now));
+  check("treino: com ler e treinar, só o treino entra", types(onFri({ habits: [reading, daily] })) === "workout");
+
+  /* a ordem: depois da sessão de foco e do compromisso em curso */
+  const now = new Date(2026, 9, 23, 10, 0);
+  const call = task({ id: "call2", title: "call", date: DAY, at: clock(10), min: 60 });
+  const session = { id: "s9", task: "", title: "foco", start: now.getTime() - 5 * 60000, end: null, planned: 30 };
+  const order = onFri({ tasks: [call], sessions: [session], habits: [daily] }, now);
+  check("treino: vem depois da sessão e do compromisso", types(order) === "session,appointment,workout", types(order));
+  check("treino: está em agora, não em para trás", order.behind.length === 0);
+
+  /* ler nunca grava */
+  const hspy = spyOf([daily]);
+  const wspy = spyOf([]);
+  nextQuest(questsOf({ tasks: [], sessions: [], habits: hspy.all(), workouts: wspy.all() }, FRI), []);
+  check("treino: ler a lista não grava", hspy.saves === 0 && wspy.saves === 0);
 }
 
 console.log("\n" + passed + " passaram, " + failures.length + " falharam");

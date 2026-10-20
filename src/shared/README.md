@@ -24,7 +24,9 @@ Vite; o build sai em `server/site/`. O que é comum vive aqui:
   chamam ao abrir). A tarefa e a nota saem com o `id` do item da caixa, então duas abas que
   recolhem o mesmo item gravam o mesmo documento em vez de dois.
 - `quests.js` — o **"o que falta hoje?"**: `questsOf(data, now)` monta os dois grupos (agora:
-  a sessão rodando ou o compromisso que começa em até 30 minutos; para trás: as atrasadas e as
+  a sessão rodando, o compromisso que começa em até 30 minutos e o treino do dia que ainda não
+  houve, a única exceção entre os hábitos (`trainingNow`: o `trainingHabit` esperado hoje, ou com
+  a meta da semana aberta, sem treino nem marca hoje; `data` leva `habits` e `workouts`); para trás: as atrasadas e as
   contas previstas de dias passados, pelo `pendingBefore` do `finance-data.js`; cada fonte vira
   um item só quando passa de dois), `nextQuest` dá a próxima não pulada, e `moveTask`,
   `dropTask`, `doneTask`, `paidEntry` ("sim, aconteceu") e `moveEntry` gravam devolvendo o
@@ -33,7 +35,10 @@ Vite; o build sai em `server/site/`. O que é comum vive aqui:
 - `quest-card.jsx` — o **cartão** dessa lista na conversa do início: um desenho por tipo em
   `VIEWS` (tipo novo é uma linha ali). "agora não" é estado da página e não grava. A reserva não tem "concluir"
   (nem a sessão de foco nela): tem "amanhã" e "agora não". O "não" da
-  conta prevista abre a `EntryForm` num portal no `body`.
+  conta prevista abre a `EntryForm` num portal no `body`, e o "registrar treino" abre a `WorkoutForm`
+  do mesmo jeito.
+- `workout-form.jsx` — a **caixa do treino** (`WorkoutForm`), usada pela aba treino e pelo cartão do
+  início. `open.habit` fixa o hábito que o treino novo marca.
 - `entry-form.jsx` — a **caixa do lançamento** (`EntryForm`) e os campos de dinheiro
   (`MoneyInput`, `KindChips`, `CategorySelect`), usados pelo financeiro e pelo cartão do início.
 - `focus.js` — as **sessões de foco**: `startSession`/`stopSession` (a única forma de começar e
