@@ -366,6 +366,11 @@ kbd{font-family:var(--mono);font-size:10.5px;padding:1px 6px;border-radius:5px;b
 /* a da planilha (sheet-start.jsx): a grade e a cabeça, em desenhos e na tela de começar */
 .th--sheet{stroke:currentColor;fill:none;stroke-width:.9;opacity:.75}
 .th--sheet .th__head{fill:currentColor;stroke:none;opacity:.35}
+/* a da apresentação (deck-start.jsx): um slide em traços, no layout dele */
+.th--deck{fill:currentColor;stroke:none}
+.th--deck rect{opacity:.8}
+.th--deck .th__soft{opacity:.35}
+.th--deck .th__frame{fill:none;stroke:currentColor;stroke-width:.9;opacity:.6}
 .th--channels{display:flex;flex-wrap:wrap;gap:4px;justify-content:center;align-items:center;padding:6px}
 .th--channels i{
   font-family:var(--mono);font-style:normal;font-size:9.5px;letter-spacing:.04em;

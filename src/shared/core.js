@@ -338,6 +338,7 @@ const SEARCH_SOURCES = [
   { type: "tasks", label: "tarefa", field: "title", href: (d) => "calendar.html#" + encodeURIComponent(d.date || ""), filter: (d) => !d.done },
   { type: "maps", label: "mapa", field: "name", href: (d) => "maps.html#" + encodeURIComponent(d.id) },
   { type: "sheets", label: "planilha", field: "name", href: (d) => "sheets.html#" + encodeURIComponent(d.id) },
+  { type: "decks", label: "apresentação", field: "name", href: (d) => "slides.html#" + encodeURIComponent(d.id) },
   { type: "funnels", label: "funil", field: "name", href: (d) => "funnels.html#" + encodeURIComponent(d.id) },
   { type: "apps", label: "produto", field: "name", href: (d) => "apps.html#" + encodeURIComponent(d.id) },
   { type: "finance", label: "R$", field: "name", href: (d) => (d.book === "business" ? "cash.html" : "finance.html"), filter: (d) => d.type === "entry" || d.type === "fixed" || d.type === "debt" || d.type === "card" },
@@ -903,7 +904,7 @@ document.addEventListener("visibilitychange", () => {
    nao baixou espera a proxima sincronizacao, e a marca de "feito" so e
    gravada quando todas fecharam. depois disso ela nunca mais faz nada. */
 const FRONTS_PURGED = "merlin:fronts-removed";
-const PURGE_TYPES = ["notes", "clients", "tasks", "week", "maps", "funnels", "apps", "finance", "habits", "plans", "bookmarks", "content", "cadence", "profile", "closes", "reviews", "sessions", "journal", "sleep", "workouts", "meals", "ops", "team", "sheets"];
+const PURGE_TYPES = ["notes", "clients", "tasks", "week", "maps", "funnels", "apps", "finance", "habits", "plans", "bookmarks", "content", "cadence", "profile", "closes", "reviews", "sessions", "journal", "sleep", "workouts", "meals", "ops", "team", "sheets", "decks"];
 function stripFront(value) {
   if (Array.isArray(value)) return value.map(stripFront).some(Boolean);
   if (!value || typeof value !== "object") return false;

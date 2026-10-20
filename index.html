@@ -41,7 +41,7 @@ try{var t=localStorage.getItem("merlin:theme");if(t?t==="light":matchMedia("(pre
 d.setAttribute("data-phase",h>=5&&h<8?"dawn":h>=8&&h<17?"day":h>=17&&h<19?"dusk":"night");
 try{var L=localStorage,s=[];try{s=JSON.parse(L.getItem("merlin:seen")||"[]")}catch(e){}
 known=!!L.getItem("merlin:who")||(Array.isArray(s)&&s.indexOf("landing")>=0);
-for(var i=0;i<L.length&&!known;i++){var k=L.key(i),m=/^merlin:(notes|clients|tasks|week|maps|funnels|apps|finance|habits|plans|bookmarks|content|cadence|profile|closes|reviews|sessions|journal|sleep|workouts|meals|ops|team|sheets|day|inbox)$/.exec(k);if(!m)continue;
+for(var i=0;i<L.length&&!known;i++){var k=L.key(i),m=/^merlin:(notes|clients|tasks|week|maps|funnels|apps|finance|habits|plans|bookmarks|content|cadence|profile|closes|reviews|sessions|journal|sleep|workouts|meals|ops|team|sheets|decks|day|inbox)$/.exec(k);if(!m)continue;
 try{var v=JSON.parse(L.getItem(k));known=!!v&&(m[1]==="day"?(v.tasks||[]).length>0:m[1]==="inbox"?Array.isArray(v)&&v.length>0:!!v.items&&Object.keys(v.items).length>0)}catch(e){}}}catch(e){}
 d.classList.add(known?"in":"bare")})();</script>
 <script>/* a medicao da landing: o Cloudflare Web Analytics, sem cookie e sem nada
