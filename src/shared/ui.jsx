@@ -948,7 +948,9 @@ function useRootClass(name, on) {
    pílula volta. `chat` é o id da conversa, que vai na origem do lançamento. */
 const CREATE_LABELS = { "onboarding-map": "gerar mapa", "onboarding-funnel": "gerar funil", "finance-entry": "lançar", "sleep-log": "registrar" };
 const CREATE_HREF = { "onboarding-map": "maps.html#", "onboarding-funnel": "funnels.html#" };
-const DONE_NOTICE = { "finance-entry": "lançado no financeiro", "lead-update": "cliente atualizado", script: "roteiro aplicado", "sleep-log": "sono registrado" };
+/* o aviso é o texto fixo, ou a própria linha da pílula: o sono confirma
+   "✓ registrado · 7h de sono", igual ao início */
+const DONE_NOTICE = { "finance-entry": "lançado no financeiro", "lead-update": "cliente atualizado", script: "roteiro aplicado", "sleep-log": (line) => "✓ " + line };
 const ACTION_OPTIONS = { finance: { normalize: normalizeFinance }, sleep: { normalize: normalizeSleep } };
 const optionPair = (o) => (Array.isArray(o) ? o : [o, o]);
 export function ProposalDialog({ proposal, chat, onClose, onDone }) {
@@ -980,7 +982,8 @@ export function ProposalDialog({ proposal, chat, onClose, onDone }) {
     const line = (ACTION_DONE[actionType] || "criado") + " · " + (previewOf(actionType, { ...payload, ...v }, ctx) || v.title || v.name || proposal.title);
     if (onDone) onDone(line);
     const undo = undoEntry(before, doc);
-    notify(DONE_NOTICE[actionType] || "feito", () => {
+    const notice = DONE_NOTICE[actionType];
+    notify(typeof notice === "function" ? notice(line) : notice || "feito", () => {
       if (undo.remove) store.remove(undo.remove); else store.save(undo.save);
       if (onDone) onDone(null);
     });
