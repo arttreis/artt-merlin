@@ -734,6 +734,17 @@ check("a saúde está na lista de fontes aceitas", r.status === 200 && Array.isA
 check("as fontes aceitas seguem a ordem da lista fechada, com a saúde no fim", JSON.stringify(body.sources) === '["agenda","saúde"]', JSON.stringify(body.sources));
 check("o pedido lista a saúde entre as fontes", /só dentre exatamente estes valores: [^.]*saúde/.test(claudeAsked), String(claudeAsked).slice(0, 300));
 check("a instrução fala da seção saúde e do interruptor do perfil", /saúde[\s\S]{0,400}perfil|perfil[\s\S]{0,400}saúde/.test(claudeAsked), String(claudeAsked).slice(0, 300));
+/* o caixa da empresa (ticket #76): "vi o negócio" é uma fonte aceita, no fim da
+   lista fechada; "dinheiro" é o pessoal, e a instrução diz a diferença */
+claudeAnswer = { stop_reason: "end_turn", content: [{ type: "text", text: JSON.stringify({ suggestions: [], clarify: "caixa de R$ 8.400, fôlego de 4,2 meses", sources: ["negócio", "inventado", "dinheiro"] }) }] };
+r = await call("POST", "/merlin", { task: "assistant", context: { message: "como está o caixa da empresa?", portrait: "negócio:\ncaixa hoje +R$ 8.400 · fim do mês +R$ 6.100 · fôlego 4,2 meses" } }, cookie);
+body = await r.json();
+check("o negócio está na lista de fontes aceitas", r.status === 200 && Array.isArray(body.sources) && body.sources.includes("negócio"), JSON.stringify(body.sources));
+check("as fontes aceitas seguem a ordem da lista fechada, com o negócio no fim", JSON.stringify(body.sources) === '["dinheiro","negócio"]', JSON.stringify(body.sources));
+check("o fora da lista continua fora, mesmo ao lado do negócio", !body.sources.includes("inventado"), JSON.stringify(body.sources));
+check("o pedido lista o negócio entre as fontes", /só dentre exatamente estes valores: [^.]*negócio/.test(claudeAsked), String(claudeAsked).slice(0, 300));
+check("o negócio é o último valor da lista que o pedido oferece", /só dentre exatamente estes valores: [^(]*saúde, negócio(\s|\.|\()/.test(claudeAsked), String(claudeAsked).slice(0, 300));
+check("a instrução diz que dinheiro é o pessoal e negócio é o caixa da empresa", /dinheiro é o (dinheiro )?pessoal/.test(claudeAsked) && /negócio é o caixa da empresa/.test(claudeAsked), String(claudeAsked).slice(0, 300));
 claudeAnswer = { stop_reason: "end_turn", content: [{ type: "text", text: '{"suggestions":[],"clarify":"ok"}' }] };
 r = await call("POST", "/merlin", { task: "assistant", context: { message: "e aí?" } }, cookie);
 body = await r.json();

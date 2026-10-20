@@ -72,6 +72,11 @@ const block = (o) => {
 };
 const ANA = { id: "c-ana", name: "Ana", email: "ana@segredo.example", whatsapp: "5511999998888", status: "active" };
 
+/* o caixa da empresa (ticket #76): documentos crus do livro "business", como a
+   coleção os entrega. a seção "negócio" só existe quando há um destes */
+const bdoc = (o) => ({ createdAt: 1, updatedAt: 1, book: "business", ...o });
+const BIZ_CASH = [bdoc({ id: "config-business", type: "config", startBalance: { day: "2026-10-01", amount: 840000 } })];
+
 const build = (o) => ({ tasks: [], routine: [], sessions: [], apps: [], closes: [], clients: [], content: [], cadence: [], habits: [], notes: [], profile: null, prefs: PREFS, loading: [], ...o });
 const run = (o, now) => portraitOf(build(o), now || NOW);
 const sec = (p, id) => p.sections.find((s) => s.id === id);
@@ -80,8 +85,10 @@ const lines = (p, id) => sec(p, id).text.split("\n");
 /* ---- o contrato público ---- */
 {
   check("o teto do retrato é 6.000", PORTRAIT_MAX === 6000, String(PORTRAIT_MAX));
-  check("as fontes são a lista fechada", JSON.stringify(SOURCES) === JSON.stringify(["dia", "agenda", "rotina", "semana", "dinheiro", "clientes", "leads", "conteúdo", "hábitos", "notas", "produtos", "saúde"]), JSON.stringify(SOURCES));
+  check("as fontes são a lista fechada", JSON.stringify(SOURCES) === JSON.stringify(["dia", "agenda", "rotina", "semana", "dinheiro", "clientes", "leads", "conteúdo", "hábitos", "notas", "produtos", "saúde", "negócio"]), JSON.stringify(SOURCES));
   check("sourcesLine: a saúde vira \"vi a saúde\"", sourcesLine(["saúde"]) === "vi a saúde", sourcesLine(["saúde"]));
+  check("sourcesLine: o negócio vira \"vi o negócio\"", sourcesLine(["negócio"]) === "vi o negócio", sourcesLine(["negócio"]));
+  check("sourcesLine: dinheiro e negócio juntos", sourcesLine(["dinheiro", "negócio"]) === "vi o dinheiro e o negócio", sourcesLine(["dinheiro", "negócio"]));
   check("as seções deste ticket, na ordem", JSON.stringify(SECTIONS.slice(0, 5).map((s) => s.id)) === JSON.stringify(["today", "agenda", "routine", "week", "products"]), JSON.stringify(SECTIONS.map((s) => s.id)));
   check("toda seção tem rótulo, orçamento, needs e build", SECTIONS.every((s) => typeof s.label === "string" && s.label && s.budget > 0 && Array.isArray(s.needs) && typeof s.build === "function"));
   check("os orçamentos juntos são um número finito", SECTIONS.reduce((t, s) => t + s.budget, 0) > 0);
@@ -89,7 +96,8 @@ const lines = (p, id) => sec(p, id).text.split("\n");
 
 /* ---- a forma da resposta, e o dado intacto ---- */
 {
-  const data = build({ tasks: [task({ title: "Pagar o boleto da gráfica", date: THU })], clients: [ANA] });
+  /* com um caixa da empresa, para a seção "negócio" existir: sem livro, ela some */
+  const data = build({ tasks: [task({ title: "Pagar o boleto da gráfica", date: THU })], clients: [ANA], finance: BIZ_CASH });
   const before = JSON.stringify(data);
   const p = portraitOf(data, NOW);
   check("o retrato não altera o que recebe", JSON.stringify(data) === before);
@@ -101,7 +109,8 @@ const lines = (p, id) => sec(p, id).text.split("\n");
 /* ---- tudo que falta vale vazio: sem lista nenhuma não quebra ---- */
 {
   const p = portraitOf({}, NOW);
-  check("sem nenhuma lista, não quebra", Array.isArray(p.sections) && p.sections.length === SECTIONS.length);
+  /* sem livro da empresa a seção "negócio" não vai: são todas as outras */
+  check("sem nenhuma lista, não quebra", Array.isArray(p.sections) && p.sections.length === SECTIONS.length - 1 && !sec(p, "business") && p.sections.every((s, i) => s.id === SECTIONS[i].id));
   check("sem preferência vale 09:00–19:00", /^agora 14:20 · janela 09:00–19:00 · /.test(lines(p, "today")[0]), lines(p, "today")[0]);
   check("sem nada: a agenda diz que está vazia", sec(p, "agenda").text === "nada nos próximos 7 dias", sec(p, "agenda").text);
   check("sem nada: a rotina diz que está vazia", sec(p, "routine").text === "nenhum bloco", sec(p, "routine").text);
@@ -447,7 +456,7 @@ const stamp = (d, h = 10) => new Date(2026, 9, d, h, 0).getTime();
   ];
   const routine = Array.from({ length: 30 }, (_, i) => block({ title: long("Bloco", i), at: hm(6, i * 5) }));
   const apps = Array.from({ length: 12 }, (_, i) => ({ id: "a" + i, name: "Produto " + i + " " + "n".repeat(280) }));
-  const p = run({ tasks, routine, apps, clients: [ANA], profile: { focusGoal: 25, meetingCap: 6 } });
+  const p = run({ tasks, routine, apps, clients: [ANA], finance: BIZ_CASH, profile: { focusGoal: 25, meetingCap: 6 } });
   check("corte total: no máximo 6.000 caracteres", p.text.length <= PORTRAIT_MAX, String(p.text.length));
   check("corte total: cada seção dentro do seu orçamento", SECTIONS.every((s) => sec(p, s.id).text.length <= s.budget), p.sections.map((s) => s.id + ":" + s.text.length).join(" "));
   check("corte total: o retrato ainda abre pelo dia", p.text.startsWith(SECTIONS[0].label + ":\nagora 14:20"), p.text.slice(0, 80));
@@ -1036,8 +1045,8 @@ const MONEY_DOCS = [
 
 /* ---- a seção no contrato público ---- */
 sectionM("money: o contrato", () => {
-  const s = SECTIONS[SECTIONS.length - 1];
-  check("money: é a última seção, 'dinheiro', de 900 caracteres, e espera a coleção finance", s && s.id === "money" && s.label === "dinheiro" && s.budget === 900 && JSON.stringify(s.needs) === JSON.stringify(["finance"]), JSON.stringify(s && { id: s.id, label: s.label, budget: s.budget, needs: s.needs }));
+  const s = SECTIONS[SECTIONS.length - 2];
+  check("money: é a penúltima seção (a última é o negócio), 'dinheiro', de 900 caracteres, e espera a coleção finance", s && s.id === "money" && s.label === "dinheiro" && s.budget === 900 && JSON.stringify(s.needs) === JSON.stringify(["finance"]), JSON.stringify(s && { id: s.id, label: s.label, budget: s.budget, needs: s.needs }));
   check("money: as cinco primeiras seções continuam as de antes", JSON.stringify(SECTIONS.slice(0, 5).map((x) => x.id)) === JSON.stringify(["today", "agenda", "routine", "week", "products"]));
   check("money: o retrato tem a seção, com rótulo e id", (() => { const p = moneyOf(MONEY_DOCS); return !!sec(p, "money") && sec(p, "money").label === "dinheiro"; })());
 });
@@ -1207,10 +1216,10 @@ sectionH("saúde: a seção", () => {
   const h = SECTIONS.find((s) => s.id === "health");
   check("saúde: existe, com rótulo 'saúde' e orçamento de 160", !!h && h.label === "saúde" && h.budget === 160, JSON.stringify(h && { label: h.label, budget: h.budget }));
   check("saúde: vem logo depois dos hábitos e antes das notas", ids.indexOf("health") === ids.indexOf("habits") + 1 && ids.indexOf("notes") === ids.indexOf("health") + 1, JSON.stringify(ids));
-  check("saúde: o dinheiro continua a última seção", ids.at(-1) === "money", JSON.stringify(ids));
+  check("saúde: o dinheiro continua depois dela, e o negócio é a última seção", ids.at(-2) === "money" && ids.at(-1) === "business", JSON.stringify(ids));
   check("saúde: espera sono, treino, refeições e perfil", !!h && ["sleep", "workouts", "meals", "profile"].every((k) => h.needs.includes(k)), JSON.stringify(h && h.needs));
   check("saúde: tem o interruptor off()", !!h && typeof h.off === "function");
-  check("saúde: hábitos cai para 120 e a agenda para 1.495", SECTIONS.find((s) => s.id === "habits").budget === 120 && SECTIONS.find((s) => s.id === "agenda").budget === 1495, JSON.stringify(SECTIONS.map((s) => s.id + ":" + s.budget)));
+  check("saúde: hábitos cai para 120, a agenda para 1.284 e a rotina para 540 (o negócio leva 260)", SECTIONS.find((s) => s.id === "habits").budget === 120 && SECTIONS.find((s) => s.id === "agenda").budget === 1284 && SECTIONS.find((s) => s.id === "routine").budget === 540 && SECTIONS.find((s) => s.id === "business").budget === 260, JSON.stringify(SECTIONS.map((s) => s.id + ":" + s.budget)));
   const total = SECTIONS.reduce((t, s) => t + s.budget + (s.label + ":\n").length, 0) + 2 * (SECTIONS.length - 1);
   check("saúde: orçamentos + rótulos + separadores cabem em 6.000", total <= PORTRAIT_MAX, String(total));
   check("saúde: a seção entra no retrato, com o rótulo que a resposta cita", !!sec(run({}), "health") && SOURCES.includes("saúde"));
@@ -1316,7 +1325,7 @@ sectionH("saúde: o interruptor", () => {
     check(label + ": não há a seção 'saúde'", !sec(p, "health"), JSON.stringify(p.sections.map((s) => s.id)));
     check(label + ": o texto não tem 'saúde:' nem sono, treino ou refeições", !/saúde:|sono 7d|treino 7d|refeições 7d/.test(p.text), p.text);
     check(label + ": os hábitos continuam", !!sec(p, "habits") && p.text.includes("hábitos:\n") && p.text.includes("Ler Hh"), p.text);
-    check(label + ": as outras seções continuam todas", p.sections.length === SECTIONS.length - 1);
+    check(label + ": as outras seções continuam todas (o negócio só vai com livro da empresa)", p.sections.length === SECTIONS.length - 2 && SECTIONS.every((s) => s.id === "health" || s.id === "business" || !!sec(p, s.id)));
   };
   const on = run(full);
   check("interruptor desligado: a saúde entra", !!sec(on, "health") && on.text.includes("saúde:\nsono 7d"), on.text.slice(-300));
@@ -1402,7 +1411,7 @@ sectionH("saúde: o pior caso", () => {
   const sleep = Array.from({ length: 7 }, (_, i) => night("2026-10-" + String(13 + i), 300 + i * 17));
   const workouts = Array.from({ length: 200 }, (_, i) => wk("w" + i, "2026-10-" + String(13 + (i % 7)), 95 + (i % 40), { title: long("treino", i) }));
   const meals = Array.from({ length: 500 }, (_, i) => ml("m" + i, "2026-10-" + String(13 + (i % 7)), { text: long("refeição", i) }));
-  const all = { tasks, routine, apps, habits, notes, clients: [ANA, ...clients], finance: [fconfig({}), ...fixed], sleep, workouts, meals, journal: [{ id: TODAY, text: "segredo do diário" }], profile: { focusGoal: 25, meetingCap: 6, sleepGoal: 450 } };
+  const all = { tasks, routine, apps, habits, notes, clients: [ANA, ...clients], finance: [fconfig({}), ...fixed, ...BIZ_CASH], sleep, workouts, meals, journal: [{ id: TODAY, text: "segredo do diário" }], profile: { focusGoal: 25, meetingCap: 6, sleepGoal: 450 } };
   const p = run(all);
   check("pior caso: o retrato não passa de 6.000", p.text.length <= PORTRAIT_MAX, String(p.text.length));
   check("pior caso: todas as seções estão lá, cada uma dentro do seu orçamento", SECTIONS.every((s) => sec(p, s.id) && sec(p, s.id).text.length <= s.budget), p.sections.map((s) => s.id + ":" + s.text.length + "/" + s.budget).join(" "));
@@ -1412,6 +1421,243 @@ sectionH("saúde: o pior caso", () => {
   check("pior caso: as outras seções cheias ainda cortam em 'e mais N'", /e mais \d+$/.test(sec(p, "today").text) && /e mais \d+$/.test(sec(p, "agenda").text));
   const off = run({ ...all, healthOff: true });
   check("pior caso: sem a saúde também cabe, e ela não está", off.text.length <= PORTRAIT_MAX && !sec(off, "health"));
+});
+
+/* =====================================================================
+   o caixa da empresa no retrato (ticket #76): a seção `business`.
+
+   "como está o caixa da empresa?" passa a ter resposta, e o que se prova é o
+   que, errado, mente ou vaza: um lançamento da empresa que entra no saldo
+   pessoal ("dinheiro"), um nome de fornecedor que vai à IA, uma seção que
+   aparece vazia para quem não tem empresa, e o teto de 6.000 caracteres que o
+   texto novo empurra.
+   ===================================================================== */
+const bent = (id, day, name, kind, amount, paid, extra) => bdoc({ id, type: "entry", day, name, kind, amount, paid, category: "", ...extra });
+const bfixed = (id, name, amount, dayOfMonth, extra) => bdoc({ id, type: "fixed", name, amount, kind: "out", category: "Recorrente", dayOfMonth, active: true, ...extra });
+const bstart = (day, amount) => bdoc({ id: "config-business", type: "config", startBalance: { day, amount } });
+const BIZ = () => SECTIONS.find((s) => s.id === "business");
+/* o texto do contrato: sinal só no positivo, o real inteiro sem ",00" */
+const S = (c) => (c > 0 ? "+" : "") + brl(c, true).replace(/,00$/, "");
+const bizLine = (p) => (sec(p, "business") ? sec(p, "business").text : null);
+/* a linha esperada, pela função pura, sobre o livro da empresa */
+const expectedBiz = (docs) => {
+  const raw = docs.map((d) => FDm.normalize(d));
+  const bc = FDm.bookCollection(fakeCol(raw), "business");
+  const f = FDm.financeToday(FDm.contextOf(bc), FDm.configOf(bc), TODAY);
+  const r = FDm.cashMonth(FDm.contextOf(bc), TODAY).runway;
+  return "caixa hoje " + S(f.real) + " · fim do mês " + S(f.monthEnd) + " · fôlego " + (r == null ? "sem saída para medir" : FDm.runwayLabel(r));
+};
+
+sectionM("negócio: o contrato", () => {
+  const s = BIZ();
+  check("negócio: é a última seção, 'negócio', de 260 caracteres, e espera a coleção finance", !!s && SECTIONS.at(-1) === s && s.label === "negócio" && s.budget === 260 && JSON.stringify(s.needs) === JSON.stringify(["finance"]), JSON.stringify(s && { label: s.label, budget: s.budget, needs: s.needs }));
+  check("negócio: o rótulo é uma fonte da lista fechada, a última", SOURCES.includes("negócio") && SOURCES.at(-1) === "negócio");
+  check("negócio: tem o interruptor off() (sem livro da empresa, some)", !!s && typeof s.off === "function");
+  check("negócio: o dinheiro vem logo antes dele", SECTIONS.at(-2).id === "money");
+  check("negócio: o dado que recebe não é alterado", (() => { const data = build({ finance: [...MONEY_DOCS, ...BIZ_CASH, bent("b1", "2026-10-05", "x", "out", 100, true)] }); const before = JSON.stringify(data); portraitOf(data, NOW); return JSON.stringify(data) === before; })());
+});
+
+/* ---- "dinheiro" lê só o livro pessoal ---- */
+sectionM("negócio: o dinheiro não conta lançamento da empresa", () => {
+  const SECRET = "Fornecedor Zeta Wq";
+  const biz = [
+    bstart("2026-10-01", 840000),
+    bent("b-out", "2026-10-07", SECRET, "out", 999900, true),
+    bent("b-in", "2026-10-08", "Cliente Grande Wq", "in", 777700, true),
+    bfixed("b-fixo", "Aluguel do Galpão Wq", 350000, 12)
+  ];
+  const sem = moneyOf(MONEY_DOCS);
+  const com = moneyOf([...MONEY_DOCS, ...biz]);
+  const ordem = moneyOf([...biz.slice().reverse(), ...MONEY_DOCS]);
+  check("dinheiro: o saldo pessoal é o mesmo com ou sem o caixa da empresa", sec(com, "money").text === sec(sem, "money").text, sec(com, "money").text.slice(0, 120));
+  check("dinheiro: e não depende da ordem dos documentos", sec(ordem, "money").text === sec(sem, "money").text);
+  check("dinheiro: o saldo ainda é o pessoal (100000 + 50000 − 120000)", lines(com, "money")[0].startsWith("saldo hoje " + brl(30000, true) + " "), lines(com, "money")[0]);
+  for (const s of [SECRET, "Cliente Grande Wq", "Aluguel do Galpão Wq", "b-out", "b-fixo", brl(999900), brl(777700), brl(350000)]) {
+    check("dinheiro: '" + s + "' da empresa fora da seção", !sec(com, "money").text.includes(s), sec(com, "money").text);
+  }
+  /* só a empresa: o pessoal está vazio */
+  const only = moneyOf(biz);
+  check("dinheiro: financeiro só com a empresa diz 'sem financeiro ainda'", sec(only, "money").text === "sem financeiro ainda" && sec(only, "money").loading === false, sec(only, "money").text);
+  check("dinheiro: e a empresa tem a seção dela", !!sec(only, "business"));
+  /* a config da empresa não vira o saldo inicial do pessoal */
+  const cfgOnly = moneyOf([bstart("2026-10-01", 840000)]);
+  check("dinheiro: a config da empresa sozinha não é financeiro pessoal", sec(cfgOnly, "money").text === "sem financeiro ainda", sec(cfgOnly, "money").text);
+  /* documento sem livro, ou com um livro que não é a empresa, é pessoal */
+  const raw = { id: "p-raw", type: "entry", day: "2026-10-06", name: "mercado sem livro Qa", kind: "out", amount: 12345, paid: true, createdAt: 1, updatedAt: 1 };
+  const semLivro = moneyOf([raw]);
+  const outroLivro = moneyOf([{ ...raw, book: "outro" }, { ...raw, id: "p-raw2", book: "personal" }]);
+  check("dinheiro: lançamento sem livro é pessoal", sec(semLivro, "money").text.includes("mercado sem livro Qa") && !sec(semLivro, "business"), sec(semLivro, "money").text);
+  check("dinheiro: livro desconhecido e livro 'personal' também", sec(outroLivro, "money").text.includes("mercado sem livro Qa") && !sec(outroLivro, "business"), sec(outroLivro, "money").text);
+  /* o inverso: o pessoal não entra na empresa */
+  const mix = run({ finance: [...MONEY_DOCS, bent("b-in2", "2026-10-07", "venda Pj", "in", 250000, true)] });
+  check("negócio: o saldo da empresa não leva o pessoal (só os 2.500 lançados nela)", /^caixa hoje \+R\$\s2\.500 · /.test(bizLine(mix)), bizLine(mix));
+  check("negócio: nem o nome do pessoal nem o da empresa vão no texto da empresa", !/mercado|freela|dentista|internet|venda Pj/.test(bizLine(mix)), bizLine(mix));
+});
+
+/* ---- a seção com caixa ---- */
+sectionM("negócio: a seção com caixa", () => {
+  const p = run({ finance: BIZ_CASH });
+  const s = sec(p, "business");
+  check("negócio: a seção entra, com id e rótulo", !!s && s.id === "business" && s.label === "negócio", JSON.stringify(s));
+  check("negócio: não está carregando", !!s && s.loading === false);
+  check("negócio: só saldo inicial de 8.400: o texto exato", !!s && s.text === "caixa hoje " + S(840000) + " · fim do mês " + S(840000) + " · fôlego sem saída para medir", s && s.text);
+  check("negócio: com sinal e sem ',00'", !!s && /^caixa hoje \+R\$\s8\.400 · fim do mês \+R\$\s8\.400 · fôlego sem saída para medir$/.test(s.text), s && s.text);
+  check("negócio: é uma linha só (o T6 estende)", !!s && !s.text.includes("\n"), s && s.text);
+  check("negócio: cabe nos 260", !!s && s.text.length <= 260, s && String(s.text.length));
+  check("negócio: bate com as contas do caixa (financeToday e cashMonth)", !!s && s.text === expectedBiz(BIZ_CASH), s && s.text + " | " + expectedBiz(BIZ_CASH));
+  check("negócio: o retrato abre a seção com o rótulo 'negócio:'", p.text.includes("negócio:\ncaixa hoje "), p.text);
+  check("negócio: é a última seção do retrato, depois do dinheiro", !!s && p.sections.at(-1).id === "business" && p.text.endsWith("negócio:\n" + s.text), p.text.slice(-200));
+  check("negócio: a fonte que a resposta cita é o rótulo", !!s && SOURCES.includes(s.label) && sourcesLine([s.label]) === "vi o negócio");
+  /* centavos ficam */
+  const c = bizLine(run({ finance: [bstart("2026-10-01", 840050)] }));
+  check("negócio: centavos ficam ('+R$ 8.400,50')", /^caixa hoje \+R\$\s8\.400,50 · fim do mês \+R\$\s8\.400,50 · /.test(c), c);
+  /* o fim do mês conta o previsto; o fôlego, a média das saídas pagas */
+  const docs = [bstart("2026-10-01", 1040000), bent("b-pg", "2026-10-05", "fornecedor", "out", 200000, true), bent("b-pv", "2026-10-28", "imposto", "out", 240000, false)];
+  const l = bizLine(run({ finance: docs }));
+  check("negócio: caixa hoje 8.400, fim do mês 6.000 (o previsto de 28/10), fôlego 4,2 meses", l === "caixa hoje " + S(840000) + " · fim do mês " + S(600000) + " · fôlego 4,2 meses", l);
+  check("negócio: bate com as contas do caixa também com saídas", l === expectedBiz(docs), l + " | " + expectedBiz(docs));
+  check("negócio: o previsto ainda não pago não entra no 'caixa hoje'", /^caixa hoje \+R\$\s8\.400 · fim do mês \+R\$\s6\.000 · /.test(l), l);
+  /* uma entrada futura também move o fim do mês */
+  const l2 = bizLine(run({ finance: [...docs, bent("b-rec", "2026-10-30", "venda grande", "in", 500000, false)] }));
+  check("negócio: o previsto a receber soma no fim do mês (11.000)", /· fim do mês \+R\$\s11\.000 · /.test(l2), l2);
+});
+
+/* ---- o fôlego ---- */
+sectionM("negócio: o fôlego", () => {
+  const folego = (docs) => { const l = bizLine(run({ finance: docs })); return l && l.split(" · fôlego ")[1]; };
+  const um = [bstart("2026-10-01", 500000), bent("o1", "2026-10-05", "x", "out", 200000, true)];
+  check("fôlego: 1,5 mês no singular (saldo 3.000, saída de 2.000)", folego(um) === "1,5 mês", folego(um));
+  check("fôlego: 2,0 meses no plural (saldo 4.000, saída de 2.000)", folego([bstart("2026-10-01", 600000), bent("o1", "2026-10-05", "x", "out", 200000, true)]) === "2,0 meses");
+  check("fôlego: 4,2 meses", folego([bstart("2026-10-01", 1040000), bent("o1", "2026-10-05", "x", "out", 200000, true)]) === "4,2 meses");
+  /* a média dos três meses que terminam neste, a contar do marco */
+  const tres = [bstart("2026-08-01", 1000000), bent("a", "2026-08-10", "x", "out", 300000, true), bent("s", "2026-09-10", "x", "out", 300000, true), bent("o", "2026-10-10", "x", "out", 300000, true)];
+  check("fôlego: a média de três meses (saldo 1.000, saída média de 3.000 → 0,3 meses)", folego(tres) === "0,3 meses", folego(tres));
+  const prev = [bstart("2026-10-01", 840000), bent("p1", "2026-10-28", "x", "out", 200000, false)];
+  check("fôlego: saída só prevista não mede (sem saída para medir)", folego(prev) === "sem saída para medir", folego(prev));
+  check("fôlego: só entradas pagas não medem (sem saída para medir)", folego([bstart("2026-10-01", 840000), bent("i1", "2026-10-05", "x", "in", 200000, true)]) === "sem saída para medir");
+  check("fôlego: nunca vira 'NaN', 'Infinity' ou '—'", [tres, [bstart("2026-10-01", 840000)], prev].every((d) => !/NaN|Infinity|—|undefined|null/.test(bizLine(run({ finance: d })))));
+});
+
+/* ---- saldo negativo e zerado ---- */
+sectionM("negócio: saldo negativo e zerado", () => {
+  const neg = bizLine(run({ finance: [bstart("2026-10-01", 100000), bent("n1", "2026-10-05", "x", "out", 250000, true)] }));
+  check("negativo: sai com '−' no caixa e no fim do mês, e fôlego 0,0", /^caixa hoje −R\$\s1\.500 · fim do mês −R\$\s1\.500 · fôlego 0,0 meses$/.test(neg), neg);
+  check("negativo: nunca '+−' nem hífen", !/\+−|\+-|-R\$/.test(neg), neg);
+  const zero = bizLine(run({ finance: [bstart("2026-10-01", 100000), bent("z1", "2026-10-05", "x", "out", 100000, true)] }));
+  check("zerado: sem sinal nenhum ('R$ 0')", /^caixa hoje R\$\s0 · fim do mês R\$\s0 · /.test(zero), zero);
+  const virada = bizLine(run({ finance: [bstart("2026-10-01", 100000), bent("v1", "2026-10-25", "imposto", "out", 150000, false)] }));
+  check("virada: positivo hoje e negativo no fim do mês", /^caixa hoje \+R\$\s1\.000 · fim do mês −R\$\s500 · /.test(virada), virada);
+});
+
+/* ---- sem livro da empresa, a seção some ---- */
+sectionM("negócio: sem livro da empresa", () => {
+  const some = (label, p) => {
+    check("sem livro (" + label + "): não há a seção 'business'", !sec(p, "business") && !p.sections.some((s) => s.id === "business"), JSON.stringify(p.sections.map((s) => s.id)));
+    check("sem livro (" + label + "): o texto não tem 'negócio:' nem 'caixa hoje'", !p.text.includes("negócio:") && !p.text.includes("caixa hoje"), p.text.slice(-200));
+    check("sem livro (" + label + "): as outras seções continuam todas", p.sections.length === SECTIONS.length - 1 && SECTIONS.every((s) => s.id === "business" || !!sec(p, s.id)));
+  };
+  some("nada", run({}));
+  some("sem nenhuma lista", portraitOf({}, NOW));
+  some("só o pessoal", run({ finance: MONEY_DOCS }));
+  some("config da empresa sem saldo inicial", run({ finance: [bdoc({ id: "config-business", type: "config" })] }));
+  some("config da empresa vazia ao lado do pessoal", run({ finance: [...MONEY_DOCS, bdoc({ id: "config-business", type: "config" })] }));
+  some("só dívida da empresa", run({ finance: [bdoc({ id: "d-biz", type: "debt", name: "Banco Xv", creditor: "Banco Xv", total: 100000 })] }));
+  check("sem livro: o retrato inteiro cabe no teto e o dinheiro continua", run({ finance: MONEY_DOCS }).text.length <= PORTRAIT_MAX && !!sec(run({ finance: MONEY_DOCS }), "money"));
+  /* basta um sinal de caixa da empresa para a seção existir */
+  check("com livro: só o saldo inicial basta", !!sec(run({ finance: BIZ_CASH }), "business"));
+  const soLanc = run({ finance: [bent("s1", "2026-10-06", "venda", "in", 250000, true)] });
+  check("com livro: só um lançamento basta (e ele conta no caixa)", !!sec(soLanc, "business") && /^caixa hoje \+R\$\s2\.500 · /.test(bizLine(soLanc)), bizLine(soLanc));
+  const soFixo = run({ finance: [bfixed("f1", "aluguel", 350000, 12)] });
+  check("com livro: só um fixo basta", !!sec(soFixo, "business") && /^caixa hoje /.test(bizLine(soFixo)), bizLine(soFixo));
+});
+
+/* ---- só números: nenhum nome da empresa vai ---- */
+sectionM("negócio: nenhum nome vaza", () => {
+  const docs = [
+    bdoc({ id: "config-business", type: "config", startBalance: { day: "2026-10-01", amount: 840000 }, categories: ["CATEGORIA-SEGREDO-ZQ", "Outra Cat Zq"], budgets: { "CATEGORIA-SEGREDO-ZQ": 50000 } }),
+    bent("b-ent-1", "2026-10-05", "FORNECEDOR-SEGREDO-ZQ", "out", 200000, true, { category: "CATEGORIA-SEGREDO-ZQ" }),
+    bent("b-ent-2", "2026-10-08", "CLIENTE-SEGREDO-ZQ", "in", 450000, true, { category: "Outra Cat Zq" }),
+    bent("b-ent-3", "2026-10-28", "PREVISTO-SEGREDO-ZQ", "out", 90000, false),
+    bfixed("b-fix-1", "FIXO-SEGREDO-ZQ", 350000, 22, { category: "CATEGORIA-SEGREDO-ZQ" })
+  ];
+  const p = run({ finance: docs });
+  check("nomes: a seção existe (o teste não é trivial)", !!sec(p, "business") && /^caixa hoje /.test(bizLine(p)), bizLine(p));
+  for (const s of ["FORNECEDOR-SEGREDO-ZQ", "CLIENTE-SEGREDO-ZQ", "PREVISTO-SEGREDO-ZQ", "FIXO-SEGREDO-ZQ", "CATEGORIA-SEGREDO-ZQ", "Outra Cat Zq", "SEGREDO", "b-ent-1", "b-fix-1", "config-business"]) {
+    check("nomes: '" + s + "' não vai no retrato", !p.text.includes(s), p.text.slice(-300));
+  }
+  check("nomes: a seção é só 'caixa hoje · fim do mês · fôlego'", /^caixa hoje .+ · fim do mês .+ · fôlego .+$/.test(bizLine(p)), bizLine(p));
+  /* com o pessoal ao lado, o nome da empresa também não cai em 'dinheiro' */
+  const junto = run({ finance: [...MONEY_DOCS, ...docs] });
+  check("nomes: ao lado do pessoal, nada da empresa em 'dinheiro'", !/SEGREDO|Cat Zq/.test(sec(junto, "money").text), sec(junto, "money").text);
+  /* e a seção da empresa não leva o nome do pessoal */
+  check("nomes: nada do pessoal em 'negócio'", !/mercado|freela|dentista|internet|aluguel atrasado|viagem/.test(bizLine(junto)), bizLine(junto));
+});
+
+/* ---- ainda carregando ---- */
+sectionM("negócio: ainda carregando", () => {
+  const withDoc = run({ loading: ["finance"], finance: BIZ_CASH });
+  check("carregando: com documento da empresa local, 'ainda carregando'", !!sec(withDoc, "business") && sec(withDoc, "business").text === "ainda carregando" && sec(withDoc, "business").loading === true, JSON.stringify(sec(withDoc, "business")));
+  check("carregando: nem saldo inventado", !withDoc.text.includes("caixa hoje"));
+  const none = run({ loading: ["finance"] });
+  check("carregando: sem documento da empresa, a seção some (não diz 'carregando' a quem não tem empresa)", !sec(none, "business") && !none.text.includes("negócio:"), JSON.stringify(none.sections.map((s) => s.id)));
+  const onlyPersonal = run({ loading: ["finance"], finance: MONEY_DOCS });
+  check("carregando: só o pessoal local também some", !sec(onlyPersonal, "business") && sec(onlyPersonal, "money").loading === true);
+  const other = run({ loading: ["tasks"], finance: BIZ_CASH });
+  check("carregando: as tarefas carregando não calam o negócio", !!sec(other, "business") && sec(other, "business").loading === false && /^caixa hoje /.test(sec(other, "business").text), sec(other, "business") && sec(other, "business").text);
+  /* pela tela: portraitData */
+  const down = (docs, ok) => ({ all: () => docs, get: (id) => docs.find((x) => x.id === id) || null, hasDownloaded: () => ok });
+  const emFalta = portraitOf(portraitData({ finance: down(BIZ_CASH, false) }, { signedIn: true, prefs: PREFS }), NOW);
+  check("carregando (tela): a coleção que não desceu segura o negócio", !!sec(emFalta, "business") && sec(emFalta, "business").text === "ainda carregando" && sec(emFalta, "business").loading === true);
+  const vazia = portraitOf(portraitData({ finance: down([], false) }, { signedIn: true, prefs: PREFS }), NOW);
+  check("carregando (tela): coleção vazia que não desceu: a seção some", !sec(vazia, "business"));
+  const desceu = portraitOf(portraitData({ finance: down(BIZ_CASH, true) }, { signedIn: true, prefs: PREFS }), NOW);
+  check("carregando (tela): desceu, a seção volta com o caixa", !!sec(desceu, "business") && sec(desceu, "business").loading === false && /^caixa hoje /.test(sec(desceu, "business").text), sec(desceu, "business") && sec(desceu, "business").text);
+  const semSessao = portraitOf(portraitData({ finance: down(BIZ_CASH, false) }, { signedIn: false, prefs: PREFS }), NOW);
+  check("carregando (tela): sem sessão nada carrega, o caixa local vale", !!sec(semSessao, "business") && sec(semSessao, "business").loading === false && /^caixa hoje /.test(sec(semSessao, "business").text), sec(semSessao, "business") && sec(semSessao, "business").text);
+});
+
+/* ---- o pior caso: todas as seções cheias, o negócio incluído ---- */
+sectionM("negócio: o pior caso", () => {
+  const long = (s, i) => s + " " + String(i).padStart(2, "0") + " " + "palavra ".repeat(25).trim();
+  const tasks = [
+    ...Array.from({ length: 60 }, (_, i) => task({ title: long("Aberta de hoje", i), min: 5 })),
+    ...Array.from({ length: 60 }, (_, i) => task({ title: long("Atrasada", i), date: "2026-10-" + String(1 + (i % 17)).padStart(2, "0") })),
+    ...Array.from({ length: 40 }, (_, i) => task({ title: long("Quinta", i), date: THU, at: hm(6) + i * 10, min: 30 })),
+    ...Array.from({ length: 40 }, (_, i) => task({ title: long("Sexta", i), date: "2026-10-23" })),
+    ...Array.from({ length: 20 }, (_, i) => task({ title: long("Feita", i), done: true }))
+  ];
+  const routine = Array.from({ length: 30 }, (_, i) => block({ title: long("Bloco", i), at: hm(6, i * 5) }));
+  const apps = Array.from({ length: 12 }, (_, i) => ({ id: "a" + i, name: "Produto " + i + " " + "n".repeat(280) }));
+  const habits = Array.from({ length: 30 }, (_, i) => habit({ name: long("Hábito", i), order: i }));
+  const notes = Array.from({ length: 30 }, (_, i) => note({ title: long("Nota", i), updatedAt: stamp(1 + (i % 18)) }));
+  const fixed = Array.from({ length: 30 }, (_, i) => ffixed("fx" + i, long("fixo", i), 123456 + i, 1 + (i % 28)));
+  const clients = Array.from({ length: 30 }, (_, i) => lead({ id: "l" + i, name: long("Lead", i), stage: "proposal", stageAt: ago(9 + i), nextDate: "" }));
+  const sleep = Array.from({ length: 7 }, (_, i) => night("2026-10-" + String(13 + i), 300 + i * 17));
+  const workouts = Array.from({ length: 200 }, (_, i) => wk("w" + i, "2026-10-" + String(13 + (i % 7)), 95 + (i % 40), { title: long("treino", i) }));
+  const meals = Array.from({ length: 500 }, (_, i) => ml("m" + i, "2026-10-" + String(13 + (i % 7)), { text: long("refeição", i) }));
+  /* o caixa da empresa cheio: 30 fixos, 150 lançamentos e valores enormes */
+  const bizFixed = Array.from({ length: 30 }, (_, i) => bfixed("bf" + i, long("fixo da empresa", i), 99999999 - i, 1 + (i % 28)));
+  const bizEntries = Array.from({ length: 150 }, (_, i) => bent("be" + i, "2026-10-" + String(1 + (i % 19)).padStart(2, "0"), long("lançamento da empresa", i), i % 3 ? "out" : "in", 9999999 + i, true));
+  const bizBig = (start) => [bstart("2026-08-01", start), ...bizFixed, ...bizEntries];
+  const all = (bizDocs) => ({ tasks, routine, apps, habits, notes, clients: [ANA, ...clients], finance: [fconfig({}), ...fixed, ...bizDocs], sleep, workouts, meals, journal: [{ id: TODAY, text: "segredo do diário" }], profile: { focusGoal: 25, meetingCap: 6, sleepGoal: 450 } });
+  for (const [label, docs] of [["caixa grande", bizBig(9999999999)], ["caixa negativo", bizBig(-9999999999)], ["só o saldo", BIZ_CASH]]) {
+    const p = run(all(docs));
+    check("pior caso (" + label + "): o retrato não passa de 6.000", p.text.length <= PORTRAIT_MAX, String(p.text.length));
+    check("pior caso (" + label + "): todas as seções estão lá, cada uma dentro do seu orçamento", SECTIONS.every((s) => sec(p, s.id) && sec(p, s.id).text.length <= s.budget), p.sections.map((s) => s.id + ":" + s.text.length + "/" + s.budget).join(" "));
+    check("pior caso (" + label + "): o negócio é a última, inteiro e com no máximo 260", p.sections.at(-1).id === "business" && /^caixa hoje .+ · fim do mês .+ · fôlego .+$/.test(bizLine(p)) && bizLine(p).length <= 260 && !/e mais \d+$/.test(bizLine(p)), bizLine(p));
+    check("pior caso (" + label + "): nada da empresa vaza (nem nome, nem id)", !/fixo da empresa|lançamento da empresa|\bbf\d|\bbe\d/.test(p.text), p.text.slice(-300));
+    check("pior caso (" + label + "): o dinheiro pessoal segue sem a empresa", !!sec(p, "money") && !sec(p, "money").text.includes("da empresa"), sec(p, "money") && sec(p, "money").text.slice(0, 200));
+    check("pior caso (" + label + "): as outras seções cheias ainda cortam em 'e mais N'", /e mais \d+$/.test(sec(p, "today").text) && /e mais \d+$/.test(sec(p, "agenda").text));
+  }
+  const grande = run(all(bizBig(9999999999)));
+  check("pior caso: o caixa grande mostra o valor inteiro, com centavos quando há", /^caixa hoje [+−]?R\$\s[\d.]+(,\d\d)? · /.test(bizLine(grande)), bizLine(grande));
+  /* os orçamentos, com rótulo e separador, cabem nos 6.000 */
+  const total = SECTIONS.reduce((t, s) => t + s.budget + (s.label + ":\n").length, 0) + 2 * (SECTIONS.length - 1);
+  check("orçamentos + rótulos + separadores cabem em 6.000 com o negócio", total <= PORTRAIT_MAX, String(total));
+  check("os cortes pagam o negócio: a agenda 1.284 e a rotina 540", SECTIONS.find((s) => s.id === "agenda").budget === 1284 && SECTIONS.find((s) => s.id === "routine").budget === 540);
+  /* sem o negócio, o mesmo pior caso também cabe */
+  const sem = run(all([]));
+  check("pior caso: sem livro da empresa também cabe, e ela não está", sem.text.length <= PORTRAIT_MAX && !sec(sem, "business"));
 });
 
 console.log("\n" + passed + " passaram, " + failures.length + " falharam");
