@@ -1290,7 +1290,7 @@ const dataLeft = () => globalThis.localStorage.keys().filter((k) => k in DATA);
     ["health", "saúde", "habits", [["habits", "hábitos", "habits.html"], ["sleep", "sono", "sleep.html"], ["training", "treino", "training.html"], ["meals", "alimentação", "meals.html"], ["journal", "diário", "journal.html"]]],
     ["work", "trabalho", "apps", [
       ["apps", "produtos", "apps.html"], ["content", "conteúdo", "content.html"],
-      ["funnels", "funis", "funnels.html"], ["maps", "mapas", "maps.html"]
+      ["funnels", "funis", "funnels.html"], ["drawings", "desenhos", "drawings.html"]
     ]],
     ["business", "meu negócio", "business", [["plans", "plano", "plans.html"], ["cash", "caixa", "cash.html"], ["team", "time", "team.html"], ["ops", "operação", "ops.html"]]],
     ["organization", "organização", "calendar", [

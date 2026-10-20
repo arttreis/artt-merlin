@@ -25,7 +25,7 @@ const KINDS = [
   { type: "tasks", one: "tarefa", many: "tarefas", href: "calendar.html" },
   { type: "habits", one: "hábito", many: "hábitos", href: "habits.html" },
   { type: "notes", one: "nota", many: "notas", href: "notes.html" },
-  { type: "maps", one: "mapa", many: "mapas", href: "maps.html" },
+  { type: "maps", one: "mapa", many: "mapas", href: "drawings.html#mapas" },
   { type: "apps", one: "produto", many: "produtos", href: "apps.html" },
   { type: "funnels", one: "funil", many: "funis", href: "funnels.html" },
   { type: "content", one: "peça", many: "peças", href: "content.html" },

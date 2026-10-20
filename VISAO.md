@@ -222,6 +222,10 @@ de semana`, e dentro de cada coluna uma lista só de cartões.
 
 ### 4.4 Mapa mental (`maps.html`)
 
+Desde 20/10/2026 o mapa não tem aba própria: mora em **desenhos** (§4.14), que lista mapas e
+planilhas juntos. O endereço `maps.html#id` e os favoritos continuam valendo, e o voltar do
+editor leva a `drawings.html#mapas`.
+
 Referência: MindMaster / XMind. O que faz um mapa ser bom é **teclado e layout automático**.
 
 - `Enter` irmão, `Tab` filho, `Shift+Tab` sobe, `Delete` apaga o ramo (com desfazer), setas
@@ -577,6 +581,38 @@ construir. O projeto de app é o mesmo desenho **com forma**.
 pronto para construir e lançar. Ninguém junta produto, marketing e execução assim.
 
 ---
+
+### 4.14 Desenhos e planilhas (`drawings.html`, `sheets.html`) — 20/10/2026
+
+A aba "mapas" do trabalho virou **desenhos** (`docs/prd/desenhos.md`, D1): uma lista só, do mais
+recente ao mais antigo, de tudo que se desenha, com filtro em pílulas (todos · planilhas · mapas,
+guardado no endereço: `drawings.html#planilhas`), miniatura, nome, tipo, produto ligado e data.
+O "+" escolhe o tipo e entrega à página do tipo, que sabe começar: a planilha vai para os modelos
+dela (`sheets.html`), o mapa para os dele (`maps.html#novo`). Cada editor continua no seu
+endereço. Um tipo novo é uma linha em `KINDS` (`src/drawings.jsx`).
+
+A **planilha** (D3) é uma folha por arquivo, até 200 linhas × 26 colunas, na coleção `sheets`.
+Não é Excel: a conversa monta, a página ajusta.
+
+- **Fórmula** começa com `=`: referências (`B3`, pela posição), intervalos (`B2:B9`), `+ - * /`,
+  parênteses, `%`, e `SOMA`, `MÉDIA`, `MÍN`, `MÁX` (sem acento também). Ciclo mostra `#ciclo`,
+  qualquer outro erro `#erro`; a conta nunca quebra a tela. O valor calculado não é gravado:
+  nasce a cada desenho, de `shared/sheet.js`, que é puro e testado.
+- **Coluna com tipo**: texto, número, R$ (duas casas, arredondado ao centavo) e data
+  (dd/mm/aaaa). Número digitado aparece como foi digitado ("30%" continua "30%").
+- **Linha e coluna** se acrescentam e se apagam como no Excel: as fórmulas são reescritas, e a
+  referência à linha que sumiu vira `#erro` em vez de apontar para a vizinha.
+- **Teclado**: setas, `Enter` desce, `Tab` anda, digitar ou `F2` edita, `Delete` limpa,
+  `Ctrl+Z` / `Ctrl+Shift+Z`. Apagar linha, coluna ou a planilha mostra o aviso com desfazer.
+- **Celular**: lê e corrige o texto das células; acrescentar e apagar linha e coluna e mudar o
+  tipo só a partir de 600px. A grade rola sozinha na horizontal, com o número da linha e a 1ª
+  coluna presos.
+- **CSV** no "mais": UTF-8 com BOM, `;` e vírgula decimal, para abrir certo no Excel brasileiro.
+  Sai o valor, não a fórmula.
+- **Modelos** na tela vazia (D5): precificação, custo do produto, MRR em 12 meses e ponto de
+  equilíbrio, cada um com as fórmulas prontas.
+- Sem gráfico, formatação de célula, várias folhas, `.xlsx`, importar CSV nem ligação viva com o
+  caixa.
 
 ## 5. Ordem de construção
 
@@ -1039,7 +1075,7 @@ Na ordem do desenho do Arthur. A primeira aba é a porta da área (`SECTIONS`, n
 | área | id | ícone | abas, na ordem |
 | --- | --- | --- | --- |
 | **saúde** | `health` | `habits` | hábitos, sono, treino, alimentação, diário |
-| **trabalho** | `work` | `apps` | produtos, conteúdo, funis, mapas |
+| **trabalho** | `work` | `apps` | produtos, conteúdo, funis, desenhos |
 | **meu negócio** | `business` | `business` | caixa, time, operação |
 | **organização** | `organization` | `calendar` | calendário, rotina, notas |
 | **finanças** | `money` | `finance` | financeiro |
@@ -1056,7 +1092,8 @@ discutíveis, e cada uma muda numa linha de `SECTIONS`, sem migração:
 - **leads e clientes** ficam no inbox, porque o desenho põe o "crm" ali: são as pessoas que
   esperam uma resposta. A alternativa era o trabalho, que ficaria com seis abas;
 - **os mapas** vão para o trabalho, porque o desenho põe o mapa mental em "desenhos", dentro do
-  trabalho.
+  trabalho. Em 20/10/2026 a aba "mapas" virou "desenhos" de fato (§4.14): mapas e planilhas numa
+  lista só, e o mapa sem aba própria.
 
 A saúde era só os hábitos; o diário voltou como aba em 20/10/2026, e o sono, o treino e a
 alimentação entraram no mesmo dia, cada um com o seu verbo ("dormi 7h", "treinei perna 40min",

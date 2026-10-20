@@ -1,0 +1,35 @@
+/* merlin · desenhos (a lista de mapas e planilhas)
+   importado depois do base.css: o comum mora na camada, isto fica fora dela. */
+
+.dw-filter{margin:0 0 var(--pd2)}
+.dw-line{cursor:pointer;gap:var(--pd)}
+/* a miniatura é a mesma das telas de começar (.th do base.css), num quadro pequeno */
+.dw-thumb{
+  flex:0 0 auto;width:64px;height:38px;border-radius:var(--br2);
+  display:flex;align-items:center;justify-content:center;
+  background:var(--fill);border:1px solid var(--line-soft);color:var(--ink-70);
+}
+.dw-thumb .th{width:92%;height:86%}
+.dw-main{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:2px}
+.dw-name{
+  font-size:13.5px;color:var(--ink);text-decoration:none;
+  overflow:hidden;white-space:nowrap;text-overflow:ellipsis;
+}
+.dw-name:hover{color:var(--accent-ink)}
+.dw-meta{color:var(--ink-50)}
+.dw-product{flex:0 0 auto;max-width:180px;overflow:hidden;text-overflow:ellipsis}
+.dw-empty{font-size:13px;color:var(--ink-50)}
+.dw-empty a{color:var(--accent-ink)}
+/* o tipo no "+": pílulas que são rádios de verdade */
+.dw-kinds label{display:inline-flex;align-items:center;cursor:pointer}
+.dw-kinds input{position:absolute;opacity:0;width:1px;height:1px;pointer-events:none}
+.dw-kinds label:focus-within{outline:2px solid var(--accent);outline-offset:2px}
+
+/* a miniatura da planilha: a grade e a cabeça */
+.th--sheet{stroke:currentColor;fill:none;stroke-width:.9;opacity:.75}
+.th--sheet .th__head{fill:currentColor;stroke:none;opacity:.35}
+
+@media (max-width:600px){
+  .dw-line{flex-wrap:wrap}
+  .dw-product{order:3;margin-left:calc(64px + var(--pd))}
+}

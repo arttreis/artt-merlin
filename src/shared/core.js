@@ -271,12 +271,13 @@ export const SECTIONS = [
     { id: "journal", label: "diário", href: "journal.html", spare: true }
   ] },
   /* o produto é o centro (VISAO, 9.5) e abre a área. o conteúdo e o funil são
-     como gente chega a ele, e o mapa é o desenho que pensa em galhos */
+     como gente chega a ele. desenhos junta o que se desenha — o mapa, que
+     pensa em galhos, e a planilha, que faz a conta (PRD desenhos, D1) */
   { id: "work", label: "trabalho", icon: "apps", pages: [
     { id: "apps", label: "produtos", href: "apps.html" },
     { id: "content", label: "conteúdo", href: "content.html" },
     { id: "funnels", label: "funis", href: "funnels.html" },
-    { id: "maps", label: "mapas", href: "maps.html" }
+    { id: "drawings", label: "desenhos", href: "drawings.html" }
   ] },
   /* o negócio de quem tem um (PRD meu-negocio, D2): o caixa da empresa é o
      financeiro com o livro "business" (finance-data.js, bookCollection). o
@@ -336,6 +337,7 @@ const SEARCH_SOURCES = [
   { type: "content", label: "conteúdo", field: "title", href: (d) => "content.html#" + encodeURIComponent(d.id) },
   { type: "tasks", label: "tarefa", field: "title", href: (d) => "calendar.html#" + encodeURIComponent(d.date || ""), filter: (d) => !d.done },
   { type: "maps", label: "mapa", field: "name", href: (d) => "maps.html#" + encodeURIComponent(d.id) },
+  { type: "sheets", label: "planilha", field: "name", href: (d) => "sheets.html#" + encodeURIComponent(d.id) },
   { type: "funnels", label: "funil", field: "name", href: (d) => "funnels.html#" + encodeURIComponent(d.id) },
   { type: "apps", label: "produto", field: "name", href: (d) => "apps.html#" + encodeURIComponent(d.id) },
   { type: "finance", label: "R$", field: "name", href: (d) => (d.book === "business" ? "cash.html" : "finance.html"), filter: (d) => d.type === "entry" || d.type === "fixed" || d.type === "debt" || d.type === "card" },
@@ -901,7 +903,7 @@ document.addEventListener("visibilitychange", () => {
    nao baixou espera a proxima sincronizacao, e a marca de "feito" so e
    gravada quando todas fecharam. depois disso ela nunca mais faz nada. */
 const FRONTS_PURGED = "merlin:fronts-removed";
-const PURGE_TYPES = ["notes", "clients", "tasks", "week", "maps", "funnels", "apps", "finance", "habits", "plans", "bookmarks", "content", "cadence", "profile", "closes", "reviews", "sessions", "journal", "sleep", "workouts", "meals", "ops", "team"];
+const PURGE_TYPES = ["notes", "clients", "tasks", "week", "maps", "funnels", "apps", "finance", "habits", "plans", "bookmarks", "content", "cadence", "profile", "closes", "reviews", "sessions", "journal", "sleep", "workouts", "meals", "ops", "team", "sheets"];
 function stripFront(value) {
   if (Array.isArray(value)) return value.map(stripFront).some(Boolean);
   if (!value || typeof value !== "object") return false;
