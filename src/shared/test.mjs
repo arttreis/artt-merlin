@@ -1291,7 +1291,7 @@ const dataLeft = () => globalThis.localStorage.keys().filter((k) => k in DATA);
       ["apps", "produtos", "apps.html"], ["content", "conteúdo", "content.html"],
       ["funnels", "funis", "funnels.html"], ["maps", "mapas", "maps.html"]
     ]],
-    ["business", "meu negócio", "business", [["cash", "caixa", "cash.html"]]],
+    ["business", "meu negócio", "business", [["cash", "caixa", "cash.html"], ["ops", "operação", "ops.html"]]],
     ["organization", "organização", "calendar", [
       ["calendar", "calendário", "calendar.html"], ["routine", "rotina", "routine.html"], ["notes", "notas", "notes.html"]
     ]],
@@ -1308,7 +1308,7 @@ const dataLeft = () => globalThis.localStorage.keys().filter((k) => k in DATA);
     const got = (SECTIONS.find((s) => s.id === id) || { pages: [] }).pages.map((p) => [p.id, p.label, p.href]);
     check("áreas: as abas de " + id + ", na ordem", JSON.stringify(got) === JSON.stringify(tabs), JSON.stringify(got));
   });
-  check("áreas: são dezessete abas", PAGES.length === 17, String(PAGES.length));
+  check("áreas: são dezoito abas", PAGES.length === 18, String(PAGES.length));
   check("áreas: o diário é uma aba de saúde", sectionOf("journal")?.id === "health", String(sectionOf("journal")?.id));
   check("áreas: só o diário sai do dock no celular (spare), e a alimentação fica", PAGES.filter((p) => p.spare).map((p) => p.id).join() === "journal", PAGES.filter((p) => p.spare).map((p) => p.id).join());
   check("áreas: a vitrine não está em nenhuma", !PAGES.some((p) => p.id === "wishlist") && !PAGES.some((p) => /wishlist/.test(p.href)));

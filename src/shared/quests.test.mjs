@@ -46,6 +46,7 @@ const { normalize: normalizeFinance } = await import("./finance-data.js");
 const { collection } = await import("./core.js");
 const { normalize: normalizeHabit } = await import("./habits-data.js");
 const { normalize: normalizeWorkout } = await import("./workouts-data.js");
+const { normalize: normalizeOp } = await import("./ops-data.js");
 const { questsOf, questsText, nextQuest, countLine, moveTask, dropTask, doneTask, paidEntry, moveEntry, SOON, DAY_HREF, FINANCE_HREF, SOURCES } = await import("./quests.js");
 
 /* ---- os ingredientes ---- */
@@ -720,6 +721,71 @@ const billIds = (q) => q.behind.map((x) => x.id);
   const wspy = spyOf([]);
   nextQuest(questsOf({ tasks: [], sessions: [], habits: hspy.all(), workouts: wspy.all() }, FRI), []);
   check("treino: ler a lista não grava", hspy.saves === 0 && wspy.saves === 0);
+}
+
+/* ---- agora: o processo da empresa que vence (ticket #79) ----
+   o processo mensal/semanal/anual sem "feito" no período entra em agora quando
+   o prazo chegou (ou passou). vence hoje: sem atraso; venceu antes: late.
+   o dia é fixo (terça, 20/10/2026) para não depender de quando o teste roda */
+{
+  const TUE = new Date(2026, 9, 20, 9, 0);
+  const BEFORE = new Date(2026, 0, 1, 9, 0).getTime();
+  let oseq = 0;
+  const opx = (over = {}) => normalizeOp({ id: "p" + (++oseq), title: "processo " + oseq, freq: "monthly", day: 20, createdAt: BEFORE, updatedAt: BEFORE, ...over });
+  const onTue = (data, now) => quests({ ops: [], ...data }, now || TUE);
+  const oq = (q) => q.now.filter((x) => x.type === "op");
+
+  check("processo: a fonte 'op' está em SOURCES, no grupo agora", SOURCES.some((s) => s.key === "op" && s.group === "now"), JSON.stringify(SOURCES.map((s) => s.key)));
+  check("processo: a fonte vem depois do treino", SOURCES.findIndex((s) => s.key === "op") > SOURCES.findIndex((s) => s.key === "workout"), JSON.stringify(SOURCES.map((s) => s.key)));
+
+  const notas = opx({ title: "emitir notas", day: 20 });
+  const q = onTue({ ops: [notas] });
+  const o = oq(q)[0];
+  check("processo: vence hoje e não foi feito: está em agora", oq(q).length === 1, JSON.stringify(q.now));
+  check("processo: o id é op:<id>:<prazo>", !!o && o.id === "op:" + notas.id + ":2026-10-20", JSON.stringify(o && o.id));
+  check("processo: o título é o do processo", !!o && o.title === "emitir notas");
+  check("processo: carrega o processo, o prazo e late falso", !!o && o.op.id === notas.id && o.due === "2026-10-20" && o.late === false, JSON.stringify(o && [o.op.id, o.due, o.late]));
+  check("processo: conta em left", q.left === 1, String(q.left));
+  check("processo: não vai para para trás", q.behind.length === 0);
+  check("processo: nextQuest o devolve", nextQuest(q, []).quest.id === "op:" + notas.id + ":2026-10-20");
+  check("processo: a linha de texto diz agora: emitir notas", questsText(q) === "agora: emitir notas · faltam 1 · 0 feitas", questsText(q));
+
+  check("processo: feito no período não vira", oq(onTue({ ops: [opx({ day: 20, done: ["2026-10-20"] })] })).length === 0);
+  check("processo: feito mais cedo no mês também some", oq(onTue({ ops: [opx({ day: 20, done: ["2026-10-02"] })] })).length === 0);
+  check("processo: feito no mês passado não conta", oq(onTue({ ops: [opx({ day: 20, done: ["2026-09-20"] })] })).length === 1);
+
+  const late = oq(onTue({ ops: [opx({ title: "pagar DAS", day: 5 })] }))[0];
+  check("processo: venceu dia 5 e hoje é 20, não feito: vira quest atrasada", !!late && late.late === true && late.due === "2026-10-05" && late.id.endsWith(":2026-10-05"), JSON.stringify(late));
+  check("processo: atrasado continua em agora, não em para trás", onTue({ ops: [opx({ day: 5 })] }).behind.length === 0);
+
+  check("processo: o que vence no dia 25 ainda não vira", oq(onTue({ ops: [opx({ day: 25 })] })).length === 0);
+  check("processo: semanal que vence só na sexta não vira numa terça", oq(onTue({ ops: [opx({ freq: "weekly", day: 5 })] })).length === 0);
+  check("processo: semanal de segunda, não feita, vira atrasada numa terça", (() => { const x = oq(onTue({ ops: [opx({ freq: "weekly", day: 1 })] })); return x.length === 1 && x[0].late === true && x[0].due === "2026-10-19"; })());
+  check("processo: anual de março, não feito, vira atrasado", oq(onTue({ ops: [opx({ freq: "yearly", day: "03-15" })] })).length === 1);
+
+  check("processo: sem ops não quebra", oq(quests({}, TUE)).length === 0 && quests({}, TUE).left === 0);
+  check("processo: ops vazio não quebra", oq(onTue({ ops: [] })).length === 0);
+  check("processo: apagado não vira", oq(onTue({ ops: [{ ...notas, deleted: true }] })).length === 0);
+  check("processo: criado depois do prazo não nasce devendo", oq(onTue({ ops: [opx({ day: 5, createdAt: new Date(2026, 9, 20, 8, 0).getTime() })] })).length === 0);
+
+  /* vários: o de prazo mais antigo primeiro */
+  const duo = oq(onTue({ ops: [opx({ title: "b hoje", day: 20 }), opx({ title: "a atrasado", day: 5 })] }));
+  check("processo: vários entram, o de prazo mais antigo primeiro", duo.map((x) => x.title).join() === "a atrasado,b hoje", duo.map((x) => x.title).join());
+  check("processo: cada um conta em left", onTue({ ops: [opx({ day: 20 }), opx({ day: 5 })] }).left === 2);
+
+  /* entra depois do treino */
+  const daily = normalizeHabit({ id: "hx", name: "treinar", schedule: { type: "daily" }, min: 45, createdAt: 1000 });
+  const wmix = onTue({ habits: [daily], workouts: [], ops: [notas] });
+  check("processo: vem depois do treino", wmix.now.map((x) => x.type).join() === "workout,op", wmix.now.map((x) => x.type).join());
+
+  /* não cria tarefa no calendário, e ler não grava */
+  const ospy = spyOf([notas]);
+  const tspy = spyOf([]);
+  const read = questsOf({ tasks: tspy.all(), sessions: [], blocks: [], ops: ospy.all() }, TUE);
+  nextQuest(read, []);
+  check("processo: ler a lista não grava no processo", ospy.saves === 0 && ospy.removes === 0, JSON.stringify([ospy.saves, ospy.removes]));
+  check("processo: ler a lista não cria tarefa", tspy.saves === 0 && tspy.all().length === 0 && read.now.every((x) => x.type !== "task"), JSON.stringify(read.now.map((x) => x.type)));
+  check("processo: ler não muda o processo", ospy.get(notas.id).done.length === 0 && ospy.get(notas.id).updatedAt === BEFORE);
 }
 
 console.log("\n" + passed + " passaram, " + failures.length + " falharam");

@@ -37,6 +37,7 @@ import { BUILD, buildIntent } from "./shared/build-intent.js";
 import { normalize as normalizeHabit, habitStatus, markOn, undoHabit, markWhen } from "./shared/habits-data.js";
 import { normalize as normalizeSleep, sleepDoc, sleepLabel, sleepLine, nightOf, undoSleep } from "./shared/sleep-data.js";
 import { normalize as normalizeWorkout, workoutDay, trainingHabit, logWorkout, applyWorkout } from "./shared/workouts-data.js";
+import { normalize as normalizeOp } from "./shared/ops-data.js";
 import { normalize as normalizeMeal, MEALS, mealDay, mealDoc, mealLine } from "./shared/meals-data.js";
 import { distribute, fmt, clock, costOf } from "./shared/day.js";
 import { Forest, phaseOf } from "./shared/forest.jsx";
@@ -906,7 +907,8 @@ function Today({ c, tasks, habits, journal, closes, reviews, sessions, me, h, ph
      no cartão (quest-card.jsx) */
   const finance = bookCollection(useCollection("finance", { normalize: normalizeFinance }), "personal");
   const workouts = useCollection("workouts", { normalize: normalizeWorkout });
-  const questsMsg = () => ({ from: "merlin", show: "quests", text: questsText(questsOf({ tasks: tasks.all(), sessions: sessions.all(), entries: finance.all(), habits: habits.all(), workouts: workouts.all() })) });
+  const ops = useCollection("ops", { normalize: normalizeOp });
+  const questsMsg = () => ({ from: "merlin", show: "quests", text: questsText(questsOf({ tasks: tasks.all(), sessions: sessions.all(), entries: finance.all(), habits: habits.all(), workouts: workouts.all(), ops: ops.all() })) });
   const ask = async (q) => {
     if (!c.signedIn) { askMerlin(q); return; }
     if (asking) return;

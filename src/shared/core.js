@@ -283,7 +283,8 @@ export const SECTIONS = [
      plano, o time e a operação entram aqui, na ordem plano, caixa, time,
      operação; vendas continua no inbox (D1) */
   { id: "business", label: "meu negócio", icon: "business", pages: [
-    { id: "cash", label: "caixa", href: "cash.html" }
+    { id: "cash", label: "caixa", href: "cash.html" },
+    { id: "ops", label: "operação", href: "ops.html" }
   ] },
   /* onde se arruma o tempo. a rotina é a semana-modelo, que só existe para
      virar tarefa no calendário (VISAO, 4.11) */
@@ -897,7 +898,7 @@ document.addEventListener("visibilitychange", () => {
    nao baixou espera a proxima sincronizacao, e a marca de "feito" so e
    gravada quando todas fecharam. depois disso ela nunca mais faz nada. */
 const FRONTS_PURGED = "merlin:fronts-removed";
-const PURGE_TYPES = ["notes", "clients", "tasks", "week", "maps", "funnels", "apps", "finance", "habits", "plans", "bookmarks", "content", "cadence", "profile", "closes", "reviews", "sessions", "journal", "sleep", "workouts", "meals"];
+const PURGE_TYPES = ["notes", "clients", "tasks", "week", "maps", "funnels", "apps", "finance", "habits", "plans", "bookmarks", "content", "cadence", "profile", "closes", "reviews", "sessions", "journal", "sleep", "workouts", "meals", "ops"];
 function stripFront(value) {
   if (Array.isArray(value)) return value.map(stripFront).some(Boolean);
   if (!value || typeof value !== "object") return false;

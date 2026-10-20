@@ -1007,7 +1007,7 @@ Na ordem do desenho do Arthur. A primeira aba é a porta da área (`SECTIONS`, n
 | --- | --- | --- | --- |
 | **saúde** | `health` | `habits` | hábitos, sono, treino, alimentação, diário |
 | **trabalho** | `work` | `apps` | produtos, conteúdo, funis, mapas |
-| **meu negócio** | `business` | `business` | caixa |
+| **meu negócio** | `business` | `business` | caixa, operação |
 | **organização** | `organization` | `calendar` | calendário, rotina, notas |
 | **finanças** | `money` | `finance` | financeiro |
 | **inbox** | `inbox` | `inbox` | o que falta, leads, clientes |
@@ -1040,6 +1040,12 @@ nem o caixa vê o pessoal. O verbo é o mesmo lançamento da conversa ("recebi 2
 empresa"), com o seletor "pessoal | empresa" na caixa: na dúvida, pessoal, e a pessoa decide. O
 plano, o time e a operação entram na mesma área, na ordem plano, caixa, time, operação; vendas
 continua no inbox (D1).
+
+A **operação** (D6) é a última aba: os processos recorrentes da empresa ("emitir notas · todo dia
+5"), e marcar feito vale pelo período. Operação é **prazo, não tempo**: a rotina diz quando se
+trabalha na semana, e a operação só diz até quando algo tem de estar feito. Por isso ela não cria
+tarefa no calendário, e o que vence hoje entra no "o que falta hoje?"; a caixa do processo diz
+que é prazo. Os verbos são "todo dia 5 emito as notas" e "emiti as notas".
 
 ### 13.2 O menu
 

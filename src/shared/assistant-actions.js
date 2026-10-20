@@ -14,6 +14,7 @@ import { normalize as normalizeHabit, habitStatus, markOn } from "./habits-data.
 import { sleepLabel, sleepLine, readHours, sleepDoc, nightOf } from "./sleep-data.js";
 import { readMinutes, workoutDoc, workoutDay, workoutLine } from "./workouts-data.js";
 import { MEALS, mealOf, mealDoc, mealDay, mealLine } from "./meals-data.js";
+import { FREQS, normalize as normalizeOp, opDoc, findOp, markDone, freqLabel, periodLabel, parseDay, dayText } from "./ops-data.js";
 
 export const ACTION_COLLECTIONS = {
   task: "tasks",
@@ -27,7 +28,9 @@ export const ACTION_COLLECTIONS = {
   "habit-mark": "habits",
   "sleep-log": "sleep",
   "workout-log": "workouts",
-  "meal-log": "meals"
+  "meal-log": "meals",
+  "op-add": "ops",
+  "op-done": "ops"
 };
 
 export const ACTION_LABELS = {
@@ -42,11 +45,13 @@ export const ACTION_LABELS = {
   "habit-mark": "marcar hábito",
   "sleep-log": "registrar sono",
   "workout-log": "registrar treino",
-  "meal-log": "anotar refeição"
+  "meal-log": "anotar refeição",
+  "op-add": "novo processo",
+  "op-done": "marcar feito"
 };
 
 /* o que a pílula confirmada diz no lugar do título: "✓ lançado · …" */
-export const ACTION_DONE = { "finance-entry": "lançado", "habit-mark": "marcado", "sleep-log": "registrado", "workout-log": "registrado", "meal-log": "anotado", task: "criada", note: "criada", "lead-update": "aplicado", script: "aplicado" };
+export const ACTION_DONE = { "finance-entry": "lançado", "habit-mark": "marcado", "sleep-log": "registrado", "workout-log": "registrado", "meal-log": "anotado", "op-add": "processo", "op-done": "feito", task: "criada", note: "criada", "lead-update": "aplicado", script: "aplicado" };
 
 /* so os campos que fazem sentido editar antes de confirmar — o resto do
    payload (arvore do mapa, etapas do funil, id do cliente/conteudo) segue
@@ -116,8 +121,30 @@ export const ACTION_FIELDS = {
     { key: "pick", label: "refeição", type: "select", initial: (p) => mealOf(p.meal), options: () => MEALS.map((m) => [m.id, m.label]) },
     { key: "text", label: "o que comeu" },
     { key: "date", label: "dia", type: "date", initial: () => today() }
+  ],
+  /* o processo da empresa (PRD meu-negocio, D6): o dia se escreve como se
+     fala ("5", "seg", "15/03"), e a frequência diz como lê-lo */
+  "op-add": [
+    { key: "title", label: "processo" },
+    { key: "freq", label: "frequência", type: "select", initial: () => "monthly", options: () => FREQS.map((f) => [f.id, f.label]) },
+    { key: "day", label: "dia", initial: (p) => dayText(p.freq || "monthly", p.day) }
+  ],
+  /* o feito é de um processo que existe: a caixa abre no que casa com o que a
+     pessoa disse ("emiti as notas" é "emitir notas"), e ela pode trocar */
+  "op-done": [
+    { key: "pick", label: "processo", type: "select", initial: (p, store) => { const op = findOp(opsOf(store), p.title); return op ? op.id : ""; },
+      options: (store) => [["", "escolha o processo"], ...opsOf(store).filter((o) => !o.deleted).map((o) => [o.id, o.title])] },
+    { key: "date", label: "dia", type: "date", initial: () => today() }
   ]
 };
+
+/* a coleção chega sem normalize na tela da conversa */
+const opsOf = (store) => (store ? store.all() : []).map(normalizeOp);
+const opOf = (p, store) => {
+  const ops = opsOf(store);
+  return ("pick" in p && p.pick ? ops.find((o) => o.id === p.pick) : null) || (p.pick ? null : findOp(ops, p.title));
+};
+const opDay = (p, freq) => (typeof p.day === "number" ? p.day : parseDay(freq, p.day));
 
 /* a refeição de uma proposta: o que a pessoa deixou na caixa por cima do que
    a IA propôs */
@@ -160,6 +187,14 @@ export function previewOf(actionType, payload, ctx) {
       const t = today(), m = mealSpec(p), { day, error } = mealDay(m, t);
       if (error) return error;
       return m.text ? mealLine({ ...m, day }, t) : "falta o que comeu";
+    }
+    case "op-add": {
+      const freq = p.freq || "monthly", day = opDay(p, freq);
+      return [String(p.title || "").trim(), day != null ? freqLabel({ freq, day }) : "falta o dia"].filter(Boolean).join(" · ");
+    }
+    case "op-done": {
+      const op = opOf(p, ctx && ctx.store);
+      return op ? op.title + " · " + periodLabel(op, p.date || today()) : String(p.title || "");
     }
     default: return "";
   }
@@ -242,6 +277,15 @@ export function buildDoc(actionType, payload, v, store, opts) {
     /* um documento por refeição; o desfazer da caixa o apaga */
     case "meal-log":
       return mealDoc(mealSpec({ ...p, ...v }), null, today());
+    /* um documento por processo; o desfazer da caixa o apaga */
+    case "op-add":
+      return opDoc({ title: v.title, freq: v.freq, day: v.day }, now);
+    /* o feito grava o dia no período, e o desfazer devolve o processo de antes */
+    case "op-done": {
+      const op = opOf({ ...p, ...v }, store);
+      if (!op) return { error: "não achei esse processo" };
+      return markDone(op, v.date || today(), today());
+    }
     default:
       return { error: "tipo de ação desconhecido" };
   }
