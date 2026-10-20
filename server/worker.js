@@ -993,7 +993,7 @@ const ASSISTANT_ACTION_TYPES = Object.keys(ASSISTANT_ACTIONS).join(", ");
    continua com 1.200. as fontes são uma lista fechada, como o catálogo: o que
    a IA citar fora dela não chega à tela. é a mesma lista do portrait.js */
 const PORTRAIT_MAX = 6000;
-const PORTRAIT_SOURCES = ["dia", "agenda", "rotina", "semana", "dinheiro", "clientes", "leads", "conteúdo", "hábitos", "notas", "produtos"];
+const PORTRAIT_SOURCES = ["dia", "agenda", "rotina", "semana", "dinheiro", "clientes", "leads", "conteúdo", "hábitos", "notas", "produtos", "saúde"];
 
 LIST_TASKS.assistant = (c) => ({
   instruction:
@@ -1013,6 +1013,7 @@ LIST_TASKS.assistant = (c) => ({
     "Há três jeitos de responder. REGISTRO (a pessoa conta algo para anotar ou pede para criar): proponha a ação. " +
     "CONSULTA (uma PERGUNTA sobre a vida dela — o dia, a agenda, a rotina, a semana —, inclusive financeira, \"posso gastar X\", \"dá pra fazer Y\"): devolva suggestions vazio e responda em clarify só pelo retrato e pelo contexto da tela; quando o dado não estiver neles, diga \"não sei\" e o que falta (ex. \"o financeiro não veio no retrato: monte o financeiro\"), nunca estime nem invente. Seção do retrato que diz \"ainda carregando\" é dado que não chegou, e não \"nada\". " +
     "CONSELHO (pede opinião, \"o que eu faço\", \"vale a pena\"): recomende citando o que viu no retrato (o horário, a sobra, a atrasada), em vez de conselho genérico. " +
+    "SAÚDE (\"como dormi essa semana?\", \"treinei quanto?\"): responda pela seção saúde do retrato, que traz só números dos últimos 7 dias (a média e as noites do sono, os treinos e os minutos, quantas refeições), e cite saúde em sources; sem noite registrada, diga o que falta e ofereça o gesto (\"registrar uma noite: diga 'dormi 7h'\"). Retrato com as outras seções e SEM a seção saúde é escolha da pessoa: ela tirou a saúde do Merlin no perfil — diga isso, que dá para religar no perfil, e não estime nem invente número de saúde. " +
     "Em sources, liste de onde tirou a resposta, só dentre exatamente estes valores: " + PORTRAIT_SOURCES.join(", ") + " (dia é a seção hoje do retrato). Sem nada tirado do retrato, sources vazio. " +
     "Se a pessoa pedir para fechar o dia, revisar a semana ou revisar o mês, devolva suggestions vazio e diga em clarify, numa frase, que é só escrever \"fechar o dia\" no campo do início (ou \"revisar a semana\", \"revisar o mês\") — é o próprio início que abre o fechamento e a revisão, e não há ação para isso no catálogo. " +
     "Se a pessoa perguntar o que falta fazer hoje, o que fazer agora ou qual é a próxima coisa, devolva suggestions vazio, show \"quests\" e em clarify uma frase curta (ex. \"aqui está o que falta\") — a tela monta a lista a partir do que ela sabe; nunca escreva a lista você mesmo. Fora desse pedido, não mande show. " +

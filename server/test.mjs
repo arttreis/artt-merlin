@@ -703,6 +703,15 @@ check("o contexto da tela continua com 1.200", claudeAsked.includes("TELA-" + "b
 check("as fontes saem filtradas pela lista fechada", JSON.stringify(body.sources) === '["agenda"]', JSON.stringify(body.sources));
 check("o retrato não faz o worker ler documento além do perfil", docReads.length === 1 && /type = 'profile'/.test(docReads[0]), JSON.stringify(docReads));
 check("a linha de medição traz o tamanho do retrato que foi, já cortado", / portrait=6000$/.test(logged.at(-1)), logged.at(-1));
+/* a saúde (ticket #66): "vi a saúde" é uma fonte aceita; a instrução fala da
+   seção e do interruptor do perfil, para a IA saber dizer como religar */
+claudeAnswer = { stop_reason: "end_turn", content: [{ type: "text", text: '{"suggestions":[],"clarify":"média de 6h40 em 5 noites","sources":["saúde","inventado","agenda"]}' }] };
+r = await call("POST", "/merlin", { task: "assistant", context: { message: "como dormi essa semana?", portrait: "saúde:\nsono 7d: média 6h40 · 5 noites · última 6h" } }, cookie);
+body = await r.json();
+check("a saúde está na lista de fontes aceitas", r.status === 200 && Array.isArray(body.sources) && body.sources.includes("saúde"), JSON.stringify(body.sources));
+check("as fontes aceitas seguem a ordem da lista fechada, com a saúde no fim", JSON.stringify(body.sources) === '["agenda","saúde"]', JSON.stringify(body.sources));
+check("o pedido lista a saúde entre as fontes", /só dentre exatamente estes valores: [^.]*saúde/.test(claudeAsked), String(claudeAsked).slice(0, 300));
+check("a instrução fala da seção saúde e do interruptor do perfil", /saúde[\s\S]{0,400}perfil|perfil[\s\S]{0,400}saúde/.test(claudeAsked), String(claudeAsked).slice(0, 300));
 claudeAnswer = { stop_reason: "end_turn", content: [{ type: "text", text: '{"suggestions":[],"clarify":"ok"}' }] };
 r = await call("POST", "/merlin", { task: "assistant", context: { message: "e aí?" } }, cookie);
 body = await r.json();

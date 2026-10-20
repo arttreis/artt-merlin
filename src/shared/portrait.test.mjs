@@ -80,7 +80,8 @@ const lines = (p, id) => sec(p, id).text.split("\n");
 /* ---- o contrato público ---- */
 {
   check("o teto do retrato é 6.000", PORTRAIT_MAX === 6000, String(PORTRAIT_MAX));
-  check("as fontes são a lista fechada", JSON.stringify(SOURCES) === JSON.stringify(["dia", "agenda", "rotina", "semana", "dinheiro", "clientes", "leads", "conteúdo", "hábitos", "notas", "produtos"]), JSON.stringify(SOURCES));
+  check("as fontes são a lista fechada", JSON.stringify(SOURCES) === JSON.stringify(["dia", "agenda", "rotina", "semana", "dinheiro", "clientes", "leads", "conteúdo", "hábitos", "notas", "produtos", "saúde"]), JSON.stringify(SOURCES));
+  check("sourcesLine: a saúde vira \"vi a saúde\"", sourcesLine(["saúde"]) === "vi a saúde", sourcesLine(["saúde"]));
   check("as seções deste ticket, na ordem", JSON.stringify(SECTIONS.slice(0, 5).map((s) => s.id)) === JSON.stringify(["today", "agenda", "routine", "week", "products"]), JSON.stringify(SECTIONS.map((s) => s.id)));
   check("toda seção tem rótulo, orçamento, needs e build", SECTIONS.every((s) => typeof s.label === "string" && s.label && s.budget > 0 && Array.isArray(s.needs) && typeof s.build === "function"));
   check("os orçamentos juntos são um número finito", SECTIONS.reduce((t, s) => t + s.budget, 0) > 0);
@@ -1178,6 +1179,239 @@ sectionM("money: portraitData", () => {
   const d = portraitData({ finance: col(all, true) }, { signedIn: true, prefs: PREFS });
   check("dados: finance é tudo que a coleção tem, de todos os tipos (o filtro é da seção)", d.finance.length === all.length && ["entry", "fixed", "config", "debt", "invest"].every((t) => d.finance.some((x) => x.type === t)), JSON.stringify(d.finance.map((x) => x.type)));
   check("dados: sem a coleção finance, é lista vazia", Array.isArray(portraitData({}, { signedIn: false, prefs: PREFS }).finance) && portraitData({}, { signedIn: false, prefs: PREFS }).finance.length === 0);
+});
+
+/* =====================================================================
+   a saúde no retrato (ticket #66): a seção `health`.
+
+   "como dormi essa semana?" passa a ter resposta, mas dado de saúde é
+   sensível (LGPD, art. 5º, II). o que se prova aqui é o que, errado, vaza ou
+   mente: um título de treino, o texto de uma refeição ou o diário que vão
+   para a IA; o interruptor "não mandar saúde" que não desliga; um sono que
+   ainda não desceu da nuvem lido como "nenhuma noite"; e o teto de 6.000
+   estourado pela seção nova.
+   ===================================================================== */
+const sectionH = sectionM;
+const night = (id, min, o) => ({ id, min, createdAt: 1, updatedAt: 1, ...o });
+const wk = (id, day, min, o) => ({ id, day, title: "treino", min, createdAt: 1, updatedAt: 1, ...o });
+const ml = (id, day, o) => ({ id, day, meal: "almoço", text: "comida", createdAt: 1, updatedAt: 1, ...o });
+const hSec = (o, now) => sec(run(o, now), "health");
+const hLines = (o, now) => { const s = hSec(o, now); return s ? s.text.split("\n") : []; };
+const NO_SLEEP = "sono 7d: nenhuma noite registrada · registrar: diga 'dormi 7h'";
+/* as 5 noites do ticket, fora de ordem de propósito: "última" é a de id mais recente, não a do fim da lista */
+const NIGHTS = [night("2026-10-16", 440), night("2026-10-13", 420), night("2026-10-17", 360), night("2026-10-15", 380), night("2026-10-14", 400)];
+
+/* ---- onde a seção mora ---- */
+sectionH("saúde: a seção", () => {
+  const ids = SECTIONS.map((s) => s.id);
+  const h = SECTIONS.find((s) => s.id === "health");
+  check("saúde: existe, com rótulo 'saúde' e orçamento de 160", !!h && h.label === "saúde" && h.budget === 160, JSON.stringify(h && { label: h.label, budget: h.budget }));
+  check("saúde: vem logo depois dos hábitos e antes das notas", ids.indexOf("health") === ids.indexOf("habits") + 1 && ids.indexOf("notes") === ids.indexOf("health") + 1, JSON.stringify(ids));
+  check("saúde: o dinheiro continua a última seção", ids.at(-1) === "money", JSON.stringify(ids));
+  check("saúde: espera sono, treino, refeições e perfil", !!h && ["sleep", "workouts", "meals", "profile"].every((k) => h.needs.includes(k)), JSON.stringify(h && h.needs));
+  check("saúde: tem o interruptor off()", !!h && typeof h.off === "function");
+  check("saúde: hábitos cai para 120 e a agenda para 1.495", SECTIONS.find((s) => s.id === "habits").budget === 120 && SECTIONS.find((s) => s.id === "agenda").budget === 1495, JSON.stringify(SECTIONS.map((s) => s.id + ":" + s.budget)));
+  const total = SECTIONS.reduce((t, s) => t + s.budget + (s.label + ":\n").length, 0) + 2 * (SECTIONS.length - 1);
+  check("saúde: orçamentos + rótulos + separadores cabem em 6.000", total <= PORTRAIT_MAX, String(total));
+  check("saúde: a seção entra no retrato, com o rótulo que a resposta cita", !!sec(run({}), "health") && SOURCES.includes("saúde"));
+});
+
+/* ---- sono: "como dormi essa semana?" ---- */
+sectionH("saúde: o sono", () => {
+  const L = hLines({ sleep: NIGHTS });
+  check("sono: 5 noites dão a média 6h40, a conta e a última (a de id mais recente)", L[0] === "sono 7d: média 6h40 · 5 noites · última 6h", JSON.stringify(L));
+  check("sono: o retrato inteiro leva 'média 6h40 · 5 noites'", run({ sleep: NIGHTS }).text.includes("média 6h40 · 5 noites"));
+  check("sono: a seção cabe nos 160", hSec({ sleep: NIGHTS }).text.length <= 160);
+
+  /* a janela é hoje-6..hoje: 13/10 entra, 12/10 e 11/10 não */
+  const edge = hLines({ sleep: [...NIGHTS, night("2026-10-12", 900), night("2026-10-11", 900), night("2026-09-01", 900)] });
+  check("sono: a noite de 7 e a de 8 dias atrás não entram na conta", edge[0] === "sono 7d: média 6h40 · 5 noites · última 6h", JSON.stringify(edge));
+  const first = hLines({ sleep: [night("2026-10-13", 420)] });
+  check("sono: a noite de hoje-6 entra (a janela é inclusiva)", first[0] === "sono 7d: média 7h · 1 noite · última 7h", JSON.stringify(first));
+  const today = hLines({ sleep: [night(TODAY, 330)] });
+  check("sono: a noite de hoje entra, e uma só é 'noite' no singular", today[0] === "sono 7d: média 5h30 · 1 noite · última 5h30", JSON.stringify(today));
+  const last = hLines({ sleep: [night(TODAY, 330), night("2026-10-14", 400)] });
+  check("sono: a última é a mais recente, e a média é arredondada em minutos (365)", last[0] === "sono 7d: média 6h05 · 2 noites · última 5h30", JSON.stringify(last));
+  const round = hLines({ sleep: [night("2026-10-18", 400), night(TODAY, 401)] });
+  check("sono: média de 400,5 arredonda para 401 (6h41)", /média 6h41 /.test(round[0]), JSON.stringify(round));
+  const short = hLines({ sleep: [night(TODAY, 45)] });
+  check("sono: menos de uma hora vira 'min'", short[0] === "sono 7d: média 45min · 1 noite · última 45min", JSON.stringify(short));
+
+  /* a noite que não conta: min zero, apagada */
+  const dead = hLines({ sleep: [...NIGHTS, night("2026-10-18", 0), night(TODAY, 500, { deleted: true })] });
+  check("sono: noite com min 0 ou apagada não entra na conta", dead[0] === "sono 7d: média 6h40 · 5 noites · última 6h", JSON.stringify(dead));
+
+  /* a meta */
+  const goal = hLines({ sleep: NIGHTS, profile: { sleepGoal: 420 } });
+  check("sono: com meta no perfil, a linha termina em ' · meta 7h'", goal[0] === "sono 7d: média 6h40 · 5 noites · última 6h · meta 7h", JSON.stringify(goal));
+  const noGoal = hLines({ sleep: NIGHTS, profile: { sleepGoal: 0 } });
+  check("sono: meta 0 não aparece", !noGoal[0].includes("meta"), JSON.stringify(noGoal));
+  const goalOnly = hLines({ profile: { sleepGoal: 420 } });
+  check("sono: sem noite, a meta não muda a linha de registrar", goalOnly[0] === NO_SLEEP, JSON.stringify(goalOnly));
+
+  /* sem sono */
+  check("sono: sem nenhuma noite, diz o que falta e o gesto", hLines({ sleep: [] })[0] === NO_SLEEP, JSON.stringify(hLines({ sleep: [] })));
+  check("sono: sem a lista, é o mesmo (não quebra)", hLines({})[0] === NO_SLEEP, JSON.stringify(hLines({})));
+  check("sono: só noites fora da janela é 'nenhuma noite registrada'", hLines({ sleep: [night("2026-10-01", 420)] })[0] === NO_SLEEP);
+});
+
+/* ---- treino: só números, nunca o que se treinou ---- */
+sectionH("saúde: o treino", () => {
+  const W = [wk("w1", "2026-10-13", 40, { title: "perna pesada" }), wk("w2", "2026-10-15", 50), wk("w3", "2026-10-16", 30)];
+  const L = hLines({ workouts: W });
+  check("treino: 3 treinos, 120 min e o dia da semana do último", L.includes("treino 7d: 3× · 120 min · último sex"), JSON.stringify(L));
+  check("treino: a linha vem depois da do sono", L.findIndex((x) => x.startsWith("sono 7d")) === 0 && L.findIndex((x) => x.startsWith("treino 7d")) === 1, JSON.stringify(L));
+  const p = run({ workouts: W });
+  check("treino: o título nunca entra no retrato", !p.text.includes("perna") && !p.text.includes("pesada"), p.text);
+
+  check("treino: um treino de terça diz '1×' e 'último ter'", hLines({ workouts: [wk("w1", "2026-10-13", 45)] }).includes("treino 7d: 1× · 45 min · último ter"));
+  const hoje = hLines({ workouts: [wk("w1", TODAY, 45), wk("w2", "2026-10-17", 20)] });
+  check("treino: se o último é hoje, diz 'último hoje'", hoje.includes("treino 7d: 2× · 65 min · último hoje"), JSON.stringify(hoje));
+  check("treino: sábado é 'sáb'", hLines({ workouts: [wk("w1", "2026-10-17", 20)] }).includes("treino 7d: 1× · 20 min · último sáb"));
+  check("treino: domingo é 'dom'", hLines({ workouts: [wk("w1", "2026-10-18", 20)] }).includes("treino 7d: 1× · 20 min · último dom"));
+
+  const edge = hLines({ workouts: [wk("w1", "2026-10-13", 40), wk("w2", "2026-10-12", 999), wk("w3", "2026-10-11", 999)] });
+  check("treino: o de hoje-6 entra e os de 7 e 8 dias atrás não", edge.includes("treino 7d: 1× · 40 min · último ter"), JSON.stringify(edge));
+  const dead = hLines({ workouts: [wk("w1", "2026-10-13", 40), wk("w2", "2026-10-15", 90, { deleted: true })] });
+  check("treino: o apagado não conta", dead.includes("treino 7d: 1× · 40 min · último ter"), JSON.stringify(dead));
+
+  check("treino: com documentos mas nenhum na janela, 'nenhum'", hLines({ workouts: [wk("w1", "2026-10-01", 40)] }).includes("treino 7d: nenhum"));
+  check("treino: coleção vazia não gera linha", !hLines({ workouts: [] }).some((x) => x.startsWith("treino")), JSON.stringify(hLines({ workouts: [] })));
+  check("treino: coleção ausente não gera linha", !hLines({}).some((x) => x.startsWith("treino")), JSON.stringify(hLines({})));
+});
+
+/* ---- refeições: só a contagem ---- */
+sectionH("saúde: as refeições", () => {
+  const M = [ml("m1", TODAY, { text: "salada caesar" }), ml("m2", TODAY, { text: "salada caesar", meal: "jantar" }), ml("m3", "2026-10-13", { text: "salada caesar", meal: "café" })];
+  const L = hLines({ meals: M });
+  check("refeições: a contagem dos 7 dias", L.includes("refeições 7d: 3"), JSON.stringify(L));
+  const p = run({ meals: M });
+  check("refeições: o texto nunca entra ('salada', 'caesar')", !/salada|caesar/i.test(p.text), p.text);
+  check("refeições: fora da janela e apagada não contam", hLines({ meals: [...M, ml("m4", "2026-10-12"), ml("m5", "2026-09-01"), ml("m6", TODAY, { deleted: true })] }).includes("refeições 7d: 3"));
+  check("refeições: o campo 'date' vale como reserva do 'day'", hLines({ meals: [{ id: "m9", date: TODAY, meal: "almoço", text: "x" }, { id: "m8", date: "2026-10-01", text: "x" }] }).includes("refeições 7d: 1"));
+  check("refeições: com documentos mas nenhum na janela, 'refeições 7d: 0'", hLines({ meals: [ml("m1", "2026-10-01")] }).includes("refeições 7d: 0"));
+  check("refeições: coleção vazia não gera linha", !hLines({ meals: [] }).some((x) => x.startsWith("refeições")));
+  check("refeições: coleção ausente não gera linha", !hLines({}).some((x) => x.startsWith("refeições")));
+  const all = hLines({ sleep: NIGHTS, workouts: [wk("w1", "2026-10-13", 40)], meals: M });
+  check("saúde: com tudo, as linhas saem na ordem sono, treino, refeições", all.length === 3 && all[0].startsWith("sono 7d") && all[1].startsWith("treino 7d") && all[2].startsWith("refeições 7d"), JSON.stringify(all));
+  check("saúde: workouts, meals e sono vazios são só a linha de registrar o sono", JSON.stringify(hLines({ workouts: [], meals: [], sleep: [] })) === JSON.stringify([NO_SLEEP]), JSON.stringify(hLines({ workouts: [], meals: [], sleep: [] })));
+});
+
+/* ---- o diário nunca entra ---- */
+sectionH("saúde: o diário nunca entra", () => {
+  const J = [{ id: TODAY, text: "segredo do diário" }];
+  const p = run({ journal: J, sleep: NIGHTS, workouts: [wk("w1", TODAY, 30)], meals: [ml("m1", TODAY)] });
+  check("diário: o texto não está no retrato (nem 'segredo')", !p.text.includes("segredo do diário") && !p.text.includes("segredo"), p.text);
+  const col = (items, down) => ({ all: () => items, get: () => null, hasDownloaded: () => down });
+  const d = portraitData({ journal: col(J, true), sleep: col(NIGHTS, true), profile: col([], true) }, { signedIn: true, prefs: PREFS });
+  const q = portraitOf(d, NOW);
+  check("diário: com a coleção em cols, o texto também não sai de portraitData", !q.text.includes("segredo"), q.text);
+  check("diário: o sono da mesma chamada entra (o teste não é trivial)", q.text.includes("média 6h40 · 5 noites"));
+});
+
+/* ---- o interruptor: "não mandar saúde ao Merlin" ---- */
+sectionH("saúde: o interruptor", () => {
+  const full = { sleep: NIGHTS, workouts: [wk("w1", TODAY, 30)], meals: [ml("m1", TODAY)], habits: [habit({ name: "Ler Hh" })] };
+  const gone = (label, p) => {
+    check(label + ": não há a seção 'saúde'", !sec(p, "health"), JSON.stringify(p.sections.map((s) => s.id)));
+    check(label + ": o texto não tem 'saúde:' nem sono, treino ou refeições", !/saúde:|sono 7d|treino 7d|refeições 7d/.test(p.text), p.text);
+    check(label + ": os hábitos continuam", !!sec(p, "habits") && p.text.includes("hábitos:\n") && p.text.includes("Ler Hh"), p.text);
+    check(label + ": as outras seções continuam todas", p.sections.length === SECTIONS.length - 1);
+  };
+  const on = run(full);
+  check("interruptor desligado: a saúde entra", !!sec(on, "health") && on.text.includes("saúde:\nsono 7d"), on.text.slice(-300));
+  gone("data.healthOff", run({ ...full, healthOff: true }));
+  gone("profile.healthOff", run({ ...full, profile: { healthOff: true } }));
+  check("interruptor: healthOff false não desliga", !!sec(run({ ...full, healthOff: false, profile: { healthOff: false } }), "health"));
+
+  const col = (items, down, byId) => ({ all: () => items, get: (id) => (byId ? byId[id] || null : null), hasDownloaded: () => down });
+  const cols = (profile) => ({ sleep: col(NIGHTS, true), workouts: col([wk("w1", TODAY, 30)], true), meals: col([ml("m1", TODAY)], true), habits: col([habit({ name: "Ler Hh" })], true), profile: col(profile ? [profile] : [], true, profile ? { me: profile } : {}) });
+  const d = portraitData(cols({ id: "me", healthOff: true }), { signedIn: true, prefs: PREFS });
+  check("dados: o perfil com healthOff vira data.healthOff", d.healthOff === true, JSON.stringify(d.healthOff));
+  gone("portraitData", portraitOf(d, NOW));
+  const d2 = portraitData(cols({ id: "me", name: "Ana" }), { signedIn: true, prefs: PREFS });
+  check("dados: perfil sem healthOff vira false", d2.healthOff === false, JSON.stringify(d2.healthOff));
+  const d3 = portraitData(cols(null), { signedIn: true, prefs: PREFS });
+  check("dados: sem perfil nenhum, healthOff é false e a saúde entra", d3.healthOff === false && !!sec(portraitOf(d3, NOW), "health"));
+
+  /* a seção segue o dado, sem cache */
+  const flip = { ...full, profile: { healthOff: false } };
+  const before = run(flip);
+  flip.profile = { healthOff: true };
+  check("interruptor: ligar muda o retrato seguinte", !!sec(before, "health") && !sec(run(flip), "health"));
+});
+
+/* ---- portraitData: as coleções novas ---- */
+sectionH("saúde: portraitData", () => {
+  const col = (items, down) => ({ all: () => items, get: () => null, hasDownloaded: () => down });
+  const d = portraitData({ sleep: col(NIGHTS, true), workouts: col([wk("w1", TODAY, 30)], true), meals: col([ml("m1", TODAY)], true), profile: col([], true) }, { signedIn: true, prefs: PREFS });
+  check("dados: sleep, workouts e meals vêm de all()", d.sleep.length === 5 && d.workouts.length === 1 && d.meals.length === 1, JSON.stringify([d.sleep, d.workouts, d.meals].map((x) => x && x.length)));
+  const e = portraitData({}, { signedIn: false, prefs: PREFS });
+  check("dados: coleção ausente é lista vazia", Array.isArray(e.sleep) && e.sleep.length === 0 && Array.isArray(e.workouts) && e.workouts.length === 0 && Array.isArray(e.meals) && e.meals.length === 0, JSON.stringify(e));
+  check("dados: sem nenhuma coleção, o retrato diz que falta registrar o sono", sec(portraitOf(e, NOW), "health").text === NO_SLEEP, sec(portraitOf(e, NOW), "health").text);
+});
+
+/* ---- ainda carregando ---- */
+sectionH("saúde: ainda carregando", () => {
+  const col = (items, down, byId) => ({ all: () => items, get: (id) => (byId ? byId[id] || null : null), hasDownloaded: () => down });
+  const direct = run({ loading: ["profile"] });
+  check("carregando: perfil em loading, sem healthOff local, a saúde diz 'ainda carregando'", !!sec(direct, "health") && sec(direct, "health").text === "ainda carregando" && sec(direct, "health").loading === true, JSON.stringify(sec(direct, "health")));
+  check("carregando: e não diz 'nenhuma noite' onde não sabe", !direct.text.includes("nenhuma noite"), direct.text);
+  for (const k of ["sleep", "workouts", "meals"]) {
+    const p = run({ loading: [k], sleep: NIGHTS });
+    check("carregando: " + k + " em loading também espera", !!sec(p, "health") && sec(p, "health").text === "ainda carregando" && sec(p, "health").loading === true, JSON.stringify(sec(p, "health")));
+  }
+  const other = run({ loading: ["tasks"], sleep: NIGHTS });
+  check("carregando: as tarefas carregando não calam a saúde", sec(other, "health").loading === false && other.text.includes("média 6h40"));
+  const hab = run({ loading: ["habits"] });
+  check("carregando: a saúde não faz os hábitos carregarem, nem o contrário", sec(hab, "habits").loading === true && sec(hab, "health").loading === false);
+
+  /* o caso real: com sessão e sem descida */
+  const cols = { sleep: col(NIGHTS, true), workouts: col([], true), meals: col([], true), profile: col([], false) };
+  const d = portraitData(cols, { signedIn: true, prefs: PREFS });
+  check("carregando: portraitData põe o perfil que não desceu em loading", d.loading.includes("profile"), JSON.stringify(d.loading));
+  check("carregando: a saúde diz 'ainda carregando' enquanto o perfil não desceu", sec(portraitOf(d, NOW), "health").text === "ainda carregando");
+  const offline = portraitData(cols, { signedIn: false, prefs: PREFS });
+  check("carregando: sem sessão, nada carrega e a saúde mostra o sono", sec(portraitOf(offline, NOW), "health").text.includes("média 6h40"));
+
+  /* o perfil local já diz que a saúde está fora: some mesmo antes de descer */
+  const off = portraitData({ ...cols, profile: col([], false, { me: { id: "me", healthOff: true } }) }, { signedIn: true, prefs: PREFS });
+  const p = portraitOf(off, NOW);
+  check("carregando: com healthOff local, a seção some mesmo carregando", off.healthOff === true && off.loading.includes("profile") && !sec(p, "health"), JSON.stringify(p.sections.map((s) => s.id)));
+  check("carregando: e nem 'sono 7d' nem 'saúde:' vazam", !p.text.includes("sono 7d") && !p.text.includes("saúde:"));
+  check("carregando: data.healthOff sozinho, com o perfil em loading, também some", !sec(run({ loading: ["profile"], healthOff: true }), "health"));
+  check("carregando: profile.healthOff sozinho, com o perfil em loading, também some", !sec(run({ loading: ["profile"], profile: { healthOff: true } }), "health"));
+});
+
+/* ---- o pior caso: tudo cheio, saúde incluída ---- */
+sectionH("saúde: o pior caso", () => {
+  const long = (s, i) => s + " " + String(i).padStart(2, "0") + " " + "palavra ".repeat(25).trim();
+  const tasks = [
+    ...Array.from({ length: 60 }, (_, i) => task({ title: long("Aberta de hoje", i), min: 5 })),
+    ...Array.from({ length: 60 }, (_, i) => task({ title: long("Atrasada", i), date: "2026-10-" + String(1 + (i % 17)).padStart(2, "0") })),
+    ...Array.from({ length: 40 }, (_, i) => task({ title: long("Quinta", i), date: THU, at: hm(6) + i * 10, min: 30 })),
+    ...Array.from({ length: 40 }, (_, i) => task({ title: long("Sexta", i), date: "2026-10-23" })),
+    ...Array.from({ length: 20 }, (_, i) => task({ title: long("Feita", i), done: true }))
+  ];
+  const routine = Array.from({ length: 30 }, (_, i) => block({ title: long("Bloco", i), at: hm(6, i * 5) }));
+  const apps = Array.from({ length: 12 }, (_, i) => ({ id: "a" + i, name: "Produto " + i + " " + "n".repeat(280) }));
+  const habits = Array.from({ length: 30 }, (_, i) => habit({ name: long("Hábito", i), order: i }));
+  const notes = Array.from({ length: 30 }, (_, i) => note({ title: long("Nota", i), updatedAt: stamp(1 + (i % 18)) }));
+  const fixed = Array.from({ length: 30 }, (_, i) => ffixed("fx" + i, long("fixo", i), 123456 + i, 1 + (i % 28)));
+  const clients = Array.from({ length: 30 }, (_, i) => lead({ id: "l" + i, name: long("Lead", i), stage: "proposal", stageAt: ago(9 + i), nextDate: "" }));
+  const sleep = Array.from({ length: 7 }, (_, i) => night("2026-10-" + String(13 + i), 300 + i * 17));
+  const workouts = Array.from({ length: 200 }, (_, i) => wk("w" + i, "2026-10-" + String(13 + (i % 7)), 95 + (i % 40), { title: long("treino", i) }));
+  const meals = Array.from({ length: 500 }, (_, i) => ml("m" + i, "2026-10-" + String(13 + (i % 7)), { text: long("refeição", i) }));
+  const all = { tasks, routine, apps, habits, notes, clients: [ANA, ...clients], finance: [fconfig({}), ...fixed], sleep, workouts, meals, journal: [{ id: TODAY, text: "segredo do diário" }], profile: { focusGoal: 25, meetingCap: 6, sleepGoal: 450 } };
+  const p = run(all);
+  check("pior caso: o retrato não passa de 6.000", p.text.length <= PORTRAIT_MAX, String(p.text.length));
+  check("pior caso: todas as seções estão lá, cada uma dentro do seu orçamento", SECTIONS.every((s) => sec(p, s.id) && sec(p, s.id).text.length <= s.budget), p.sections.map((s) => s.id + ":" + s.text.length + "/" + s.budget).join(" "));
+  check("pior caso: a saúde está lá, com no máximo 160", !!sec(p, "health") && sec(p, "health").text.length > 0 && sec(p, "health").text.length <= 160, String(sec(p, "health") && sec(p, "health").text.length));
+  check("pior caso: a saúde traz as três linhas, inteiras", /^sono 7d: média .+ · 7 noites · última .+ · meta 7h30\ntreino 7d: 200× · \d+ min · último \S+\nrefeições 7d: 500$/.test(sec(p, "health").text), sec(p, "health").text);
+  check("pior caso: nada do treino, das refeições nem do diário vaza", !/treino \d\d palavra|refeição \d\d|segredo/.test(p.text), p.text.slice(-400));
+  check("pior caso: as outras seções cheias ainda cortam em 'e mais N'", /e mais \d+$/.test(sec(p, "today").text) && /e mais \d+$/.test(sec(p, "agenda").text));
+  const off = run({ ...all, healthOff: true });
+  check("pior caso: sem a saúde também cabe, e ela não está", off.text.length <= PORTRAIT_MAX && !sec(off, "health"));
 });
 
 console.log("\n" + passed + " passaram, " + failures.length + " falharam");
