@@ -25,7 +25,9 @@ import {
 import { svgBoardLayers, svgSelection, textItemHeight } from "./shared/board-draw.jsx";
 import { BoardToolbar, ItemBar, ItemEditor, DocPanel, TemplatesDialog, BulkDialog } from "./maps-board.jsx";
 
-initPage("maps");
+/* o mapa não tem aba própria: mora em desenhos (PRD desenhos, D1), e é ela
+   que acende no menu enquanto o mapa está aberto */
+initPage("drawings");
 
 /* ---------- forma do documento ----------
    raiz e cada filho tem sempre a mesma forma. quem cria um mapa de fora
@@ -861,7 +863,8 @@ function MapList({ maps }) {
   /* escolher o modelo é uma tela, e não um campo da caixa de criar: com o
      modelo dentro da caixa, desistir dele obrigava a rolar a lista inteira
      de volta até "em branco". a caixa pede só o nome. */
-  const [choosing, setChoosing] = useState(false);
+  /* maps.html#novo é o "+" de desenhos escolhendo mapa: chega direto nos modelos */
+  const [choosing, setChoosing] = useState(() => location.hash === "#novo");
   const [importing, setImporting] = useState(false);
   const [renaming, setRenaming] = useState(null);
   const all = maps.all().sort((a, b) => b.updatedAt - a.updatedAt);
@@ -2034,7 +2037,7 @@ function Editor({ id, maps }) {
             compartilhar. as ferramentas do quadro (e o merlin) moram na
             coluna da esquerda, como numa lousa; exportar e atalhos, no "mais". */}
         <div className="mp-bar">
-          <a className="action" href="maps.html" id="mp-back" title="voltar para os mapas" aria-label="Voltar"><BackIcon /></a>
+          <a className="action" href="drawings.html#mapas" id="mp-back" title="voltar para os desenhos" aria-label="Voltar"><BackIcon /></a>
           <input className="mp-name" id="mp-name" maxLength="120" aria-label="Nome do mapa" value={doc.name}
             onChange={(e) => { const v = e.currentTarget.value; mutate((d) => { d.name = v; }, { history: false }); }} />
           <button className="action" type="button" id="mp-frame" title="enquadrar (Ctrl+0)" aria-label="Enquadrar" onClick={() => engine.frame()}><FrameIcon /></button>

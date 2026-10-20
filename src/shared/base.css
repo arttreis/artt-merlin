@@ -363,6 +363,9 @@ kbd{font-family:var(--mono);font-size:10.5px;padding:1px 6px;border-radius:5px;b
 .th--map circle{fill:currentColor;stroke:none}
 .th--map .th__root{opacity:1}
 .th--map .th__leaf{opacity:.55}
+/* a da planilha (sheet-start.jsx): a grade e a cabeça, em desenhos e na tela de começar */
+.th--sheet{stroke:currentColor;fill:none;stroke-width:.9;opacity:.75}
+.th--sheet .th__head{fill:currentColor;stroke:none;opacity:.35}
 .th--channels{display:flex;flex-wrap:wrap;gap:4px;justify-content:center;align-items:center;padding:6px}
 .th--channels i{
   font-family:var(--mono);font-style:normal;font-size:9.5px;letter-spacing:.04em;
