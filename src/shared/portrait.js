@@ -15,10 +15,12 @@
  * corpo das notas, roteiros, dívidas e investimentos (das notas, só o título, o
  * estágio e a data). do cliente, só o nome
  * (e do lead, a etapa, os dias e o próximo passo). da saúde, só números de 7
- * dias: nunca o diário, o texto da refeição nem o que se treinou.
+ * dias: nunca o diário, o texto da refeição nem o que se treinou. do caixa da
+ * empresa, só o saldo, o fim do mês e o fôlego: nenhum nome de lançamento.
  *
  * a lista SECTIONS é o ponto de composição: uma seção nova (o dinheiro, os
- * clientes, o conteúdo) é uma linha a mais nela.
+ * clientes, o conteúdo) é uma linha a mais nela. o financeiro guarda dois
+ * livros: "dinheiro" lê só o pessoal, e "negócio" só o caixa da empresa.
  *
  * sem React e sem coleção aberta aqui: entra lista, sai texto. quem abre as
  * coleções é a tela (useCollection), e `portraitData` só lê o que ela abriu.
@@ -29,8 +31,9 @@ import { focusMinutes, meetingMinutes } from "./focus.js";
 import { pipelineToday } from "./client-doc.js";
 import { contentToday } from "./content-script.js";
 import { normalize as normalizeHabit, isExpected, monthStats, streakOf as habitStreak, weekProgress } from "./habits-data.js";
-import { normalize as normalizeFinance, contextOf, configOf, financeToday, moneyLines } from "./finance-data.js";
+import { normalize as normalizeFinance, contextOf, configOf, financeToday, moneyLines, bookCollection, cashMonth, runwayLabel } from "./finance-data.js";
 import { weekAverage, sleepLabel } from "./sleep-data.js";
+import { brl } from "./core.js";
 
 export const PORTRAIT_MAX = 6000;
 const BACK = 30;
@@ -40,7 +43,7 @@ const LOADING = "ainda carregando";
 const NOTE_STAGE = { seed: "semente", exploring: "explorando", defined: "definida", executing: "executando" };
 
 /* as fontes que a resposta pode citar: a lista fechada que o Worker filtra */
-export const SOURCES = ["dia", "agenda", "rotina", "semana", "dinheiro", "clientes", "leads", "conteúdo", "hábitos", "notas", "produtos", "saúde"];
+export const SOURCES = ["dia", "agenda", "rotina", "semana", "dinheiro", "clientes", "leads", "conteúdo", "hábitos", "notas", "produtos", "saúde", "negócio"];
 
 /* ---------- datas, sem o core ---------- */
 
@@ -128,6 +131,16 @@ function streakOf(closes, day) {
   return n;
 }
 
+/* o financeiro chega cru: um livro só, normalizado, como a tela o abriria */
+function bookView(finance, book) {
+  const docs = (finance || []).filter(Boolean).map(normalizeFinance);
+  return bookCollection({ all: () => docs, get: (id) => docs.find((x) => x.id === id) || null }, book);
+}
+/* nada lançado, nada fixo e nenhum saldo de partida: o caixa que não existe */
+const cashEmpty = (col) => { const c = contextOf(col); return !c.entries.length && !c.fixed.length && !c.startBalance; };
+/* o sinal vai no texto, e o real inteiro sem ",00", como se fala */
+const signed = (cents) => (cents > 0 ? "+" : "") + brl(cents, true).replace(/,00$/, "");
+
 /* ---------- as seções ----------
    cada uma: {id, label, budget, max?, needs, build(data, now) -> linhas}.
    `needs` são as coleções sem as quais a seção diria "nada" sem saber;
@@ -154,8 +167,11 @@ export const SECTIONS = [
       return lines;
     }
   },
+  /* a agenda e a rotina cederam 260 ao negócio (PRD meu-negocio, D7), e a
+     agenda mais 11, o rótulo dele e a linha em branco: os orçamentos, os
+     rótulos e os separadores somam 6.000 cravados, e toda seção cabe inteira */
   {
-    id: "agenda", label: "agenda dos próximos 7 dias (a rotina vem à parte)", budget: 1495, needs: ["tasks"],
+    id: "agenda", label: "agenda dos próximos 7 dias (a rotina vem à parte)", budget: 1284, needs: ["tasks"],
     build({ tasks, clients }, now) {
       const day = dayOf(now);
       /* a cópia da rotina só existe na semana aberta; contá-la aqui faria a
@@ -177,7 +193,7 @@ export const SECTIONS = [
     }
   },
   {
-    id: "routine", label: "rotina", budget: 600, max: 12, needs: ["routine"],
+    id: "routine", label: "rotina", budget: 540, max: 12, needs: ["routine"],
     build({ routine, clients }, now) {
       const day = dayOf(now);
       const lines = routine.filter((b) => b && b.days && b.days.length && (!b.until || b.until > day))
@@ -315,9 +331,24 @@ export const SECTIONS = [
        orçamento daqui é o mesmo que ele recebe */
     id: "money", label: "dinheiro", budget: 900, needs: ["finance"],
     build({ finance }, now) {
-      const docs = finance.map(normalizeFinance);
-      const col = { all: () => docs, get: (id) => docs.find((x) => x.id === id) || null };
+      const col = bookView(finance, "personal");
       return moneyLines(financeToday(contextOf(col), configOf(col), dayOf(now)), 900);
+    }
+  },
+  {
+    /* o caixa da empresa (PRD meu-negocio, D7): só números agregados, nenhum
+       nome de lançamento. as contas são as do topo do caixa (financeToday e
+       cashMonth), nenhuma nova. é uma lista de linhas para crescer com as
+       metas, o time e a operação; sem livro da empresa, a seção não vai */
+    id: "business", label: "negócio", budget: 260, needs: ["finance"],
+    off: (d) => cashEmpty(bookView(d.finance, "business")),
+    build({ finance }, now) {
+      const col = bookView(finance, "business");
+      const day = dayOf(now);
+      const ctx = contextOf(col);
+      const f = financeToday(ctx, configOf(col), day);
+      const r = cashMonth(ctx, day).runway;
+      return ["caixa hoje " + signed(f.real) + " · fim do mês " + signed(f.monthEnd) + " · fôlego " + (r == null ? "sem saída para medir" : runwayLabel(r))];
     }
   }
 ];
@@ -414,7 +445,7 @@ export function waitPortrait(cols, signedIn, ms = 5000) {
 }
 
 /* "vi o dia e a agenda": a linha discreta embaixo da resposta */
-const ARTICLE = { dia: "o", agenda: "a", rotina: "a", semana: "a", dinheiro: "o", clientes: "os", leads: "os", "conteúdo": "o", "hábitos": "os", notas: "as", produtos: "os", "saúde": "a" };
+const ARTICLE = { dia: "o", agenda: "a", rotina: "a", semana: "a", dinheiro: "o", clientes: "os", leads: "os", "conteúdo": "o", "hábitos": "os", notas: "as", produtos: "os", "saúde": "a", "negócio": "o" };
 export function sourcesLine(list) {
   const named = (Array.isArray(list) ? list : []).filter((s) => SOURCES.includes(s)).map((s) => ARTICLE[s] + " " + s);
   if (!named.length) return "";

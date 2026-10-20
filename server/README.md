@@ -85,8 +85,8 @@ Quem estourar espera; quem está ao lado não paga por isso.
 Toda pergunta ao assistente (a tarefa `assistant`) leva junto o **retrato**: um resumo do
 dia, da agenda dos próximos 7 dias, da rotina, da semana, dos produtos, dos leads e dos
 clientes, do conteúdo, dos hábitos, da saúde (só números de 7 dias, e só se a pessoa não a
-tirou no perfil), dos títulos das notas e do dinheiro (sem dívidas nem
-investimentos), montado no
+tirou no perfil), dos títulos das notas, do dinheiro pessoal (sem dívidas nem
+investimentos) e do caixa da empresa (só caixa hoje, fim do mês e fôlego), montado no
 navegador (`src/shared/portrait.js`) e mandado em `context.portrait`. O Worker corta o
 retrato em 6.000 caracteres (o `pageContext` continua com 1.200), descarta-o em qualquer
 outra tarefa e não lê documento nenhum para montá-lo. A resposta traz `sources`, filtrado
