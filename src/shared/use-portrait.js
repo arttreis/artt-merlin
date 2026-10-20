@@ -29,6 +29,11 @@ export function usePortrait() {
     habits: useCollection("habits", { normalize: normalizeHabit }),
     notes: useCollection("notes"),
     finance: useCollection("finance", { normalize: normalizeFinance }),
+    /* as metas, o time e a operação vão crus: o retrato os lê pelas contas do
+       plano, do time e da operação, que normalizam por conta própria */
+    plans: useCollection("plans"),
+    team: useCollection("team"),
+    ops: useCollection("ops"),
     /* o treino e a refeição vão crus: o retrato só os conta, e lê o dia
        defensivamente (portrait.js), sem depender do miolo de cada aba */
     sleep: useCollection("sleep", { normalize: normalizeSleep }),
