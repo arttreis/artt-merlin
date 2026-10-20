@@ -985,7 +985,8 @@ const ASSISTANT_ACTIONS = {
   script: { collection: "content", fields: ["contentId", "script"] },
   "finance-entry": { collection: "finance", fields: ["name", "amount", "kind", "day", "category", "paid", "confirm", "fixed"] },
   "habit-mark": { collection: "habits", fields: ["habit", "name", "date"] },
-  "sleep-log": { collection: "sleep", fields: ["min", "date"] }
+  "sleep-log": { collection: "sleep", fields: ["min", "date"] },
+  "workout-log": { collection: "workouts", fields: ["title", "min", "date"] }
 };
 const ASSISTANT_ACTION_TYPES = Object.keys(ASSISTANT_ACTIONS).join(", ");
 
@@ -1010,6 +1011,7 @@ LIST_TASKS.assistant = (c) => ({
     "finance-entry {name (o que foi, curto), amount (centavos, número inteiro; 0 se a pessoa não disse o valor — nunca estime), kind (out para gasto, in para entrada), day (AAAA-MM-DD; sem data, hoje), category (uma das categorias do contexto, ou vazio), paid (true se já aconteceu, false se é para depois), confirm (o id de um previsto do contexto — na seção dinheiro do retrato, o que vem depois do # em \"a confirmar\", \"vence em 7 dias\" e \"previsto no mês\", sem o # — quando a pessoa diz que pagou ou recebeu algo que já estava previsto — NUNCA invente; sem id no contexto, vazio), fixed (o id de um fixo do contexto — no retrato, o que vem depois do # em \"fixos\" — quando é a conta fixa do mês e não há previsto para ela — NUNCA invente; sem id no contexto, vazio)} — use quando a pessoa contar um gasto ou uma entrada (\"gastei 45 no almoço\", \"recebi 3 mil da Ana\"); fixo, parcela, dívida, investimento e transferência novos não entram por aqui; " +
     "habit-mark {habit (o nome exato de um hábito do contexto, ou vazio), name (o hábito como a pessoa disse, curto: \"treinar\", \"ler\"), date (AAAA-MM-DD do dia em que a pessoa fez; sem data, hoje)} — use quando a pessoa contar que fez um hábito (\"treinei\", \"ontem li 20 páginas\"), mesmo que ele ainda não exista: a tela oferece criar; nunca para desmarcar nem para mudar a frequência. " +
     "sleep-log {min (minutos dormidos, número: \"7h\" é 420, \"7h e meia\" é 450; 0 se a pessoa não disse — nunca estime), date (AAAA-MM-DD do dia em que a pessoa ACORDOU: \"dormi 7h\" é hoje, \"ontem dormi 6h\" é ontem)} — use quando a pessoa contar quanto dormiu; horas de sono são sleep-log, nunca habit-mark nem task. " +
+    "workout-log {title (o que treinou, curto: \"perna\", \"corrida\"; vazio se a pessoa não disse), min (minutos de treino, número: \"1h\" é 60; 0 se a pessoa não disse — nunca estime), date (AAAA-MM-DD do dia em que treinou; sem data, hoje)} — use quando a pessoa contar um treino com o que treinou ou por quanto tempo (\"treinei perna 40min\", \"ontem corri 30 min\"); a tela marca sozinha o hábito de treino. \"treinei\" sem detalhe nenhum continua habit-mark. " +
     "Há três jeitos de responder. REGISTRO (a pessoa conta algo para anotar ou pede para criar): proponha a ação. " +
     "CONSULTA (uma PERGUNTA sobre a vida dela — o dia, a agenda, a rotina, a semana —, inclusive financeira, \"posso gastar X\", \"dá pra fazer Y\"): devolva suggestions vazio e responda em clarify só pelo retrato e pelo contexto da tela; quando o dado não estiver neles, diga \"não sei\" e o que falta (ex. \"o financeiro não veio no retrato: monte o financeiro\"), nunca estime nem invente. Seção do retrato que diz \"ainda carregando\" é dado que não chegou, e não \"nada\". " +
     "CONSELHO (pede opinião, \"o que eu faço\", \"vale a pena\"): recomende citando o que viu no retrato (o horário, a sobra, a atrasada), em vez de conselho genérico. " +
@@ -1141,7 +1143,7 @@ const CAPTURE_TASKS = {
   capture: (c) => ({
     instruction:
       "Leia a linha que a pessoa escreveu no campo do início e diga o que ela vira. Pode ser mais de uma coisa: \"revisar a landing, responder os e-mails e call com a Ana\" são três tarefas. " +
-      "Cada item: kind = task (uma ação concreta que a pessoa vai fazer — verbo de fazer, data, hora ou duração), note (uma ideia, possibilidade ou pensamento para explorar depois), money (um gasto ou uma entrada de dinheiro que aconteceu ou vai acontecer: \"gastei 45 no almoço\", \"recebi 3 mil da Ana\", \"paguei o aluguel\"; \"comprar pão\" sem dizer que gastou é task), habit (a pessoa conta que FEZ um hábito: \"treinei\", \"li 20 páginas\", \"fiz yoga\"; o que ela ainda vai fazer é task) ou sleep (quanto a pessoa dormiu: \"dormi 7h\", \"ontem dormi 6h e meia\"; horas de sono são sleep, nunca habit nem task); " +
+      "Cada item: kind = task (uma ação concreta que a pessoa vai fazer — verbo de fazer, data, hora ou duração), note (uma ideia, possibilidade ou pensamento para explorar depois), money (um gasto ou uma entrada de dinheiro que aconteceu ou vai acontecer: \"gastei 45 no almoço\", \"recebi 3 mil da Ana\", \"paguei o aluguel\"; \"comprar pão\" sem dizer que gastou é task), habit (a pessoa conta que FEZ um hábito: \"treinei\", \"li 20 páginas\", \"fiz yoga\"; o que ela ainda vai fazer é task), sleep (quanto a pessoa dormiu: \"dormi 7h\", \"ontem dormi 6h e meia\"; horas de sono são sleep, nunca habit nem task) ou workout (um treino que a pessoa FEZ, dito com o que treinou ou por quanto tempo: \"treinei perna 40min\", \"corri 30 min\", \"fiz yoga 1h\"; \"treinei\" sozinho, sem detalhe, continua habit); " +
       "title = o que fazer, curto e na grafia da pessoa, SEM a data, a hora, a duração e o cliente (até 80 caracteres); " +
       "min = a duração em minutos — a que foi escrita, ou, se não houver, uma estimativa realista (múltiplos de 15) com guess true; para note, 0; " +
       "date = AAAA-MM-DD contada a partir de hoje (\"amanhã\", \"sexta\", \"dia 14\"; \"semana que vem\" é a próxima segunda); sem data, hoje; para note, vazio; " +
@@ -1153,8 +1155,9 @@ const CAPTURE_TASKS = {
       "fixed = o id de um dos fixos listados quando a linha é a conta fixa do mês e não há previsto para ela, senão vazio. NUNCA invente id. " +
       "Para habit, só estes campos: habit = o nome exato de um dos hábitos listados que a linha cita (\"treinei\" e há \"treinar\"), senão vazio; name = o hábito como a pessoa disse, curto (\"yoga\"); date = o dia em que fez, AAAA-MM-DD (\"ontem\"); sem data, hoje. " +
       "Para sleep, só estes campos: min = os minutos dormidos (\"7h\" é 420, \"7h e meia\" é 450; 0 se a linha não diz as horas — nunca estime); date = o dia em que a pessoa ACORDOU, AAAA-MM-DD (\"dormi 7h\" é hoje, \"ontem dormi 6h\" é ontem). " +
+      "Para workout, só estes campos: title = o que treinou, curto e na grafia da pessoa (\"perna\", \"corrida\"), sem a duração e a data, ou vazio; min = os minutos de treino (\"1h\" é 60; 0 se a linha não diz — nunca estime); date = o dia em que treinou, AAAA-MM-DD (\"ontem\"); sem data, hoje. " +
       "Nunca invente item que a linha não diz. Se a linha inteira for uma pergunta, devolva items vazio. " +
-      'Formato: {"items":[{"kind":"task","title":"…","min":45,"guess":false,"date":"AAAA-MM-DD","at":"","client":""},{"kind":"money","title":"almoço","amount":4500,"flow":"out","category":"","date":"AAAA-MM-DD","paid":true,"confirm":"","fixed":""},{"kind":"habit","habit":"treinar","name":"treinar","date":"AAAA-MM-DD"},{"kind":"sleep","min":420,"date":"AAAA-MM-DD"}]}',
+      'Formato: {"items":[{"kind":"task","title":"…","min":45,"guess":false,"date":"AAAA-MM-DD","at":"","client":""},{"kind":"money","title":"almoço","amount":4500,"flow":"out","category":"","date":"AAAA-MM-DD","paid":true,"confirm":"","fixed":""},{"kind":"habit","habit":"treinar","name":"treinar","date":"AAAA-MM-DD"},{"kind":"sleep","min":420,"date":"AAAA-MM-DD"},{"kind":"workout","title":"perna","min":40,"date":"AAAA-MM-DD"}]}',
     context:
       "Linha: " + String(c.text || "").slice(0, 600) + "\n" +
       "Hoje: " + String(c.today || "").slice(0, 40) + " · agora " + String(c.hour || "").slice(0, 5) + "\n" +
@@ -1224,16 +1227,33 @@ function cleanSleep(x, c) {
     date: /^\d{4}-\d{2}-\d{2}$/.test(String(x.date || "")) ? String(x.date) : base
   };
 }
+/* o treino lido: o que treinou em até 60 caracteres, os minutos entre 0 e
+   600 e a data do dia em que treinou. sem os minutos, o item fica com 0 e a
+   tela os pede antes de gravar; a marca do hábito de treino é da tela */
+const WORKOUT_MAX = 600;
+function cleanWorkout(x, c) {
+  const base = /^\d{4}-\d{2}-\d{2}/.test(String(c.today || "")) ? String(c.today).slice(0, 10) : new Date().toISOString().slice(0, 10);
+  const min = Math.round(+x.min);
+  return {
+    kind: "workout",
+    title: cut(x.title, 60).trim(),
+    min: Number.isFinite(min) ? Math.max(0, Math.min(WORKOUT_MAX, min)) : 0,
+    date: /^\d{4}-\d{2}-\d{2}$/.test(String(x.date || "")) ? String(x.date) : base
+  };
+}
 /* o que cada tipo precisa ter para não ser descartado: o hábito, um nome; o
-   sono, nada (sem as horas, a tela pede); o resto, o título */
-const captureKept = (x) => (x.kind === "habit" ? !!habitName(x) : x.kind === "sleep" ? true : !!String(x.title || "").trim());
+   sono, nada (sem as horas, a tela pede); o treino, o que ou quanto tempo
+   (sem nenhum dos dois é o "treinei" do hábito); o resto, o título */
+const workoutKept = (x) => !!String(x.title || "").trim() || +x.min > 0;
+const captureKept = (x) => (x.kind === "habit" ? !!habitName(x) : x.kind === "sleep" ? true : x.kind === "workout" ? workoutKept(x) : !!String(x.title || "").trim());
 function cleanCapture(d, c) {
   return arr(d && d.items, MAX_CAPTURE_ITEMS)
-    .filter((x) => x && ["task", "note", "money", "habit", "sleep"].includes(x.kind) && captureKept(x))
+    .filter((x) => x && ["task", "note", "money", "habit", "sleep", "workout"].includes(x.kind) && captureKept(x))
     .map((x) => {
       if (x.kind === "money") return cleanMoney(x, c || {});
       if (x.kind === "habit") return cleanHabit(x, c || {});
       if (x.kind === "sleep") return cleanSleep(x, c || {});
+      if (x.kind === "workout") return cleanWorkout(x, c || {});
       const task = x.kind === "task";
       const min = Math.round(+x.min || 0);
       return {

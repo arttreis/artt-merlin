@@ -31,6 +31,7 @@ import { ACTION_COLLECTIONS, ACTION_LABELS, ACTION_FIELDS, ACTION_DONE, buildDoc
 import { normalize as normalizeFinance, contextOf as financeContext, undoEntry } from "./finance-data.js";
 import { normalize as normalizeHabit, SCHEDULES, COLORS, WEEKDAY_NAMES, habitStatus, undoHabit, markWhen } from "./habits-data.js";
 import { normalize as normalizeSleep } from "./sleep-data.js";
+import { normalize as normalizeWorkout, logWorkout, applyWorkout } from "./workouts-data.js";
 /* o Ctrl+K cria tarefa de hoje com a mesma regra e a mesma forma do dia */
 import { tasks, newTask, topOrder, routeLine } from "./tasks.js";
 import { BUILD, buildIntent } from "./build-intent.js";
@@ -946,12 +947,12 @@ function useRootClass(name, on) {
    abriu a caixa fica sabendo pelo `onDone(linha)`: a pílula da conversa vira
    "✓ lançado · …" e não abre de novo. o desfazer chama `onDone(null)`, e a
    pílula volta. `chat` é o id da conversa, que vai na origem do lançamento. */
-const CREATE_LABELS = { "onboarding-map": "gerar mapa", "onboarding-funnel": "gerar funil", "finance-entry": "lançar", "sleep-log": "registrar" };
+const CREATE_LABELS = { "onboarding-map": "gerar mapa", "onboarding-funnel": "gerar funil", "finance-entry": "lançar", "sleep-log": "registrar", "workout-log": "registrar" };
 const CREATE_HREF = { "onboarding-map": "maps.html#", "onboarding-funnel": "funnels.html#" };
 /* o aviso é o texto fixo, ou a própria linha da pílula: o sono confirma
    "✓ registrado · 7h de sono", igual ao início */
 const DONE_NOTICE = { "finance-entry": "lançado no financeiro", "lead-update": "cliente atualizado", script: "roteiro aplicado", "sleep-log": (line) => "✓ " + line };
-const ACTION_OPTIONS = { finance: { normalize: normalizeFinance }, sleep: { normalize: normalizeSleep } };
+const ACTION_OPTIONS = { finance: { normalize: normalizeFinance }, sleep: { normalize: normalizeSleep }, workouts: { normalize: normalizeWorkout } };
 const optionPair = (o) => (Array.isArray(o) ? o : [o, o]);
 export function ProposalDialog({ proposal, chat, onClose, onDone }) {
   const { actionType, note } = proposal;
@@ -970,6 +971,18 @@ export function ProposalDialog({ proposal, chat, onClose, onDone }) {
   const submit = () => {
     const { doc, error } = buildDoc(actionType, payload, v, store, { chat });
     if (error) { notify(error); return false; }
+    /* o treino marca o hábito de treino do dia (PRD saude-completa, D4), pelo
+       mesmo logWorkout da aba e do início, e o desfazer desfaz os dois */
+    if (actionType === "workout-log") {
+      const habits = collection("habits", { normalize: normalizeHabit });
+      const res = logWorkout(doc, habits.all(), today());
+      if (res.error) { notify(res.error); return false; }
+      const line = ACTION_DONE[actionType] + " · " + res.line;
+      const undo = applyWorkout(store, habits, res);
+      if (onDone) onDone(line);
+      notify("✓ " + line, () => { undo(); if (onDone) onDone(null); });
+      return;
+    }
     const before = store.get(doc.id);
     store.save(doc);
     /* mapa e funil de onboarding entregam um documento pronto pra olhar — o

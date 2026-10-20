@@ -1,0 +1,33 @@
+/* merlin · o CSS desta página
+   importado logo depois do base.css: primeiro o comum, depois o da página. */
+
+/* a semana: uma linha por dia, o dia, os treinos dele e a soma. os treinos
+   usam a tinta secundária; o roxo fica para o accent do resto da casca. em
+   390px a coluna do meio encolhe, os treinos quebram linha e nada rola para
+   o lado */
+.tr-week{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:4px}
+.tr-day{
+  display:grid;grid-template-columns:68px minmax(0,1fr) 56px;align-items:center;gap:10px;
+  padding:7px 8px;border:1px solid transparent;border-radius:var(--br2);
+}
+.tr-day.is-future{opacity:.45}
+.tr-day__day{font-size:11px;color:var(--ink-50);white-space:nowrap}
+.tr-day.is-today .tr-day__day{color:var(--ink)}
+.tr-day__items{display:flex;flex-wrap:wrap;align-items:center;gap:6px;min-width:0;min-height:30px}
+.tr-day__min{font-size:12px;color:var(--ink);text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+
+.tr-item{
+  display:inline-flex;align-items:center;gap:6px;max-width:100%;min-width:0;height:30px;padding:0 10px;
+  border:1px solid var(--line-soft);border-radius:var(--br2);background:var(--fill);color:inherit;font:inherit;font-size:13px;cursor:pointer;
+  transition:background var(--t),border-color var(--t);
+}
+.tr-item:hover{background:var(--fill-hover);border-color:var(--ink-30)}
+.tr-item__title{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tr-item__min{font-size:11px;color:var(--ink-50);white-space:nowrap}
+
+.tr-add{
+  display:inline-grid;place-items:center;width:30px;height:30px;padding:0;border:1px dashed var(--line-soft);border-radius:var(--br2);
+  background:none;color:var(--ink-30);cursor:pointer;transition:color var(--t),border-color var(--t);
+}
+.tr-add:hover{color:var(--ink);border-color:var(--ink-30)}
+.tr-add svg{width:14px;height:14px}
