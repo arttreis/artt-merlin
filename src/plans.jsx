@@ -62,7 +62,7 @@ function GoalForm({ plans, form, data, onClose }) {
   });
   const target = v.source === "launched" ? 1 : readTarget(v.target, v.source);
   const draft = normalize({ id: "draft", kind, period, source: v.source, text: v.text.trim() || textOf(v.source, target, kind), target, current: readTarget(v.current, "manual"), done: v.done });
-  const sub = draft.source === "manual" ? "à mão: você move o número" : draft.source === "launched" ? "sim ou não: você marca quando lançar" : "o Merlin mede sozinho · hoje " + progressOf(draft, data).text;
+  const sub = draft.source === "manual" ? "à mão: você move o número" : draft.source === "launched" ? "sim ou não: você marca quando lançar" : "o Merlin mede sozinho · hoje " + (draft.target ? progressOf(draft, data).text : progressOf(draft, data).text.split("/")[0]);
   const changeSource = (source) => { if (source !== v.source) { set("source", source); set("target", ""); } };
 
   const submit = () => {
@@ -121,7 +121,7 @@ function Goal({ goal, data, label, onOpen, onToggle }) {
           : <span className="pl-goal__src">{sourceLabel(goal.source)}</span>}
       </div>
       <div className="pl-goal__meter">
-        <span className="bar" role="progressbar" aria-label={goal.text} aria-valuemin={0} aria-valuenow={p.value} aria-valuemax={p.target}><i style={{ width: p.pct + "%" }} /></span>
+        <span className="bar" role="progressbar" aria-label={goal.text} aria-valuemin={0} aria-valuenow={p.value} aria-valuemax={p.target} aria-valuetext={p.text}><i style={{ width: p.pct + "%" }} /></span>
         {goal.source === "launched"
           ? <button className={"chip" + (goal.done ? " is-on" : "")} type="button" aria-pressed={String(goal.done)} onClick={onToggle}>{p.text}</button>
           : <span className="pl-goal__num t-mono">{p.text}</span>}
