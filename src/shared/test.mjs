@@ -915,6 +915,8 @@ const dataLeft = () => globalThis.localStorage.keys().filter((k) => k in DATA);
   check("regra: o nome do Merlin sai da pergunta", T.routeLine("merlin, vale lançar sexta").text === "vale lançar sexta", JSON.stringify(T.routeLine("merlin, vale lançar sexta")));
   check("regra: duração vence a palavra de pergunta", T.routeLine("como fazer o deck 45m").kind === "task");
   check("regra: sem pergunta e sem duração continua ideia", T.routeLine("comprar domínio do app").kind === "note");
+  check("regra: 'dormi 7h' sem sessão não vira tarefa de 7h", T.routeLine("dormi 7h").kind !== "task" && T.routeLine("dormi 6h30").kind !== "task" && T.routeLine("ontem dormi 6h").kind !== "task", [T.routeLine("dormi 7h"), T.routeLine("dormi 6h30"), T.routeLine("ontem dormi 6h")].map((r) => r.kind).join());
+  check("regra: 'dormi' só tira a tarefa de quem dorme", T.routeLine("revisar landing 45m").kind === "task" && T.routeLine("dormir cedo 30m").kind === "task");
   /* os pedidos locais do campo do início (fechar o dia, revisar): reconhecidos sem crédito */
   const ai = (s) => JSON.stringify(T.askIntent(s));
   check("pedido: \"fechar o dia\" fecha o dia", ai("fechar o dia") === JSON.stringify({ kind: "close" }), ai("fechar o dia"));
@@ -1315,6 +1317,13 @@ const dataLeft = () => globalThis.localStorage.keys().filter((k) => k in DATA);
   check("áreas: NAV_ICONS foi encontrado no icons.jsx", block.length > 0);
   const noIcon = SECTIONS.filter((s) => !s.icon || !block.includes("\n  " + s.icon + ":")).map((s) => s.id + "→" + s.icon);
   check("áreas: toda área tem o ícone em NAV_ICONS", block.length > 0 && noIcon.length === 0, noIcon.join(","));
+
+  /* o cartão do gasto no início desenha icon(DRAFT_ICON.money): nome que não
+     está em ICONS vira cartão sem ícone (ticket #74) */
+  const iconsBlock = icons.slice(icons.indexOf("export const ICONS = {"), icons.indexOf("export const NAV_ICONS = {"));
+  const home = fs.readFileSync(path.join(root, "src", "index.jsx"), "utf8");
+  const moneyIcon = (home.match(/const DRAFT_ICON = {[^}]*money: "([\w-]+)"/) || [])[1] || "";
+  check("início: o ícone do cartão de gasto existe em ICONS", moneyIcon !== "" && iconsBlock.includes("\n  " + moneyIcon + ":"), moneyIcon);
 }
 
 /* ---- a apresentação das áreas e o "ideias" que virou "notas" (ticket #39) ----

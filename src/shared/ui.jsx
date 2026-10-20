@@ -1460,7 +1460,7 @@ function Dock({ page, onCommand }) {
 }
 
 /* o menu das áreas: as cinco, com todas as abas, de uma vez e sem segundo
-   nível (são 12 links, cabem numa olhada). mora no body, e não dentro da
+   nível (são 16 links, cabem numa olhada). mora no body, e não dentro da
    faixa, porque a faixa não recebe clique fora dos filhos dela. abrir põe o
    foco no primeiro link; Esc fecha e devolve o foco ao botão; clicar fora ou
    escolher um link também fecha. não há atalho de teclado próprio: quem usa o

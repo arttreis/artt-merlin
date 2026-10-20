@@ -217,6 +217,15 @@ const ler = habit("h-ler", "ler 20 páginas");
   check("desfazer: remover não leva o save junto", !("save" in undoNew));
 }
 
+/* ---------- o dia que existe (ticket #74) ---------- */
+{
+  const { isDay } = core;
+  check("isDay: dia de verdade", isDay("2026-10-20") && isDay("2024-02-29") && isDay("2026-12-31"));
+  check("isDay: mês e dia que não existem", !isDay("2026-13-45") && !isDay("2026-00-10") && !isDay("2026-10-00") && !isDay("2026-04-31"));
+  check("isDay: fevereiro não rola para março", !isDay("2026-02-30") && !isDay("2025-02-29"));
+  check("isDay: só o formato AAAA-MM-DD", !isDay("2026-1-5") && !isDay("ontem") && !isDay("") && !isDay(null) && !isDay(20261020));
+}
+
 /* ---------- o estado do que foi lido ---------- */
 {
   const list = [treinar, ler, habit("h-m", "meditar", { marks: { [TODAY]: true } }), habit("h-y", "yoga", { archived: true })];
@@ -235,6 +244,11 @@ const ler = habit("h-ler", "ler 20 páginas");
 
   s = habitStatus(list, { habit: "", name: "ler", date: "" }, TODAY);
   check("status: sem habit, acha pelo name; sem data, hoje", s.habit === ler && s.day === TODAY, JSON.stringify(s));
+
+  s = habitStatus(list, { habit: "treinar", date: "2026-13-45" }, TODAY);
+  check("status: dia que não existe cai em hoje", s.day === TODAY && !s.error, JSON.stringify(s));
+  s = habitStatus(list, { habit: "treinar", date: "2026-02-30" }, TODAY);
+  check("status: 30 de fevereiro cai em hoje, não em 2 de março", s.day === TODAY && !s.error, JSON.stringify(s));
 
   s = habitStatus(list, { habit: "treinar", name: "outra coisa", date: TODAY }, TODAY);
   check("status: habit vale mais que name", s.habit === treinar, JSON.stringify(s));

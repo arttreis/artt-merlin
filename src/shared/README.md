@@ -187,7 +187,7 @@ vezes numa montagem (esvaziar a caixa de entrada, gerar a recorrência da semana
 | --- | --- |
 | `initPage(id)` | sidebar, clientes, preferências, sessão. `id` é `home, calendar, routine, notes, prospecting, clients, content, funnels, maps, apps, finance, habits, plans, profile` |
 | `collection(type, {normalize})` | fora de componente; dentro use `useCollection` |
-| `newId()`, `today()`, `dayOf(date)`, `isDay(v)`, `dateOf(day)`, `addDays(day, n)`, `mondayOf(day)` | datas como `YYYY-MM-DD` |
+| `newId()`, `today()`, `dayOf(date)`, `isDay(v)`, `dateOf(day)`, `addDays(day, n)`, `mondayOf(day)` | datas como `YYYY-MM-DD`; `isDay` confere o formato e o calendário (`2026-02-30` não é dia) |
 | `dateLabel(day, withYear?)`, `weekdayOf(day)`, `monthLabel("YYYY-MM")` | rótulos |
 | `brl(cents, sign?)`, `parseMoney(text)` | dinheiro em centavos |
 | `formatMin(min)`, `parseDuration(text) → {min, title}` | duração no fim do texto |
