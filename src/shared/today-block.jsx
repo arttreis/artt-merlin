@@ -6,15 +6,17 @@
 
    o "como foi o dia" é o que restou do diário: a página saiu sem nunca ter tido
    um documento, mas a pergunta do fim do dia ficou — é a coleção `journal`, um
-   documento por data, a mesma de sempre.
+   documento por data, a mesma de sempre. desde 20/10/2026 a página voltou como
+   aba de saúde (journal.jsx), com os dias anteriores, e as duas gravam pelo
+   mesmo gancho (journal-draft.js).
 
    segue a data aberta no calendário: voltar para ontem mostra os hábitos e o
    texto de ontem. o dia que ainda não chegou não se marca (toggleMark). */
 import "./today-block.css";
-import { useState, useEffect, useRef } from "react";
 import { today } from "./core.js";
 import { useCollection } from "./ui.jsx";
 import { icon } from "./icons.jsx";
+import { useJournalDraft } from "./journal-draft.js";
 import { normalize as normalizeHabit, isExpected, toggleMark } from "./habits-data.js";
 
 export function TodayBlock({ date }) {
@@ -25,30 +27,7 @@ export function TodayBlock({ date }) {
     .filter((h) => !h.archived && isExpected(h, date))
     .sort((a, b) => a.order - b.order || a.createdAt - b.createdAt);
 
-  const entry = journal.get(date);
-  const [draft, setDraft] = useState(() => (entry && entry.body) || "");
-  const draftRef = useRef(draft);
-  draftRef.current = draft;
-  const timer = useRef(null);
-  /* o que falta gravar, e de QUE dia: andar para outro dia no meio da
-     digitacao grava o texto no dia em que ele foi escrito, e nao no novo */
-  const pending = useRef(null);
-  const flush = () => {
-    clearTimeout(timer.current);
-    const p = pending.current;
-    if (!p) return;
-    pending.current = null;
-    journal.save({ id: p.date, body: draftRef.current, createdAt: p.createdAt, updatedAt: Date.now() });
-  };
-  useEffect(() => flush, [date]);
-  /* trocou de dia, ou o texto chegou de outro aparelho: o campo segue */
-  useEffect(() => { setDraft((entry && entry.body) || ""); }, [date, entry && entry.body]);
-  const write = (v) => {
-    setDraft(v);
-    pending.current = { date, createdAt: (entry && entry.createdAt) || Date.now() };
-    clearTimeout(timer.current);
-    timer.current = setTimeout(flush, 700);
-  };
+  const { draft, write } = useJournalDraft(journal, date);
 
   return (
     <section className="block todayb">

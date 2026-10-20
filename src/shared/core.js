@@ -251,9 +251,11 @@ initTheme();
    e a vitrine, que saiu em 19/10/2026: wishlist.html leva ao financeiro
    (wishlist.jsx), e a coleção fica guardada, sem tela. */
 export const SECTIONS = [
-  /* os hábitos são a saúde inteira, por enquanto */
+  /* hábitos e diário, por enquanto. o diário é o histórico do "como foi o
+     dia" do Hoje: a semana em cartões, um por dia (VISAO, 9.3) */
   { id: "health", label: "saúde", icon: "habits", pages: [
-    { id: "habits", label: "hábitos", href: "habits.html" }
+    { id: "habits", label: "hábitos", href: "habits.html" },
+    { id: "journal", label: "diário", href: "journal.html" }
   ] },
   /* o produto é o centro (VISAO, 9.5) e abre a área. o conteúdo e o funil são
      como gente chega a ele, e o mapa é o desenho que pensa em galhos */
@@ -316,9 +318,9 @@ const SEARCH_SOURCES = [
   { type: "finance", label: "R$", field: "name", href: () => "finance.html", filter: (d) => d.type === "entry" || d.type === "fixed" || d.type === "debt" || d.type === "card" },
   { type: "habits", label: "hábito", field: "name", href: () => "habits.html", filter: (d) => !d.archived },
   { type: "routine", label: "rotina", field: "title", href: () => "routine.html" },
-  /* o "como foi o dia" e texto corrido: acha no corpo, mostra o trecho. a
-     pagina do diario saiu em 09/10/2026 (VISAO, 9) e o texto mora no Hoje */
-  { type: "journal", label: "diário", href: () => "calendar.html#day", each: (d) => [String(d.body || "").replace(/\s+/g, " ").trim()], clip: true }
+  /* o "como foi o dia" e texto corrido: acha no corpo, mostra o trecho e leva
+     ao cartao do dia na pagina do diario (a semana certa, o id e a data) */
+  { type: "journal", label: "diário", href: (d) => "journal.html#" + encodeURIComponent(d.id), each: (d) => [String(d.body || "").replace(/\s+/g, " ").trim()], clip: true }
 ];
 export function search(term) {
   const k = foldKey(term);
@@ -875,7 +877,7 @@ document.addEventListener("visibilitychange", () => {
    nao baixou espera a proxima sincronizacao, e a marca de "feito" so e
    gravada quando todas fecharam. depois disso ela nunca mais faz nada. */
 const FRONTS_PURGED = "merlin:fronts-removed";
-const PURGE_TYPES = ["notes", "clients", "tasks", "week", "maps", "funnels", "apps", "finance", "habits", "plans", "bookmarks", "content", "cadence", "profile", "closes", "reviews", "sessions"];
+const PURGE_TYPES = ["notes", "clients", "tasks", "week", "maps", "funnels", "apps", "finance", "habits", "plans", "bookmarks", "content", "cadence", "profile", "closes", "reviews", "sessions", "journal"];
 function stripFront(value) {
   if (Array.isArray(value)) return value.map(stripFront).some(Boolean);
   if (!value || typeof value !== "object") return false;

@@ -1,0 +1,20 @@
+/* merlin · o CSS desta pagina
+   importado logo depois do base.css: primeiro o comum, depois o da pagina. */
+
+/* a semana: um cartao por dia. uma coluna no celular, e quantas couberem
+   (de 300px para cima) no computador */
+.jweek{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,300px),1fr));gap:var(--pd);align-items:start}
+.jcard{display:flex;flex-direction:column;gap:8px;min-width:0}
+.jcard__head{display:flex;align-items:center;justify-content:space-between;gap:var(--pd2);margin:0;min-height:28px}
+.jcard__head .t-mono{font-size:11px;color:var(--ink-50)}
+.jcard textarea{
+  resize:vertical;width:100%;border:1px solid var(--line-soft);border-radius:var(--br2);
+  background:var(--surface-2);padding:9px 10px;font:inherit;font-size:13px;line-height:1.5;color:var(--ink);
+  min-height:96px;
+}
+.jcard textarea:focus{outline:none;border-color:var(--ink-30)}
+.jcard textarea:disabled{opacity:.5}
+.jcard.is-future{opacity:.7}
+/* o cartao que a busca trouxe */
+.jcard.is-picked{border-color:var(--accent)}
+.start + .jweek{margin-top:0}
