@@ -1,0 +1,32 @@
+/* merlin · o CSS desta página
+   importado logo depois do base.css: primeiro o comum, depois o da página. */
+
+/* a semana: uma linha por dia, o dia e as refeições dele na ordem do dia.
+   tudo na tinta secundária, sem cor de julgamento (sem culpa); o roxo fica
+   para o accent do resto da casca. em 390px a coluna das refeições encolhe,
+   elas quebram linha e nada rola para o lado */
+.ml-week{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:4px}
+.ml-day{
+  display:grid;grid-template-columns:68px minmax(0,1fr);align-items:center;gap:10px;
+  padding:7px 8px;border:1px solid transparent;border-radius:var(--br2);
+}
+.ml-day.is-future{opacity:.45}
+.ml-day__day{font-size:11px;color:var(--ink-50);white-space:nowrap}
+.ml-day.is-today .ml-day__day{color:var(--ink)}
+.ml-day__items{display:flex;flex-wrap:wrap;align-items:center;gap:6px;min-width:0;min-height:30px}
+
+.ml-item{
+  display:inline-flex;align-items:center;gap:6px;max-width:100%;min-width:0;height:30px;padding:0 10px;
+  border:1px solid var(--line-soft);border-radius:var(--br2);background:var(--fill);color:inherit;font:inherit;font-size:13px;cursor:pointer;
+  transition:background var(--t),border-color var(--t);
+}
+.ml-item:hover{background:var(--fill-hover);border-color:var(--ink-30)}
+.ml-item__meal{font-size:11px;color:var(--ink-50);white-space:nowrap}
+.ml-item__text{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+.ml-add{
+  display:inline-grid;place-items:center;width:30px;height:30px;padding:0;border:1px dashed var(--line-soft);border-radius:var(--br2);
+  background:none;color:var(--ink-30);cursor:pointer;transition:color var(--t),border-color var(--t);
+}
+.ml-add:hover{color:var(--ink);border-color:var(--ink-30)}
+.ml-add svg{width:14px;height:14px}

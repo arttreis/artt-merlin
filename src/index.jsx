@@ -37,6 +37,7 @@ import { BUILD, buildIntent } from "./shared/build-intent.js";
 import { normalize as normalizeHabit, habitStatus, markOn, undoHabit, markWhen } from "./shared/habits-data.js";
 import { normalize as normalizeSleep, sleepDoc, sleepLabel, sleepLine, nightOf, undoSleep } from "./shared/sleep-data.js";
 import { normalize as normalizeWorkout, workoutDay, trainingHabit, logWorkout, applyWorkout } from "./shared/workouts-data.js";
+import { normalize as normalizeMeal, MEALS, mealDay, mealDoc, mealLine } from "./shared/meals-data.js";
 import { distribute, fmt, clock, costOf } from "./shared/day.js";
 import { Forest, phaseOf } from "./shared/forest.jsx";
 import { githubDay } from "./shared/focus.js";
@@ -270,6 +271,11 @@ function Onboarding({ profile, apps, habits, veteran, onDone }) {
    minutos espera no cartão, como o sono sem as horas. "treinei" sozinho
    continua sendo o hábito.
 
+   e refeição ("almocei salada", "comi uma maçã"): o cartão mostra a refeição
+   num seletor, que a pessoa troca ali mesmo se o Merlin escolheu errado pelo
+   horário, e o Enter a anota na aba alimentação; o desfazer a apaga. "gastei
+   45 no almoço" continua sendo gasto.
+
    o pedido de montar ("monta um funil pra consultoria", "quero um app de
    agenda") não é tarefa nem pergunta: vai para a conversa do assistente, que
    pergunta o que falta e mostra o rascunho (shared/build.js). a duração
@@ -313,16 +319,23 @@ function workoutMeta(it, base, habitsNow) {
   const h = trainingHabit(habitsNow, it.title);
   return [it.min + " min", day === base ? "hoje" : markWhen(day, base), h && !h.marks[day] ? "marca " + h.name : ""].filter(Boolean).join(" · ");
 }
+/* a refeição lida: "hoje", "ontem", "19/10", ou o dia que não chegou */
+function mealMeta(it, base) {
+  const { day, error } = mealDay(it, base);
+  return error || markWhen(day, base);
+}
 const draftMeta = (it, base, money, habitsNow) => it.kind === "note" ? "nota"
   : it.kind === "money" ? entryLine(it, base, money)
   : it.kind === "habit" ? habitMeta(habitStatus(habitsNow, it, base), base)
   : it.kind === "sleep" ? sleepMeta(it, base)
   : it.kind === "workout" ? workoutMeta(it, base, habitsNow)
+  : it.kind === "meal" ? mealMeta(it, base)
   : [dayLabel(it.date, base), it.at, it.min ? (it.guess ? "~" : "") + fmt(it.min) : "", it.client].filter(Boolean).join(" · ");
-const DRAFT_ICON = { task: "check", note: "pencil", money: "finance", habit: "habits", sleep: "sleep", workout: "workout" };
+const DRAFT_ICON = { task: "check", note: "pencil", money: "finance", habit: "habits", sleep: "sleep", workout: "workout", meal: "meal" };
 /* o hábito que existe aparece com o nome dele; o que não existe, como foi dito */
 const draftTitle = (it, habitsNow, base) => it.kind === "sleep" ? (it.min ? sleepLabel(it.min) + " de sono" : "sono")
   : it.kind === "workout" ? it.title || "treino"
+  : it.kind === "meal" ? it.text
   : it.kind !== "habit" ? it.title : (habitStatus(habitsNow, it, base).habit || it).name;
 
 /* o gasto ou a entrada lidos na linha, como a caixa de proposta os recebe: é
@@ -368,6 +381,7 @@ function Composer({ tasks, habits, b, smart, onAsk, onIntent, readContext }) {
   const habitOf = (it) => habitStatus(habitsNow, it, date);
   const sleep = useCollection("sleep", { normalize: normalizeSleep });
   const workouts = useCollection("workouts", { normalize: normalizeWorkout });
+  const meals = useCollection("meals", { normalize: normalizeMeal });
   /* o que ainda não pode ser criado: o gasto sem valor só se lança pela caixa,
      o hábito que não existe, pela caixa de novo hábito, e o sono sem as
      horas e o treino sem os minutos, pela caixa de proposta */
@@ -377,11 +391,12 @@ function Composer({ tasks, habits, b, smart, onAsk, onIntent, readContext }) {
     : it.kind === "workout" ? !workoutDay(it, date).error && !it.min
     : false;
   /* o que não tem o que fazer: o hábito que já estava marcado, ou o hábito, a
-     noite e o treino de um dia que ainda não chegou. o Enter o tira do cartão
-     sem gravar nada */
+     noite, o treino e a refeição de um dia que ainda não chegou. o Enter o
+     tira do cartão sem gravar nada */
   const idle = (it) => it.kind === "habit" ? !!habitOf(it).error || habitOf(it).already
     : it.kind === "sleep" ? !!nightOf(it, date).error
     : it.kind === "workout" ? !!workoutDay(it, date).error
+    : it.kind === "meal" ? !!mealDay(it, date).error
     : false;
   const route = routeLine(text);
   const build = !intent && route && route.kind !== "task" ? buildIntent(text) : null;
@@ -416,6 +431,7 @@ function Composer({ tasks, habits, b, smart, onAsk, onIntent, readContext }) {
     const marked = [];
     const slept = [];
     const trained = [];
+    const ate = [];
     let nTasks = 0, nNotes = 0, nMoney = 0;
     ready.forEach((it) => {
       const client = clientId(it.client);
@@ -443,6 +459,12 @@ function Composer({ tasks, habits, b, smart, onAsk, onIntent, readContext }) {
         if (res.error) return;
         undo.push(applyWorkout(workouts, habits, res));
         trained.push("✓ registrado · " + res.line);
+      } else if (it.kind === "meal") {
+        const { doc } = mealDoc(it, null, date);
+        if (!doc) return;
+        meals.save(doc);
+        undo.push(() => meals.remove(doc.id));
+        ate.push("✓ anotado · " + mealLine(doc, date));
       } else if (it.kind === "money") {
         const { doc } = newEntry({ ...it, chat: "home" }, configOf(finance), financeContext(finance), date);
         const before = finance.get(doc.id);
@@ -468,7 +490,8 @@ function Composer({ tasks, habits, b, smart, onAsk, onIntent, readContext }) {
       nMoney && (nMoney === 1 ? "lançado no financeiro" : nMoney + " lançados no financeiro"),
       marked.length && (marked.length === 1 ? marked[0] : marked.length + " hábitos marcados"),
       slept.length && (slept.length === 1 ? slept[0] : slept.length + " noites registradas"),
-      trained.length && (trained.length === 1 ? trained[0] : trained.length + " treinos registrados")
+      trained.length && (trained.length === 1 ? trained[0] : trained.length + " treinos registrados"),
+      ate.length && (ate.length === 1 ? ate[0] : ate.length + " refeições anotadas")
     ].filter(Boolean);
     /* do último para o primeiro: a mesma noite lida duas vezes volta à de antes */
     if (said.length) notify(said.join(" · "), () => undo.slice().reverse().forEach((f) => f()));
@@ -502,6 +525,8 @@ function Composer({ tasks, habits, b, smart, onAsk, onIntent, readContext }) {
     const items = draft.items.filter((_, j) => j !== i);
     setDraft(items.length ? { ...draft, items } : null);
   };
+  /* a refeição que o Merlin escolheu pelo horário se troca no próprio cartão */
+  const setMeal = (i, meal) => setDraft({ ...draft, items: draft.items.map((x, j) => (j === i ? { ...x, meal } : x)) });
   const asNote = () => {
     const n = newNote({ title: draft.text.replace(/\s+/g, " ").trim() });
     if (n) notify("guardado em notas", () => collection("notes").remove(n.id));
@@ -552,6 +577,11 @@ function Composer({ tasks, habits, b, smart, onAsk, onIntent, readContext }) {
             {draft.items.map((it, i) => (
               <li key={i}>
                 {icon(DRAFT_ICON[it.kind] || "pencil")}
+                {it.kind === "meal" && (
+                  <select className="hm-draft__meal" aria-label={"A refeição de " + it.text} value={it.meal} onChange={(e) => setMeal(i, e.currentTarget.value)}>
+                    {MEALS.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
+                  </select>
+                )}
                 <span className="hm-draft__title">{draftTitle(it, habitsNow, date)}</span>
                 <span className="hm-draft__meta t-mono">{draftMeta(it, date, money, habitsNow)}</span>
                 {missing(it) && <button type="button" className="pill pill--mini" onClick={() => setBoxed(i)}>{it.kind === "habit" ? "criar e marcar" : it.kind === "sleep" ? "pôr as horas" : it.kind === "workout" ? "pôr os minutos" : "abrir a caixa"}</button>}

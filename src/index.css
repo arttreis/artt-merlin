@@ -116,6 +116,9 @@ html:has(.hm) body{overflow-x:clip}
 .hm-draft__list li > svg{flex:none;width:13px;height:13px;color:var(--ink-30)}
 .hm-draft__title{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--ink)}
 .hm-draft__meta{flex:none;font-size:11.5px;color:var(--ink-50)}
+/* a refeição lida, trocável ali: um seletor baixo, na tinta secundária */
+.hm-draft__meal{flex:none;height:24px;max-width:118px;padding:0 6px;border:1px solid var(--line-soft);border-radius:8px;background:var(--fill);color:var(--ink-50);font:inherit;font-size:12px;cursor:pointer}
+.hm-draft__meal:hover,.hm-draft__meal:focus-visible{color:var(--ink);border-color:var(--ink-30)}
 .hm-draft__drop{flex:none;width:24px;height:24px;border-radius:50%;display:grid;place-items:center;color:var(--ink-30)}
 .hm-draft__drop:hover{background:var(--fill-hover);color:var(--ink)}
 .hm-draft__drop svg{width:12px;height:12px}
