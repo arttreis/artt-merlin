@@ -80,10 +80,10 @@
 
 /* 3 · o menu: as cinco areas, e os dois gestos de qualquer tela */
 .ta--menu{display:flex;flex-direction:column;align-items:center;gap:18px}
-.ta__areas{display:grid;grid-template-columns:repeat(5,1fr);gap:4px;width:100%}
+.ta__areas{display:grid;grid-auto-flow:column;grid-auto-columns:1fr;gap:4px;width:100%}
 .ta__areas span{display:flex;flex-direction:column;align-items:center;gap:5px;padding:9px 2px 7px;border-radius:9px;background:var(--surface);border:1px solid var(--line-soft);color:var(--ink-70)}
 .ta__areas svg{width:16px;height:16px}
-.ta__areas small{font-size:9px;color:var(--ink-50)}
+.ta__areas small{font-size:9px;color:var(--ink-50);text-align:center}
 .ta__keyrow{display:flex;align-items:center;gap:10px}
 .ta__key{display:inline-flex;align-items:center;gap:4px;height:38px;min-width:38px;padding:0 10px;justify-content:center;border-radius:11px;background:var(--surface);border:1px solid var(--line);color:var(--ink-70)}
 .ta__key svg{width:15px;height:15px}

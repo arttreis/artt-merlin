@@ -8,7 +8,7 @@
 import { newId, today } from "./core.js";
 import { journalEntry } from "./client-doc.js";
 import { layoutNodes } from "./funnel-layout.js";
-import { newEntry, entryLine, paidOf, configOf, contextOf } from "./finance-data.js";
+import { newEntry, entryLine, paidOf, configOf, contextOf, bookOf, bookCollection } from "./finance-data.js";
 import { SOURCES } from "./portrait.js";
 import { normalize as normalizeHabit, habitStatus, markOn } from "./habits-data.js";
 import { sleepLabel, sleepLine, readHours, sleepDoc, nightOf } from "./sleep-data.js";
@@ -52,7 +52,8 @@ export const ACTION_DONE = { "finance-entry": "lançado", "habit-mark": "marcado
    payload (arvore do mapa, etapas do funil, id do cliente/conteudo) segue
    como a IA propos, sem virar campo de formulario.
    alem de texto, numero, data e textarea, o campo pode ser `money` (centavos),
-   `select` (as opcoes vem de `options(store)`, a colecao alvo) e `check`.
+   `select` (as opcoes vem de `options(store, v)`: a colecao alvo e o que ja
+   esta na caixa) e `check`.
    `initial(payload, store)` preenche o que a IA deixou em branco. */
 export const ACTION_FIELDS = {
   task: [
@@ -80,15 +81,18 @@ export const ACTION_FIELDS = {
   "onboarding-funnel": [{ key: "name", label: "nome" }],
   script: [{ key: "script", label: "roteiro", type: "textarea" }],
   /* o previsto confirmado e o fixo (confirm, fixed) seguem como a IA propos:
-     sao ids, nao campo de formulario */
+     sao ids, nao campo de formulario. o livro vem primeiro e sempre à vista:
+     na dúvida a IA manda pessoal, e quem decide é a pessoa (PRD meu-negocio).
+     `options` recebe também o que está na caixa, e as categorias seguem o livro */
   "finance-entry": [
+    { key: "book", label: "de quem", type: "select", initial: (p) => bookOf(p.book), options: () => [["personal", "pessoal"], ["business", "empresa"]] },
     { key: "name", label: "o quê" },
     { key: "amount", label: "valor", type: "money" },
     { key: "day", label: "data", type: "date", initial: () => today() },
     { key: "kind", label: "entrada ou saída", type: "select", initial: () => "out", options: () => [["out", "saída"], ["in", "entrada"]] },
     { key: "category", label: "categoria", type: "select",
-      initial: (p, store) => (configOf(store).categories.includes(p.category) ? p.category : ""),
-      options: (store) => [["", "sem categoria"], ...configOf(store).categories] },
+      initial: (p, store) => (configOf(bookCollection(store, p.book)).categories.includes(p.category) ? p.category : ""),
+      options: (store, v) => [["", "sem categoria"], ...configOf(bookCollection(store, v && v.book)).categories] },
     { key: "paid", label: "já aconteceu", type: "check", initial: (p) => paidOf(p.day || today(), p.paid, today()) }
   ],
   /* as horas como se escrevem ("7h30"): a IA manda minutos, e a caixa os
@@ -205,11 +209,16 @@ export function buildDoc(actionType, payload, v, store, opts) {
       if (!existing) return { error: "não achei essa peça de conteúdo" };
       return { doc: { ...existing, script: v.script, updatedAt: now } };
     }
-    case "finance-entry":
-      return newEntry({
+    /* as contas e as referências (o previsto, o fixo) são as do livro
+       escolhido: um "#id" do outro livro não confirma nada */
+    case "finance-entry": {
+      const book = bookCollection(store, v.book);
+      const r = newEntry({
         title: v.name, amount: v.amount, flow: v.kind, category: v.category, date: v.day, paid: v.paid,
         confirm: p.confirm, fixed: p.fixed, chat: opts && opts.chat
-      }, configOf(store), contextOf(store), today());
+      }, configOf(book), contextOf(book), today());
+      return r.doc ? { doc: { ...r.doc, book: book.book } } : r;
+    }
     /* a pílula marca sem caixa: `v` é o próprio payload. a coleção chega sem
        normalize na tela da conversa, então cada hábito é normalizado aqui.
        hábito que não existe não se cria por aqui: é a caixa de novo hábito */

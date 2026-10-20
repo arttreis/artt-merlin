@@ -1366,3 +1366,26 @@ export function buildFinance(tpl) {
     fixed: (tpl.out || []).map((l) => line(l, "out")).concat((tpl.in || []).map((l) => line(l, "in")))
   };
 }
+
+/* ---------- o caixa da empresa ----------
+   o que quase toda empresa pequena paga ou recebe todo mês (PRD meu-negocio).
+   escolher um abre a caixa do fixo já com o nome, o tipo e a categoria; o valor
+   fica em branco, pela mesma razão do buildFinance. as categorias são as do
+   livro da empresa (finance-data.js, BUSINESS_CATEGORIES) */
+export const CASH_TEMPLATES = [
+  { key: "tools", label: "ferramentas", items: [
+    { id: "hosting", name: "hospedagem", kind: "out", category: "Ferramentas" },
+    { id: "domain", name: "domínio", kind: "out", category: "Ferramentas" },
+    { id: "workspace", name: "Google Workspace", kind: "out", category: "Ferramentas" },
+    { id: "figma", name: "Figma", kind: "out", category: "Ferramentas" }
+  ] },
+  { key: "duties", label: "obrigações", items: [
+    { id: "accountant", name: "contador", kind: "out", category: "Contador" },
+    { id: "das", name: "DAS/Simples", kind: "out", category: "Impostos", dayOfMonth: 20 },
+    { id: "prolabore", name: "pró-labore", kind: "out", category: "Pró-labore" }
+  ] },
+  { key: "income", label: "entradas", items: [
+    { id: "retainer", name: "mensalidade de cliente", kind: "in", category: "Clientes" },
+    { id: "sale", name: "venda avulsa", kind: "in", category: "Vendas" }
+  ] }
+];

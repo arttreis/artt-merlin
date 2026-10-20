@@ -999,7 +999,7 @@ encaixar. O argumento da contagem de 09/10 continua: o que a conversa traz de vo
 que espera visita numa gaveta morre. Com a conversa trazendo o dia de volta, a gaveta pode ficar
 fechada, desde que se ache em um gesto.
 
-### 13.1 As cinco áreas
+### 13.1 As áreas
 
 Na ordem do desenho do Arthur. A primeira aba é a porta da área (`SECTIONS`, no `core.js`).
 
@@ -1007,6 +1007,7 @@ Na ordem do desenho do Arthur. A primeira aba é a porta da área (`SECTIONS`, n
 | --- | --- | --- | --- |
 | **saúde** | `health` | `habits` | hábitos, sono, treino, alimentação, diário |
 | **trabalho** | `work` | `apps` | produtos, conteúdo, funis, mapas |
+| **meu negócio** | `business` | `business` | caixa |
 | **organização** | `organization` | `calendar` | calendário, rotina, notas |
 | **finanças** | `money` | `finance` | financeiro |
 | **inbox** | `inbox` | `inbox` | o que falta, leads, clientes |
@@ -1032,6 +1033,14 @@ que refeição. O id `inbox` da área não tem relação com a fila
 `merlin:inbox` (§3), e o comentário de `SECTIONS` diz isso. "inbox" e "lead" ficaram como o
 Arthur escreveu: são as palavras que esse público usa.
 
+**Meu negócio** entrou em 20/10/2026, entre o trabalho e a organização (`docs/prd/meu-negocio.md`,
+D2), com o **caixa** da empresa: o mesmo financeiro, num livro separado (`book: "business"` no
+documento; sem o campo, é pessoal, e nada migrou). O financeiro pessoal não vê o livro da empresa,
+nem o caixa vê o pessoal. O verbo é o mesmo lançamento da conversa ("recebi 2.400 da Acme na
+empresa"), com o seletor "pessoal | empresa" na caixa: na dúvida, pessoal, e a pessoa decide. O
+plano, o time e a operação entram na mesma área, na ordem plano, caixa, time, operação; vendas
+continua no inbox (D1).
+
 ### 13.2 O menu
 
 Um botão "menu" na faixa do alto, logo depois da marca, **em toda tela e do mesmo jeito no
@@ -1039,8 +1048,8 @@ desktop e no celular** (no celular, só o ícone). Ficar sempre no mesmo canto v
 ficar perto do polegar: no início, o polegar já tem o campo. É o único caminho do início para uma
 área com o mouse ou o dedo.
 
-Ele abre um painel com as cinco áreas e **todas as abas de uma vez**, cada aba um link, sem
-segundo nível: são doze links e cabem numa olhada. A área e a aba de onde se está ficam marcadas.
+Ele abre um painel com as áreas e **todas as abas de uma vez**, cada aba um link, sem
+segundo nível: cabem numa olhada. A área e a aba de onde se está ficam marcadas.
 No desktop o painel desce do botão, com as áreas em colunas; no celular ocupa a largura toda, com
 as áreas numa coluna e alvos de toque de 36px. Fecha com `Esc` (o foco volta ao botão), clicando
 fora, no botão de novo ou num link. Durante o onboarding o botão some, como a busca.

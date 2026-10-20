@@ -242,7 +242,8 @@ initTheme();
    seções no dock (hoje, ideias, produtos, distribuição, clientes, dinheiro),
    sempre à vista, inclusive embaixo da conversa do início. agora o início é
    só a conversa, e as áreas moram num menu que se abre do alto (o botão
-   "menu" da faixa, ui.jsx): saúde, trabalho, organização, finanças, inbox.
+   "menu" da faixa, ui.jsx): saúde, trabalho, meu negócio, organização,
+   finanças, inbox.
 
    cada área é UMA linha aqui, nunca um componente: uma gaveta nova (o sono, o
    treino) é uma aba a mais na área dela. as páginas continuam sendo páginas,
@@ -276,6 +277,13 @@ export const SECTIONS = [
     { id: "content", label: "conteúdo", href: "content.html" },
     { id: "funnels", label: "funis", href: "funnels.html" },
     { id: "maps", label: "mapas", href: "maps.html" }
+  ] },
+  /* o negócio de quem tem um (PRD meu-negocio, D2): o caixa da empresa é o
+     financeiro com o livro "business" (finance-data.js, bookCollection). o
+     plano, o time e a operação entram aqui, na ordem plano, caixa, time,
+     operação; vendas continua no inbox (D1) */
+  { id: "business", label: "meu negócio", icon: "business", pages: [
+    { id: "cash", label: "caixa", href: "cash.html" }
   ] },
   /* onde se arruma o tempo. a rotina é a semana-modelo, que só existe para
      virar tarefa no calendário (VISAO, 4.11) */
@@ -327,7 +335,7 @@ const SEARCH_SOURCES = [
   { type: "maps", label: "mapa", field: "name", href: (d) => "maps.html#" + encodeURIComponent(d.id) },
   { type: "funnels", label: "funil", field: "name", href: (d) => "funnels.html#" + encodeURIComponent(d.id) },
   { type: "apps", label: "produto", field: "name", href: (d) => "apps.html#" + encodeURIComponent(d.id) },
-  { type: "finance", label: "R$", field: "name", href: () => "finance.html", filter: (d) => d.type === "entry" || d.type === "fixed" || d.type === "debt" || d.type === "card" },
+  { type: "finance", label: "R$", field: "name", href: (d) => (d.book === "business" ? "cash.html" : "finance.html"), filter: (d) => d.type === "entry" || d.type === "fixed" || d.type === "debt" || d.type === "card" },
   { type: "habits", label: "hábito", field: "name", href: () => "habits.html", filter: (d) => !d.archived },
   { type: "routine", label: "rotina", field: "title", href: () => "routine.html" },
   /* o "como foi o dia" e texto corrido: acha no corpo, mostra o trecho e leva

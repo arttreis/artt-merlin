@@ -686,9 +686,31 @@ claudeAnswer = { stop_reason: "end_turn", content: [{ type: "text", text: JSON.s
 r = await call("POST", "/merlin", { task: "assistant", context: { message: "gastei 45 no almoço" } }, cookie);
 body = await r.json();
 check("conversa: finance-entry entra no catálogo", r.status === 200 && body.suggestions.length === 1 && body.suggestions[0].actionType === "finance-entry", JSON.stringify(body));
-check("conversa: a proposta só tem os oito campos do catálogo", body.suggestions[0] && Object.keys(body.suggestions[0].payload).sort().join() === "amount,category,confirm,day,fixed,kind,name,paid" && !("hack" in body.suggestions[0].payload), JSON.stringify(body.suggestions[0] && body.suggestions[0].payload));
+check("conversa: a proposta só tem os nove campos do catálogo", body.suggestions[0] && Object.keys(body.suggestions[0].payload).sort().join() === "amount,book,category,confirm,day,fixed,kind,name,paid" && !("hack" in body.suggestions[0].payload), JSON.stringify(body.suggestions[0] && body.suggestions[0].payload));
 check("conversa: os campos guardam o que a IA propôs", body.suggestions[0] && body.suggestions[0].payload.amount === 4500 && body.suggestions[0].payload.name === "almoço", JSON.stringify(body.suggestions[0] && body.suggestions[0].payload));
 check("conversa: a instrução ensina o tipo novo", /finance-entry/.test(claudeAsked), String(claudeAsked).slice(0, 300));
+/* o caixa da empresa (ticket #75): o livro do lançamento é um campo fechado,
+   pessoal na dúvida */
+check("conversa: sem book na proposta, chega pessoal", body.suggestions[0] && body.suggestions[0].payload.book === "personal", JSON.stringify(body.suggestions[0] && body.suggestions[0].payload));
+/* estas chamadas a mais gastam a cota do conselho (30 por hora); a cota é
+   guardada e devolvida no fim, para os testes de depois não pagarem por elas */
+const adviceSnap = db.advice.map((x) => ({ ...x }));
+db.advice.length = 0;
+const financeSpec = (claudeAsked.match(/finance-entry \{[\s\S]{0,2500}/) || [""])[0];
+check("conversa: a instrução do finance-entry cita o campo book", /\bbook\b/.test(financeSpec), financeSpec.slice(0, 200));
+check("conversa: a instrução do finance-entry fala da empresa", /empresa/.test(financeSpec), financeSpec.slice(0, 200));
+const bookAnswer = (book) => ({ stop_reason: "end_turn", content: [{ type: "text", text: JSON.stringify({ suggestions: [{ actionType: "finance-entry", title: "gasto de R$ 80,00", note: "", payload: { name: "Figma", amount: 8000, kind: "out", day: "2026-10-17", category: "Ferramentas", paid: true, confirm: "", fixed: "", ...(book === undefined ? {} : { book }) } }], clarify: "" }) }] });
+for (const [sent, want, label] of [["business", "business", "business chega business"], ["x", "personal", "um livro inventado chega pessoal"], ["personal", "personal", "personal chega pessoal"], [undefined, "personal", "ausente chega pessoal"], [7, "personal", "que não é texto chega pessoal"], ["BUSINESS", "personal", "só o valor exato business vale"]]) {
+  claudeAnswer = bookAnswer(sent);
+  r = await call("POST", "/merlin", { task: "assistant", context: { message: "paguei o Figma da empresa" } }, cookie);
+  body = await r.json();
+  check("conversa: finance-entry com book " + label, r.status === 200 && body.suggestions.length === 1 && body.suggestions[0].payload.book === want, JSON.stringify(body.suggestions[0] && body.suggestions[0].payload));
+}
+claudeAnswer = bookAnswer("business");
+r = await call("POST", "/merlin", { task: "assistant", context: { message: "paguei o Figma da empresa" } }, cookie);
+body = await r.json();
+check("conversa: com book business, o resto da proposta continua o mesmo", body.suggestions[0] && body.suggestions[0].payload.name === "Figma" && body.suggestions[0].payload.amount === 8000 && body.suggestions[0].payload.category === "Ferramentas" && Object.keys(body.suggestions[0].payload).sort().join() === "amount,book,category,confirm,day,fixed,kind,name,paid", JSON.stringify(body.suggestions[0] && body.suggestions[0].payload));
+db.advice.splice(0, db.advice.length, ...adviceSnap);
 /* o retrato (PRD da secretária, D8 e D9): vai num campo próprio, com teto de
    6.000; só na pergunta ao assistente; o segredo MERLIN_PORTRAIT_OFF o tira de
    todos; e a resposta diz de onde tirou, numa lista fechada */

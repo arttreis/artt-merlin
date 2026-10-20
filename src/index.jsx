@@ -32,7 +32,7 @@ import {
 } from "./shared/tasks.js";
 import { normalize as normalizeBlock, copyRoutine } from "./shared/routine.js";
 import { MAX_TURNS, normalizeChat, chatTitle, turnsOf, markProposal } from "./shared/assistant-actions.js";
-import { normalize as normalizeFinance, configOf, contextOf as financeContext, newEntry, undoEntry, entryLine, captureContext } from "./shared/finance-data.js";
+import { normalize as normalizeFinance, configOf, contextOf as financeContext, newEntry, undoEntry, entryLine, captureContext, bookCollection } from "./shared/finance-data.js";
 import { BUILD, buildIntent } from "./shared/build-intent.js";
 import { normalize as normalizeHabit, habitStatus, markOn, undoHabit, markWhen } from "./shared/habits-data.js";
 import { normalize as normalizeSleep, sleepDoc, sleepLabel, sleepLine, nightOf, undoSleep } from "./shared/sleep-data.js";
@@ -374,8 +374,10 @@ function Composer({ tasks, habits, b, smart, onAsk, onIntent, readContext }) {
   const date = today();
   const intent = askIntent(text);
   /* o financeiro aberto aqui para descer da nuvem (core.js, ensureSynced): a
-     leitura precisa das categorias, dos previstos e dos fixos de verdade */
-  const finance = useCollection("finance", { normalize: normalizeFinance });
+     leitura precisa das categorias, dos previstos e dos fixos de verdade. o
+     campo do início lança no livro pessoal: o da empresa entra pela conversa,
+     com o seletor "pessoal | empresa" na caixa */
+  const finance = bookCollection(useCollection("finance", { normalize: normalizeFinance }), "personal");
   const money = financeContext(finance);
   const habitsNow = habits.all();
   const habitOf = (it) => habitStatus(habitsNow, it, date);
@@ -900,8 +902,9 @@ function Today({ c, tasks, habits, journal, closes, reviews, sessions, me, h, ph
   };
   /* o cartão do "o que falta hoje?" é desenhado ao vivo a partir das
      coleções; a linha de texto é o que a conversa guarda e o Merlin lê depois.
-     as contas previstas que passaram também estão na lista */
-  const finance = useCollection("finance", { normalize: normalizeFinance });
+     as contas previstas que passaram também estão na lista, as do pessoal como
+     no cartão (quest-card.jsx) */
+  const finance = bookCollection(useCollection("finance", { normalize: normalizeFinance }), "personal");
   const workouts = useCollection("workouts", { normalize: normalizeWorkout });
   const questsMsg = () => ({ from: "merlin", show: "quests", text: questsText(questsOf({ tasks: tasks.all(), sessions: sessions.all(), entries: finance.all(), habits: habits.all(), workouts: workouts.all() })) });
   const ask = async (q) => {

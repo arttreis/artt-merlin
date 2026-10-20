@@ -31,7 +31,7 @@ const TOUR = [
   },
   {
     title: "o resto mora no menu",
-    text: "Saúde, trabalho, organização, finanças e inbox: o menu abre no alto, em qualquer tela. O Ctrl K leva a qualquer página pelo nome, e o + cria em qualquer lugar."
+    text: "Saúde, trabalho, meu negócio, organização, finanças e inbox: o menu abre no alto, em qualquer tela. O Ctrl K leva a qualquer página pelo nome, e o + cria em qualquer lugar."
   },
   {
     title: "só o dia tem minutos",
@@ -48,7 +48,7 @@ const TOUR = [
 ];
 
 /* as cinco áreas do passo 3, com o ícone e o nome do menu (core.js, SECTIONS) */
-const AREAS = [["habits", "saúde"], ["apps", "trabalho"], ["calendar", "organização"], ["finance", "finanças"], ["inbox", "inbox"]];
+const AREAS = [["habits", "saúde"], ["apps", "trabalho"], ["business", "meu negócio"], ["calendar", "organização"], ["finance", "finanças"], ["inbox", "inbox"]];
 
 export function Tour({ onClose }) {
   const [i, setI] = useState(0);

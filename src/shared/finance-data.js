@@ -14,6 +14,8 @@ export const pad = (n) => String(n).padStart(2, "0");
 
 /* categorias padrao: as da planilha, ate a config guardar a lista propria */
 export const DEFAULT_CATEGORIES = ["Básicas/PF", "Básicas/PJ", "Lazer", "Recorrente", "Ferramentas", "Freela", "Investimento", "Outros"];
+/* as do caixa da empresa, até a config dela guardar a lista própria */
+export const BUSINESS_CATEGORIES = ["Clientes", "Vendas", "Ferramentas", "Contador", "Impostos", "Pró-labore", "Outros"];
 
 /* categorias do investimento: so o suficiente pra separar por tipo de ativo,
    sem cotacao automatica nem historico — aporte e saldo atual, na mao */
@@ -44,6 +46,13 @@ export function effectiveDay(year, month, dayOfMonth) {
 export function monthsBetween(from, to) {
   const [y1, m1] = from.split("-").map(Number), [y2, m2] = to.split("-").map(Number);
   return (y2 - y1) * 12 + (m2 - m1);
+}
+/* o mês ao lado: "2026-12" + 1 = "2027-01". morava no finance.jsx até 20/10/2026,
+   quando o caixa da empresa passou a andar de mês em mês com ele */
+export function adjacentMonth(yyyymm, delta) {
+  const [year, month] = yyyymm.split("-").map(Number);
+  const i = year * 12 + month - 1 + delta;
+  return Math.floor(i / 12) + "-" + pad(i - Math.floor(i / 12) * 12 + 1);
 }
 export const cardInstallment = (c) => c.installments ? Math.round(c.total / c.installments) : 0;
 /* que numero de parcela cai no mes `yyyymm`: 1 na primeira, 0 antes dela,
@@ -221,6 +230,31 @@ export function categoryOrder(cfg, moved) {
   return names.slice().sort((a, b) => rank(b) - rank(a));
 }
 
+/* ---------- o livro ----------
+   desde 20/10/2026 a coleção guarda dois livros, o pessoal e o da empresa (PRD
+   meu-negocio, D3). é um campo do documento, e não uma coleção nova: o caixa
+   da empresa é o mesmo financeiro, com as mesmas contas. documento sem `book`
+   é pessoal, e nada migra; qualquer valor que não seja "business" também. */
+export const bookOf = (book) => (book === "business" ? "business" : "personal");
+const configId = (book) => (bookOf(book) === "business" ? "config-business" : "config");
+
+/* a coleção vista por um livro só: `all()` e `get()` filtram, e `save()`
+   carimba. é o que a tela do financeiro e a do caixa abrem, e por isso
+   contextOf, balanceUntil e buildMonth não precisam saber que livros existem.
+   apagar o documento do outro livro não apaga nada */
+export function bookCollection(finance, book) {
+  const b = bookOf(book);
+  const mine = (d) => !!d && bookOf(d.book) === b;
+  return {
+    book: b,
+    all: () => finance.all().filter(mine),
+    get: (id) => { const d = finance.get(id); return mine(d) ? d : null; },
+    save: (doc) => finance.save({ ...doc, book: b }),
+    saveMany: (docs) => finance.saveMany(docs.map((doc) => ({ ...doc, book: b }))),
+    remove: (id) => (mine(finance.get(id)) ? finance.remove(id) : null)
+  };
+}
+
 /* ---------- colecao e normalizacao ----------
    uma colecao so, varios tipos — o proprio documento diz o que ele e, e a
    normalizacao decide os campos por tipo. os tipos sao os quatro blocos da
@@ -236,6 +270,7 @@ export function normalize(d) {
   const base = {
     id: String(d.id || ""),
     type: String(d.type || ""),
+    book: bookOf(d.book),
     createdAt: Number.isFinite(+d.createdAt) ? +d.createdAt : Date.now(),
     updatedAt: Number.isFinite(+d.updatedAt) ? +d.updatedAt : Date.now()
   };
@@ -299,7 +334,7 @@ export function normalize(d) {
     case "config":
       return {
         ...base,
-        id: "config",
+        id: configId(base.book),
         startBalance: d.startBalance && isDay(d.startBalance.day)
           ? { day: d.startBalance.day, amount: Math.round(+d.startBalance.amount) || 0 }
           : null,
@@ -308,22 +343,25 @@ export function normalize(d) {
           spending: Number.isFinite(+((d.percents || {}).spending)) ? +d.percents.spending : 30,
           assets: Number.isFinite(+((d.percents || {}).assets)) ? +d.percents.assets : 20
         },
-        categories: Array.isArray(d.categories) && d.categories.length ? d.categories.map(String) : DEFAULT_CATEGORIES.slice(),
+        categories: Array.isArray(d.categories) && d.categories.length ? d.categories.map(String)
+          : (base.book === "business" ? BUSINESS_CATEGORIES : DEFAULT_CATEGORIES).slice(),
         /* a meta de gasto do mes por categoria, em centavos: { "Lazer": 50000 }.
            vale para todo mes igual — meta que muda todo mes vira planilha. */
         budgets: Object.fromEntries(Object.entries(d.budgets && typeof d.budgets === "object" ? d.budgets : {})
           .map(([k, v]) => [String(k), Math.round(Math.abs(+v)) || 0]).filter(([, v]) => v > 0))
       };
     default:
-      return { ...base, ...d };
+      return { ...base, ...d, book: base.book };
   }
 }
 
 export const byType = (finance, type) => finance.all().filter((d) => d.type === type);
-export const configOf = (finance) => finance.get("config") || normalize({ id: "config", type: "config" });
+/* a config é uma por livro: a coleção crua e o livro pessoal leem a "config" de
+   sempre, e o livro da empresa a "config-business" (bookCollection, abaixo) */
+export const configOf = (finance) => finance.get(configId(finance.book)) || normalize({ id: configId(finance.book), type: "config", book: finance.book });
 export function saveConfig(finance, partial) {
   const current = configOf(finance);
-  finance.save({ ...current, ...partial, id: "config", type: "config", updatedAt: Date.now() });
+  finance.save({ ...current, ...partial, id: current.id, type: "config", updatedAt: Date.now() });
 }
 export function contextOf(finance) {
   return {
@@ -542,3 +580,42 @@ export function moneyLines(f, budget) {
   });
   return lines;
 }
+
+/* ---------- o caixa da empresa ----------
+   os quatro números do topo do caixa (PRD meu-negocio, D3): entrou, saiu, a
+   sobra do mês e o fôlego. o resto do caixa são as contas de sempre, sobre o
+   livro da empresa. */
+
+/* quantos meses o saldo aguenta a saída média: `outs` são as saídas de cada
+   mês, em centavos. sem saída nenhuma não há fôlego para medir (null), e saldo
+   negativo não aguenta mês nenhum */
+export function runway(balance, outs) {
+  const list = outs || [];
+  const avg = list.length ? list.reduce((s, v) => s + v, 0) / list.length : 0;
+  return avg > 0 ? Math.max(0, balance) / avg : null;
+}
+/* "1,5 mês" e "2,0 meses": no singular de 1 a menos de 2, como se fala */
+export function runwayLabel(r) {
+  if (r == null) return "—";
+  const n = r.toFixed(1);
+  return n.replace(".", ",") + (+n >= 1 && +n < 2 ? " mês" : " meses");
+}
+
+/* o mês de `t` no livro: só o que já aconteceu (o previsto não entrou nem saiu).
+   o fôlego divide o saldo de hoje pela média de saída dos três meses que
+   terminam neste, sem contar mês de antes do marco: um caixa que começou agora
+   não tem a média puxada para baixo por meses que ele não viveu */
+export function cashMonth(ctx, t) {
+  const month = t.slice(0, 7);
+  const paid = (ctx.entries || []).filter((e) => e.paid);
+  const sum = (kind, m) => paid.filter((e) => e.kind === kind && e.day.slice(0, 7) === m).reduce((s, e) => s + e.amount, 0);
+  const start = ((ctx.startBalance || {}).day || oldestDay(ctx.entries) || t).slice(0, 7);
+  const months = [0, -1, -2].map((k) => adjacentMonth(month, k)).filter((m) => m >= start);
+  const inflow = sum("in", month), outflow = sum("out", month);
+  const balance = realBalanceUntil(t, ctx);
+  return { inflow, outflow, left: inflow - outflow, balance, runway: runway(balance, months.map((m) => sum("out", m))) };
+}
+
+/* a pílula do lançamento que caiu no caixa (D8): "lançado no caixa · R$ 2.400 ·
+   Acme". o real inteiro vai sem ",00", como se fala */
+export const cashLine = (doc) => ["lançado no caixa", brl(doc.amount).replace(/,00$/, ""), doc.name].filter(Boolean).join(" · ");

@@ -41,6 +41,10 @@ Vite; o build sai em `server/site/`. O que é comum vive aqui:
   início. `open.habit` fixa o hábito que o treino novo marca.
 - `entry-form.jsx` — a **caixa do lançamento** (`EntryForm`) e os campos de dinheiro
   (`MoneyInput`, `KindChips`, `CategorySelect`), usados pelo financeiro e pelo cartão do início.
+- `finance-views.jsx` — as peças do financeiro que o **caixa da empresa** também usa: o mês dia a
+  dia (`MonthView`), os blocos e a caixa dos fixos (`FixedBlocks`, `FixedForm`), os ajustes
+  (`ConfigForm`, sem a divisão no caixa) e as ações dos lançamentos (`entryActions`). Recebem o
+  livro já aberto (`bookCollection`), e nunca a coleção crua.
 - `focus.js` — as **sessões de foco**: `startSession`/`stopSession` (a única forma de começar e
   parar, usada pelo rastreador e pelo cartão), a meta de horas, o teto de reunião, o recibo e o
   GitHub do dia. Entra lista ou coleção, sai número; sem `localStorage`.
@@ -265,7 +269,7 @@ Um documento é um objeto JSON plano. Coloque nele o que o módulo precisa, mas 
 | `tasks` | calendar.html | `{id, title, date ('YYYY-MM-DD'), min, done, reserved, client, order, at, origin}` — o dia, a semana e o mês são três visões dela |
 | `maps` | maps.html | `{id, name, root:{id, title, note, color, collapsed, children:[…]}, client, idea, funnel}` |
 | `funnels` | funnels.html | `{id, name, client, channel, nodes:[{id, type, title, x, y, fields:{}, number}], edges:[{from, to}], creatives:[…], automations:[…], offers:[…], triggers:[…], snapshots:[…]}` |
-| `finance` | finance.html | vários docs: `{id, type:'entry'|'fixed'|'card'|'debt'|'config', …}` (`card` é uma compra parcelada: `{name, card, total, installments, start:'YYYY-MM', dayOfMonth}`). O `entry` lançado pelo campo do início ou pela conversa leva `via:'chat'` e `origin:{type:'chat', id:'home'\|<id da conversa>}` (ou `{type:'fixed', id}`), e nasce do `newEntry()` do finance-data.js; a prévia da caixa e do cartão do início (`entryLine()`) acha o previsto e o fixo pelo mesmo `refsOf()`, para dizer o valor que o lançamento vai gravar |
+| `finance` | finance.html, cash.html | vários docs: `{id, type:'entry'|'fixed'|'card'|'debt'|'config', book, …}`. `book` é `'personal'` ou `'business'` (ausente = pessoal; `bookOf`), e cada tela abre o seu livro com `bookCollection()`, que filtra e carimba; a config é uma por livro (`'config'` e `'config-business'`) (`card` é uma compra parcelada: `{name, card, total, installments, start:'YYYY-MM', dayOfMonth}`). O `entry` lançado pelo campo do início ou pela conversa leva `via:'chat'` e `origin:{type:'chat', id:'home'\|<id da conversa>}` (ou `{type:'fixed', id}`), e nasce do `newEntry()` do finance-data.js; a prévia da caixa e do cartão do início (`entryLine()`) acha o previsto e o fixo pelo mesmo `refsOf()`, para dizer o valor que o lançamento vai gravar |
 | `wishlist` | — (sem tela desde 19/10/2026; a vitrine saiu e `wishlist.html` só encaminha para o financeiro; a coleção continua guardada, no navegador e na nuvem) | dois tipos: `{id, type:'list', name, order}` e `{id, type:'item', list, name, price (centavos), url, photo:{id, name, type, size}\|null, note, bought:{day, amount, entry}\|null, order}` — `entry` é o lançamento do financeiro, com `origin:{type:'wishlist', id}` |
 | `vault` | clients.html | um doc `{id:'config', salt}` — só o sal do cofre; o segredo vai cifrado dentro do cliente |
 | `habits` | habits.html | `{id, name, schedule:{type:'daily'|'perWeek'|'weekdays', times, weekdays:[0-6]}, min, color, order, archived, marks:{'YYYY-MM-DD':true}}`. O criado pelo "criar e marcar" do início ou da conversa leva `origin:{type:'chat'}`. Marcar pela secretária usa o `markOn()` do habits-data.js, que nunca desmarca |

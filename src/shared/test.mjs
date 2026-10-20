@@ -1257,7 +1257,23 @@ const dataLeft = () => globalThis.localStorage.keys().filter((k) => k in DATA);
   check("diário na busca: leva ao cartão do dia", hits[0] && hits[0].href === "journal.html#2026-10-19", JSON.stringify(hits));
 }
 
-/* ---- as cinco áreas do menu (ticket #36) ----
+/* ---- o lançamento da empresa na busca (ticket #75) ----
+   o livro da empresa mora no caixa: achar um lançamento dele leva a cash.html,
+   e o pessoal (com ou sem `book`) continua no financeiro */
+{
+  const entry = (doc) => ({ v: 1000, doc: { createdAt: 1, updatedAt: 1, type: "entry", day: "2026-10-19", amount: 100, kind: "in", ...doc } });
+  const finance = JSON.stringify({ items: {
+    e1: entry({ id: "e1", name: "Acme mensalidade", book: "business" }),
+    e2: entry({ id: "e2", name: "Acme presente" }),
+    e3: entry({ id: "e3", name: "Acme reembolso", book: "personal" })
+  }, serverV: 0, dirty: [], refused: {} });
+  const { search } = await fresh({ "merlin:finance": finance });
+  const href = (name) => (search("acme").find((h) => h.text === name) || {}).href;
+  check("caixa na busca: o lançamento da empresa leva ao caixa", href("Acme mensalidade") === "cash.html", JSON.stringify(search("acme")));
+  check("caixa na busca: o pessoal, com ou sem livro, segue no financeiro", href("Acme presente") === "finance.html" && href("Acme reembolso") === "finance.html", JSON.stringify(search("acme")));
+}
+
+/* ---- as áreas do menu (ticket #36; meu negócio no #75) ----
    SECTIONS alimenta o menu do alto, o dock e o Ctrl+K. se uma página sumir de
    lá, ela fica sem porta; se estiver em duas áreas, o dock e o menu discordam
    sobre qual é a área atual; se o href apontar para um .html que não existe,
@@ -1275,6 +1291,7 @@ const dataLeft = () => globalThis.localStorage.keys().filter((k) => k in DATA);
       ["apps", "produtos", "apps.html"], ["content", "conteúdo", "content.html"],
       ["funnels", "funis", "funnels.html"], ["maps", "mapas", "maps.html"]
     ]],
+    ["business", "meu negócio", "business", [["cash", "caixa", "cash.html"]]],
     ["organization", "organização", "calendar", [
       ["calendar", "calendário", "calendar.html"], ["routine", "rotina", "routine.html"], ["notes", "notas", "notes.html"]
     ]],
@@ -1284,14 +1301,14 @@ const dataLeft = () => globalThis.localStorage.keys().filter((k) => k in DATA);
     ]]
   ];
   const ids = SECTIONS.map((s) => s.id);
-  check("áreas: são cinco, na ordem", JSON.stringify(ids) === JSON.stringify(["health", "work", "organization", "money", "inbox"]), JSON.stringify(ids));
-  check("áreas: os nomes", JSON.stringify(SECTIONS.map((s) => s.label)) === JSON.stringify(["saúde", "trabalho", "organização", "finanças", "inbox"]), JSON.stringify(SECTIONS.map((s) => s.label)));
+  check("áreas: são seis, na ordem", JSON.stringify(ids) === JSON.stringify(["health", "work", "business", "organization", "money", "inbox"]), JSON.stringify(ids));
+  check("áreas: os nomes", JSON.stringify(SECTIONS.map((s) => s.label)) === JSON.stringify(["saúde", "trabalho", "meu negócio", "organização", "finanças", "inbox"]), JSON.stringify(SECTIONS.map((s) => s.label)));
   check("áreas: cada uma com o seu ícone", JSON.stringify(SECTIONS.map((s) => s.icon)) === JSON.stringify(wanted.map((w) => w[2])), JSON.stringify(SECTIONS.map((s) => s.icon)));
   wanted.forEach(([id, , , tabs]) => {
     const got = (SECTIONS.find((s) => s.id === id) || { pages: [] }).pages.map((p) => [p.id, p.label, p.href]);
     check("áreas: as abas de " + id + ", na ordem", JSON.stringify(got) === JSON.stringify(tabs), JSON.stringify(got));
   });
-  check("áreas: são dezesseis abas", PAGES.length === 16, String(PAGES.length));
+  check("áreas: são dezessete abas", PAGES.length === 17, String(PAGES.length));
   check("áreas: o diário é uma aba de saúde", sectionOf("journal")?.id === "health", String(sectionOf("journal")?.id));
   check("áreas: só o diário sai do dock no celular (spare), e a alimentação fica", PAGES.filter((p) => p.spare).map((p) => p.id).join() === "journal", PAGES.filter((p) => p.spare).map((p) => p.id).join());
   check("áreas: a vitrine não está em nenhuma", !PAGES.some((p) => p.id === "wishlist") && !PAGES.some((p) => /wishlist/.test(p.href)));
@@ -1302,6 +1319,7 @@ const dataLeft = () => globalThis.localStorage.keys().filter((k) => k in DATA);
     PAGES.every((p) => SECTIONS.filter((s) => s.pages.includes(p)).length === 1 && sectionOf(p.id).pages.includes(p)));
 
   check("áreas: finanças fica em money", sectionOf("finance")?.id === "money", String(sectionOf("finance")?.id));
+  check("áreas: o caixa fica em meu negócio", sectionOf("cash")?.id === "business", String(sectionOf("cash")?.id));
   check("áreas: conteúdo fica em trabalho", sectionOf("content")?.id === "work", String(sectionOf("content")?.id));
   check("áreas: clientes fica no inbox", sectionOf("clients")?.id === "inbox", String(sectionOf("clients")?.id));
   check("áreas: rotina fica em organização", sectionOf("routine")?.id === "organization", String(sectionOf("routine")?.id));
@@ -1356,7 +1374,7 @@ const dataLeft = () => globalThis.localStorage.keys().filter((k) => k in DATA);
   check("apresentação: nada de ideias, vitrine, distribuição ou quest", stale.length === 0, stale.join(","));
   const areas = SECTIONS.map((s) => s.label);
   const third = tour[2] ? tour[2].text.toLowerCase() : "";
-  check("apresentação: o passo 3 diz as cinco áreas", areas.every((a) => third.includes(a)), third);
+  check("apresentação: o passo 3 diz as seis áreas", areas.every((a) => third.includes(a)), third);
   const drawn = literal("AREAS") || [];
   check("apresentação: o desenho do passo 3 tem as áreas do menu, com o ícone de cada uma",
     JSON.stringify(drawn) === JSON.stringify(SECTIONS.map((s) => [s.icon, s.label])), JSON.stringify(drawn));

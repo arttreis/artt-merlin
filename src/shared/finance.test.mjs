@@ -866,6 +866,354 @@ section("pendingBefore e suggestionsBetween", () => {
   check("vitrine: a proposta antiga não vira pílula", abriu && !chat.messages[1].proposal);
 }
 
+/* =====================================================================
+   o caixa da empresa (ticket #75): o financeiro ganha livros.
+
+   a coleção é uma só, com um campo `book` no documento. errar aqui é a conta
+   da empresa aparecendo na pessoal (ou o contrário) sem aviso: um lançamento
+   da empresa que soma no saldo de casa, um "confirmar" que pega o previsto do
+   outro livro, o fôlego do caixa puxado para baixo por meses que ele não viveu.
+   ===================================================================== */
+const FDB = await import("./finance-data.js");
+const { bookOf, BUSINESS_CATEGORIES, DEFAULT_CATEGORIES, bookCollection, saveConfig, runway, runwayLabel, cashMonth, cashLine, adjacentMonth } = FDB;
+const AAB = await import("./assistant-actions.js");
+
+/* uma coleção de mentira, com a mesma cara da real: all/get/save/saveMany/remove.
+   `norm` é opcional: a real normaliza ao ler, e o documento "antigo" do teste
+   precisa poder ficar cru, sem o campo book */
+function fakeFinance(seed, norm) {
+  const map = new Map((seed || []).map((d) => [d.id, { ...d }]));
+  const out = (d) => (d ? (norm ? norm({ ...d }) : { ...d }) : null);
+  return {
+    all: () => [...map.values()].map(out),
+    get: (id) => out(map.get(id)),
+    save: (d) => { map.set(d.id, { ...d }); return out(d); },
+    saveMany: (ds) => { ds.forEach((d) => map.set(d.id, { ...d })); return ds.map(out); },
+    remove: (id) => { const d = map.get(id); map.delete(id); return d ? out(d) : null; },
+    raw: (id) => (map.has(id) ? { ...map.get(id) } : null)
+  };
+}
+const spaced = (s) => String(s).replace(/\s/g, " ");
+
+section("livros: bookOf", () => {
+  check("livros: bookOf(business) é business", bookOf("business") === "business");
+  check("livros: bookOf(personal) é personal", bookOf("personal") === "personal");
+  check("livros: bookOf(undefined) é personal", bookOf(undefined) === "personal");
+  check("livros: bookOf(null) é personal", bookOf(null) === "personal");
+  check("livros: bookOf(\"x\") é personal", bookOf("x") === "personal");
+  check("livros: bookOf(\"\") é personal", bookOf("") === "personal");
+  check("livros: só o valor exato business vale (BUSINESS é personal)", bookOf("BUSINESS") === "personal");
+});
+
+section("livros: normalize", () => {
+  const e = { id: "e1", type: "entry", name: "x", amount: 100, kind: "out", day: "2026-10-01" };
+  check("livros: normalize sem book vira personal", normalize(e).book === "personal", JSON.stringify(normalize(e)));
+  check("livros: normalize com book x vira personal", normalize({ ...e, book: "x" }).book === "personal");
+  check("livros: normalize preserva business", normalize({ ...e, book: "business" }).book === "business");
+  check("livros: normalize preserva personal", normalize({ ...e, book: "personal" }).book === "personal");
+  for (const type of ["fixed", "card", "debt", "invest"]) {
+    check("livros: normalize de " + type + " ganha book", normalize({ id: "z", type }).book === "personal" && normalize({ id: "z", type, book: "business" }).book === "business");
+  }
+  check("livros: tipo desconhecido (default) também ganha book", normalize({ id: "z", type: "mistério" }).book === "personal" && normalize({ id: "z", type: "mistério", book: "business" }).book === "business" && normalize({ id: "z", type: "mistério", book: "x" }).book === "personal");
+  check("livros: o resto do documento do lançamento não muda", sameJson({ ...normalize({ ...e, book: "business" }), book: undefined, createdAt: 0, updatedAt: 0 }, { ...normalize(e), book: undefined, createdAt: 0, updatedAt: 0 }));
+  /* a config */
+  const cp = normalize({ type: "config" });
+  const cb = normalize({ type: "config", book: "business" });
+  check("livros: a config sem book é a de sempre (id config)", cp.id === "config" && cp.book === "personal", JSON.stringify(cp));
+  check("livros: a config sem book tem as categorias padrão pessoais", sameJson(cp.categories, DEFAULT_CATEGORIES));
+  check("livros: a config da empresa tem o id config-business", cb.id === "config-business" && cb.book === "business", JSON.stringify(cb));
+  check("livros: a config da empresa tem as categorias padrão da empresa", sameJson(cb.categories, BUSINESS_CATEGORIES));
+  check("livros: a config da empresa ignora um id que não é o dela", normalize({ id: "config", type: "config", book: "business" }).id === "config-business");
+  check("livros: a config pessoal ignora um id que não é o dela", normalize({ id: "config-business", type: "config" }).id === "config");
+  check("livros: as categorias da empresa incluem Clientes e Ferramentas", Array.isArray(BUSINESS_CATEGORIES) && BUSINESS_CATEGORIES.includes("Clientes") && BUSINESS_CATEGORIES.includes("Ferramentas"), JSON.stringify(BUSINESS_CATEGORIES));
+  check("livros: categorias da empresa gravadas na config valem", sameJson(normalize({ type: "config", book: "business", categories: ["Aluguel", "Clientes"] }).categories, ["Aluguel", "Clientes"]));
+  check("livros: a lista padrão da empresa não é a mesma referência (editar não suja o padrão)", (() => { const c = normalize({ type: "config", book: "business" }); c.categories.push("zzz"); return !BUSINESS_CATEGORIES.includes("zzz"); })());
+});
+
+section("livros: bookCollection", () => {
+  const old = { id: "old", type: "entry", name: "mercado", amount: 5000, kind: "out", day: "2026-10-01", paid: true }; /* de antes: sem book */
+  const pers = { id: "pers", type: "entry", name: "cinema", amount: 3000, kind: "out", day: "2026-10-02", paid: true, book: "personal" };
+  const biz = { id: "biz", type: "entry", name: "Figma", amount: 8000, kind: "out", day: "2026-10-03", paid: true, book: "business" };
+  const f = fakeFinance([old, pers, biz]);
+  const B = bookCollection(f, "business");
+  const P = bookCollection(f, "personal");
+  check("livros: bookCollection diz de que livro é", B.book === "business" && P.book === "personal");
+  check("livros: bookCollection tem a interface da coleção", ["all", "get", "save", "saveMany", "remove"].every((k) => typeof B[k] === "function" && typeof P[k] === "function"));
+  check("livros: o all da empresa só vê a empresa", sameJson(ids(B.all()).sort(), ["biz"]), JSON.stringify(ids(B.all())));
+  check("livros: o all do pessoal vê o pessoal e o documento antigo sem book", sameJson(ids(P.all()).sort(), ["old", "pers"]), JSON.stringify(ids(P.all())));
+  check("livros: o documento antigo sem book aparece no pessoal e não na empresa", !!P.get("old") && B.get("old") === null);
+  check("livros: get da empresa de um id pessoal é null", B.get("pers") === null);
+  check("livros: get do pessoal de um id da empresa é null", P.get("biz") === null);
+  check("livros: get de um id que não existe é null", B.get("nada") === null && P.get("nada") === null);
+  check("livros: get no próprio livro devolve o documento", B.get("biz") && B.get("biz").name === "Figma");
+
+  /* gravar carimba */
+  B.save({ id: "n1", type: "entry", name: "Acme", amount: 240000, kind: "in", day: "2026-10-05", paid: true });
+  check("livros: save pela empresa grava com book business", f.raw("n1") && f.raw("n1").book === "business", JSON.stringify(f.raw("n1")));
+  P.save({ id: "n2", type: "entry", name: "padaria", amount: 900, kind: "out", day: "2026-10-05", paid: true });
+  check("livros: save pelo pessoal grava com book personal", f.raw("n2") && f.raw("n2").book === "personal", JSON.stringify(f.raw("n2")));
+  P.save({ id: "n3", type: "entry", name: "errado", amount: 1, kind: "out", day: "2026-10-05", paid: true, book: "business" });
+  check("livros: o livro vence o book que veio no documento", f.raw("n3").book === "personal", JSON.stringify(f.raw("n3")));
+  B.saveMany([{ id: "m1", type: "entry", name: "a", amount: 1, kind: "out", day: "2026-10-05", paid: true }, { id: "m2", type: "entry", name: "b", amount: 2, kind: "out", day: "2026-10-05", paid: true, book: "personal" }]);
+  check("livros: saveMany carimba todos com o livro", f.raw("m1").book === "business" && f.raw("m2").book === "business", JSON.stringify([f.raw("m1"), f.raw("m2")]));
+  check("livros: cada livro não vê o que o outro gravou", !ids(P.all()).includes("n1") && !ids(P.all()).includes("m1") && !ids(B.all()).includes("n2") && !ids(B.all()).includes("n3"));
+  check("livros: o que a empresa gravou aparece na empresa", ["biz", "n1", "m1", "m2"].every((id) => ids(B.all()).includes(id)), JSON.stringify(ids(B.all())));
+
+  /* apagar */
+  const total = f.all().length;
+  const r1 = B.remove("pers");
+  check("livros: remove de um documento do outro livro devolve null", r1 === null, String(r1));
+  check("livros: remove de um documento do outro livro não apaga", !!f.raw("pers") && f.all().length === total);
+  const r2 = P.remove("biz");
+  check("livros: remove pelo pessoal de um documento da empresa não apaga", r2 === null && !!f.raw("biz"));
+  const r3 = B.remove("nada");
+  check("livros: remove de um id que não existe devolve null", r3 === null && f.all().length === total);
+  B.remove("n1");
+  check("livros: remove no próprio livro apaga", f.raw("n1") === null && B.get("n1") === null);
+  P.remove("old");
+  check("livros: o pessoal apaga o documento antigo sem book", f.raw("old") === null);
+
+  /* com a normalização da coleção real (que carimba personal ao ler) */
+  const g = fakeFinance([{ id: "o2", type: "entry", name: "velho", amount: 1, kind: "out", day: "2026-10-01", paid: true }, { id: "b2", type: "entry", name: "emp", amount: 1, kind: "out", day: "2026-10-01", paid: true, book: "business" }], normalize);
+  check("livros: com a coleção normalizando, o antigo continua só no pessoal", sameJson(ids(bookCollection(g, "personal").all()), ["o2"]) && sameJson(ids(bookCollection(g, "business").all()), ["b2"]));
+  /* tipos que não são lançamento também se separam */
+  const h = fakeFinance([{ id: "fx1", type: "fixed", name: "internet", amount: 1, kind: "out", dayOfMonth: 5, active: true, book: "business" }, { id: "fx2", type: "fixed", name: "luz", amount: 1, kind: "out", dayOfMonth: 5, active: true }]);
+  check("livros: um fixo da empresa não aparece no contexto do pessoal", sameJson(ids(contextOf(bookCollection(h, "personal")).fixed), ["fx2"]) && sameJson(ids(contextOf(bookCollection(h, "business")).fixed), ["fx1"]));
+});
+
+section("livros: a config de cada livro", () => {
+  const f = fakeFinance([], normalize);
+  const raw = fakeFinance([], normalize);
+  /* a coleção crua e o livro pessoal leem a "config" */
+  saveConfig(raw, { startBalance: { day: "2026-10-01", amount: 111 } });
+  check("livros: saveConfig na coleção crua grava no id config", !!raw.raw("config") && !raw.raw("config-business"), JSON.stringify(raw.all()));
+  check("livros: configOf na coleção crua lê a config", configOf(raw).startBalance.amount === 111 && configOf(raw).id === "config");
+
+  const P = bookCollection(f, "personal"), B = bookCollection(f, "business");
+  saveConfig(P, { startBalance: { day: "2026-10-01", amount: 500000 } });
+  saveConfig(B, { startBalance: { day: "2026-10-01", amount: 20000 } });
+  check("livros: saveConfig pessoal grava no id config", f.raw("config") && f.raw("config").startBalance.amount === 500000 && f.raw("config").book === "personal", JSON.stringify(f.raw("config")));
+  check("livros: saveConfig da empresa grava no id config-business", f.raw("config-business") && f.raw("config-business").startBalance.amount === 20000 && f.raw("config-business").book === "business", JSON.stringify(f.raw("config-business")));
+  check("livros: configOf lê a config de cada livro", configOf(P).startBalance.amount === 500000 && configOf(B).startBalance.amount === 20000);
+  check("livros: as duas configs coexistem na coleção", f.all().filter((d) => d.type === "config").length === 2);
+  check("livros: o all de cada livro vê só a própria config", sameJson(ids(P.all()), ["config"]) && sameJson(ids(B.all()), ["config-business"]), JSON.stringify([ids(P.all()), ids(B.all())]));
+
+  const f2 = fakeFinance([], normalize);
+  const B2 = bookCollection(f2, "business");
+  check("livros: sem config gravada, a da empresa é a padrão da empresa", sameJson(configOf(B2).categories, BUSINESS_CATEGORIES) && configOf(B2).id === "config-business" && configOf(B2).startBalance === null);
+  check("livros: sem config gravada, a do pessoal é a padrão pessoal", sameJson(configOf(bookCollection(f2, "personal")).categories, DEFAULT_CATEGORIES) && configOf(bookCollection(f2, "personal")).id === "config");
+  saveConfig(B2, { categories: ["Aluguel", "Clientes"] });
+  check("livros: mudar as categorias da empresa não mexe nas do pessoal", sameJson(configOf(B2).categories, ["Aluguel", "Clientes"]) && sameJson(configOf(bookCollection(f2, "personal")).categories, DEFAULT_CATEGORIES));
+
+  /* contextOf */
+  const seed = [
+    { id: "pe", type: "entry", name: "mercado", amount: 5000, kind: "out", day: "2026-10-02", paid: true, book: "personal" },
+    { id: "be", type: "entry", name: "Acme", amount: 240000, kind: "in", day: "2026-10-03", paid: true, book: "business" },
+    { id: "old", type: "entry", name: "antigo", amount: 100, kind: "out", day: "2026-10-01", paid: true },
+    { type: "config", id: "config", book: "personal", startBalance: { day: "2026-10-01", amount: 700000 } },
+    { type: "config", id: "config-business", book: "business", startBalance: { day: "2026-10-01", amount: 30000 } }
+  ];
+  const g = fakeFinance(seed, normalize);
+  const cb = contextOf(bookCollection(g, "business")), cp = contextOf(bookCollection(g, "personal"));
+  check("livros: contextOf da empresa só vê os lançamentos da empresa", sameJson(ids(cb.entries), ["be"]), JSON.stringify(ids(cb.entries)));
+  check("livros: contextOf da empresa usa o saldo inicial da config da empresa", cb.startBalance && cb.startBalance.amount === 30000, JSON.stringify(cb.startBalance));
+  check("livros: contextOf do pessoal só vê o pessoal, com o saldo inicial dele", sameJson(ids(cp.entries).sort(), ["old", "pe"]) && cp.startBalance.amount === 700000, JSON.stringify(cp));
+  check("livros: o saldo da empresa não mistura com o pessoal", realBalanceUntil("2026-10-31", cb) === 30000 + 240000 && realBalanceUntil("2026-10-31", cp) === 700000 - 5000 - 100, realBalanceUntil("2026-10-31", cb) + " / " + realBalanceUntil("2026-10-31", cp));
+  check("livros: contextOf da empresa sem config não usa o saldo do pessoal", contextOf(bookCollection(fakeFinance(seed.slice(0, 4), normalize), "business")).startBalance === null);
+});
+
+section("fôlego: runway e runwayLabel", () => {
+  check("fôlego: 12000 com saídas 3000, 3000 e 6000 dá 3 meses", runway(12000, [3000, 3000, 6000]) === 3, String(runway(12000, [3000, 3000, 6000])));
+  check("fôlego: sem saída nenhuma não há fôlego (null)", runway(12000, [0, 0, 0]) === null && runway(12000, []) === null);
+  check("fôlego: sem lista também não quebra", runway(12000) === null);
+  check("fôlego: saldo negativo aguenta 0 meses", runway(-500, [1000, 1000]) === 0 && runway(-500, [1000]) === 0, String(runway(-500, [1000])));
+  check("fôlego: saldo zero aguenta 0 meses", runway(0, [1000]) === 0);
+  check("fôlego: um mês só", runway(5000, [1000]) === 5);
+  check("fôlego: fração", Math.abs(runway(10000, [2000, 3000]) - 4) < 1e-9 && Math.abs(runway(10000, [3000]) - 10000 / 3000) < 1e-9);
+  check("fôlego: mês com saída zero entra na média", runway(9000, [0, 3000, 6000]) === 3);
+  check("fôlego: 4,2 vira \"4,2 meses\"", runwayLabel(4.2) === "4,2 meses", runwayLabel(4.2));
+  check("fôlego: null vira o travessão", runwayLabel(null) === "—", runwayLabel(null));
+  check("fôlego: 3 vira \"3,0 meses\"", runwayLabel(3) === "3,0 meses", runwayLabel(3));
+  check("fôlego: 0 vira \"0,0 meses\"", runwayLabel(0) === "0,0 meses", runwayLabel(0));
+  check("fôlego: de 1 a menos de 2 fica no singular", runwayLabel(1) === "1,0 mês" && runwayLabel(1.5) === "1,5 mês" && runwayLabel(1.96) === "2,0 meses", [runwayLabel(1), runwayLabel(1.5), runwayLabel(1.96)].join(" | "));
+});
+
+section("fôlego: adjacentMonth", () => {
+  check("meses: dezembro mais um é janeiro do ano seguinte", adjacentMonth("2026-12", 1) === "2027-01");
+  check("meses: janeiro menos um é dezembro do ano anterior", adjacentMonth("2026-01", -1) === "2025-12");
+  check("meses: dentro do ano", adjacentMonth("2026-10", 1) === "2026-11" && adjacentMonth("2026-10", -1) === "2026-09");
+  check("meses: zero é o próprio mês", adjacentMonth("2026-10", 0) === "2026-10");
+  check("meses: dois para trás atravessa o ano", adjacentMonth("2026-02", -2) === "2025-12" && adjacentMonth("2026-01", -2) === "2025-11");
+});
+
+section("caixa: cashMonth", () => {
+  /* outubro: saldo inicial de 1.000,00 no dia 1. entrou 2.400 (pago) e há 500 de
+     entrada prevista; saiu 300 + 200 (pagos) e há 999,99 de saída prevista */
+  const ctx = {
+    entries: [
+      ent("a", "2026-10-05", "Acme", "in", 240000, true),
+      ent("b", "2026-10-10", "Beta", "in", 50000, false),
+      ent("c", "2026-10-08", "Figma", "out", 30000, true),
+      ent("d", "2026-10-12", "Contador", "out", 20000, true),
+      ent("e", "2026-10-15", "Imposto", "out", 99999, false)
+    ],
+    startBalance: { day: "2026-10-01", amount: 100000 }
+  };
+  const m = cashMonth(ctx, "2026-10-20");
+  check("caixa: entrou soma só as entradas pagas do mês", m.inflow === 240000, JSON.stringify(m));
+  check("caixa: saiu soma só as saídas pagas do mês", m.outflow === 50000, JSON.stringify(m));
+  check("caixa: a sobra é o que entrou menos o que saiu", m.left === 190000, JSON.stringify(m));
+  check("caixa: o saldo é o saldo real de hoje (sem o previsto)", m.balance === 290000 && m.balance === realBalanceUntil("2026-10-20", ctx), JSON.stringify(m));
+  check("caixa: caixa que começou neste mês tira a média só deste mês", Math.abs(m.runway - 290000 / 50000) < 1e-9, String(m.runway));
+
+  /* o resumo é do mês de t, e t só decide o saldo */
+  const nov = cashMonth(ctx, "2026-11-10");
+  check("caixa: outro mês sem lançamento zera entrou, saiu e sobra", nov.inflow === 0 && nov.outflow === 0 && nov.left === 0, JSON.stringify(nov));
+  check("caixa: o saldo de novembro carrega o de outubro", nov.balance === 290000, JSON.stringify(nov));
+  /* novembro sem saída, outubro com 50.000: a média dos meses vividos (out e nov) é 25.000 */
+  check("caixa: o fôlego de novembro conta outubro e novembro (média 25.000)", Math.abs(nov.runway - 290000 / 25000) < 1e-9, String(nov.runway));
+
+  /* o previsto não conta, nem como saída nem como entrada */
+  const onlyPlanned = cashMonth({ entries: [ent("p", "2026-10-05", "x", "out", 5000, false), ent("q", "2026-10-06", "y", "in", 7000, false)], startBalance: { day: "2026-10-01", amount: 1000 } }, "2026-10-20");
+  check("caixa: só previstos: nada entrou, nada saiu, saldo é o inicial", onlyPlanned.inflow === 0 && onlyPlanned.outflow === 0 && onlyPlanned.balance === 1000, JSON.stringify(onlyPlanned));
+  check("caixa: só previstos: sem saída paga não há fôlego", onlyPlanned.runway === null, String(onlyPlanned.runway));
+
+  /* três meses que terminam no de t */
+  const tri = cashMonth({
+    entries: [
+      ent("o1", "2026-08-10", "ago", "out", 10000, true),
+      ent("o2", "2026-09-10", "set", "out", 20000, true),
+      ent("o3", "2026-10-10", "out", "out", 30000, true),
+      ent("o4", "2026-10-11", "futuro", "out", 90000, false)
+    ],
+    startBalance: { day: "2026-08-01", amount: 100000 }
+  }, "2026-10-31");
+  check("caixa: três meses de saída: média de ago, set e out", tri.outflow === 30000 && tri.balance === 40000 && Math.abs(tri.runway - 2) < 1e-9, JSON.stringify(tri));
+
+  /* só os três últimos: um mês mais velho que isso fica fora da média */
+  const quatro = cashMonth({
+    entries: [
+      ent("q1", "2026-07-10", "jul", "out", 600000, true),
+      ent("q2", "2026-08-10", "ago", "out", 10000, true),
+      ent("q3", "2026-09-10", "set", "out", 20000, true),
+      ent("q4", "2026-10-10", "out", "out", 30000, true)
+    ],
+    startBalance: { day: "2026-07-01", amount: 700000 }
+  }, "2026-10-31");
+  check("caixa: o quarto mês para trás não entra na média", quatro.balance === 700000 - 660000 && Math.abs(quatro.runway - 40000 / 20000) < 1e-9, JSON.stringify(quatro));
+
+  /* o marco: mês antes do saldo inicial não conta, mesmo com lançamento nele */
+  const marco = cashMonth({
+    entries: [
+      ent("m1", "2026-08-10", "antes do marco", "out", 90000, true),
+      ent("m2", "2026-09-10", "set", "out", 20000, true),
+      ent("m3", "2026-10-10", "out", "out", 40000, true)
+    ],
+    startBalance: { day: "2026-09-01", amount: 120000 }
+  }, "2026-10-31");
+  check("caixa: mês anterior ao marco fica fora da média", marco.balance === 60000 && Math.abs(marco.runway - 60000 / 30000) < 1e-9, JSON.stringify(marco));
+
+  /* sem saldo inicial, o marco é o lançamento mais antigo */
+  const semSaldo = cashMonth({
+    entries: [
+      ent("s1", "2026-09-10", "set", "out", 20000, true),
+      ent("s2", "2026-09-12", "set in", "in", 100000, true),
+      ent("s3", "2026-10-10", "out", "out", 40000, true)
+    ],
+    startBalance: null
+  }, "2026-10-31");
+  check("caixa: sem saldo inicial, o marco é o lançamento mais antigo", semSaldo.balance === 40000 && Math.abs(semSaldo.runway - 40000 / 30000) < 1e-9, JSON.stringify(semSaldo));
+  const semSaldoUmMes = cashMonth({ entries: [ent("t1", "2026-10-10", "x", "out", 40000, true), ent("t2", "2026-10-11", "y", "in", 100000, true)], startBalance: null }, "2026-10-31");
+  check("caixa: sem saldo inicial e com um mês só, a média é a deste mês", semSaldoUmMes.balance === 60000 && Math.abs(semSaldoUmMes.runway - 1.5) < 1e-9, JSON.stringify(semSaldoUmMes));
+
+  /* virada de ano */
+  const virada = cashMonth({
+    entries: [ent("v1", "2025-12-10", "dez", "out", 10000, true), ent("v2", "2026-01-10", "jan", "out", 30000, true)],
+    startBalance: { day: "2025-12-01", amount: 100000 }
+  }, "2026-01-31");
+  check("caixa: a janela de três meses atravessa a virada do ano", virada.outflow === 30000 && virada.balance === 60000 && Math.abs(virada.runway - 60000 / 20000) < 1e-9, JSON.stringify(virada));
+
+  /* vazio e saldo negativo */
+  const vazio = cashMonth({ entries: [], startBalance: null }, "2026-10-20");
+  check("caixa: sem nada, tudo zero e sem fôlego", vazio.inflow === 0 && vazio.outflow === 0 && vazio.left === 0 && vazio.balance === 0 && vazio.runway === null, JSON.stringify(vazio));
+  const negativo = cashMonth({ entries: [ent("n1", "2026-10-05", "x", "out", 80000, true)], startBalance: { day: "2026-10-01", amount: 10000 } }, "2026-10-20");
+  check("caixa: saldo negativo: sobra negativa e fôlego 0", negativo.left === -80000 && negativo.balance === -70000 && negativo.runway === 0, JSON.stringify(negativo));
+
+  /* é pura: não mexe no contexto */
+  const frozen = JSON.stringify(ctx);
+  cashMonth(ctx, "2026-10-20");
+  check("caixa: cashMonth não mexe no contexto", JSON.stringify(ctx) === frozen);
+});
+
+section("caixa: cashLine", () => {
+  check("pílula do caixa: reais inteiros sem ,00", spaced(cashLine({ amount: 240000, name: "Acme" })) === "lançado no caixa · R$ 2.400 · Acme", spaced(cashLine({ amount: 240000, name: "Acme" })));
+  check("pílula do caixa: com centavos mostra os centavos", spaced(cashLine({ amount: 245050, name: "Acme" })) === "lançado no caixa · R$ 2.450,50 · Acme", spaced(cashLine({ amount: 245050, name: "Acme" })));
+  check("pílula do caixa: valor pequeno", spaced(cashLine({ amount: 4500, name: "Figma" })) === "lançado no caixa · R$ 45 · Figma", spaced(cashLine({ amount: 4500, name: "Figma" })));
+  check("pílula do caixa: um centavo a mais não perde o centavo", spaced(cashLine({ amount: 4501, name: "Figma" })) === "lançado no caixa · R$ 45,01 · Figma", spaced(cashLine({ amount: 4501, name: "Figma" })));
+});
+
+section("conversa: o livro do lançamento", () => {
+  const fields = AAB.ACTION_FIELDS["finance-entry"];
+  const bf = fields.find((x) => x.key === "book");
+  check("conversa: o cartão do lançamento ganha o campo book, um seletor", !!bf && bf.type === "select", JSON.stringify(bf && { key: bf.key, type: bf.type }));
+  check("conversa: as opções do livro são pessoal e empresa", !!bf && sameJson(bf.options(), [["personal", "pessoal"], ["business", "empresa"]]), JSON.stringify(bf && bf.options()));
+  check("conversa: o cartão abre em empresa só quando a proposta pede business", !!bf && bf.initial({ book: "business" }) === "business");
+  check("conversa: na dúvida o cartão abre em pessoal", !!bf && bf.initial({}) === "personal" && bf.initial({ book: "x" }) === "personal" && bf.initial({ book: "personal" }) === "personal" && bf.initial({ book: undefined }) === "personal");
+  check("conversa: os campos que já existiam continuam", ["name", "amount", "day", "kind", "category", "paid"].every((k) => fields.some((x) => x.key === k)));
+
+  const payload = { name: "Figma", amount: 8000, kind: "out", day: core.today(), category: "Ferramentas", paid: true, confirm: "", fixed: "" };
+  const v = { name: "Figma", amount: 8000, kind: "out", day: core.today(), category: "Ferramentas", paid: true };
+
+  const f = fakeFinance([], normalize);
+  const biz = AAB.buildDoc("finance-entry", payload, { ...v, book: "business" }, f, {});
+  check("conversa: buildDoc com book business devolve o doc da empresa", biz.doc && !biz.error && biz.doc.book === "business", JSON.stringify(biz));
+  const pess = AAB.buildDoc("finance-entry", payload, { ...v, book: "personal" }, f, {});
+  check("conversa: buildDoc com book personal devolve o doc pessoal", pess.doc && pess.doc.book === "personal", JSON.stringify(pess));
+  const sem = AAB.buildDoc("finance-entry", payload, v, f, {});
+  check("conversa: buildDoc sem book é pessoal", sem.doc && sem.doc.book === "personal", JSON.stringify(sem));
+  const lixo = AAB.buildDoc("finance-entry", payload, { ...v, book: "x" }, f, {});
+  check("conversa: buildDoc com book inválido é pessoal", lixo.doc && lixo.doc.book === "personal", JSON.stringify(lixo));
+  check("conversa: o doc da empresa leva o resto do lançamento", biz.doc && biz.doc.type === "entry" && biz.doc.name === "Figma" && biz.doc.amount === 8000 && biz.doc.kind === "out" && biz.doc.category === "Ferramentas" && biz.doc.paid === true, JSON.stringify(biz));
+  check("conversa: buildDoc não grava nada sozinho", f.all().length === 0);
+
+  /* a categoria vale na config do livro escolhido */
+  const clientes = AAB.buildDoc("finance-entry", { ...payload, category: "Clientes" }, { ...v, category: "Clientes", book: "business" }, f, {}).doc;
+  check("conversa: a categoria Clientes vale no livro da empresa", clientes && clientes.category === "Clientes", JSON.stringify(clientes));
+  const clientesPessoal = AAB.buildDoc("finance-entry", { ...payload, category: "Clientes" }, { ...v, category: "Clientes", book: "personal" }, f, {}).doc;
+  check("conversa: a categoria Clientes não existe no pessoal e fica vazia", clientesPessoal && clientesPessoal.category === "", JSON.stringify(clientesPessoal));
+  const lazerEmpresa = AAB.buildDoc("finance-entry", { ...payload, category: "Lazer" }, { ...v, category: "Lazer", book: "business" }, f, {}).doc;
+  check("conversa: a categoria pessoal Lazer não vale no livro da empresa", lazerEmpresa && lazerEmpresa.category === "", JSON.stringify(lazerEmpresa));
+  const custom = fakeFinance([{ type: "config", id: "config-business", book: "business", categories: ["Aluguel"] }], normalize);
+  const doAluguel = AAB.buildDoc("finance-entry", { ...payload, category: "Aluguel" }, { ...v, category: "Aluguel", book: "business" }, custom, {}).doc;
+  check("conversa: vale a categoria da config gravada do livro da empresa", doAluguel && doAluguel.category === "Aluguel", JSON.stringify(doAluguel));
+
+  /* confirmar um previsto: só o do livro escolhido */
+  const day = "2026-10-15";
+  const g = fakeFinance([
+    { id: "p-pess", type: "entry", name: "aluguel", amount: 150000, kind: "out", category: "Básicas/PF", day, paid: false, origin: null, book: "personal" },
+    { id: "p-emp", type: "entry", name: "Acme", amount: 240000, kind: "in", category: "Clientes", day, paid: false, origin: null, book: "business" }
+  ], normalize);
+  const vc = { name: "", amount: 148000, kind: "out", day: core.today(), category: "", paid: true };
+  const certo = AAB.buildDoc("finance-entry", { ...payload, confirm: "p-emp" }, { ...vc, kind: "in", book: "business" }, g, {}).doc;
+  check("conversa: confirm com o previsto do mesmo livro confirma o previsto", certo && certo.id === "p-emp" && certo.paid === true && certo.book === "business" && certo.day === day, JSON.stringify(certo));
+  const cruzado = AAB.buildDoc("finance-entry", { ...payload, confirm: "p-pess" }, { ...v, book: "business" }, g, {});
+  check("conversa: confirm com id de previsto do outro livro vira lançamento novo", cruzado.doc && cruzado.doc.id !== "p-pess" && cruzado.doc.book === "business" && cruzado.doc.amount === 8000, JSON.stringify(cruzado));
+  check("conversa: o lançamento novo não herda o previsto do outro livro", cruzado.doc && cruzado.doc.day === core.today() && !(cruzado.doc.origin && cruzado.doc.origin.id === "p-pess"), JSON.stringify(cruzado));
+  const cruzado2 = AAB.buildDoc("finance-entry", { ...payload, confirm: "p-emp" }, { ...v, book: "personal" }, g, {});
+  check("conversa: o contrário também: previsto da empresa não confirma no pessoal", cruzado2.doc && cruzado2.doc.id !== "p-emp" && cruzado2.doc.book === "personal", JSON.stringify(cruzado2));
+  const antigo = AAB.buildDoc("finance-entry", { ...payload, confirm: "p-pess" }, { ...vc, book: "personal" }, g, {}).doc;
+  check("conversa: confirm no pessoal continua confirmando o previsto pessoal", antigo && antigo.id === "p-pess" && antigo.paid === true && antigo.book === "personal", JSON.stringify(antigo));
+  check("conversa: o previsto do outro livro segue intacto na coleção", g.raw("p-pess").paid === false && g.raw("p-emp").paid === false);
+
+  /* os fixos também são de um livro */
+  const h = fakeFinance([{ id: "f-emp", type: "fixed", name: "Figma", amount: 9000, kind: "out", category: "Ferramentas", dayOfMonth: 20, active: true, book: "business" }], normalize);
+  const fixPayload = { ...payload, name: "Figma", amount: 0, fixed: "#f-emp" };
+  const noEmpresa = AAB.buildDoc("finance-entry", fixPayload, { ...v, name: "Figma", amount: 0, book: "business" }, h, {});
+  check("conversa: o fixo da empresa lança no livro da empresa", noEmpresa.doc && noEmpresa.doc.amount === 9000 && noEmpresa.doc.book === "business" && noEmpresa.doc.origin && noEmpresa.doc.origin.id === "f-emp", JSON.stringify(noEmpresa));
+  const noPessoal = AAB.buildDoc("finance-entry", fixPayload, { ...v, name: "Figma", amount: 0, book: "personal" }, h, {});
+  check("conversa: o fixo da empresa não lança no pessoal (falta o valor)", noPessoal.error === "falta o valor" && !noPessoal.doc, JSON.stringify(noPessoal));
+});
+
 console.log("\n" + passed + " passaram, " + failures.length + " falharam");
 if (failures.length) { console.log("\nFALHAS:"); failures.forEach((f) => console.log("  - " + f)); process.exit(1); }
 process.exit(0);
