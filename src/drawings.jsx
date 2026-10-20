@@ -2,7 +2,8 @@
 
    a aba que era "mapas": uma lista só, do mais recente ao mais antigo, de tudo
    que se desenha no trabalho. cada tipo continua com o seu editor e o seu
-   endereço (maps.html#id, sheets.html#id); aqui só se acha, filtra e começa.
+   endereço (maps.html#id, sheets.html#id, slides.html#id); aqui só se acha,
+   filtra e começa.
 
    um tipo novo é uma linha em KINDS: a coleção, o nome, onde abre, onde
    começa e como se mede. a ordem de KINDS é a ordem das pílulas. */
@@ -14,6 +15,8 @@ import { mount, useCollection, useHash, setHash, useKeydown, isTyping, useFields
 import { NAV_ICONS } from "./shared/icons.jsx";
 import { normalizeSheet } from "./shared/sheet.js";
 import { SheetStart, SheetThumb } from "./shared/sheet-start.jsx";
+import { normalizeDeck } from "./shared/deck.js";
+import { DeckStart, DeckThumb } from "./shared/deck-start.jsx";
 
 initPage("drawings");
 
@@ -21,6 +24,12 @@ const enc = encodeURIComponent;
 const countNodes = (n) => 1 + ((n && n.children) || []).reduce((a, c) => a + countNodes(c), 0);
 
 const KINDS = [
+  {
+    id: "decks", one: "apresentação", many: "apresentações", normalize: normalizeDeck,
+    open: (d) => "slides.html#" + enc(d.id), start: "slides.html",
+    measure: (d) => d.slides.length + (d.slides.length === 1 ? " slide" : " slides"),
+    thumb: (d) => <DeckThumb layout={d.slides[0].layout} count={d.slides.length} />
+  },
   {
     id: "sheets", one: "planilha", many: "planilhas", normalize: normalizeSheet,
     open: (d) => "sheets.html#" + enc(d.id), start: "sheets.html",
@@ -67,7 +76,7 @@ function Drawings() {
   return (
     <main className="page">
       <div className="header">
-        <div><h1>desenhos</h1><p className="sub">mapas e planilhas do trabalho, do mais recente ao mais antigo</p></div>
+        <div><h1>desenhos</h1><p className="sub">apresentações, planilhas e mapas do trabalho, do mais recente ao mais antigo</p></div>
         <div className="actions">
           <button className="pill pill--accent" type="button" id="new-drawing" title="novo desenho (n)" onClick={() => setCreating(true)}>{icon("plus")}desenho</button>
         </div>
@@ -101,7 +110,10 @@ function Drawings() {
         <SheetStart sheets={stores.sheets} title={filter ? "nenhuma planilha ainda" : "nenhum desenho ainda"}
           onOpen={(doc) => { location.href = "sheets.html#" + enc(doc.id); }} />
       )}
-      {!all.length && filter && filter.id !== "sheets" && (
+      {!all.length && filter && filter.id === "decks" && (
+        <DeckStart decks={stores.decks} onOpen={(doc) => { location.href = "slides.html#" + enc(doc.id); }} />
+      )}
+      {!all.length && filter && filter.id !== "sheets" && filter.id !== "decks" && (
         <p className="dw-empty">{"nenhum " + filter.one + " ainda. "}<a href={filter.start}>{"começar um " + filter.one}</a></p>
       )}
       {creating && <NewDrawing onClose={() => setCreating(false)} />}

@@ -593,8 +593,8 @@ pronto para construir e lançar. Ninguém junta produto, marketing e execução 
 ### 4.14 Desenhos e planilhas (`drawings.html`, `sheets.html`) — 20/10/2026
 
 A aba "mapas" do trabalho virou **desenhos** (`docs/prd/desenhos.md`, D1): uma lista só, do mais
-recente ao mais antigo, de tudo que se desenha, com filtro em pílulas (todos · planilhas · mapas,
-guardado no endereço: `drawings.html#planilhas`), miniatura, nome, tipo, produto ligado e data.
+recente ao mais antigo, de tudo que se desenha, com filtro em pílulas (todos · apresentações · planilhas ·
+mapas, guardado no endereço: `drawings.html#planilhas`), miniatura, nome, tipo, produto ligado e data.
 O "+" escolhe o tipo e entrega à página do tipo, que sabe começar: a planilha vai para os modelos
 dela (`sheets.html`), o mapa para os dele (`maps.html#novo`). Cada editor continua no seu
 endereço. Um tipo novo é uma linha em `KINDS` (`src/drawings.jsx`).
@@ -627,6 +627,34 @@ Não é Excel: a conversa monta, a página ajusta.
   negócio do retrato, como valor inicial: é cópia, não ligação.
 - Sem gráfico, formatação de célula, várias folhas, `.xlsx`, importar CSV nem ligação viva com o
   caixa.
+
+### 4.15 Apresentações (`slides.html`) — 20/10/2026
+
+A **apresentação** (`docs/prd/desenhos.md`, D4) entra em desenhos ao lado da planilha e do mapa,
+com a pílula "apresentações" (primeira depois de "todos") e o tipo no "+". Coleção `decks`. Serve
+para mostrar o produto, o lançamento ou o resultado do mês sem montar fora do Merlin. Não é
+PowerPoint: a conversa monta, a página ajusta.
+
+- **Slides 16:9 de texto**, em quatro layouts fixos: **capa**, **título + tópicos**, **número
+  grande** e **duas colunas**. O texto se escreve no lugar, no tamanho em que vai aparecer. Todo
+  slide guarda todos os campos, então trocar de layout e voltar não perde nada.
+- **Um só desenho de slide** para o editor, as miniaturas, a tela cheia e o PDF: o tamanho do texto
+  é em unidades do próprio slide, e o que se vê no editor é o que sai.
+- **Notas do apresentador** embaixo do slide, só para quem apresenta (não vão à tela cheia nem
+  ao PDF).
+- **Reordenar, duplicar, apagar** e "+ slide", até 30 slides. `Ctrl+Z` como no mapa: digitar
+  seguido no mesmo campo é um passo, e apagar um slide mostra "slide apagado · desfazer".
+- **Tela cheia** com `←` / `→`, espaço e PageUp/PageDown; `Esc` sai; tocar na metade da direita
+  avança. Contador "3/8"; o slide atual é anunciado ("slide 3 de 8"), e o foco volta ao
+  "apresentar" na saída.
+- **PDF** pela impressão do navegador ("exportar PDF" no "mais"): um slide por página, na página
+  do tamanho do slide, com as cores do tema (escuro ou claro).
+- **Tema do Merlin**, nos dois temas, sem editor de tema.
+- **Celular**: ver, apresentar e corrigir o texto; layout, reordenar, duplicar e apagar só a
+  partir de 600px.
+- **Modelos** na tela vazia (D5): pitch do produto, lançamento, resultado do mês e proposta para
+  cliente, um slide por pergunta; ou "em branco: uma capa, e só".
+- Sem posição livre, imagem, animação, transição, temas, `.pptx` nem link para compartilhar.
 
 ## 5. Ordem de construção
 
@@ -1107,7 +1135,7 @@ discutíveis, e cada uma muda numa linha de `SECTIONS`, sem migração:
   esperam uma resposta. A alternativa era o trabalho, que ficaria com seis abas;
 - **os mapas** vão para o trabalho, porque o desenho põe o mapa mental em "desenhos", dentro do
   trabalho. Em 20/10/2026 a aba "mapas" virou "desenhos" de fato (§4.14): mapas e planilhas numa
-  lista só, e o mapa sem aba própria.
+  lista só (e, no mesmo dia, as apresentações, §4.15), e o mapa sem aba própria.
 
 A saúde era só os hábitos; o diário voltou como aba em 20/10/2026, e o sono, o treino e a
 alimentação entraram no mesmo dia, cada um com o seu verbo ("dormi 7h", "treinei perna 40min",

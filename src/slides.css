@@ -1,0 +1,154 @@
+/* merlin · a apresentação
+   importado depois do base.css: o comum mora na camada, isto fica fora dela. */
+
+.dk-editor{display:flex;flex-direction:column;gap:var(--pd2)}
+.dk-bar{display:flex;align-items:center;gap:4px}
+.dk-name{
+  flex:1 1 auto;min-width:60px;
+  background:none;border:1px solid transparent;border-radius:var(--br2);
+  padding:6px 8px;font-size:18px;font-weight:600;letter-spacing:-.02em;color:var(--ink);
+  transition:background var(--t),border-color var(--t);
+}
+.dk-name:hover,.dk-name:focus{background:var(--fill);border-color:var(--line);outline:none}
+#dk-play svg{width:14px;height:14px}
+
+/* as miniaturas à esquerda e o slide aberto à direita; no celular, as
+   miniaturas viram uma fita que rola só ela, em cima */
+.dk-work{display:grid;grid-template-columns:168px minmax(0,1fr);gap:var(--pd);align-items:start}
+.dk-strip{
+  list-style:none;margin:0;padding:0 4px 0 0;display:flex;flex-direction:column;gap:8px;
+  max-height:calc(100dvh - 150px);overflow-y:auto;position:sticky;top:12px;
+}
+.dk-thumb{
+  position:relative;display:block;width:100%;padding:0 0 0 18px;border:0;background:none;cursor:pointer;text-align:left;
+}
+.dk-thumb .dk-slide{border:1px solid var(--line);border-radius:6px;transition:border-color var(--t),box-shadow var(--t)}
+.dk-thumb:hover .dk-slide{border-color:var(--ink-30)}
+.dk-thumb.is-on .dk-slide{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
+.dk-thumb:focus-visible{outline:none}
+.dk-thumb:focus-visible .dk-slide{box-shadow:0 0 0 2px var(--accent-ink)}
+.dk-thumb__n{position:absolute;left:0;top:2px;width:14px;text-align:right;color:var(--ink-30)}
+.dk-thumb.is-on .dk-thumb__n{color:var(--accent-ink)}
+.dk-strip__add{padding-left:18px}
+
+.dk-main{min-width:0;display:flex;flex-direction:column;gap:var(--pd2)}
+.dk-tools{display:flex;align-items:center;gap:var(--pd2);flex-wrap:wrap}
+.dk-layouts{flex:1 1 auto}
+.dk-actions{display:flex;gap:2px}
+.dk-choice{display:inline-flex;align-items:center;cursor:pointer}
+.dk-choice input{position:absolute;opacity:0;width:1px;height:1px;pointer-events:none}
+.dk-choice:focus-within{outline:2px solid var(--accent);outline-offset:2px}
+.dk-stage{max-width:min(100%, calc((100dvh - 260px) * 16 / 9));min-width:min(100%, 320px)}
+.dk-stage .dk-slide{border:1px solid var(--line);border-radius:var(--br2);box-shadow:var(--sombra-2)}
+.dk-notes{resize:vertical;min-height:64px;font-size:13px;line-height:1.5}
+.dk-keys{margin:0;color:var(--ink-30);line-height:1.8}
+.dk-keys kbd{font-family:var(--mono);font-size:10.5px;padding:1px 5px;border-radius:4px;border:1px solid var(--line);color:var(--ink-50)}
+
+.dk-menu{display:flex;flex-direction:column;gap:8px}
+.dk-menu .pill{justify-content:flex-start;height:38px}
+.dk-product{display:flex;flex-direction:column;gap:4px}
+
+/* ---------- o slide ----------
+   16:9 e com o tamanho do texto em unidades do próprio slide (cqi): a mesma
+   regra desenha a miniatura de 150px, o editor, a tela cheia e a página do
+   PDF. tudo dentro é em em, a partir do corpo do slide. as cores são as do
+   tema, então a apresentação acompanha o claro e o escuro */
+.dk-slide{
+  position:relative;width:100%;aspect-ratio:16/9;overflow:hidden;
+  container-type:inline-size;
+  background:var(--surface);color:var(--ink);
+  -webkit-print-color-adjust:exact;print-color-adjust:exact;
+}
+.dk-slide__in{
+  position:absolute;inset:0;padding:6.5cqi 7.5cqi;
+  font-family:var(--sans);font-size:2.6cqi;line-height:1.3;letter-spacing:-.01em;
+  display:flex;flex-direction:column;
+}
+.dk-slide__n{position:absolute;right:3.2cqi;bottom:2.6cqi;font-size:.55em;color:var(--ink-30);font-variant-numeric:tabular-nums}
+:where(.dk-slide) :is(h2,p){margin:0;font:inherit}
+.dk-title{font-size:1.75em;font-weight:600;line-height:1.12;letter-spacing:-.03em}
+
+.dk-cover{margin:auto 0;display:flex;flex-direction:column;align-items:center;text-align:center;gap:.7em}
+.dk-cover::before{content:"";width:3.2em;height:.22em;border-radius:1em;background:var(--accent);margin-bottom:.3em}
+.dk-cover .dk-title{font-size:2.6em;max-width:90%}
+.dk-cover .dk-body{font-size:1.05em;color:var(--ink-70);max-width:80%}
+
+.dk-bullets{display:flex;flex-direction:column;gap:1.1em}
+.dk-items{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:.6em;font-size:1.05em}
+.dk-items li{position:relative;padding-left:1.1em}
+.dk-items li::before{content:"";position:absolute;left:0;top:.5em;width:.42em;height:.42em;border-radius:.1em;background:var(--accent)}
+
+.dk-number{margin:auto 0;display:flex;flex-direction:column;gap:.35em}
+.dk-label{font-size:.95em;color:var(--ink-50);text-transform:lowercase}
+.dk-big{font-size:4.6em;font-weight:600;line-height:1;letter-spacing:-.04em;color:var(--accent-ink);font-variant-numeric:tabular-nums}
+.dk-caption{font-size:1.05em;color:var(--ink-70);max-width:80%}
+
+.dk-columns{display:flex;flex-direction:column;gap:1.1em;min-height:0}
+.dk-cols{display:grid;grid-template-columns:1fr 1fr;gap:2.4em}
+.dk-col{font-size:.85em;line-height:1.45;white-space:pre-wrap;color:var(--ink-70);padding-top:.7em;border-top:.12em solid var(--line)}
+.dk-cols > .dk-col:first-child{border-top-color:var(--accent)}
+
+/* ---------- escrever no lugar ----------
+   o textarea fica em cima de um reflexo invisível do próprio texto (o ::after
+   com data-value): o reflexo dá a altura, e o campo cresce sem medir nada */
+.dk-grow{display:grid;min-width:0}
+.dk-grow::after{content:attr(data-value) " ";white-space:pre-wrap;overflow-wrap:anywhere;visibility:hidden;grid-area:1/1}
+.dk-grow > textarea{
+  grid-area:1/1;display:block;width:100%;min-width:0;margin:0;padding:0;border:0;outline:none;resize:none;overflow:hidden;
+  background:none;color:inherit;font:inherit;letter-spacing:inherit;line-height:inherit;text-align:inherit;
+  overflow-wrap:anywhere;border-radius:.15em;
+  transition:background var(--t),box-shadow var(--t);
+}
+.dk-grow > textarea::placeholder{color:var(--ink-30);opacity:1}
+.dk-slide.is-edit .dk-grow > textarea:hover{background:var(--fill)}
+.dk-slide.is-edit .dk-grow > textarea:focus{background:var(--fill);box-shadow:0 0 0 .12em var(--accent)}
+.dk-cover .dk-grow{width:100%;justify-items:center}
+.dk-cover .dk-grow::after,.dk-cover .dk-grow > textarea{text-align:center}
+.dk-col.dk-grow{white-space:normal}
+.dk-col.dk-grow > textarea{white-space:pre-wrap}
+
+/* ---------- a tela cheia ---------- */
+.dk-show{
+  position:fixed;inset:0;z-index:200;background:var(--bg);
+  display:flex;align-items:center;justify-content:center;outline:none;
+}
+.dk-show__stage{width:min(100vw, calc(100dvh * 16 / 9));cursor:pointer}
+.dk-show__stage .dk-slide{border-radius:0}
+.dk-show__bar{
+  position:absolute;right:12px;bottom:12px;display:flex;align-items:center;gap:2px;
+  padding:4px 6px;border-radius:var(--br-pill);background:var(--surface-2);border:1px solid var(--line);
+  opacity:.35;transition:opacity var(--t);
+}
+.dk-show__bar:hover,.dk-show__bar:focus-within{opacity:1}
+.dk-show__count{min-width:42px;text-align:center;color:var(--ink-70)}
+
+/* ---------- o PDF ----------
+   "exportar PDF" é a impressão do navegador: só os slides, um por página,
+   na página do tamanho do slide (o Safari, que ignora o tamanho, põe um por
+   página do mesmo jeito, pela quebra). as cores do tema vão junto */
+.dk-print{display:none}
+@media print{
+  @page{size:1280px 720px;margin:0}
+  html,body{margin:0 !important;padding:0 !important;background:var(--surface) !important}
+  body > :not(#app){display:none !important}
+  #app{margin:0 !important;padding:0 !important}
+  .dk-editor{display:block !important;margin:0 !important;padding:0 !important;max-width:none !important}
+  .dk-editor > :not(.dk-print){display:none !important}
+  .dk-print{display:block}
+  .dk-print .dk-slide{width:100%;break-inside:avoid;break-after:page;page-break-after:always}
+  .dk-print .dk-slide:last-child{break-after:auto;page-break-after:auto}
+}
+
+@media (max-width:600px){
+  .dk-work{grid-template-columns:minmax(0,1fr);gap:var(--pd2)}
+  .dk-strip{
+    flex-direction:row;max-height:none;overflow-x:auto;overflow-y:hidden;position:static;
+    padding:2px 2px 6px;-webkit-overflow-scrolling:touch;scrollbar-width:thin;
+  }
+  .dk-strip > li{flex:0 0 112px}
+  .dk-thumb{padding:0}
+  .dk-thumb__n{display:none}
+  .dk-stage{max-width:none;min-width:0}
+  .dk-name{font-size:16px}
+  #dk-play{padding:0 10px}
+}

@@ -5,7 +5,7 @@ entra pelo mesmo endereço e cada um ganha um Merlin inteiro, que ninguém mais 
 o `artt · planner` — um controle
 de tarefas de um dia — e virou um conjunto de módulos ligados entre si. O início é só a
 conversa com o Merlin; o resto mora num **menu** que se abre do alto, organizado em **cinco
-áreas** da vida: **saúde** (os hábitos, o sono, o treino, a alimentação e o diário), **trabalho** (produtos, conteúdo, funis e desenhos: mapas e planilhas),
+áreas** da vida: **saúde** (os hábitos, o sono, o treino, a alimentação e o diário), **trabalho** (produtos, conteúdo, funis e desenhos: apresentações, mapas e planilhas),
 **organização** (o calendário, a rotina e as notas), **finanças** (o financeiro) e **inbox**
 (o que falta, leads e clientes). O `Ctrl+K` é o campo de tudo: com duração vai para hoje,
 sem duração vira nota, com "?" pergunta ao Merlin, e vazio lista todas as abas. A visão
@@ -40,8 +40,9 @@ está em [MIGRATION.md](MIGRATION.md).
 | `clients.html` | clientes com canais (Mercado Livre, Shopee, TikTok Shop…), backlog, diário, objetivos, ficha e cofre. Um cliente novo abre com os primeiros passos. |
 | `content.html` | o que vai ao ar: um quadro por etapa (ideia → publicado), um cartão por peça, com o roteiro dentro do cartão. |
 | `funnels.html` | funil como grafo com tipos de nó, vazão por etapa, criativos, automações, ofertas e gatilhos. |
-| `drawings.html` | **os desenhos**: a aba do trabalho que junta mapas e planilhas numa lista, do mais recente ao mais antigo, com filtro (todos · planilhas · mapas). O "+" escolhe o tipo e abre os modelos dele. |
+| `drawings.html` | **os desenhos**: a aba do trabalho que junta apresentações, mapas e planilhas numa lista, do mais recente ao mais antigo, com filtro (todos · apresentações · planilhas · mapas). O "+" escolhe o tipo e abre os modelos dele. |
 | `sheets.html` | a planilha: uma folha com fórmulas simples (`=SOMA(B2:B5)`, `=B2*C2`, `MÉDIA`, `MÍN`, `MÁX`), colunas de texto, número, R$ e data, desfazer e CSV que abre certo no Excel. Começa de um modelo: precificação, custo do produto, MRR em 12 meses ou ponto de equilíbrio. |
+| `slides.html` | a apresentação: slides 16:9 de texto em quatro layouts (capa, título + tópicos, número grande, duas colunas), escritos no lugar, com notas do apresentador, desfazer, tela cheia com setas e PDF com um slide por página, no tema do Merlin. Começa de um modelo: pitch do produto, lançamento, resultado do mês ou proposta para cliente. |
 | `maps.html` | mapa mental (sem aba própria: mora em desenhos) com teclado e layout automático. Sai como texto (copiar mermaid ou outline), como arquivo (png, .md, .mmd) ou como link só de leitura; e volta colando o mermaid, num mapa novo ou como ramo de um que já existe. |
 | `apps.html` | **os produtos**, o centro: abrir um mostra a visão geral — o que está construído e o que falta, o funil e as peças, os mapas ligados. Por dentro, o projeto de app: conceito e funcionalidades com fase (primeira versão, depois, talvez), o banco (entidades, campos e relações num diagrama), as telas e as ações entre elas, e a saída pronta para construir — SQL do Postgres, mermaid do banco e dos fluxos, a especificação em markdown e o prompt para o Claude Code. O Merlin rascunha o projeto a partir de duas frases e revisa o que está desenhado; o app se liga ao funil de lançamento e às peças de conteúdo. |
 | `finance.html` | do jeito da planilha: o mês dia a dia com saldo previsto, o ano em doze colunas, e o painel com saídas fixas, entradas fixas, compras no cartão e dívidas, mais a divisão 50/30/20. |
