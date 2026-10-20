@@ -1005,7 +1005,7 @@ Na ordem do desenho do Arthur. A primeira aba é a porta da área (`SECTIONS`, n
 
 | área | id | ícone | abas, na ordem |
 | --- | --- | --- | --- |
-| **saúde** | `health` | `habits` | hábitos |
+| **saúde** | `health` | `habits` | hábitos, sono, diário |
 | **trabalho** | `work` | `apps` | produtos, conteúdo, funis, mapas |
 | **organização** | `organization` | `calendar` | calendário, rotina, notas |
 | **finanças** | `money` | `finance` | financeiro |
@@ -1024,7 +1024,9 @@ discutíveis, e cada uma muda numa linha de `SECTIONS`, sem migração:
 - **os mapas** vão para o trabalho, porque o desenho põe o mapa mental em "desenhos", dentro do
   trabalho.
 
-Os hábitos são a saúde inteira, por enquanto. O id `inbox` da área não tem relação com a fila
+A saúde era só os hábitos; o diário voltou como aba em 20/10/2026, e o sono entrou no mesmo
+dia com o seu verbo ("dormi 7h", §13.7). Treino e alimentação entram entre o sono e o diário
+(`docs/prd/saude-completa.md`). O id `inbox` da área não tem relação com a fila
 `merlin:inbox` (§3), e o comentário de `SECTIONS` diz isso. "inbox" e "lead" ficaram como o
 Arthur escreveu: são as palavras que esse público usa.
 

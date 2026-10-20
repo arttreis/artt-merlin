@@ -30,6 +30,7 @@ import { LOGO, ICONS, NAV_ICONS, icon } from "./icons.jsx";
 import { ACTION_COLLECTIONS, ACTION_LABELS, ACTION_FIELDS, ACTION_DONE, buildDoc, previewOf } from "./assistant-actions.js";
 import { normalize as normalizeFinance, contextOf as financeContext, undoEntry } from "./finance-data.js";
 import { normalize as normalizeHabit, SCHEDULES, COLORS, WEEKDAY_NAMES, habitStatus, undoHabit, markWhen } from "./habits-data.js";
+import { normalize as normalizeSleep } from "./sleep-data.js";
 /* o Ctrl+K cria tarefa de hoje com a mesma regra e a mesma forma do dia */
 import { tasks, newTask, topOrder, routeLine } from "./tasks.js";
 import { BUILD, buildIntent } from "./build-intent.js";
@@ -945,10 +946,10 @@ function useRootClass(name, on) {
    abriu a caixa fica sabendo pelo `onDone(linha)`: a pílula da conversa vira
    "✓ lançado · …" e não abre de novo. o desfazer chama `onDone(null)`, e a
    pílula volta. `chat` é o id da conversa, que vai na origem do lançamento. */
-const CREATE_LABELS = { "onboarding-map": "gerar mapa", "onboarding-funnel": "gerar funil", "finance-entry": "lançar" };
+const CREATE_LABELS = { "onboarding-map": "gerar mapa", "onboarding-funnel": "gerar funil", "finance-entry": "lançar", "sleep-log": "registrar" };
 const CREATE_HREF = { "onboarding-map": "maps.html#", "onboarding-funnel": "funnels.html#" };
-const DONE_NOTICE = { "finance-entry": "lançado no financeiro", "lead-update": "cliente atualizado", script: "roteiro aplicado" };
-const ACTION_OPTIONS = { finance: { normalize: normalizeFinance } };
+const DONE_NOTICE = { "finance-entry": "lançado no financeiro", "lead-update": "cliente atualizado", script: "roteiro aplicado", "sleep-log": "sono registrado" };
+const ACTION_OPTIONS = { finance: { normalize: normalizeFinance }, sleep: { normalize: normalizeSleep } };
 const optionPair = (o) => (Array.isArray(o) ? o : [o, o]);
 export function ProposalDialog({ proposal, chat, onClose, onDone }) {
   const { actionType, note } = proposal;
