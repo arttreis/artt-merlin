@@ -1346,6 +1346,9 @@ const BUILD_PORTRAIT_MAX = 1500;
 const DECK_LAYOUTS = ["cover", "bullets", "number", "columns"];
 const DECK_MIN = 3, DECK_MAX = 12;
 const PRODUCT_MAX = 6000;
+/* o protótipo (ticket #95): no máximo 12 telas por pedido, e o app como
+   está sobe cortado em 8000 caracteres */
+const PROTOTYPE_MAX = 12, SPEC_MAX = 8000;
 const BUILD_KINDS = {
   funnel: {
     label: "funil de marketing e vendas",
@@ -1414,6 +1417,23 @@ const BUILD_KINDS = {
       "O que não está no pedido nem no contexto você não sabe: não invente número, cliente nem resultado — escreva o tópico com … para a pessoa preencher e diga no summary o que falta. " +
       "name = o nome da apresentação (até 6 palavras). " +
       'Formato: {"name":"…","slides":[{"layout":"cover","title":"…","body":"…","items":[],"left":"","right":"","number":"","caption":"","notes":"…"}],"summary":"…"}'
+  },
+  /* o protótipo de um trecho de um app que já existe (PRD desenhos, D2 e
+     D6). `spec`: a tela manda o app como está (telas, o que cada uma tem,
+     ações e entidades), e o rascunho volta só com telas e ações — a tela
+     junta sem trocar nada do que a pessoa escreveu */
+  prototype: {
+    label: "protótipo das telas de um app",
+    spec: true,
+    matters: "qual fluxo do app desenhar, de onde a pessoa sai e aonde ela quer chegar, e o que precisa ter em cada tela",
+    draft:
+      "Desenhe só o trecho pedido do app que está no contexto: as telas desse fluxo, de 1 a " + PROTOTYPE_MAX + ", e as ações que levam de uma a outra. " +
+      "Cada tela: name (até 4 palavras; para passar por uma tela que o app já tem, use exatamente o nome dela), goal (uma frase), " +
+      "parts (de 3 a 10 linhas curtas, uma coisa da tela por linha, de cima para baixo, começando pelo tipo quando houver: \"título …\", \"campo …\", \"botão …\", \"lista de …\", \"imagem …\"; o resto é texto) " +
+      "e start (true só se a tela for a entrada e o app ainda não tiver entrada). " +
+      "flows: as ações {from, to, action}, com from e to iguais aos NOMES das telas (as do trecho ou as que o app já tem) e action curto (\"tocou em criar conta\"). " +
+      "Numa tela que já existe, ponha em parts só o que falta nela para o trecho funcionar; nunca reescreva o que ela já tem. Não mexa em conceito, banco nem funcionalidades. " +
+      'Formato: {"screens":[{"name":"…","goal":"…","parts":["…"],"start":false}],"flows":[{"from":"…","to":"…","action":"…"}],"summary":"…"}'
   }
 };
 const BUILD_TASKS = {
@@ -1427,7 +1447,8 @@ const BUILD_TASKS = {
       (step === "revise" && c.draft ? "Rascunho atual (JSON):\n" + JSON.stringify(c.draft).slice(0, 24000) + "\n" : "") +
       (step === "revise" ? "Ajuste pedido: " + String(c.change || "").slice(0, 1000) + "\n" : "") +
       (k.cash && c.portrait ? "O caixa da pessoa agora (uma cópia para valor inicial; a planilha não se atualiza sozinha):\n" + String(c.portrait).slice(0, BUILD_PORTRAIT_MAX) + "\n" : "") +
-      (k.product && c.product ? "O que o Merlin sabe do produto (são os fatos; o que não está aqui, não invente):\n" + String(c.product).slice(0, PRODUCT_MAX) + "\n" : "");
+      (k.product && c.product ? "O que o Merlin sabe do produto (são os fatos; o que não está aqui, não invente):\n" + String(c.product).slice(0, PRODUCT_MAX) + "\n" : "") +
+      (k.spec && c.spec ? "O app como está agora (as telas, o que cada uma tem, as ações e as entidades):\n" + String(c.spec).slice(0, SPEC_MAX) + "\n" : "");
     if (step === "brief") {
       return {
         instruction:
@@ -1487,7 +1508,22 @@ function cleanDeck(d) {
   });
   return { name: cut(d.name, 120), slides };
 }
+/* o protótipo: só telas e ações, pelos nomes. a ação que aponta para uma
+   tela que não existe a tela descarta, porque só ela conhece o app */
+function cleanPrototype(d) {
+  const text = (v, n) => (typeof v === "string" ? cut(v, n) : "");
+  /* o que não é tela não ocupa vaga das 12: filtra antes de cortar */
+  const screens = arr(d.screens, 200).filter((s) => s && typeof s === "object" && !Array.isArray(s) && text(s.name, 60).trim()).slice(0, PROTOTYPE_MAX).map((s) => ({
+    name: text(s.name, 60), goal: text(s.goal, 300),
+    parts: (Array.isArray(s.parts) ? s.parts : []).filter((x) => typeof x === "string").slice(0, 20).map((x) => cut(x, 120)),
+    start: !!s.start
+  }));
+  const flows = arr(d.flows, 400).filter((f) => f && typeof f === "object" && text(f.from, 60).trim() && text(f.to, 60).trim())
+    .slice(0, 40).map((f) => ({ from: text(f.from, 60), to: text(f.to, 60), action: text(f.action, 120) }));
+  return { screens, flows };
+}
 function cleanDraft(kind, d) {
+  if (kind === "prototype") return cleanPrototype(d);
   if (kind === "deck") return cleanDeck(d);
   if (kind === "app") return { name: cut(d.name, 120), ...cleanBlueprint(d) };
   if (kind === "map") return { name: cut(d.name, 120), tree: cleanTree(d.tree || {}, 1, { n: 80 }) };
@@ -1605,6 +1641,9 @@ async function advise(req, env, person) {
   if ((name !== "assistant" && !cashBuild) || env.MERLIN_PORTRAIT_OFF) delete body.context.portrait;
   /* o que se sabe do produto só vai na montagem da apresentação (ticket #94) */
   if (!(name === "build" && BUILD_KINDS[body.context.kind] && BUILD_KINDS[body.context.kind].product)) delete body.context.product;
+  /* o app como está só vai na montagem do protótipo (ticket #95); as tarefas
+     app e appReview, que não são montagem, continuam lendo o `spec` delas */
+  if (name === "build" && !(BUILD_KINDS[body.context.kind] && BUILD_KINDS[body.context.kind].spec)) delete body.context.spec;
   /* o tamanho do retrato que vai de fato (o já cortado) entra na linha da
      medição, no wrangler tail */
   const portraitChars = body.context.portrait ? Math.min(String(body.context.portrait).length, cashBuild ? BUILD_PORTRAIT_MAX : PORTRAIT_MAX) : 0;
@@ -1679,6 +1718,7 @@ async function advise(req, env, person) {
       : kind === "app" ? !draft.features.length && !draft.entities.length && !draft.screens.length
       : kind === "sheet" ? !draft.cols.length || !draft.rows.length
       : kind === "deck" ? !draft.slides.length
+      : kind === "prototype" ? !draft.screens.length
       : !draft.tree.children.length;
     if (empty) return fail("o Merlin devolveu um rascunho vazio; tente de novo", 502);
     /* a apresentação montada aqui tem de 3 a 12 slides; o ajuste de uma que já

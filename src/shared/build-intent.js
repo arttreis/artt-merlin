@@ -1,4 +1,4 @@
-/* merlin · reconhecer o pedido de montar (funil, app, mapa, planilha, apresentação)
+/* merlin · reconhecer o pedido de montar (funil, app, mapa, planilha, apresentação, protótipo)
    separado de build.js de proposito: o campo da home e o Ctrl+K, que estao em
    toda tela, so precisam saber SE e um pedido de montar — o resto (o desenho
    do funil, o projeto de app) so carrega na tela do assistente. */
@@ -6,13 +6,17 @@
 /* `the` e `of` levam o artigo de cada um: "antes de montar a planilha",
    "rascunho do funil". `cash`: o pedido que cita o caixa leva os números
    dele junto (build.js, citesCash); `product`: o que nomeia um produto leva o
-   que o Merlin sabe dele (build.js, productContext) */
+   que o Merlin sabe dele (build.js, productContext); `spec`: o protótipo
+   leva o app como está (build.js, prototypeContext), e não cria documento —
+   junta telas e ações a um app que já existe, por isso o "abrir" vai direto
+   ao modo telas da aba fluxos (`?ver=telas`, apps.jsx) */
 export const BUILD = {
   funnel: { label: "funil", collection: "funnels", href: "funnels.html#", create: "criar o funil", the: "o funil", of: "do funil" },
   app: { label: "app", collection: "apps", href: "apps.html#", create: "criar o app", the: "o app", of: "do app" },
   map: { label: "mapa", collection: "maps", href: "maps.html#", create: "criar o mapa", the: "o mapa", of: "do mapa" },
   sheet: { label: "planilha", collection: "sheets", href: "sheets.html#", create: "criar a planilha", the: "a planilha", of: "da planilha", cash: true },
-  deck: { label: "apresentação", collection: "decks", href: "slides.html#", create: "criar a apresentação", the: "a apresentação", of: "da apresentação", product: true }
+  deck: { label: "apresentação", collection: "decks", href: "slides.html#", create: "criar a apresentação", the: "a apresentação", of: "da apresentação", product: true },
+  prototype: { label: "protótipo", collection: "apps", href: "apps.html?ver=telas#", create: "juntar ao app", the: "o protótipo", of: "do protótipo", spec: true }
 };
 
 /* "monta um funil pra minha consultoria", "quero um app de agenda", "me ajuda
@@ -26,6 +30,7 @@ const WHAT = [
   ["map", "mapa(?:s)?(?: mental| mentais)?"],
   ["sheet", "planilhas?"],
   ["deck", "apresenta[çc](?:ão|ao|ões|oes)|slides?|ppt|deck"],
+  ["prototype", "prot[óo]tipos?|wireframes?"],
   ["funnel", "funil|funis"],
   ["app", "app|aplicativo|saas|sistema|plataforma"]
 ];

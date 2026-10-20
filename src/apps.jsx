@@ -14,7 +14,7 @@
    shared/app-spec.js, que e puro e testado. aqui e so tela. */
 import "./shared/base.css";
 import "./apps.css";
-import { initPage, newId, notify, api, setPageContext, today } from "./shared/core.js";
+import { initPage, newId, notify, api, setPageContext, today, takeChange } from "./shared/core.js";
 import { useState, useEffect, useRef, useMemo } from "react";
 import {
   mount, useCollection, useHash, setHash, useFields,
@@ -29,8 +29,9 @@ import {
   PHASES, phaseLabel, FIELD_TYPES, typeLabel, ENTITY_W, ENTITY_HEAD, FIELD_H, SCREEN_W, SCREEN_H, entityHeight,
   normalizeApp, snake, problemsOf, layoutEntities, layoutScreens, fromBlueprint, mergeDraft,
   toSQL, toMermaidER, toMermaidFlow, toMarkdown, toPrompt, digestOf,
-  FRAME_W, FRAME_H, WIRE_PAD, wireframeOf, placeWireframe, wireframeLabel
+  FRAME_W, FRAME_H, wireframeLabel
 } from "./shared/app-spec.js";
+import { Wireframe } from "./shared/wireframe.jsx";
 
 initPage("apps");
 
@@ -176,7 +177,10 @@ const TABS = [
 ];
 
 function AppView({ app, store }) {
-  const [tab, setTab] = useState("overview");
+  /* o "abrir" do protótipo pronto na conversa (apps.html?ver=telas#id,
+     ticket #95) chega na aba fluxos, já no modo telas */
+  const [screensFirst] = useState(() => /(?:^|[?&])ver=telas(?:&|$)/.test(location.search));
+  const [tab, setTab] = useState(screensFirst ? "flows" : "overview");
   const [edit, setEdit] = useState(false);
   const [draftAsk, setDraftAsk] = useState(false);
   const [busy, setBusy] = useState("");
@@ -197,6 +201,15 @@ function AppView({ app, store }) {
     save(fn);
     notify(text, () => store.save({ ...before, updatedAt: Date.now() }));
   };
+
+  /* o protótipo juntado na conversa chega com o app de antes: o aviso dá o
+     desfazer aqui, onde se veem as telas (shared/core.js, sendChange). o
+     ?ver=telas sai do endereço, para voltar à lista não levá-lo junto */
+  useEffect(() => {
+    if (screensFirst) history.replaceState(null, "", location.pathname + location.hash);
+    const got = takeChange("prototype", app.id);
+    if (got) notify(got.line || "o Merlin mudou o protótipo", () => store.save({ ...got.doc, updatedAt: Date.now() }));
+  }, []);
 
   useEffect(() => {
     setPageContext(() => "Projeto de app aberto:\n" + digestOf(store.get(app.id) || app).slice(0, 1100));
@@ -262,7 +275,7 @@ function AppView({ app, store }) {
       {tab === "overview" && <OverviewTab app={app} problems={left} setTab={setTab} />}
       {tab === "concept" && <ConceptTab app={app} save={save} saveUndo={saveUndo} />}
       {tab === "data" && <DataTab app={app} save={save} saveUndo={saveUndo} />}
-      {tab === "flows" && <FlowsTab app={app} save={save} saveUndo={saveUndo} />}
+      {tab === "flows" && <FlowsTab app={app} save={save} saveUndo={saveUndo} startMode={screensFirst ? "screens" : "boxes"} />}
       {tab === "export" && <ExportTab app={app} problems={left} />}
       {tab === "launch" && <LaunchTab app={app} save={save} />}
 
@@ -750,13 +763,13 @@ function EntityDialog({ entity, app, onSave, onRemove, onClose }) {
 /* ================================================================
    fluxos: telas e as acoes entre elas
    ================================================================ */
-function FlowsTab({ app, save, saveUndo }) {
+function FlowsTab({ app, save, saveUndo, startMode }) {
   const [view, setView] = useView();
   const [open, setOpen] = useState(null);
   const [link, setLink] = useState(null);      // a seta sendo puxada: {from, x, y}
   const [naming, setNaming] = useState(null);  // a acao recem-ligada, pedindo nome
   /* caixas ou telas: e jeito de ver, estado da pagina, nao vai para o documento */
-  const [mode, setMode] = useState("boxes");
+  const [mode, setMode] = useState(startMode || "boxes");
   const [trail, setTrail] = useState(null);    // navegar: as telas andadas, a ultima e a em foco
   const frameRef = useRef(null);
   const stageRef = useRef(null);
@@ -892,75 +905,6 @@ function FlowsTab({ app, save, saveUndo }) {
       {naming && <ActionForm from={byId.get(naming.from)} to={byId.get(naming.to)} onClose={() => setNaming(null)}
         onSave={(action) => save((cur) => ({ ...cur, flows: cur.flows.concat({ id: newId(), from: naming.from, to: naming.to, action }) }))} />}
     </>
-  );
-}
-
-/* ---------- o wireframe ----------
-   a tela desenhada em baixa fidelidade: moldura de celular e, de cima para
-   baixo, um bloco por linha do que ela tem. tudo por atributo (e nao por
-   classe), para o PNG sair igual ao que esta na tela. */
-const WIRE_FONT = "Sora, system-ui, sans-serif";
-const INNER = FRAME_W - WIRE_PAD * 2;
-/* corta o rotulo pela largura: o SVG nao quebra linha sozinho */
-const fit = (t, px) => { const n = Math.floor(INNER / px); return t.length > n ? t.slice(0, n - 1) + "…" : t; };
-
-function WireBlock({ b }) {
-  const x = WIRE_PAD, y = b.y;
-  if (b.kind === "heading") return <text x={x} y={y + 19} fontSize="15" fontWeight="700" fill="var(--ink)">{fit(b.label, 8.4)}</text>;
-  if (b.kind === "button") return (
-    <g>
-      <rect x={x} y={y} width={INNER} height={b.h} rx="9" fill="var(--accent)" />
-      <text x={FRAME_W / 2} y={y + b.h / 2 + 4} fontSize="12" fontWeight="600" textAnchor="middle" fill="var(--on-accent)">{fit(b.label, 7)}</text>
-    </g>
-  );
-  if (b.kind === "input") return (
-    <g>
-      <rect x={x + 0.5} y={y + 0.5} width={INNER - 1} height={b.h - 1} rx="7" fill="var(--surface)" stroke="var(--ink-30)" />
-      <text x={x + 10} y={y + b.h / 2 + 4} fontSize="11" fill="var(--ink-50)">{fit(b.label, 6.6)}</text>
-    </g>
-  );
-  if (b.kind === "image") return (
-    <g>
-      <rect x={x + 0.5} y={y + 0.5} width={INNER - 1} height={b.h - 1} rx="7" fill="var(--fill)" stroke="var(--line)" />
-      <path d={"M" + (x + 3) + "," + (y + 3) + " L" + (x + INNER - 3) + "," + (y + b.h - 3) + " M" + (x + INNER - 3) + "," + (y + 3) + " L" + (x + 3) + "," + (y + b.h - 3)} stroke="var(--line)" />
-      <text x={FRAME_W / 2} y={y + b.h / 2 + 4} fontSize="10.5" textAnchor="middle" fill="var(--ink-50)" stroke="var(--surface-2)" strokeWidth="4" paintOrder="stroke">{fit(b.label, 6.4)}</text>
-    </g>
-  );
-  if (b.kind === "list") return (
-    <g>
-      <text x={x} y={y + 11} fontSize="10.5" fontWeight="600" fill="var(--ink-50)">{fit(b.label, 6.4)}</text>
-      {[0, 1, 2].map((i) => {
-        const ry = y + 18 + i * 21;
-        return (
-          <g key={i}>
-            <circle cx={x + 7} cy={ry + 9} r="7" fill="var(--fill)" stroke="var(--line)" />
-            <rect x={x + 22} y={ry + 3} width={INNER * (i === 1 ? 0.5 : 0.62)} height="5" rx="2.5" fill="var(--ink-30)" />
-            <rect x={x + 22} y={ry + 12} width={INNER * (i === 2 ? 0.28 : 0.38)} height="4" rx="2" fill="var(--line)" />
-          </g>
-        );
-      })}
-    </g>
-  );
-  return <text x={x} y={y + 13} fontSize="11" fill="var(--ink-70)">{fit(b.label, 6.6)}</text>;
-}
-
-function Wireframe({ screen }) {
-  const { items, hidden } = placeWireframe(wireframeOf(screen.parts));
-  return (
-    <svg className="ap-wire__svg" viewBox={"0 0 " + FRAME_W + " " + FRAME_H} width={FRAME_W} height={FRAME_H}
-      fontFamily={WIRE_FONT} aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
-      <rect x="0.5" y="0.5" width={FRAME_W - 1} height={FRAME_H - 1} rx="24" fill="var(--surface-2)" stroke="var(--line)" />
-      <rect x={FRAME_W / 2 - 22} y="9" width="44" height="6" rx="3" fill="var(--line)" />
-      <text x={WIRE_PAD} y="31" fontSize="10.5" fill="var(--ink-30)">{fit(screen.name, 6.4)}</text>
-      {items.map((b, i) => <WireBlock key={i} b={b} />)}
-      {!items.length && (
-        <text x={FRAME_W / 2} y={FRAME_H / 2 - 8} fontSize="11.5" textAnchor="middle" fill="var(--ink-50)">
-          <tspan x={FRAME_W / 2}>escreva o que a tela tem,</tspan>
-          <tspan x={FRAME_W / 2} dy="16">uma coisa por linha</tspan>
-        </text>
-      )}
-      {hidden > 0 && <text x={FRAME_W / 2} y={FRAME_H - 11} fontSize="10.5" textAnchor="middle" fill="var(--ink-50)">+ {hidden} {hidden === 1 ? "coisa" : "coisas"} abaixo</text>}
-    </svg>
   );
 }
 

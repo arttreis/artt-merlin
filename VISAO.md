@@ -396,6 +396,13 @@ tracejada no próprio palco, onde ela nasceria, e um clique é que a torna real.
   uma planilha de custos do app" é planilha). Cada tipo é uma linha em `BUILD_KINDS` (worker) e
   em `BUILD` (`shared/build-intent.js`); tirar a linha do worker desliga o verbo. A medição
   anota o passo e o tipo (`build:draft:sheet`).
+- **O protótipo pela conversa**, em 20/10/2026 (`docs/prd/desenhos.md`, D6): "desenha o
+  protótipo do cadastro do app Agenda" (ou "wireframe") é o tipo `prototype`, o único que não
+  cria documento: ele entra num app que já existe. O app vem do nome no pedido; sem nome, a tela
+  pergunta "De qual app?" com os apps para clicar (sem "decide você"); sem nenhum app, "Você
+  ainda não tem um app. Quer que eu monte um?" segue pelo tipo `app`. O Merlin lê o app como
+  está (telas, o que cada uma tem, ações e entidades, até 8.000 caracteres, só nesse pedido) e
+  devolve só as telas e as ações do trecho, até 12 telas.
 
 ---
 
@@ -584,6 +591,14 @@ construir. O projeto de app é o mesmo desenho **com forma**.
 - **Merlin**: rascunha o projeto a partir de duas frases (tarefa `app`) e revisa o que está
   desenhado (`appReview`). O rascunho é **proposta**, como no assistente: aparece inteiro e só
   entra quando a pessoa junta — e juntar nunca troca o que ela escreveu.
+- **O protótipo pela conversa** (20/10/2026, PRD [desenhos](docs/prd/desenhos.md), D6):
+  "desenha o protótipo do fluxo X do app Y" propõe só as telas e as ações daquele trecho. O
+  rascunho aparece desenhado na conversa, cada tela como vai ficar depois de juntar ("nova",
+  "+ 2 linhas", "já tem tudo"), e só entra com "juntar ao app", pelo `mergeDraft` restrito a
+  telas e ações: tela nova entra, tela de mesmo nome ganha só as linhas que faltam no que ela
+  tem, ação para tela que não existe sai, e conceito, dados e funcionalidades não mudam. Juntar
+  deixa "✓ protótipo pronto · 4 telas · abrir" na conversa e abre o app na aba fluxos, no modo
+  telas, com "o Merlin mudou o protótipo · desfazer": um desfazer tira tudo o que entrou.
 
 É também a aposta do produto: desenhar o app e o funil dele no mesmo lugar, e sair com tudo
 pronto para construir e lançar. Ninguém junta produto, marketing e execução assim.

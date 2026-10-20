@@ -133,6 +133,15 @@ html.onboarding .page--chat{padding-bottom:0}
 .build__grid td{color:var(--ink-70)}
 .build__grid .is-num{text-align:right}
 .build__grid:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+/* o rascunho do protótipo: as telas desenhadas lado a lado, rolando de lado,
+   cada uma com o que muda nela embaixo */
+.build__wires{margin:12px 0 0;display:flex;gap:12px;overflow-x:auto;padding-bottom:4px}
+.build__wires:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.build__wire{margin:0;flex:none;width:124px;display:flex;flex-direction:column;gap:6px}
+.build__wire-svg{display:block;width:100%;height:auto}
+.build__wire figcaption{display:flex;flex-direction:column;gap:1px;min-width:0}
+.build__wire figcaption b{font-size:12px;font-weight:600;color:var(--ink-70);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.build__wire figcaption span{font-size:11px;color:var(--ink-50)}
 /* o antes e o depois do ajuste de um documento aberto: o antes apagado, o
    depois na cor do texto */
 .build__diff dd span{display:block}

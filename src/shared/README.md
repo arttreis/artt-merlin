@@ -72,11 +72,14 @@ Vite; o build sai em `server/site/`. O que é comum vive aqui:
 - `app-spec.js` — o **projeto de app** (`apps.html`): a forma do documento (`normalizeApp`), o que
   falta antes de construir (`problemsOf`), o arranjo no palco (`layoutEntities`, `layoutScreens`),
   o rascunho do Merlin (`fromBlueprint` resolve nome em id; `mergeDraft` junta sem trocar o que a
-  pessoa escreveu) e as saídas: `toSQL` (Postgres, na ordem das relações), `toMermaidER`,
+  pessoa escreveu; com `{ screensOnly: true }` só telas e ações mudam, e a tela de mesmo nome
+  ganha só as linhas de `parts` que faltam; `fromPrototype` e `mergePrototype` fazem isso com o
+  rascunho do protótipo, cuja ação pode sair de uma tela que já existe) e as saídas: `toSQL` (Postgres, na ordem das relações), `toMermaidER`,
   `toMermaidFlow`, `toMarkdown` e `toPrompt`. E o wireframe de cada tela: `wireframeOf(parts)`
   vira cada linha num bloco (botão, lista, campo, título, imagem, texto) por palavra-chave, sem
   IA; `placeWireframe` empilha os blocos na moldura fixa `FRAME_W × FRAME_H`; `wireframeLabel` é
   o `aria-label`; `toWireframes` leva os blocos ao prompt. Puro, testado no `app-spec.test.mjs`.
+  O desenho em SVG (`<Wireframe>`) mora em `wireframe.jsx`, que o `apps.jsx` e a conversa usam.
 - `mermaid.js` — o **mapa mental em mermaid**: `parseMermaid(text)` lê o que uma IA devolve
   (`mindmap`, ou `graph`/`flowchart` como plano B, com cerca e conversa em volta) e devolve
   `{name, root, kind, count, dropped}` — nós sem id, que o `normalizeNode` do `maps.jsx` completa;

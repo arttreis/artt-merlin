@@ -1,4 +1,4 @@
-/* merlin · montar com o Merlin (funil, app, mapa, planilha e apresentação)
+/* merlin · montar com o Merlin (funil, app, mapa, planilha, apresentação e protótipo)
    logica pura, sem React. ate 10/10/2026 o Merlin montava essas coisas numa
    resposta so, a partir de uma frase, e tinha que adivinhar o negocio. agora
    a tela do assistente conduz uma conversa curta (a tarefa `build` do
@@ -10,7 +10,7 @@
    sabe ler. reconhecer o pedido mora em build-intent.js, que e leve. */
 import { layoutNodes } from "./funnel-layout.js";
 import { NODE_TYPES } from "./funnel-draw.js";
-import { fromBlueprint, normalizeApp } from "./app-spec.js";
+import { fromBlueprint, normalizeApp, mergePrototype, snake } from "./app-spec.js";
 import { normalizeSheet, buildSheet, evaluateSheet, colLetter } from "./sheet.js";
 import { normalizeDeck, SLIDE_LAYOUTS } from "./deck.js";
 import { KINDS as GOAL_KINDS, goalsOf, goalLine, periodOf } from "./plans-data.js";
@@ -64,14 +64,22 @@ const sheetSize = (s) => plural(s.rows.length, "linha", "linhas") + " · " + plu
 export function builtLine(kind, doc) {
   if (kind === "sheet" && doc) return "planilha pronta · " + sheetSize(normalizeSheet(doc));
   if (kind === "deck" && doc) return "apresentação pronta · " + plural(normalizeDeck(doc).slides.length, "slide", "slides");
+  /* o protótipo não cria documento: conta as telas do rascunho que entrou */
+  if (kind === "prototype" && doc) return "protótipo pronto · " + plural(Array.isArray(doc.screens) ? doc.screens.length : 0, "tela", "telas");
   return "";
 }
 
-/* { title, lines: [{ label, text }], table? } — a carta do rascunho na conversa.
+/* { title, lines: [{ label, text }], table?, wires? } — a carta do rascunho na conversa.
    curta de proposito: e para conferir de relance, o detalhe esta na tela de
-   cada um depois de criar */
-export function draftView(kind, d) {
+   cada um depois de criar. `app`: o app em que o protótipo vai entrar */
+export function draftView(kind, d, app) {
   if (!d) return { title: "", lines: [] };
+  /* o protótipo se confere desenhado: cada tela como vai ficar depois de
+     juntar, e as ações que entram */
+  if (kind === "prototype") {
+    const v = prototypeView(app, d);
+    return { title: v.title, sub: v.sub, lines: v.actions.length ? [{ label: "ações", text: v.actions.join("; ") }] : [], wires: v.screens };
+  }
   if (kind === "funnel") {
     const lines = [{ label: "etapas", text: d.stages.map((s) => s.title || typeLabel(s.nodeType)).join(" → ") }];
     if (d.offers.length) lines.push({ label: plural(d.offers.length, "oferta", "ofertas"), text: d.offers.map((o) => [o.name, priceLabel(o.price)].filter(Boolean).join(" · ")).join("; ") });
@@ -332,4 +340,57 @@ export function adjustView(kind, beforeDoc, afterDoc) {
     }
   }
   return { line: "o Merlin mudou a planilha", at: 0, pairs: pairs.slice(0, 8), more: Math.max(0, pairs.length - 8) };
+}
+
+/* ---------- o protótipo de um app que já existe (ticket #95) ----------
+   "desenha o protótipo do cadastro do app Agenda": o Merlin lê o app como
+   está (as telas, o que cada uma tem, as ações e as entidades) e devolve só
+   as telas e as ações do trecho pedido. o rascunho entra pelo mergeDraft
+   restrito (app-spec.js, mergePrototype): nada do que a pessoa escreveu
+   muda. só vai à Anthropic quando a pessoa pede (PRD desenhos, D8). */
+const SPEC_MAX = 8000;
+export function prototypeContext(app) {
+  if (!app) return "";
+  const a = normalizeApp(app, counter());
+  const one = (v) => String(v || "").replace(/\s+/g, " ").trim();
+  const names = new Map(a.screens.map((s) => [s.id, s.name]));
+  const lines = ["app: " + one(a.name)];
+  if (one(a.pitch)) lines.push("em uma frase: " + one(a.pitch));
+  if (a.entities.length) lines.push("entidades: " + a.entities.map((e) => one(e.name)).join(", "));
+  a.screens.forEach((s) => {
+    lines.push("tela: " + one(s.name) + (s.start ? " (entrada)" : "") + (one(s.goal) ? " — " + one(s.goal) : ""));
+    s.parts.split(/\r?\n/).map((p) => one(p).replace(/^[-*•]\s+/, "")).filter(Boolean).forEach((p) => lines.push("  - " + p));
+  });
+  a.flows.forEach((f) => lines.push("ação: " + names.get(f.from) + " → " + names.get(f.to) + (one(f.action) ? ": " + one(f.action) : "")));
+  if (!a.screens.length) lines.push("(o app ainda não tem tela)");
+  return lines.join("\n").slice(0, SPEC_MAX);
+}
+
+/* o que o rascunho faz no app: cada tela do rascunho como vai ficar
+   ("new" é nova, "more" é uma que existe e ganha `added` linhas, "same" uma
+   que já tem tudo), e as ações que entram de fato */
+export function prototypeView(app, d) {
+  const before = normalizeApp(app || {}, counter());
+  const after = mergePrototype(before, d, counter());
+  const old = new Map(before.screens.map((s) => [s.id, s]));
+  const byKey = new Map(after.screens.map((s) => [snake(s.name), s]));
+  const count = (p) => String(p || "").split(/\r?\n/).filter((l) => l.trim()).length;
+  const seen = new Set();
+  const screens = [];
+  (Array.isArray(d && d.screens) ? d.screens : []).forEach((x) => {
+    const s = byKey.get(snake(x && x.name));
+    if (!s || seen.has(s.id)) return;
+    seen.add(s.id);
+    const was = old.get(s.id);
+    const added = was ? count(s.parts) - count(was.parts) : 0;
+    screens.push({ name: s.name, parts: s.parts, start: s.start, status: !was ? "new" : added ? "more" : "same", added });
+  });
+  const names = new Map(after.screens.map((s) => [s.id, s.name]));
+  const actions = after.flows.slice(before.flows.length)
+    .map((f) => names.get(f.from) + " → " + names.get(f.to) + (f.action.trim() ? " · " + f.action.trim() : ""));
+  return {
+    title: app && app.name ? before.name : "protótipo",
+    sub: plural(screens.length, "tela", "telas") + " · " + plural(actions.length, "ação", "ações"),
+    screens, actions
+  };
 }

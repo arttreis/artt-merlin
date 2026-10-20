@@ -310,19 +310,64 @@ export function fromBlueprint(data, makeId) {
   };
 }
 
+/* o rascunho do protótipo (o `build` do tipo prototype, ticket #95): só
+   telas e ações de um trecho do app. a ação pode sair de uma tela que já
+   existe ("Início" → a tela nova), então o nome resolve primeiro entre as
+   telas do rascunho e depois entre as do app; o que não fecha sai. */
+const PROTOTYPE_SCREENS = 12;
+export function fromPrototype(data, app, makeId) {
+  const b = data && typeof data === "object" ? data : {};
+  const screens = list(b.screens).slice(0, PROTOTYPE_SCREENS).map((s) => normalizeScreen({
+    name: s && s.name, goal: s && s.goal, start: s && s.start,
+    parts: Array.isArray(s && s.parts) ? s.parts.map((p) => str(p, 120)).join("\n") : s && s.parts
+  }, makeId));
+  const appScreens = app && Array.isArray(app.screens) ? app.screens : [];
+  if (screens.length && !screens.some((s) => s.start) && !appScreens.some((s) => s.start)) screens[0].start = true;
+  const byName = new Map(appScreens.map((s) => [snake(s.name), s.id]));
+  screens.forEach((s) => byName.set(snake(s.name), s.id));
+  const flows = list(b.flows).slice(0, 200).map((f) => ({
+    id: makeId(),
+    from: byName.get(snake(f && f.from)) || "",
+    to: byName.get(snake(f && f.to)) || "",
+    action: str(f && f.action, 120)
+  })).filter((f) => f.from && f.to && f.from !== f.to);
+  return { screens: layoutScreens(screens, flows), flows };
+}
+
+/* as linhas de `parts` que faltam numa tela que já existe: as dela ficam
+   como estão, e a comparação não liga para caixa, acento nem marcador */
+const PARTS_MAX = 2000;
+const partKey = (line) => plain(line.trim().replace(/^[-*•]\s+/, "").trim());
+function addParts(have, more) {
+  const seen = new Set(have.split(/\r?\n/).map(partKey).filter(Boolean));
+  let out = have;
+  more.split(/\r?\n/).map((l) => l.trim()).filter(Boolean).forEach((line) => {
+    const k = partKey(line);
+    if (!k || seen.has(k)) return;
+    const next = out.trim() ? out.replace(/\s+$/, "") + "\n" + line : line;
+    if (next.length > PARTS_MAX) return;
+    seen.add(k);
+    out = next;
+  });
+  return out;
+}
+
 /* juntar o rascunho a um projeto que ja tem coisa: o que a pessoa escreveu
    ganha sempre. campo de conceito so e preenchido se estava vazio; entidade e
    tela com o mesmo nome nao entram de novo (e o que apontava para a do
    rascunho passa a apontar para a que ja existia); o que e novo entra a
-   direita do que ja esta no palco, para nao cair por cima. */
-export function mergeDraft(app, parts) {
+   direita do que ja esta no palco, para nao cair por cima.
+   `screensOnly` (o protótipo): só telas e ações mudam, e a tela de mesmo
+   nome ganha as linhas de `parts` que faltam nela */
+export function mergeDraft(app, parts, opts) {
+  const screensOnly = !!(opts && opts.screensOnly);
   const fill = (k) => (app[k].trim() ? app[k] : parts[k] || "");
   const right = (items, w) => (items.length ? Math.max(...items.map((i) => i.x + w)) + 140 : 0);
 
   const entityKey = new Map(app.entities.map((e) => [snake(e.name), e.id]));
   const entityAlias = new Map();
   const newEntities = [];
-  parts.entities.forEach((e) => {
+  list(parts.entities).forEach((e) => {
     const same = entityKey.get(snake(e.name));
     if (same) entityAlias.set(e.id, same); else newEntities.push(e);
   });
@@ -343,21 +388,33 @@ export function mergeDraft(app, parts) {
   const scr = (id) => screenAlias.get(id) || id;
   const hasStart = app.screens.some((s) => s.start);
   const dxS = right(app.screens, SCREEN_W);
-  const screens = app.screens.concat(newScreens.map((s) => ({
+  /* no protótipo, a tela que já existia ganha as linhas que o rascunho dela
+     traz e ela não tem; o resto dela fica igual */
+  const more = new Map();
+  if (screensOnly) parts.screens.forEach((s) => { const id = screenAlias.get(s.id); if (id) more.set(id, (more.get(id) || []).concat(s.parts)); });
+  const kept = app.screens.map((s) => {
+    if (!more.has(s.id)) return s;
+    const p = more.get(s.id).reduce(addParts, s.parts);
+    return p === s.parts ? s : { ...s, parts: p };
+  });
+  const screens = kept.concat(newScreens.map((s) => ({
     ...s, x: s.x + dxS, start: hasStart ? false : s.start,
-    entities: [...new Set(s.entities.map(ent))]
+    entities: screensOnly ? [] : [...new Set(s.entities.map(ent))]
   })));
 
   const flowKey = (f) => f.from + ">" + f.to + ">" + f.action.trim().toLowerCase();
   const seenFlows = new Set(app.flows.map(flowKey));
   const flows = app.flows.slice();
+  const screenIds = new Set(screens.map((s) => s.id));
   parts.flows.forEach((f) => {
     const g = { ...f, from: scr(f.from), to: scr(f.to) };
+    if (screensOnly && (!screenIds.has(g.from) || !screenIds.has(g.to))) return;
     if (!seenFlows.has(flowKey(g))) { seenFlows.add(flowKey(g)); flows.push(g); }
   });
+  if (screensOnly) return { ...app, screens, flows };
 
   const seenFeatures = new Set(app.features.map((f) => f.title.trim().toLowerCase()));
-  const features = app.features.concat(parts.features.filter((f) => !seenFeatures.has(f.title.trim().toLowerCase())));
+  const features = app.features.concat(list(parts.features).filter((f) => !seenFeatures.has(f.title.trim().toLowerCase())));
 
   return {
     ...app,
@@ -365,6 +422,7 @@ export function mergeDraft(app, parts) {
     features, entities, screens, flows
   };
 }
+export const mergePrototype = (app, data, makeId) => mergeDraft(app, fromPrototype(data, app, makeId), { screensOnly: true });
 
 /* ---------- as saidas ---------- */
 
