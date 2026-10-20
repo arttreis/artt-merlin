@@ -983,7 +983,10 @@ const ASSISTANT_ACTIONS = {
   "onboarding-map": { collection: "maps", fields: ["name", "tree"] },
   "onboarding-funnel": { collection: "funnels", fields: ["name", "stages"] },
   script: { collection: "content", fields: ["contentId", "script"] },
-  "finance-entry": { collection: "finance", fields: ["name", "amount", "kind", "day", "category", "paid", "confirm", "fixed"] },
+  /* o livro só aceita "business"; o resto, e a falta dele, é o pessoal: na
+     dúvida a tela abre em pessoal, com o seletor à vista (PRD meu-negocio) */
+  "finance-entry": { collection: "finance", fields: ["name", "amount", "kind", "day", "category", "paid", "confirm", "fixed", "book"],
+    clean: (p) => ({ ...p, book: p.book === "business" ? "business" : "personal" }) },
   "habit-mark": { collection: "habits", fields: ["habit", "name", "date"] },
   "sleep-log": { collection: "sleep", fields: ["min", "date"] },
   "workout-log": { collection: "workouts", fields: ["title", "min", "date"] },
@@ -1009,7 +1012,7 @@ LIST_TASKS.assistant = (c) => ({
     "onboarding-map {name, tree: {title, note, children:[{title, note, children:[...]}]} — no máximo 3 níveis, 6 filhos por nó}; " +
     "onboarding-funnel {name, stages: lista de {nodeType (um de " + NODE_TYPES + "), title}}; " +
     "script {contentId (o id da peça de conteúdo do contexto — NUNCA invente um; sem id no contexto, não proponha este tipo), script (roteiro em markdown: # título e depois as seções \"## \" do molde do formato que vier no contexto da tela, na mesma ordem e sem as linhas de dica em itálico — sem molde no contexto, ## gancho, ## desenvolvimento, ## fechamento —, com bullets para falar, não texto corrido; gancho com número, contraste ou case, nunca pergunta nem saudação; virada antes do fim e CTA amarrado nela; NUNCA invente número, resultado ou case — o dado que faltar entra marcado com [conferir])}; " +
-    "finance-entry {name (o que foi, curto), amount (centavos, número inteiro; 0 se a pessoa não disse o valor — nunca estime), kind (out para gasto, in para entrada), day (AAAA-MM-DD; sem data, hoje), category (uma das categorias do contexto, ou vazio), paid (true se já aconteceu, false se é para depois), confirm (o id de um previsto do contexto — na seção dinheiro do retrato, o que vem depois do # em \"a confirmar\", \"vence em 7 dias\" e \"previsto no mês\", sem o # — quando a pessoa diz que pagou ou recebeu algo que já estava previsto — NUNCA invente; sem id no contexto, vazio), fixed (o id de um fixo do contexto — no retrato, o que vem depois do # em \"fixos\" — quando é a conta fixa do mês e não há previsto para ela — NUNCA invente; sem id no contexto, vazio)} — use quando a pessoa contar um gasto ou uma entrada (\"gastei 45 no almoço\", \"recebi 3 mil da Ana\"); fixo, parcela, dívida, investimento e transferência novos não entram por aqui; " +
+    "finance-entry {name (o que foi, curto), amount (centavos, número inteiro; 0 se a pessoa não disse o valor — nunca estime), kind (out para gasto, in para entrada), day (AAAA-MM-DD; sem data, hoje), category (uma das categorias do contexto, ou vazio), paid (true se já aconteceu, false se é para depois), confirm (o id de um previsto do contexto — na seção dinheiro do retrato, o que vem depois do # em \"a confirmar\", \"vence em 7 dias\" e \"previsto no mês\", sem o # — quando a pessoa diz que pagou ou recebeu algo que já estava previsto — NUNCA invente; sem id no contexto, vazio), fixed (o id de um fixo do contexto — no retrato, o que vem depois do # em \"fixos\" — quando é a conta fixa do mês e não há previsto para ela — NUNCA invente; sem id no contexto, vazio), book (business quando o dinheiro é da empresa — a pessoa diz \"a empresa\", \"PJ\", \"na empresa\" ou cita um cliente do retrato —; personal no resto e na dúvida, que a tela pergunta)} — use quando a pessoa contar um gasto ou uma entrada (\"gastei 45 no almoço\", \"recebi 3 mil da Ana\", \"recebi 2.400 da Acme na empresa\"); fixo, parcela, dívida, investimento e transferência novos não entram por aqui; " +
     "habit-mark {habit (o nome exato de um hábito do contexto, ou vazio), name (o hábito como a pessoa disse, curto: \"treinar\", \"ler\"), date (AAAA-MM-DD do dia em que a pessoa fez; sem data, hoje)} — use quando a pessoa contar que fez um hábito (\"treinei\", \"ontem li 20 páginas\"), mesmo que ele ainda não exista: a tela oferece criar; nunca para desmarcar nem para mudar a frequência. " +
     "sleep-log {min (minutos dormidos, número: \"7h\" é 420, \"7h e meia\" é 450; 0 se a pessoa não disse — nunca estime), date (AAAA-MM-DD do dia em que a pessoa ACORDOU: \"dormi 7h\" é hoje, \"ontem dormi 6h\" é ontem)} — use quando a pessoa contar quanto dormiu; horas de sono são sleep-log, nunca habit-mark nem task. " +
     "workout-log {title (o que treinou, curto: \"perna\", \"corrida\"; vazio se a pessoa não disse), min (minutos de treino, número: \"1h\" é 60; 0 se a pessoa não disse — nunca estime), date (AAAA-MM-DD do dia em que treinou; sem data, hoje)} — use quando a pessoa contar um treino com o que treinou ou por quanto tempo (\"treinei perna 40min\", \"ontem corri 30 min\"); a tela marca sozinha o hábito de treino. \"treinei\" sem detalhe nenhum continua habit-mark. " +
@@ -1591,7 +1594,7 @@ async function advise(req, env, person) {
           actionType: String(raw.actionType),
           title: String(raw.title || "").slice(0, 120),
           note: String(raw.note || "").slice(0, 300),
-          payload
+          payload: spec.clean ? spec.clean(payload) : payload
         }];
       }
     }

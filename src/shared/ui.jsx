@@ -28,7 +28,7 @@ import { LOGO, ICONS, NAV_ICONS, icon } from "./icons.jsx";
    Form como qualquer outro do sistema — e porque qualquer tela que um dia
    receba uma proposta usa o mesmo. */
 import { ACTION_COLLECTIONS, ACTION_LABELS, ACTION_FIELDS, ACTION_DONE, buildDoc, previewOf } from "./assistant-actions.js";
-import { normalize as normalizeFinance, contextOf as financeContext, undoEntry } from "./finance-data.js";
+import { normalize as normalizeFinance, contextOf as financeContext, undoEntry, bookCollection, cashLine } from "./finance-data.js";
 import { normalize as normalizeHabit, SCHEDULES, COLORS, WEEKDAY_NAMES, habitStatus, undoHabit, markWhen } from "./habits-data.js";
 import { normalize as normalizeSleep } from "./sleep-data.js";
 import { normalize as normalizeWorkout, logWorkout, applyWorkout } from "./workouts-data.js";
@@ -969,7 +969,7 @@ export function ProposalDialog({ proposal, chat, onClose, onDone }) {
   });
   const [v, bind, set] = useFields(initial);
   if (!collectionName) return null;
-  const ctx = collectionName === "finance" ? financeContext(store) : null;
+  const ctx = collectionName === "finance" ? financeContext(bookCollection(store, v.book)) : null;
   const submit = () => {
     const { doc, error } = buildDoc(actionType, payload, v, store, { chat });
     if (error) { notify(error); return false; }
@@ -994,10 +994,13 @@ export function ProposalDialog({ proposal, chat, onClose, onDone }) {
     if (goTo) { if (onDone) onDone(ACTION_LABELS[actionType]); location.href = goTo + doc.id; return; }
     /* a linha da pílula confirmada sai do que foi gravado, com o que a pessoa
        editou na caixa, e não do que a IA propôs */
-    const line = (ACTION_DONE[actionType] || "criado") + " · " + (previewOf(actionType, { ...payload, ...v }, ctx) || v.title || v.name || proposal.title);
+    /* o lançamento da empresa diz onde caiu: "✓ lançado no caixa · R$ 2.400 ·
+       Acme" (PRD meu-negocio, D8) */
+    const cash = actionType === "finance-entry" && doc.book === "business";
+    const line = cash ? cashLine(doc) : (ACTION_DONE[actionType] || "criado") + " · " + (previewOf(actionType, { ...payload, ...v }, ctx) || v.title || v.name || proposal.title);
     if (onDone) onDone(line);
     const undo = undoEntry(before, doc);
-    const notice = DONE_NOTICE[actionType];
+    const notice = cash ? (l) => "✓ " + l : DONE_NOTICE[actionType];
     notify(typeof notice === "function" ? notice(line) : notice || "feito", () => {
       if (undo.remove) store.remove(undo.remove); else store.save(undo.save);
       if (onDone) onDone(null);
@@ -1017,7 +1020,7 @@ export function ProposalDialog({ proposal, chat, onClose, onDone }) {
               ? <MoneyInput value={+v[f.key] || 0} onChange={(c) => set(f.key, c)} />
               : f.type === "select"
               ? <select className="select" {...bind(f.key)}>
-                  {f.options(store).map(optionPair).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+                  {f.options(store, v).map(optionPair).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
                 </select>
               : <input className="input" type={f.type === "number" ? "number" : f.type === "date" ? "date" : "text"} {...bind(f.key)} />}
           </Field>

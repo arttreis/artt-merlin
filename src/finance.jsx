@@ -5,27 +5,33 @@ import "./shared/base.css";
 import "./finance.css";
 import {
   initPage, newId, today, notify, brl, parseMoney,
-  isDay, addDays, weekdayOf, monthLabel, dateLabel
+  addDays, monthLabel, dateLabel
 } from "./shared/core.js";
 import { useState } from "react";
 import { FINANCE_TEMPLATES, financeGroups, buildFinance } from "./shared/templates.js";
 import {
   mount, useCollection, useKeydown, isTyping,
-  useFields, Form, Field, EmptyStart, icon, DateField, DayOfMonthField
+  useFields, Form, Field, EmptyStart, icon
 } from "./shared/ui.jsx";
 /* o saldo e a normalizacao moram no shared desde 22/09/2026: o assistente
    tambem os usa, de qualquer tela */
 import {
-  pad, INVEST_CATEGORIES,
-  daysInMonth, effectiveDay, cardInstallment, installmentNumber,
-  projectionsOf, oldestDay, balanceUntil, realBalanceUntil,
+  pad, INVEST_CATEGORIES, adjacentMonth,
+  cardInstallment, installmentNumber,
+  balanceUntil, realBalanceUntil,
   pendingBefore, suggestionsBetween, buildMonth, spentByCategory, categoryOrder,
-  normalize, byType, configOf, saveConfig, contextOf
+  normalize, configOf, saveConfig, contextOf, bookCollection
 } from "./shared/finance-data.js";
 /* a caixa do lancamento e os campos de dinheiro moram no shared desde
    19/10/2026: o cartao do inicio abre a mesma caixa para o previsto que
    passou ("nao aconteceu") */
-import { EntryForm, MoneyInput, KindChips, CategorySelect, inReais, pickCategory } from "./shared/entry-form.jsx";
+import { EntryForm, MoneyInput, inReais } from "./shared/entry-form.jsx";
+/* o mês, os fixos e os ajustes moram no shared desde 20/10/2026: o caixa da
+   empresa (cash.jsx) usa os mesmos */
+import {
+  balanceStyle, isForecast, Meter, SplitBar, MonthView, DayItem, SuggestionItem,
+  PanelTable, PanelBlock, FixedBlocks, fixedOf, FixedForm, ConfigForm, UnitInput, DayOfMonthInput, entryActions
+} from "./shared/finance-views.jsx";
 
 initPage("finance");
 
@@ -40,41 +46,15 @@ const TABS = [
   { id: "invest", label: "investimentos" }
 ];
 
-
-/* a cor do saldo escala com o proprio conjunto visivel (o mes ou o ano
-   aberto), nao com faixas fixas — senao um saldo de R$ 3 mil e um de
-   R$ 300 mil pintam igual so por passarem os dois de um teto absoluto.
-   raiz quadrada pra nao achatar os valores do meio quando um unico dia
-   dispara bem acima do resto. em centavos. */
-function balanceStyle(cents, maxAbs) {
-  if (cents < 0) return { cls: " is-negative" };
-  const t = maxAbs > 0 ? Math.min(1, Math.sqrt(cents / maxAbs)) : 0;
-  return { cls: " is-positive", style: { "--tone": t } };
-}
 /* negativo entre parenteses, como na planilha */
 const brlBalance = (cents) => cents < 0 ? "(" + brl(cents) + ")" : brl(cents);
-
-/* tres coisas, tres desenhos:
-   - REAL: lancamento pago. cheio.
-   - PREVISTO: lancamento que a pessoa gravou como nao pago. tracejado, com
-     o "≈" — a mesma regra do funil, tracejado e o que ainda nao aconteceu.
-   - SUGESTAO: fixo ou parcela ainda nao lancado. nao tem numero nas contas;
-     aparece apagado, com o botao de lancar.
-   somados num numero so, eles faziam o "saldo de hoje" mentir. */
-const isForecast = (it) => !it.paid;
-
-function adjacentMonth(yyyymm, delta) {
-  const [year, month] = yyyymm.split("-").map(Number);
-  let m = month + delta, y = year;
-  if (m < 1) { m = 12; y--; } else if (m > 12) { m = 1; y++; }
-  return y + "-" + pad(m);
-}
 
 /* ---------- a pagina ----------
    o estado de tela mora aqui: a aba, o mes e o ano abertos, o dia expandido
    e qual caixa esta aberta. nada disso e documento — some ao recarregar. */
 function Finance() {
-  const finance = useCollection("finance", { normalize });
+  /* o livro pessoal: o da empresa é o caixa (cash.jsx), e um não vê o outro */
+  const finance = bookCollection(useCollection("finance", { normalize }), "personal");
   const [tab, setTab] = useState("today");
   const [month, setMonth] = useState(() => today().slice(0, 7));
   const [year, setYear] = useState(() => +today().slice(0, 4));
@@ -98,28 +78,10 @@ function Finance() {
   const closeForm = () => setForm(null);
   const newEntry = (day) => setForm({ type: "entry", id: "", day: day || (month === today().slice(0, 7) ? today() : month + "-01") });
   const edit = (type, id) => setForm({ type, id });
-  const newFixed = (kind) => setForm({ type: "fixed", id: "", kind });
+  const newFixed = (kind) => setForm({ type: "fixed", id: "", preset: { kind } });
 
-  /* ---------- gravar e apagar ---------- */
-  const save = (doc, existing, text) => {
-    finance.save({ ...doc, createdAt: existing ? existing.createdAt : Date.now(), updatedAt: Date.now() });
-    notify(text);
-  };
-  const removeWithUndo = (id, text) => {
-    const before = finance.remove(id);
-    notify(text, before ? () => finance.save(before) : null);
-  };
-
-  /* ---------- acoes do dia ---------- */
-  /* lancar uma sugestao: a caixa de lancamento ja preenchida com o que o
-     fixo ou a parcela diz. quem decide o valor, o dia e se ja foi pago e a
-     pessoa — a sugestao so poupa a digitacao. */
-  const launchSuggestion = (day, it) => setForm({ type: "entry", id: "", day,
-    preset: { name: it.name, amount: it.amount, kind: it.kind, category: it.category, origin: it.origin, paid: day <= today() } });
-  const togglePaid = (id) => {
-    const doc = finance.get(id);
-    if (doc) finance.save({ ...doc, paid: !doc.paid, updatedAt: Date.now() });
-  };
+  /* ---------- gravar, apagar e as acoes do dia ---------- */
+  const { save, removeWithUndo, launchSuggestion, togglePaid } = entryActions(finance, setForm);
   /* abater uma parcela so anda o "ja pago" da divida: nao cria lancamento,
      porque a divida e registro e nao movimento do saldo */
   const payInstallment = (id) => {
@@ -220,7 +182,7 @@ function Finance() {
 
       {form && form.type === "entry" && <EntryForm key={"entry:" + form.id + ":" + form.day} id={form.id} presetDay={form.day} preset={form.preset} {...formProps}/>}
       {form && form.type === "category" && <CategoryForm key={"category:" + form.name} finance={finance} name={form.name} onClose={closeForm}/>}
-      {form && form.type === "fixed" && <FixedForm key={"fixed:" + form.id} id={form.id} presetKind={form.kind} {...formProps}/>}
+      {form && form.type === "fixed" && <FixedForm key={"fixed:" + form.id} id={form.id} preset={form.preset} {...formProps}/>}
       {form && form.type === "card" && <CardForm key={"card:" + form.id} id={form.id} {...formProps}/>}
       {form && form.type === "debt" && <DebtForm key={"debt:" + form.id} id={form.id} {...formProps}/>}
       {form && form.type === "invest" && <InvestForm key={"invest:" + form.id} id={form.id} {...formProps}/>}
@@ -228,21 +190,6 @@ function Finance() {
     </>
   );
 }
-
-/* um medidor: legenda em cima, numero embaixo. `forecast` desenha o numero
-   como previsao: tinta mais leve, sublinhado tracejado e o "≈" na frente */
-const Meter = ({ label, value, cls, forecast }) => (
-  <div className="meter"><span className="legend">{label}</span><span className={"num mono" + (forecast ? " is-forecast" : "") + (cls || "")}>{forecast ? "≈ " : ""}{brl(value, true)}</span></div>);
-
-/* a barra de dois tempos: o cheio e o que ja aconteceu, o tracejado e o que
-   ainda vai, sobre o total `of`. passar do total nao some: a barra enche e
-   a legenda diz quanto passou. */
-const SplitBar = ({ real, forecast, of }) => {
-  const base = Math.max(1, of || real + forecast);
-  const r = Math.min(100, (real / base) * 100);
-  const f = Math.min(100 - r, (forecast / base) * 100);
-  return <span className="split"><i style={{ width: r + "%" }} /><b style={{ width: f + "%" }} /></span>;
-};
 
 /* ----- hoje: a primeira tela do dinheiro -----
    três perguntas, nessa ordem: quanto tem na conta agora (real), onde ela
@@ -463,185 +410,6 @@ function CategoryForm({ finance, name, onClose }) {
   );
 }
 
-/* ----- mês ----- */
-function MonthView({ ctx, month, openDay, onToggleDay, onShift, onNewEntry, onEditEntry, onTogglePaid, onLaunch }) {
-  const t = today();
-  /* simular: uma lista de lancamentos hipoteticos, so em memoria — nunca
-     grava na colecao. o saldo/entradas/saidas do mes saem do ctx simulado;
-     o detalhe de cada dia (o que abre ao clicar) continua mostrando so os
-     lancamentos de verdade, com as acoes de sempre (editar, confirmar). */
-  const [sim, setSim] = useState([]);
-  const [simOpen, setSimOpen] = useState(false);
-  const realDays = buildMonth(month, ctx, null, t);
-  const days = sim.length
-    ? buildMonth(month, { ...ctx, entries: ctx.entries.concat(sim) }, null, t)
-        .map((d, i) => ({ ...d, items: realDays[i].items, suggestions: realDays[i].suggestions }))
-    : realDays;
-  const [year, monthNum] = month.split("-").map(Number);
-  const nDays = daysInMonth(year, monthNum);
-  const isThisMonth = month === t.slice(0, 7);
-  const todayNum = isThisMonth ? +t.slice(8, 10) : 0;
-
-  const balanceToday = realBalanceUntil(t, ctx);
-  const balanceEnd = days[days.length - 1].balance;
-  /* o "diario" da planilha: o que sobra no fim do mes dividido pelos dias
-     que ainda faltam — mesma logica da barra do dia */
-  const daysLeft = isThisMonth ? (nDays - todayNum + 1) : nDays;
-  const daily = daysLeft > 0 ? Math.round(balanceEnd / daysLeft) : 0;
-  const monthIn = days.reduce((s, d) => s + d.inflow, 0);
-  const monthOut = days.reduce((s, d) => s + d.outflow, 0);
-  /* o teto da escala de cor: o maior saldo de verdade do mes (o "antes do
-     marco" fica de fora, ele nem pinta) */
-  const maxAbs = Math.max(0, ...days.filter((d) => !d.before).map((d) => d.balance));
-
-  const addSim = (entry) => setSim((s) => s.concat([{ ...entry, id: newId(), paid: false, category: "", origin: { type: "sim", id: "" } }]));
-  const removeSim = (id) => setSim((s) => s.filter((e) => e.id !== id));
-  const clearSim = () => { setSim([]); setSimOpen(false); };
-
-  return (
-    <>
-      <div className="row mb">
-        <button className="pill pill--icon" type="button" aria-label="Mês anterior" onClick={() => onShift(-1)}>{icon("arrowLeft")}</button>
-        <strong className="mono" id="month-label">{monthLabel(month)}</strong>
-        <button className="pill pill--icon" type="button" aria-label="Mês seguinte" onClick={() => onShift(1)}>{icon("arrow")}</button>
-        <span className="spacer"></span>
-        <button className={"pill" + (sim.length || simOpen ? " is-on" : "")} type="button" aria-pressed={String(simOpen)} onClick={() => setSimOpen((v) => !v)}>
-          {icon("spark")}simular{sim.length > 0 ? " · " + sim.length : ""}
-        </button>
-        <button className="pill pill--accent" type="button" onClick={() => onNewEntry()}>{icon("plus")}lançamento</button>
-      </div>
-
-      {simOpen && <SimPanel month={month} entries={sim} onAdd={addSim} onRemove={removeSim} onClear={clearSim} onClose={() => setSimOpen(false)} />}
-
-      <div className="meters mb">
-        <Meter label="na conta hoje" value={balanceToday} cls={balanceToday < 0 ? " is-negative" : ""}/>
-        <Meter label="fim do mês" value={balanceEnd} forecast cls={balanceEnd < 0 ? " is-negative" : ""}/>
-        <Meter label={daily < 0 ? "não fecha" : "por dia até o fim"} value={daily} forecast cls={daily < 0 ? " is-negative" : ""}/>
-        <Meter label="entradas do mês" value={monthIn} forecast/>
-        <Meter label="saídas do mês" value={monthOut} forecast/>
-      </div>
-
-      <div className="table-scroll"><table className="table">
-        <thead><tr><th>dia</th><th className="num">entradas</th><th className="num">saídas</th><th className="num">saldo</th></tr></thead>
-        <tbody>
-          {days.map((d) => <DayRow key={d.day} d={d} today={t} isToday={isThisMonth && d.day === t} open={openDay === d.day} maxAbs={maxAbs}
-            onToggle={() => onToggleDay(d.day)} onNewEntry={onNewEntry} onEditEntry={onEditEntry} onTogglePaid={onTogglePaid} onLaunch={onLaunch}/>)}
-        </tbody>
-      </table></div>
-    </>
-  );
-}
-
-/* ----- simular: um "e se" que nunca grava -----
-   uma lista hipotetica em memoria, somada aos lancamentos de verdade so na
-   hora de calcular o saldo projetado. fechar a aba ou limpar a simulacao
-   nao deixa rastro nenhum na colecao. */
-function SimPanel({ month, entries, onAdd, onRemove, onClear, onClose }) {
-  const [v, bind, set] = useFields({ name: "", amount: "", kind: "out", day: today() > month + "-01" ? today() : month + "-01" });
-  const add = () => {
-    const amount = parseMoney(v.amount);
-    if (!v.name.trim() || !amount) { notify("preciso de um nome e um valor pra simular"); return; }
-    onAdd({ day: isDay(v.day) ? v.day : today(), name: v.name.trim(), amount, kind: v.kind });
-    set("name", ""); set("amount", "");
-  };
-  const total = entries.reduce((s, e) => s + (e.kind === "in" ? e.amount : -e.amount), 0);
-  return (
-    <div className="block sim-panel mb">
-      <p className="heading">
-        <span className="t-mono">simulação · e se</span>
-        <span className="row">
-          {entries.length > 0 && <span className={"total" + (total < 0 ? " is-negative" : total > 0 ? " is-green" : "")}>{(total > 0 ? "+" : "") + brl(total, true)}</span>}
-          {entries.length > 0 && <button className="action" type="button" title="limpar simulação" aria-label="limpar simulação" onClick={onClear}>{icon("trash")}</button>}
-          <button className="action" type="button" title="fechar" aria-label="fechar" onClick={onClose}>{icon("x")}</button>
-        </span>
-      </p>
-      <p className="small weak sim-panel__hint">lançamentos hipotéticos, só nesta tela — não gravam em nada, e somem se você sair sem limpar</p>
-      {entries.length > 0 && (
-        <ul className="list mb">
-          {entries.slice().sort((a, b) => a.day.localeCompare(b.day)).map((e) => (
-            <li key={e.id} className="line fin-item is-forecast">
-              <span className="name"><small className="fin-item__day">{dateLabel(e.day)}</small>{e.name}</span>
-              <span className={"measure mono" + (e.kind === "in" ? " positive" : "")}>{e.kind === "in" ? "+" : "−"} {brl(e.amount)}</span>
-              <span className="fin-item__acts"><button className="action" type="button" title="tirar da simulação" aria-label="tirar da simulação" onClick={() => onRemove(e.id)}>{icon("x")}</button></span>
-            </li>
-          ))}
-        </ul>
-      )}
-      <div className="row sim-panel__add">
-        <input className="input" placeholder="o que aconteceria?" maxLength="140" {...bind("name")} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); add(); } }}/>
-        <MoneyInput {...bind("amount")}/>
-        <KindChips {...bind("kind")}/>
-        <DateField {...bind("day")}/>
-        <button className="pill" type="button" onClick={add}>{icon("plus")}simular</button>
-      </div>
-    </div>
-  );
-}
-
-/* a linha do dia e, embaixo dela, o detalhe quando esta aberta */
-/* o dia que ainda não chegou é previsão inteira: tinta leve e o "≈". o que
-   já passou com item sem confirmar ganha o ponto de "a confirmar". */
-function DayRow({ d, today: t, isToday, open, maxAbs, onToggle, onNewEntry, onEditEntry, onTogglePaid, onLaunch }) {
-  const label = weekdayOf(d.day) + " " + (+d.day.slice(8, 10));
-  const future = d.day > t;
-  const unconfirmed = !future && !d.before && d.items.some(isForecast);
-  const money = (v) => (future ? "≈ " : "") + brl(v, true);
-  const tone = balanceStyle(d.balance, maxAbs);
-  return (
-    <>
-      <tr className={"day-row" + (isToday ? " is-today" : "") + (future ? " is-future" : "")} data-day={d.day} onClick={onToggle}>
-        <td>{label}{unconfirmed && <i className="dot-pending" title="tem previsto a confirmar" />}{d.suggestions.length > 0 && <i className="dot-suggest" title={d.suggestions.length + (d.suggestions.length === 1 ? " sugestão" : " sugestões") + " para lançar"} />}</td>
-        <td className="num">{d.inflow ? money(d.inflow) : "—"}</td>
-        <td className="num">{d.outflow ? money(-d.outflow) : "—"}</td>
-        <td className={"num" + (d.before ? " weak" : " balance-cell" + tone.cls)} style={d.before ? undefined : tone.style}>{d.before ? "—" : money(d.balance)}</td>
-      </tr>
-      {open && (
-        <tr className="day-detail"><td colSpan="4">
-          {d.items.length > 0 && <ul className="list">{d.items.map((it) => <DayItem key={it.id} it={it} day={d.day} onEditEntry={onEditEntry} onTogglePaid={onTogglePaid}/>)}</ul>}
-          {d.suggestions.length > 0 && <ul className="list mt2">{d.suggestions.map((it) => <SuggestionItem key={it.id} it={it} day={d.day} onLaunch={onLaunch}/>)}</ul>}
-          {!d.items.length && !d.suggestions.length && <p className="empty">nada neste dia</p>}
-          <p className="mt2"><button className="pill pill--mini" type="button" onClick={() => onNewEntry(d.day)}>+ lançamento neste dia</button></p>
-        </td></tr>)}
-    </>
-  );
-}
-
-/* um lançamento do dia. o previsto vem tracejado, com o "aconteceu" que o
-   confirma; o real vem cheio, e o check dele volta para previsto. */
-function DayItem({ it, day, showDay, onEditEntry, onTogglePaid }) {
-  const forecast = isForecast(it);
-  const sign = it.kind === "in" ? "+" : "−";
-  return (
-    <li className={"line fin-item" + (forecast ? " is-forecast" : "")}>
-      <span className="name">
-        {showDay && <small className="fin-item__day">{dateLabel(day)}</small>}
-        {it.name}{it.category && <>{" "}<small>#{it.category}</small></>}
-      </span>
-      <span className={"measure mono" + (it.kind === "in" ? " positive" : "")}>{forecast ? "≈ " : ""}{sign} {brl(it.amount)}</span>
-      <span className="fin-item__acts">
-        {forecast
-          ? <button className="pill pill--mini" type="button" title={it.kind === "in" ? "entrou de verdade" : "saiu de verdade"} onClick={() => onTogglePaid(it.id)}>{icon("check")}aconteceu</button>
-          : <button className="action" type="button" title="voltar para previsto" aria-label="voltar para previsto" onClick={() => onTogglePaid(it.id)}>{icon("check")}</button>}
-        <button className="action" type="button" title="editar" aria-label="editar" onClick={() => onEditEntry(it.id)}>{icon("pencil")}</button>
-      </span>
-    </li>
-  );
-}
-
-/* uma sugestão: apagada, sem sinal de conta, e o "lançar" que abre a caixa
-   preenchida. o valor aparece porque ajuda a decidir — mas não soma. */
-function SuggestionItem({ it, day, onLaunch }) {
-  return (
-    <li className="line fin-item is-suggestion">
-      <span className="name"><small className="fin-item__day">{dateLabel(day)}</small>{it.name}{it.category && <>{" "}<small>#{it.category}</small></>}</span>
-      <span className="measure">{brl(it.amount)}</span>
-      <span className="fin-item__acts">
-        <button className="pill pill--mini" type="button" title="abre o lançamento preenchido" onClick={() => onLaunch(day, it)}>{icon("plus")}lançar</button>
-      </span>
-    </li>
-  );
-}
-
 /* ----- ano ----- */
 function YearView({ ctx, year, onShift, onOpenMonth }) {
   const t = today();
@@ -699,39 +467,6 @@ function YearMonth({ mo, index, today: t, maxAbs, onOpen }) {
   );
 }
 
-/* ----- painel: as quatro tabelas da planilha ----- */
-function PanelTable({ headers, rows, empty }) {
-  if (!rows.length) return <p className="empty">{empty}</p>;
-  return (
-    <div className="table-scroll"><table className="table">
-      <thead><tr>{headers.map((h, i) => <th key={i} className={h.num ? "num" : null}>{h.text}</th>)}</tr></thead>
-      <tbody>{rows}</tbody>
-    </table></div>
-  );
-}
-function PanelBlock({ title, total, addTitle, onAdd, children }) {
-  return (
-    <div className="col-6"><div className="block panel-block">
-      <p className="heading">
-        <span className="t-mono">{title}</span>
-        <span className="row"><span className="total">{total}</span><button className="action" type="button" title={addTitle} aria-label={addTitle} onClick={onAdd}>{icon("plus")}</button></span>
-      </p>
-      {children}
-    </div></div>
-  );
-}
-const fixedHeaders = (amountLabel) => [{ text: "nome" }, { text: "categoria" }, { text: "dia", num: true }, { text: amountLabel, num: true }];
-
-function FixedRow({ f, onEdit }) {
-  return (
-    <tr className="editable" data-id={f.id} onClick={onEdit}>
-      <td>{f.name}{!f.active && <>{" "}<span className="badge">pausado</span></>}</td>
-      <td className="weak">{f.category}</td>
-      <td className="num weak">{f.dayOfMonth}/mês</td>
-      <td className="num">{brl(f.amount)}</td>
-    </tr>
-  );
-}
 /* cartao: a parcela que cai neste mes, e quantas ainda faltam */
 function CardRow({ c, thisMonth, onEdit }) {
   const n = installmentNumber(c, thisMonth);
@@ -765,10 +500,8 @@ function PanelView({ ctx, cfg, onEdit, onNewFixed, onNewCard, onNewDebt, onPay }
   const thisMonth = today().slice(0, 7);
   const pct = cfg.percents;
 
-  const fixedOf = (kind) => ctx.fixed.filter((f) => f.kind === kind).sort((a, b) => a.dayOfMonth - b.dayOfMonth);
-  const outs = fixedOf("out"), ins = fixedOf("in");
-  const totalOut = outs.reduce((s, f) => s + f.amount, 0);
-  const totalIn = ins.reduce((s, f) => s + f.amount, 0);
+  const totalOut = fixedOf(ctx, "out").reduce((s, f) => s + f.amount, 0);
+  const totalIn = fixedOf(ctx, "in").reduce((s, f) => s + f.amount, 0);
 
   const cards = ctx.cards.slice().sort((a, b) => a.start.localeCompare(b.start) || a.dayOfMonth - b.dayOfMonth);
   const cardRemaining = (c) => { const n = Math.max(0, Math.min(c.installments, installmentNumber(c, thisMonth) - 1)); return c.total - n * cardInstallment(c); };
@@ -782,14 +515,7 @@ function PanelView({ ctx, cfg, onEdit, onNewFixed, onNewCard, onNewDebt, onPay }
   return (
     <>
       <div className="grid">
-        <PanelBlock title="saídas fixas" total={brl(totalOut) + " por mês"} addTitle="nova saída fixa" onAdd={() => onNewFixed("out")}>
-          <PanelTable headers={fixedHeaders("saída")} empty="nenhuma saída fixa — aluguel, luz, academia…"
-            rows={outs.map((f) => <FixedRow key={f.id} f={f} onEdit={() => onEdit("fixed", f.id)}/>)}/>
-        </PanelBlock>
-        <PanelBlock title="entradas fixas" total={brl(totalIn) + " por mês"} addTitle="nova entrada fixa" onAdd={() => onNewFixed("in")}>
-          <PanelTable headers={fixedHeaders("entrada")} empty="nenhuma entrada fixa — o que entra todo mês"
-            rows={ins.map((f) => <FixedRow key={f.id} f={f} onEdit={() => onEdit("fixed", f.id)}/>)}/>
-        </PanelBlock>
+        <FixedBlocks ctx={ctx} onEdit={onEdit} onNewFixed={onNewFixed}/>
         <PanelBlock title="compras parceladas" total={"faltam " + brl(totalCard)} addTitle="nova compra parcelada" onAdd={onNewCard}>
           <PanelTable headers={[{ text: "nome" }, { text: "cartão" }, { text: "parcelamento", num: true }, { text: "total", num: true }]} empty="nenhuma compra parcelada"
             rows={cards.map((c) => <CardRow key={c.id} c={c} thisMonth={thisMonth} onEdit={() => onEdit("card", c.id)}/>)}/>
@@ -856,43 +582,6 @@ function InvestView({ ctx, onEdit, onNew }) {
 /* ---------- formularios (todos em pop-up) ----------
    o mesmo <Form> do ui: criar e editar sao a mesma caixa, a diferenca e
    ter ou nao um documento por baixo. */
-/* a unidade mora no campo ("R$" antes, "%" e "x" depois), e nao no rotulo */
-const UnitInput = ({ unit, ...props }) => <span className="affix affix--post"><input className="input input--num" type="number" {...props}/><i>{unit}</i></span>;
-const DayOfMonthInput = (props) => <DayOfMonthField required {...props}/>;
-
-function FixedForm({ finance, categories, id, presetKind, onClose, onRemove, onSave }) {
-  const f = id ? finance.get(id) : null;
-  const kind = f ? f.kind : (presetKind || "out");
-  const [v, bind] = useFields({
-    name: f ? f.name : "",
-    amount: inReais(f && f.amount),
-    dayOfMonth: f ? f.dayOfMonth : "",
-    category: pickCategory(categories, f ? f.category : (kind === "in" ? "Recorrente" : "")),
-    active: f ? f.active : true
-  });
-  if (id && !f) return null;
-  const submit = () => {
-    const amount = parseMoney(v.amount);
-    if (!v.name.trim() || !amount) { notify("preciso de um nome e um valor"); return false; }
-    onSave({
-      id: f ? f.id : newId(), type: "fixed", name: v.name.trim(), amount, kind,
-      category: v.category, dayOfMonth: +v.dayOfMonth || 1, active: f ? !!v.active : true
-    }, f, f ? "fixo atualizado" : "fixo criado");
-  };
-  return (
-    <Form title={f ? (kind === "in" ? "entrada fixa" : "saída fixa") : (kind === "in" ? "nova entrada fixa" : "nova saída fixa")}
-        sub="cai todo mês no mesmo dia, como previsto até você confirmar"
-        submit={f ? "salvar" : "adicionar"} remove={f ? "apagar" : ""}
-        onRemove={() => onRemove(id, "fixo apagado")} onClose={onClose} onSubmit={submit}>
-      <Field label="nome" full><input className="input" required maxLength="140" {...bind("name")}/></Field>
-      <Field label="valor"><MoneyInput {...bind("amount")}/></Field>
-      <Field label="dia do mês"><DayOfMonthInput {...bind("dayOfMonth")}/></Field>
-      <Field label="categoria"><CategorySelect categories={categories} {...bind("category")}/></Field>
-      {f && <label className="row full" title="desmarque para pausar sem apagar"><input type="checkbox" {...bind("active", "check")}/> ativo</label>}
-    </Form>
-  );
-}
-
 function CardForm({ finance, id, onClose, onRemove, onSave }) {
   const c = id ? finance.get(id) : null;
   const [v, bind] = useFields({
@@ -988,36 +677,6 @@ function InvestForm({ finance, id, onClose, onRemove, onSave }) {
       </Field>
       <Field label="total aportado"><MoneyInput {...bind("contributed")}/></Field>
       <Field label="saldo atual"><MoneyInput {...bind("current")}/></Field>
-    </Form>
-  );
-}
-
-/* a config: saldo inicial, divisao e categorias. as categorias gravam na
-   hora, sem esperar o salvar: sao uma lista, nao um campo — e o Enter no
-   campo delas nao pode fechar a caixa. */
-function ConfigForm({ finance, onClose }) {
-  const cfg = configOf(finance);
-  const [v, bind] = useFields({
-    day: cfg.startBalance ? cfg.startBalance.day : today(),
-    amount: inReais(cfg.startBalance && cfg.startBalance.amount),
-    expenses: cfg.percents.expenses,
-    spending: cfg.percents.spending,
-    assets: cfg.percents.assets
-  });
-  const submit = () => {
-    saveConfig(finance, {
-      startBalance: isDay(v.day) ? { day: v.day, amount: parseMoney(v.amount) } : null,
-      percents: { expenses: +v.expenses || 0, spending: +v.spending || 0, assets: +v.assets || 0 }
-    });
-    notify("configuração salva");
-  };
-  return (
-    <Form title="ajustes" sub="de onde o saldo parte e como as entradas se dividem — as categorias e as metas moram na aba hoje" onClose={onClose} onSubmit={submit}>
-      <Field label="saldo inicial em"><DateField {...bind("day")} /></Field>
-      <Field label="saldo inicial"><MoneyInput {...bind("amount")}/></Field>
-      <Field label="despesas"><UnitInput unit="%" min="0" max="100" {...bind("expenses")}/></Field>
-      <Field label="gastos"><UnitInput unit="%" min="0" max="100" {...bind("spending")}/></Field>
-      <Field label="ativos"><UnitInput unit="%" min="0" max="100" {...bind("assets")}/></Field>
     </Form>
   );
 }

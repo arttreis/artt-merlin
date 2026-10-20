@@ -21,7 +21,7 @@ import { useState } from "react";
 import { createPortal } from "react-dom";
 import { today, addDays, dateOf, notify, brl } from "./core.js";
 import { useCollection } from "./ui.jsx";
-import { normalize as normalizeFinance, configOf } from "./finance-data.js";
+import { normalize as normalizeFinance, configOf, bookCollection } from "./finance-data.js";
 import { EntryForm } from "./entry-form.jsx";
 import { WorkoutForm } from "./workout-form.jsx";
 import { normalize as normalizeHabit } from "./habits-data.js";
@@ -237,7 +237,9 @@ const VIEWS = {
 /* ---------- o cartão ---------- */
 
 export function QuestCard({ tasks, sessions }) {
-  const finance = useCollection("finance", { normalize: normalizeFinance });
+  /* as contas que passaram são as do financeiro pessoal, que é para onde o
+     grupo leva; o caixa da empresa tem a tela dele */
+  const finance = bookCollection(useCollection("finance", { normalize: normalizeFinance }), "personal");
   const habits = useCollection("habits", { normalize: normalizeHabit });
   const workouts = useCollection("workouts", { normalize: normalizeWorkout });
   const state = questsOf({ tasks: tasks.all(), sessions: sessions.all(), entries: finance.all(), habits: habits.all(), workouts: workouts.all() });
