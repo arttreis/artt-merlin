@@ -128,7 +128,10 @@ precisam distribuí-lo.
   sem build.
 - **D10. A privacidade fica para depois** (decisão do Arthur, 17/10). A página
   `public/privacidade.html` e o botão de desligar o retrato no perfil não entram neste projeto,
-  apesar da regra do PRD da landing. Ficam como pendência registrada.
+  apesar da regra do PRD da landing. Ficam como pendência registrada. *Nota de 20/10:* o
+  interruptor da **saúde** já existe no perfil ("não mandar saúde ao Merlin", `healthOff`,
+  [saúde completa](saude-completa.md), D7); o de desligar o retrato inteiro e a página
+  continuam pendentes.
 - **D11. Uma sobra só.** As cópias da rotina contam na sobra em todas as telas; o calendário só
   deixa de listá-las. O início passa a esvaziar a caixa de entrada e a copiar a rotina ao abrir,
   como o calendário.

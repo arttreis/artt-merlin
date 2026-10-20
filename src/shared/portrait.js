@@ -14,7 +14,8 @@
  * o que NUNCA entra: contatos, cofre, arquivos, contratos, diário do cliente,
  * corpo das notas, roteiros, dívidas e investimentos (das notas, só o título, o
  * estágio e a data). do cliente, só o nome
- * (e do lead, a etapa, os dias e o próximo passo).
+ * (e do lead, a etapa, os dias e o próximo passo). da saúde, só números de 7
+ * dias: nunca o diário, o texto da refeição nem o que se treinou.
  *
  * a lista SECTIONS é o ponto de composição: uma seção nova (o dinheiro, os
  * clientes, o conteúdo) é uma linha a mais nela.
@@ -29,6 +30,7 @@ import { pipelineToday } from "./client-doc.js";
 import { contentToday } from "./content-script.js";
 import { normalize as normalizeHabit, isExpected, monthStats, streakOf as habitStreak, weekProgress } from "./habits-data.js";
 import { normalize as normalizeFinance, contextOf, configOf, financeToday, moneyLines } from "./finance-data.js";
+import { weekAverage, sleepLabel } from "./sleep-data.js";
 
 export const PORTRAIT_MAX = 6000;
 const BACK = 30;
@@ -38,7 +40,7 @@ const LOADING = "ainda carregando";
 const NOTE_STAGE = { seed: "semente", exploring: "explorando", defined: "definida", executing: "executando" };
 
 /* as fontes que a resposta pode citar: a lista fechada que o Worker filtra */
-export const SOURCES = ["dia", "agenda", "rotina", "semana", "dinheiro", "clientes", "leads", "conteúdo", "hábitos", "notas", "produtos"];
+export const SOURCES = ["dia", "agenda", "rotina", "semana", "dinheiro", "clientes", "leads", "conteúdo", "hábitos", "notas", "produtos", "saúde"];
 
 /* ---------- datas, sem o core ---------- */
 
@@ -85,6 +87,37 @@ export function daysLabel(days) {
   }).join(", ");
 }
 
+/* a saúde em números de 7 dias (hoje inclusive). do treino e da refeição, só
+   a conta: o `title` e o `text` não saem daqui. a coleção que nunca teve nada
+   não ganha linha (quem não registra refeição não lê "0" a cada pergunta) */
+const lastWeek = (day) => { const from = addDays(day, -6); return (x) => x >= from && x <= day; };
+const dayField = (d) => String(d.day || d.date || "");
+const alive = (docs) => (docs || []).filter((d) => d && !d.deleted);
+
+function sleepLine(sleep, profile, day) {
+  const inWeek = lastWeek(day);
+  const nights = alive(sleep).filter((d) => +d.min > 0 && inWeek(String(d.id || ""))).sort((a, b) => (a.id < b.id ? 1 : -1));
+  if (!nights.length) return "sono 7d: nenhuma noite registrada · registrar: diga 'dormi 7h'";
+  const goal = +(profile && profile.sleepGoal) > 0 ? " · meta " + sleepLabel(profile.sleepGoal) : "";
+  return "sono 7d: média " + sleepLabel(weekAverage(nights, day)) + " · " + nights.length + (nights.length === 1 ? " noite" : " noites") +
+    " · última " + sleepLabel(nights[0].min) + goal;
+}
+
+function workoutLine(workouts, day) {
+  const all = alive(workouts);
+  if (!all.length) return null;
+  const week = all.filter((d) => lastWeek(day)(dayField(d)));
+  if (!week.length) return "treino 7d: nenhum";
+  const min = week.reduce((t, d) => t + Math.max(0, Math.min(600, Math.round(+d.min) || 0)), 0);
+  const last = week.map(dayField).sort().pop();
+  return "treino 7d: " + week.length + "× · " + min + " min · último " + (last === day ? "hoje" : WEEKDAY[dateOf(last).getDay()]);
+}
+
+function mealLine(meals, day) {
+  const all = alive(meals);
+  return all.length ? "refeições 7d: " + all.filter((d) => lastWeek(day)(dayField(d))).length : null;
+}
+
 /* a sequência de dias fechados, como a do início: hoje ainda aberto não
    quebra a conta */
 function streakOf(closes, day) {
@@ -122,7 +155,7 @@ export const SECTIONS = [
     }
   },
   {
-    id: "agenda", label: "agenda dos próximos 7 dias (a rotina vem à parte)", budget: 1600, needs: ["tasks"],
+    id: "agenda", label: "agenda dos próximos 7 dias (a rotina vem à parte)", budget: 1495, needs: ["tasks"],
     build({ tasks, clients }, now) {
       const day = dayOf(now);
       /* a cópia da rotina só existe na semana aberta; contá-la aqui faria a
@@ -232,7 +265,7 @@ export const SECTIONS = [
   {
     /* uma linha por hábito: hoje, o mês e a sequência. as contas são as da
        tela dos hábitos (habits-data.js), com a taxa que nunca passa de 100% */
-    id: "habits", label: "hábitos", budget: 170, needs: ["habits"],
+    id: "habits", label: "hábitos", budget: 120, needs: ["habits"],
     build({ habits }, now) {
       const day = dayOf(now);
       const list = habits.filter((h) => h && h.id).map(normalizeHabit).filter((h) => !h.archived)
@@ -247,6 +280,18 @@ export const SECTIONS = [
         const m = monthStats(h, day.slice(0, 7), day);
         return [h.name, hoje, "mês " + m.done + "/" + m.expected + " " + m.rate + "%", "seq " + habitStreak(h, day) + (perWeek ? "sem" : "d")].filter(Boolean).join(" · ");
       });
+    }
+  },
+  {
+    /* sono, treino e refeições em números de 7 dias (PRD saude-completa, D6).
+       quem tirou a saúde do Merlin no perfil (healthOff, D7) não leva a seção,
+       nem enquanto o perfil desce: o `off` vale antes do "ainda carregando".
+       o perfil está em `needs` porque é ele que diz se a saúde pode ir */
+    id: "health", label: "saúde", budget: 160, needs: ["sleep", "workouts", "meals", "profile"],
+    off: (d) => !!(d.healthOff || (d.profile && d.profile.healthOff)),
+    build({ sleep, workouts, meals, profile }, now) {
+      const day = dayOf(now);
+      return [sleepLine(sleep, profile, day), workoutLine(workouts, day), mealLine(meals, day)].filter(Boolean);
     }
   },
   {
@@ -294,7 +339,7 @@ export function fit(items, budget, hidden = 0) {
   return text;
 }
 
-const EMPTY = { tasks: [], routine: [], sessions: [], apps: [], closes: [], clients: [], content: [], cadence: [], habits: [], notes: [], finance: [], profile: null, loading: [] };
+const EMPTY = { tasks: [], routine: [], sessions: [], apps: [], closes: [], clients: [], content: [], cadence: [], habits: [], notes: [], finance: [], sleep: [], workouts: [], meals: [], healthOff: false, profile: null, loading: [] };
 const DEFAULT_WINDOW = { dayStart: 540, dayEnd: 1140 };
 
 export function portraitOf(data, now = new Date()) {
@@ -304,6 +349,7 @@ export function portraitOf(data, now = new Date()) {
   const sections = [];
   let used = 0;
   for (const s of SECTIONS) {
+    if (s.off && s.off(d)) continue;
     const head = s.label + ":\n";
     const gap = sections.length ? 2 : 0;
     const room = Math.min(s.budget, PORTRAIT_MAX - used - gap - head.length);
@@ -330,6 +376,7 @@ export function portraitOf(data, now = new Date()) {
    iguais e só uma é verdade */
 export function portraitData(cols, { signedIn, prefs } = {}) {
   const list = (c) => (c ? c.all() : []);
+  const profile = cols.profile ? cols.profile.get("me") : null;
   return {
     tasks: list(cols.tasks),
     routine: list(cols.routine),
@@ -342,7 +389,11 @@ export function portraitData(cols, { signedIn, prefs } = {}) {
     habits: list(cols.habits),
     notes: list(cols.notes),
     finance: list(cols.finance),
-    profile: cols.profile ? cols.profile.get("me") : null,
+    sleep: list(cols.sleep),
+    workouts: list(cols.workouts),
+    meals: list(cols.meals),
+    profile,
+    healthOff: !!(profile && profile.healthOff),
     prefs,
     loading: signedIn ? Object.keys(cols).filter((k) => cols[k] && !cols[k].hasDownloaded()) : []
   };
@@ -363,7 +414,7 @@ export function waitPortrait(cols, signedIn, ms = 5000) {
 }
 
 /* "vi o dia e a agenda": a linha discreta embaixo da resposta */
-const ARTICLE = { dia: "o", agenda: "a", rotina: "a", semana: "a", dinheiro: "o", clientes: "os", leads: "os", "conteúdo": "o", "hábitos": "os", notas: "as", produtos: "os" };
+const ARTICLE = { dia: "o", agenda: "a", rotina: "a", semana: "a", dinheiro: "o", clientes: "os", leads: "os", "conteúdo": "o", "hábitos": "os", notas: "as", produtos: "os", "saúde": "a" };
 export function sourcesLine(list) {
   const named = (Array.isArray(list) ? list : []).filter((s) => SOURCES.includes(s)).map((s) => ARTICLE[s] + " " + s);
   if (!named.length) return "";

@@ -5,7 +5,8 @@
    nasceu porque o tema era um interruptor solto no fim da barra, ao lado de
    nada — e porque nao havia lugar nenhum para "esta e a minha conta" alem de
    um cartao apertado no rodape da navegacao. nada aqui e configuracao do
-   produto: o Merlin nao tem preferencias que mudem o que ele faz. */
+   produto: o Merlin nao tem preferencias que mudem o que ele faz. a exceção
+   é o que é da pessoa por direito: tirar a saúde das conversas (HealthSwitch). */
 import "./shared/base.css";
 import "./profile.css";
 import {
@@ -13,7 +14,7 @@ import {
   seen, markSeen, forgetSeen, notify
 } from "./shared/core.js";
 import { useState, useEffect } from "react";
-import { mount, useCloud, icon } from "./shared/ui.jsx";
+import { mount, useCloud, useCollection, icon } from "./shared/ui.jsx";
 import { Tour } from "./shared/tour.jsx";
 
 initPage("profile");
@@ -48,7 +49,9 @@ function Rhythm() {
   const save = (e) => {
     e.preventDefault();
     const num = (x) => { const n = Math.round(+String(x).replace(",", ".") || 0); return n > 0 && n <= 120 ? n : ""; };
-    profile.save({ ...me, github: v.github.trim().replace(/^@/, ""), focusGoal: num(v.focusGoal), meetingCap: num(v.meetingCap), updatedAt: Date.now() });
+    /* o documento de agora, e não o do desenho: o interruptor da saúde grava
+       no mesmo perfil, e o ritmo não pode desfazê-lo */
+    profile.save({ ...(profile.get("me") || me), github: v.github.trim().replace(/^@/, ""), focusGoal: num(v.focusGoal), meetingCap: num(v.meetingCap), updatedAt: Date.now() });
     notify("ritmo guardado");
   };
   const bind = (k) => ({ value: v[k], onChange: (e) => setV({ ...v, [k]: e.currentTarget.value }) });
@@ -62,6 +65,31 @@ function Rhythm() {
         <label><span>usuário do GitHub</span><input className="input" placeholder="ex.: arttreis" {...bind("github")} /><small>só o público</small></label>
         <button className="pill pill--accent" type="submit">guardar</button>
       </form>
+    </section>
+  );
+}
+
+/* o dado de saúde é sensível (LGPD, art. 5º, II): quem quiser o tira das
+   conversas. ligado, o retrato vai sem a seção saúde (portrait.js) e os
+   hábitos continuam. mora no profile/me, `healthOff`, e sincroniza como o
+   resto do perfil (PRD saude-completa, D7) */
+function HealthSwitch() {
+  const profile = useCollection("profile");
+  const me = profile.get("me") || { id: "me", createdAt: Date.now() };
+  const off = !!me.healthOff;
+  const toggle = (e) => {
+    const on = e.currentTarget.checked;
+    profile.save({ ...me, healthOff: on, updatedAt: Date.now() });
+    notify(on ? "a saúde fica fora das conversas" : "a saúde volta às conversas");
+  };
+  return (
+    <section className="block col-12">
+      <p className="heading"><span className="t-mono">o Merlin e a saúde</span></p>
+      <label className="pf-check">
+        <input type="checkbox" checked={off} onChange={toggle} />
+        <span>não mandar saúde ao Merlin</span>
+      </label>
+      <p className="note">sono, treino e alimentação ficam fora das conversas. Hábitos continuam.</p>
     </section>
   );
 }
@@ -163,6 +191,9 @@ function Profile() {
 
         {/* ---------- o ritmo (VISAO, 11) ---------- */}
         <Rhythm />
+
+        {/* ---------- a saúde nas conversas (D7) ---------- */}
+        <HealthSwitch />
 
         {/* ---------- o que está guardado ---------- */}
         <section className="block col-12">

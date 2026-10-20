@@ -13,6 +13,7 @@ import { normalize as normalizeBlock } from "./routine.js";
 import { normalizeCadence } from "./content-script.js";
 import { normalize as normalizeHabit } from "./habits-data.js";
 import { normalize as normalizeFinance } from "./finance-data.js";
+import { normalize as normalizeSleep } from "./sleep-data.js";
 import { portraitOf, portraitData, waitPortrait } from "./portrait.js";
 
 export function usePortrait() {
@@ -28,6 +29,11 @@ export function usePortrait() {
     habits: useCollection("habits", { normalize: normalizeHabit }),
     notes: useCollection("notes"),
     finance: useCollection("finance", { normalize: normalizeFinance }),
+    /* o treino e a refeição vão crus: o retrato só os conta, e lê o dia
+       defensivamente (portrait.js), sem depender do miolo de cada aba */
+    sleep: useCollection("sleep", { normalize: normalizeSleep }),
+    workouts: useCollection("workouts"),
+    meals: useCollection("meals"),
     profile: useCollection("profile")
   };
   return async () => {
