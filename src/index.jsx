@@ -32,7 +32,7 @@ import {
 } from "./shared/tasks.js";
 import { normalize as normalizeBlock, copyRoutine } from "./shared/routine.js";
 import { MAX_TURNS, normalizeChat, chatTitle, turnsOf, markProposal } from "./shared/assistant-actions.js";
-import { normalize as normalizeFinance, configOf, contextOf as financeContext, newEntry, undoEntry, entryLine, captureContext, bookCollection } from "./shared/finance-data.js";
+import { normalize as normalizeFinance, configOf, contextOf as financeContext, newEntry, undoEntry, entryLine, captureContext, bookCollection, bookOf, cashLine, BOOKS } from "./shared/finance-data.js";
 import { BUILD, buildIntent } from "./shared/build-intent.js";
 import { normalize as normalizeHabit, habitStatus, markOn, undoHabit, markWhen } from "./shared/habits-data.js";
 import { normalize as normalizeSleep, sleepDoc, sleepLabel, sleepLine, nightOf, undoSleep } from "./shared/sleep-data.js";
@@ -326,7 +326,7 @@ function mealMeta(it, base) {
   return error || markWhen(day, base);
 }
 const draftMeta = (it, base, money, habitsNow) => it.kind === "note" ? "nota"
-  : it.kind === "money" ? entryLine(it, base, money)
+  : it.kind === "money" ? entryLine(it, base, money(it))
   : it.kind === "habit" ? habitMeta(habitStatus(habitsNow, it, base), base)
   : it.kind === "sleep" ? sleepMeta(it, base)
   : it.kind === "workout" ? workoutMeta(it, base, habitsNow)
@@ -343,7 +343,7 @@ const draftTitle = (it, habitsNow, base) => it.kind === "sleep" ? (it.min ? slee
    por ela que se lança o que veio sem valor */
 const moneyProposal = (it) => ({
   actionType: "finance-entry", title: it.title, note: "",
-  payload: { name: it.title, amount: it.amount, kind: it.flow, day: it.date, category: it.category, paid: it.paid, confirm: it.confirm, fixed: it.fixed }
+  payload: { name: it.title, amount: it.amount, kind: it.flow, day: it.date, category: it.category, paid: it.paid, confirm: it.confirm, fixed: it.fixed, book: it.book }
 });
 /* o sono lido sem as horas, como a caixa de proposta o recebe */
 const sleepProposal = (it) => ({ actionType: "sleep-log", title: "registrar sono", note: "", payload: { min: it.min, date: it.date } });
@@ -375,11 +375,17 @@ function Composer({ tasks, habits, b, smart, onAsk, onIntent, readContext }) {
   const date = today();
   const intent = askIntent(text);
   /* o financeiro aberto aqui para descer da nuvem (core.js, ensureSynced): a
-     leitura precisa das categorias, dos previstos e dos fixos de verdade. o
-     campo do início lança no livro pessoal: o da empresa entra pela conversa,
-     com o seletor "pessoal | empresa" na caixa */
-  const finance = bookCollection(useCollection("finance", { normalize: normalizeFinance }), "personal");
-  const money = financeContext(finance);
+     leitura precisa das categorias, dos previstos e dos fixos de verdade. a
+     leitura manda as do livro pessoal; cada item de dinheiro carrega o seu
+     livro (`book`, o que a IA leu), trocável no cartão antes de gravar, e
+     `bookOfItem` o abre: as contas, o lançar e o desfazer seguem esse livro
+     (PRD meu-negocio, "na dúvida, pergunta") */
+  const financeAll = useCollection("finance", { normalize: normalizeFinance });
+  const bookOfItem = (it) => bookCollection(financeAll, it && it.book);
+  const finance = bookOfItem(null);
+  const money = (it) => financeContext(bookOfItem(it));
+  /* a categoria que a IA leu é a do livro pessoal: no outro livro ela só vale se existir lá */
+  const inBook = (it, book) => ({ ...it, book, category: configOf(bookCollection(financeAll, book)).categories.includes(it.category) ? it.category : "" });
   const habitsNow = habits.all();
   const habitOf = (it) => habitStatus(habitsNow, it, date);
   const sleep = useCollection("sleep", { normalize: normalizeSleep });
@@ -388,7 +394,7 @@ function Composer({ tasks, habits, b, smart, onAsk, onIntent, readContext }) {
   /* o que ainda não pode ser criado: o gasto sem valor só se lança pela caixa,
      o hábito que não existe, pela caixa de novo hábito, e o sono sem as
      horas e o treino sem os minutos, pela caixa de proposta */
-  const missing = (it) => it.kind === "money" ? !!newEntry(it, configOf(finance), money, date).error
+  const missing = (it) => it.kind === "money" ? !!newEntry(it, configOf(bookOfItem(it)), money(it), date).error
     : it.kind === "habit" ? !habitOf(it).error && !habitOf(it).habit
     : it.kind === "sleep" ? !nightOf(it, date).error && !it.min
     : it.kind === "workout" ? !workoutDay(it, date).error && !it.min
@@ -435,6 +441,7 @@ function Composer({ tasks, habits, b, smart, onAsk, onIntent, readContext }) {
     const slept = [];
     const trained = [];
     const ate = [];
+    const cashed = [];
     let nTasks = 0, nNotes = 0, nMoney = 0;
     ready.forEach((it) => {
       const client = clientId(it.client);
@@ -469,12 +476,14 @@ function Composer({ tasks, habits, b, smart, onAsk, onIntent, readContext }) {
         undo.push(() => meals.remove(doc.id));
         ate.push("✓ anotado · " + mealLine(doc, date));
       } else if (it.kind === "money") {
-        const { doc } = newEntry({ ...it, chat: "home" }, configOf(finance), financeContext(finance), date);
-        const before = finance.get(doc.id);
-        finance.save(doc);
+        const book = bookOfItem(it);
+        const { doc } = newEntry({ ...it, chat: "home" }, configOf(book), financeContext(book), date);
+        const before = book.get(doc.id);
+        book.save(doc);
         const back = undoEntry(before, doc);
-        undo.push(() => { if (back.remove) finance.remove(back.remove); else finance.save(back.save); });
-        nMoney++;
+        undo.push(() => { if (back.remove) book.remove(back.remove); else book.save(back.save); });
+        /* o da empresa diz onde caiu: "lançado no caixa · R$ 2.400 · Acme" */
+        if (book.book === "business") cashed.push("✓ " + cashLine({ ...doc, book: "business" })); else nMoney++;
       } else if (it.kind === "task") {
         const day = it.date || date;
         const at = it.at ? readClock(it.at) : null;
@@ -491,6 +500,7 @@ function Composer({ tasks, habits, b, smart, onAsk, onIntent, readContext }) {
     const said = [
       parts.length && parts.join(" e ") + (nTasks + nNotes === 1 ? " criada" : " criadas"),
       nMoney && (nMoney === 1 ? "lançado no financeiro" : nMoney + " lançados no financeiro"),
+      cashed.length && (cashed.length === 1 ? cashed[0] : cashed.length + " lançados no caixa"),
       marked.length && (marked.length === 1 ? marked[0] : marked.length + " hábitos marcados"),
       slept.length && (slept.length === 1 ? slept[0] : slept.length + " noites registradas"),
       trained.length && (trained.length === 1 ? trained[0] : trained.length + " treinos registrados"),
@@ -520,7 +530,7 @@ function Composer({ tasks, habits, b, smart, onAsk, onIntent, readContext }) {
     if (items && !items.length) { onAsk(said.trim()); clear(); return; }
     /* uma nota só, onde a regra já via uma nota: grava com as palavras da
        pessoa, sem cartão para confirmar o que não mudou */
-    if (items && !(items.length === 1 && items[0].kind === "note" && route.kind === "note")) { setDraft({ text: said, items }); return; }
+    if (items && !(items.length === 1 && items[0].kind === "note" && route.kind === "note")) { setDraft({ text: said, items: items.map((it) => (it.kind === "money" ? inBook(it, it.book) : it)) }); return; }
     byRule(route);
   };
 
@@ -530,6 +540,8 @@ function Composer({ tasks, habits, b, smart, onAsk, onIntent, readContext }) {
   };
   /* a refeição que o Merlin escolheu pelo horário se troca no próprio cartão */
   const setMeal = (i, meal) => setDraft({ ...draft, items: draft.items.map((x, j) => (j === i ? { ...x, meal } : x)) });
+  /* e o livro do dinheiro lido: a IA sugere, e quem decide é a pessoa */
+  const setBook = (i, book) => setDraft({ ...draft, items: draft.items.map((x, j) => (j === i ? inBook(x, book) : x)) });
   const asNote = () => {
     const n = newNote({ title: draft.text.replace(/\s+/g, " ").trim() });
     if (n) notify("guardado em notas", () => collection("notes").remove(n.id));
@@ -583,6 +595,11 @@ function Composer({ tasks, habits, b, smart, onAsk, onIntent, readContext }) {
                 {it.kind === "meal" && (
                   <select className="hm-draft__meal" aria-label={"A refeição de " + it.text} value={it.meal} onChange={(e) => setMeal(i, e.currentTarget.value)}>
                     {MEALS.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
+                  </select>
+                )}
+                {it.kind === "money" && (
+                  <select className="hm-draft__meal" aria-label={"De quem é " + it.title} value={bookOf(it.book)} onChange={(e) => setBook(i, e.currentTarget.value)}>
+                    {BOOKS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
                   </select>
                 )}
                 <span className="hm-draft__title">{draftTitle(it, habitsNow, date)}</span>

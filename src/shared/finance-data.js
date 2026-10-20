@@ -236,6 +236,8 @@ export function categoryOrder(cfg, moved) {
    da empresa é o mesmo financeiro, com as mesmas contas. documento sem `book`
    é pessoal, e nada migra; qualquer valor que não seja "business" também. */
 export const bookOf = (book) => (book === "business" ? "business" : "personal");
+/* os dois livros como o seletor "de quem" os mostra, na caixa da conversa e no cartão do início */
+export const BOOKS = [["personal", "pessoal"], ["business", "empresa"]];
 const configId = (book) => (bookOf(book) === "business" ? "config-business" : "config");
 
 /* a coleção vista por um livro só: `all()` e `get()` filtram, e `save()`

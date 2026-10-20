@@ -119,6 +119,8 @@ html:has(.hm) body{overflow-x:clip}
 /* a refeição lida, trocável ali: um seletor baixo, na tinta secundária */
 .hm-draft__meal{flex:none;height:24px;padding:0 6px;border:1px solid var(--line-soft);border-radius:8px;background:var(--fill);color:var(--ink-50);font:inherit;font-size:12px;cursor:pointer}
 .hm-draft__meal:hover,.hm-draft__meal:focus-visible{color:var(--ink);border-color:var(--ink-30)}
+/* no celular o seletor e a linha de números não cabem ao lado do título: a linha quebra e o título fica inteiro */
+@media (max-width:520px){.hm-draft__list li{flex-wrap:wrap;row-gap:2px;padding:3px 0}.hm-draft__title{flex-basis:40%}}
 .hm-draft__drop{flex:none;width:24px;height:24px;border-radius:50%;display:grid;place-items:center;color:var(--ink-30)}
 .hm-draft__drop:hover{background:var(--fill-hover);color:var(--ink)}
 .hm-draft__drop svg{width:12px;height:12px}

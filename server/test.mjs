@@ -679,6 +679,24 @@ check("dinheiro: note, money e task misturados mantêm a ordem", money13.body.it
 money13 = await readLine("gastei", [{ kind: "money", title: "   ", amount: 100 }]);
 check("dinheiro: item sem título é descartado, como as tarefas", money13.status === 200 && money13.body.items.length === 0, JSON.stringify(money13.body));
 
+/* o livro (#83): o dinheiro do início também pergunta pessoal ou empresa. só
+   "business" vale; ausente, lixo e qualquer outra coisa voltam pessoal */
+money13 = await readLine("recebi 2.400 da Acme na empresa", [
+  money({ title: "Acme", amount: 240000, flow: "in", category: "", book: "business" }),
+  money({ book: "personal" }), money(), money({ book: "empresa" }), money({ book: "BUSINESS" }), money({ book: null }), money({ book: 7 })
+]);
+check("livro: 'business' volta business", money13.body.items[0].book === "business" && money13.body.items[0].amount === 240000 && money13.body.items[0].flow === "in", JSON.stringify(money13.body.items[0]));
+check("livro: 'personal' volta personal", money13.body.items[1].book === "personal", JSON.stringify(money13.body.items[1]));
+check("livro: ausente volta personal", money13.body.items[2].book === "personal", JSON.stringify(money13.body.items[2]));
+check("livro: lixo volta personal", money13.body.items.slice(3).every((x) => x.book === "personal"), JSON.stringify(money13.body.items.slice(3)));
+money13 = await readLine("paguei o aluguel e a internet na empresa", [
+  money({ title: "aluguel", amount: 0, confirm: "p1", book: "business" }), money({ title: "internet", amount: 0, fixed: "f1", book: "business" }),
+  money({ title: "aluguel", amount: 0, confirm: "p1", book: "personal" })
+]);
+check("livro: na empresa o previsto e o fixo do pessoal não valem", money13.body.items[0].confirm === "" && money13.body.items[1].fixed === "", JSON.stringify(money13.body.items.slice(0, 2)));
+check("livro: no pessoal o previsto continua valendo", money13.body.items[2].confirm === "p1", JSON.stringify(money13.body.items[2]));
+check("livro: a instrução da leitura pede o livro", /book = business/.test(claudeMessages.at(-1).content) && /"book":"personal"/.test(claudeMessages.at(-1).content));
+
 /* a conversa: o catalogo ganha finance-entry, com os campos fechados */
 claudeAnswer = { stop_reason: "end_turn", content: [{ type: "text", text: JSON.stringify({ suggestions: [{ actionType: "finance-entry", title: "gasto de R$ 45,00", note: "no almoço", payload: {
   name: "almoço", amount: 4500, kind: "out", day: "2026-10-17", category: "Lazer", paid: true, confirm: "p1", fixed: "f1", hack: "<script>"

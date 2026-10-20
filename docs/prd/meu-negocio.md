@@ -55,7 +55,8 @@ pessoa só: ninguém do time loga, e os dados do time são anotações do dono.
   fixos e "a receber", e quatro números no topo: entrou, saiu, sobra do mês e **fôlego** (saldo ÷
   média de saída de 3 meses). Sem 50/30/20, cartão ou dívidas. O financeiro pessoal deixa de ver o
   livro da empresa. `finance-entry` ganha `book`; "a empresa", "PJ", "na empresa" ou um cliente
-  citado querem dizer empresa.
+  citado querem dizer empresa. O campo do início também pergunta: o cartão de dinheiro da
+  captura traz `book` e o seletor "pessoal | empresa" (#83).
 - **D4. Plano: ano, semestre e trimestre (Arthur).** Uma meta-norte no ano, uma no semestre e até
   3 no trimestre (o "+" some na 3ª: "três já é muito para um trimestre"). O trimestre fica aberto
   com `PeriodNav`; ano e semestre são uma linha cada, com barra. **A meta se mede sozinha** quando
