@@ -922,7 +922,7 @@ function WireBlock({ b }) {
   if (b.kind === "image") return (
     <g>
       <rect x={x + 0.5} y={y + 0.5} width={INNER - 1} height={b.h - 1} rx="7" fill="var(--fill)" stroke="var(--line)" />
-      <path d={"M" + x + "," + y + " L" + (x + INNER) + "," + (y + b.h) + " M" + (x + INNER) + "," + y + " L" + x + "," + (y + b.h)} stroke="var(--line)" />
+      <path d={"M" + (x + 3) + "," + (y + 3) + " L" + (x + INNER - 3) + "," + (y + b.h - 3) + " M" + (x + INNER - 3) + "," + (y + 3) + " L" + (x + 3) + "," + (y + b.h - 3)} stroke="var(--line)" />
       <text x={FRAME_W / 2} y={y + b.h / 2 + 4} fontSize="10.5" textAnchor="middle" fill="var(--ink-50)" stroke="var(--surface-2)" strokeWidth="4" paintOrder="stroke">{fit(b.label, 6.4)}</text>
     </g>
   );
@@ -1027,7 +1027,7 @@ function WireNav({ app, path, setTrail, onEdit }) {
         {out.length
           ? out.map((f) => (
               <button key={f.id} className="pill pill--accent" type="button" title={"vai para " + names.get(f.to)}
-                onClick={() => setTrail(path.concat(f.to))}>→ {f.action.trim() || names.get(f.to)}</button>
+                onClick={() => setTrail(path.concat(f.to))}>{"→ " + (f.action.trim() || names.get(f.to))}</button>
             ))
           : <p className="ap-nav__end">fim deste caminho</p>}
       </div>
