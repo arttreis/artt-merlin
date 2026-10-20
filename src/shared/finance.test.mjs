@@ -1035,6 +1035,7 @@ section("fôlego: runway e runwayLabel", () => {
   check("fôlego: null vira o travessão", runwayLabel(null) === "—", runwayLabel(null));
   check("fôlego: 3 vira \"3,0 meses\"", runwayLabel(3) === "3,0 meses", runwayLabel(3));
   check("fôlego: 0 vira \"0,0 meses\"", runwayLabel(0) === "0,0 meses", runwayLabel(0));
+  check("fôlego: de 1 a menos de 2 fica no singular", runwayLabel(1) === "1,0 mês" && runwayLabel(1.5) === "1,5 mês" && runwayLabel(1.96) === "2,0 meses", [runwayLabel(1), runwayLabel(1.5), runwayLabel(1.96)].join(" | "));
 });
 
 section("fôlego: adjacentMonth", () => {

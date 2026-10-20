@@ -594,7 +594,12 @@ export function runway(balance, outs) {
   const avg = list.length ? list.reduce((s, v) => s + v, 0) / list.length : 0;
   return avg > 0 ? Math.max(0, balance) / avg : null;
 }
-export const runwayLabel = (r) => (r == null ? "—" : r.toFixed(1).replace(".", ",") + " meses");
+/* "1,5 mês" e "2,0 meses": no singular de 1 a menos de 2, como se fala */
+export function runwayLabel(r) {
+  if (r == null) return "—";
+  const n = r.toFixed(1);
+  return n.replace(".", ",") + (+n >= 1 && +n < 2 ? " mês" : " meses");
+}
 
 /* o mês de `t` no livro: só o que já aconteceu (o previsto não entrou nem saiu).
    o fôlego divide o saldo de hoje pela média de saída dos três meses que
