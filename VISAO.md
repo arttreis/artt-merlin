@@ -1005,7 +1005,7 @@ Na ordem do desenho do Arthur. A primeira aba é a porta da área (`SECTIONS`, n
 
 | área | id | ícone | abas, na ordem |
 | --- | --- | --- | --- |
-| **saúde** | `health` | `habits` | hábitos, sono, treino, diário |
+| **saúde** | `health` | `habits` | hábitos, sono, treino, alimentação, diário |
 | **trabalho** | `work` | `apps` | produtos, conteúdo, funis, mapas |
 | **organização** | `organization` | `calendar` | calendário, rotina, notas |
 | **finanças** | `money` | `finance` | financeiro |
@@ -1024,10 +1024,11 @@ discutíveis, e cada uma muda numa linha de `SECTIONS`, sem migração:
 - **os mapas** vão para o trabalho, porque o desenho põe o mapa mental em "desenhos", dentro do
   trabalho.
 
-A saúde era só os hábitos; o diário voltou como aba em 20/10/2026, e o sono e o treino entraram
-no mesmo dia, cada um com o seu verbo ("dormi 7h", "treinei perna 40min", §13.7). O treino marca
-o hábito de treino do dia, sem criar hábito. A alimentação entra entre o treino e o diário
-(`docs/prd/saude-completa.md`). O id `inbox` da área não tem relação com a fila
+A saúde era só os hábitos; o diário voltou como aba em 20/10/2026, e o sono, o treino e a
+alimentação entraram no mesmo dia, cada um com o seu verbo ("dormi 7h", "treinei perna 40min",
+"almocei salada", §13.7; `docs/prd/saude-completa.md`). O treino marca o hábito de treino do dia,
+sem criar hábito. A alimentação não tem caloria, nota nem "bom ou ruim": só o que se comeu e em
+que refeição. O id `inbox` da área não tem relação com a fila
 `merlin:inbox` (§3), e o comentário de `SECTIONS` diz isso. "inbox" e "lead" ficaram como o
 Arthur escreveu: são as palavras que esse público usa.
 
@@ -1053,6 +1054,10 @@ No início não há dock: só a faixa do alto, a saudação e o campo. Nas outra
 o início, as abas da área em que se está e o "+"; na conversa (`assistant.html`) e no perfil, que
 não são de área nenhuma, com o início e o "+". O "+" e o `Ctrl+K` continuam em toda tela que não
 seja o início e o rastreador; no início, o próprio campo é esse gesto.
+
+A saúde tem cinco abas, e no celular (até 600px) elas não cabem no dock: o diário sai dele, mesmo
+na página dele, e continua no menu e no Hoje (`spare` em `SECTIONS`). As outras quatro cabem de
+360px para cima.
 
 ### 13.4 "O que falta" no inbox
 

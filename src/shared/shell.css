@@ -592,6 +592,9 @@ html.light{--color-1:#1c6fc4;--color-2:#b8600a;--color-3:#c4234f;--color-4:#7a3b
 .dk__plus svg{width:17px;height:17px}
 .dk__plus:hover{filter:brightness(1.08)}
 @media (max-width:600px){.dk__item[aria-current="page"] span{display:none}.dk__item{padding:0 9px}.dk__tab{padding:0 9px}}
+/* a quinta aba da saúde (o diário) não cabe no celular: sai do dock, e fica
+   no menu e no Hoje (PRD saude-completa, riscos) */
+@media (max-width:600px){.dk__tab--spare{display:none}}
 /* até 400px o dock aperta o respiro: as quatro abas do trabalho cabem em
    360px. abaixo disso ele rola dentro dele, sem cortar o início nem o "+" */
 .dk{max-width:100%}

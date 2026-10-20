@@ -989,6 +989,82 @@ check("conversa: os campos guardam o que a IA propôs", body.suggestions[0] && b
 check("conversa: a instrução cita workout-log", /workout-log/.test(claudeAsked), String(claudeAsked).slice(0, 300));
 check("conversa: sleep-log, habit-mark e finance-entry continuam no catálogo", /sleep-log/.test(claudeAsked) && /habit-mark/.test(claudeAsked) && /finance-entry/.test(claudeAsked));
 
+/* ---- 13e-septies. a refeição ----
+   "almocei salada" escrito no início, ou "ontem jantei pizza" dito na
+   conversa, vira uma refeição. o que o Worker garante: a refeição é uma das
+   quatro (o resto vira lanche), o texto é curto, a data é um dia de verdade
+   (senão, o de hoje), e nada de outro tipo vaza para o item. "gastei 45 no
+   almoço" continua money. a seção entra como uma pessoa nova, pelo teto da
+   captura (60 por hora por pessoa). */
+sentEmails = [];
+await call("POST", "/code", { email: "refeicao@exemplo.com" });
+r = await call("POST", "/sign-in", { email: "refeicao@exemplo.com", code: codeFromEmail() });
+const mealCookie = cookieOf(r);
+const mealCtx = { today: "2026-10-18 (domingo)", hour: "12:40", clients: [] };
+const mealItem = (over) => ({ kind: "meal", meal: "lunch", text: "salada", date: "2026-10-18", ...over });
+const readMeal = async (text, items) => {
+  claudeAnswer = { stop_reason: "end_turn", content: [{ type: "text", text: JSON.stringify({ items }) }] };
+  const res = await call("POST", "/merlin", { task: "capture", context: { ...mealCtx, text } }, mealCookie);
+  return { status: res.status, body: await res.json() };
+};
+
+let ml13 = await readMeal("almocei salada", [mealItem()]);
+check("refeição: 'almocei salada' volta como meal, lunch, salada, hoje", ml13.status === 200 && ml13.body.items.length === 1 && ml13.body.items[0].kind === "meal" && ml13.body.items[0].meal === "lunch" && ml13.body.items[0].text === "salada" && ml13.body.items[0].date === "2026-10-18", JSON.stringify(ml13.body));
+check("refeição: o kind meal passa no filtro e o item só tem kind, meal, text e date", Object.keys(ml13.body.items[0] || {}).sort().join() === "date,kind,meal,text", JSON.stringify(ml13.body.items[0]));
+check("refeição: a instrução da captura cita meal e manda o gasto do almoço para money", /meal/.test(claudeAsked) && /gastei 45 no almoço\\?" continua money/.test(claudeAsked), String(claudeAsked).slice(0, 400));
+check("refeição: a instrução da captura não pede caloria", /Nunca fale de caloria/.test(claudeAsked));
+check("refeição: a leitura grava capture:meal na usage", db.usage.some((x) => x.task === "capture:meal" && x.n >= 1), JSON.stringify(db.usage.map((x) => x.task)));
+
+/* a refeição */
+for (const m of ["breakfast", "lunch", "snack", "dinner"]) {
+  ml13 = await readMeal("comi", [mealItem({ meal: m })]);
+  check("refeição: " + m + " fica", ml13.body.items[0].meal === m, JSON.stringify(ml13.body.items));
+}
+ml13 = await readMeal("comi uma maçã", [mealItem({ meal: "brunch", text: "uma maçã" })]);
+check("refeição: meal fora da lista vira snack", ml13.body.items[0].meal === "snack", JSON.stringify(ml13.body.items));
+ml13 = await readMeal("comi uma maçã", [mealItem({ meal: undefined, text: "uma maçã" })]);
+check("refeição: sem meal vira snack", ml13.body.items[0].meal === "snack", JSON.stringify(ml13.body.items));
+
+/* o texto */
+ml13 = await readMeal("almocei", [mealItem({ text: "  arroz   e   feijão  " })]);
+check("refeição: o texto perde os espaços repetidos e das pontas", ml13.body.items[0].text === "arroz e feijão", JSON.stringify(ml13.body.items));
+ml13 = await readMeal("almocei", [mealItem({ text: "x".repeat(300) })]);
+check("refeição: texto enorme é cortado em 120", ml13.body.items[0].text.length === 120, String(ml13.body.items[0].text.length));
+ml13 = await readMeal("almocei", [mealItem({ text: "", title: "salada" })]);
+check("refeição: sem text, o title da IA vale como texto", ml13.body.items.length === 1 && ml13.body.items[0].text === "salada", JSON.stringify(ml13.body.items));
+ml13 = await readMeal("almocei", [mealItem({ text: "" }), mealItem({ text: "   " }), { kind: "meal" }]);
+check("refeição: item sem o que comeu é descartado", ml13.status === 200 && ml13.body.items.length === 0, JSON.stringify(ml13.body));
+
+/* a data */
+ml13 = await readMeal("ontem jantei pizza", [mealItem({ meal: "dinner", text: "pizza", date: "2026-10-17" })]);
+check("refeição: a data dita (ontem) fica", ml13.body.items[0].date === "2026-10-17" && ml13.body.items[0].meal === "dinner", JSON.stringify(ml13.body.items[0]));
+ml13 = await readMeal("almocei salada", [mealItem({ date: "ontem" })]);
+check("refeição: cleanMeal com data inválida vira o dia de context.today", ml13.body.items[0].date === "2026-10-18", JSON.stringify(ml13.body.items[0]));
+ml13 = await readMeal("almocei salada", [mealItem({ date: undefined })]);
+check("refeição: sem data vira o dia de context.today", ml13.body.items[0].date === "2026-10-18", JSON.stringify(ml13.body.items[0]));
+
+/* a IA manda campo a mais e ele não passa */
+ml13 = await readMeal("almocei salada", [mealItem({ amount: 4500, min: 30, kcal: 450, hack: "<script>" })]);
+check("refeição: campo de outro tipo (e caloria) não vaza para o item", Object.keys(ml13.body.items[0]).sort().join() === "date,kind,meal,text", JSON.stringify(ml13.body.items[0]));
+
+/* "gastei 45 no almoço" continua gasto; a linha com as duas coisas mantém a ordem */
+ml13 = await readMeal("gastei 45 no almoço", [money({ date: "2026-10-18" })]);
+check("refeição: 'gastei 45 no almoço' continua money", ml13.body.items.length === 1 && ml13.body.items[0].kind === "money" && ml13.body.items[0].amount === 4500, JSON.stringify(ml13.body.items));
+ml13 = await readMeal("almocei salada e gastei 45 no almoço", [mealItem(), money({ date: "2026-10-18" })]);
+check("refeição: refeição e gasto mantêm a ordem, cada um com os seus campos", ml13.body.items.map((x) => x.kind).join() === "meal,money" && !("amount" in ml13.body.items[0]) && !("meal" in ml13.body.items[1]), JSON.stringify(ml13.body.items));
+
+/* a conversa: o catálogo ganha meal-log, com os campos fechados */
+claudeAnswer = { stop_reason: "end_turn", content: [{ type: "text", text: JSON.stringify({ suggestions: [{ actionType: "meal-log", title: "jantar · pizza", note: "ontem", payload: {
+  meal: "dinner", text: "pizza", date: "2026-10-17", kcal: 900, amount: 4500, id: "m1", hack: "<script>"
+} }], clarify: "" }) }] };
+r = await call("POST", "/merlin", { task: "assistant", context: { message: "ontem jantei pizza" } }, mealCookie);
+body = await r.json();
+check("conversa: meal-log entra no catálogo", r.status === 200 && body.suggestions.length === 1 && body.suggestions[0].actionType === "meal-log", JSON.stringify(body));
+check("conversa: a proposta só tem meal, text e date", body.suggestions[0] && Object.keys(body.suggestions[0].payload).sort().join() === "date,meal,text", JSON.stringify(body.suggestions[0] && body.suggestions[0].payload));
+check("conversa: os campos guardam o que a IA propôs", body.suggestions[0] && body.suggestions[0].payload.meal === "dinner" && body.suggestions[0].payload.text === "pizza" && body.suggestions[0].payload.date === "2026-10-17", JSON.stringify(body.suggestions[0] && body.suggestions[0].payload));
+check("conversa: a instrução cita meal-log", /meal-log/.test(claudeAsked), String(claudeAsked).slice(0, 300));
+check("conversa: workout-log, sleep-log e finance-entry continuam no catálogo", /workout-log/.test(claudeAsked) && /sleep-log/.test(claudeAsked) && /finance-entry/.test(claudeAsked));
+
 /* ---- 13f. o teto do conselheiro ----
    a chave da Anthropic e uma so para o time. o teto e por pessoa e por hora:
    quem gastou espera, e quem esta ao lado nao paga por isso. */

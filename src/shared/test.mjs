@@ -1268,7 +1268,7 @@ const dataLeft = () => globalThis.localStorage.keys().filter((k) => k in DATA);
   const { SECTIONS, PAGES, sectionOf } = await fresh({});
 
   const wanted = [
-    ["health", "saúde", "habits", [["habits", "hábitos", "habits.html"], ["sleep", "sono", "sleep.html"], ["training", "treino", "training.html"], ["journal", "diário", "journal.html"]]],
+    ["health", "saúde", "habits", [["habits", "hábitos", "habits.html"], ["sleep", "sono", "sleep.html"], ["training", "treino", "training.html"], ["meals", "alimentação", "meals.html"], ["journal", "diário", "journal.html"]]],
     ["work", "trabalho", "apps", [
       ["apps", "produtos", "apps.html"], ["content", "conteúdo", "content.html"],
       ["funnels", "funis", "funnels.html"], ["maps", "mapas", "maps.html"]
@@ -1289,8 +1289,9 @@ const dataLeft = () => globalThis.localStorage.keys().filter((k) => k in DATA);
     const got = (SECTIONS.find((s) => s.id === id) || { pages: [] }).pages.map((p) => [p.id, p.label, p.href]);
     check("áreas: as abas de " + id + ", na ordem", JSON.stringify(got) === JSON.stringify(tabs), JSON.stringify(got));
   });
-  check("áreas: são quinze abas", PAGES.length === 15, String(PAGES.length));
+  check("áreas: são dezesseis abas", PAGES.length === 16, String(PAGES.length));
   check("áreas: o diário é uma aba de saúde", sectionOf("journal")?.id === "health", String(sectionOf("journal")?.id));
+  check("áreas: só o diário sai do dock no celular (spare), e a alimentação fica", PAGES.filter((p) => p.spare).map((p) => p.id).join() === "journal", PAGES.filter((p) => p.spare).map((p) => p.id).join());
   check("áreas: a vitrine não está em nenhuma", !PAGES.some((p) => p.id === "wishlist") && !PAGES.some((p) => /wishlist/.test(p.href)));
 
   const pageIds = PAGES.map((p) => p.id);

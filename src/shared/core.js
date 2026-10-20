@@ -251,14 +251,16 @@ initTheme();
    e a vitrine, que saiu em 19/10/2026: wishlist.html leva ao financeiro
    (wishlist.jsx), e a coleção fica guardada, sem tela. */
 export const SECTIONS = [
-  /* hábitos, sono, treino e diário, por enquanto; a alimentação entra entre o
-     treino e o diário (PRD saude-completa, D2). o diário é o histórico do
-     "como foi o dia" do Hoje: a semana em cartões, um por dia (VISAO, 9.3) */
+  /* hábitos, sono, treino, alimentação e diário (PRD saude-completa, D2). o
+     diário é o histórico do "como foi o dia" do Hoje: a semana em cartões,
+     um por dia (VISAO, 9.3). com cinco abas o dock não cabe no celular, e o
+     diário é o que sai dele primeiro (`spare`): continua no menu e no Hoje */
   { id: "health", label: "saúde", icon: "habits", pages: [
     { id: "habits", label: "hábitos", href: "habits.html" },
     { id: "sleep", label: "sono", href: "sleep.html" },
     { id: "training", label: "treino", href: "training.html" },
-    { id: "journal", label: "diário", href: "journal.html" }
+    { id: "meals", label: "alimentação", href: "meals.html" },
+    { id: "journal", label: "diário", href: "journal.html", spare: true }
   ] },
   /* o produto é o centro (VISAO, 9.5) e abre a área. o conteúdo e o funil são
      como gente chega a ele, e o mapa é o desenho que pensa em galhos */
@@ -880,7 +882,7 @@ document.addEventListener("visibilitychange", () => {
    nao baixou espera a proxima sincronizacao, e a marca de "feito" so e
    gravada quando todas fecharam. depois disso ela nunca mais faz nada. */
 const FRONTS_PURGED = "merlin:fronts-removed";
-const PURGE_TYPES = ["notes", "clients", "tasks", "week", "maps", "funnels", "apps", "finance", "habits", "plans", "bookmarks", "content", "cadence", "profile", "closes", "reviews", "sessions", "journal", "sleep", "workouts"];
+const PURGE_TYPES = ["notes", "clients", "tasks", "week", "maps", "funnels", "apps", "finance", "habits", "plans", "bookmarks", "content", "cadence", "profile", "closes", "reviews", "sessions", "journal", "sleep", "workouts", "meals"];
 function stripFront(value) {
   if (Array.isArray(value)) return value.map(stripFront).some(Boolean);
   if (!value || typeof value !== "object") return false;

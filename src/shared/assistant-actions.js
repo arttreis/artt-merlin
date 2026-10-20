@@ -13,6 +13,7 @@ import { SOURCES } from "./portrait.js";
 import { normalize as normalizeHabit, habitStatus, markOn } from "./habits-data.js";
 import { sleepLabel, sleepLine, readHours, sleepDoc, nightOf } from "./sleep-data.js";
 import { readMinutes, workoutDoc, workoutDay, workoutLine } from "./workouts-data.js";
+import { MEALS, mealOf, mealDoc, mealDay, mealLine } from "./meals-data.js";
 
 export const ACTION_COLLECTIONS = {
   task: "tasks",
@@ -25,7 +26,8 @@ export const ACTION_COLLECTIONS = {
   "finance-entry": "finance",
   "habit-mark": "habits",
   "sleep-log": "sleep",
-  "workout-log": "workouts"
+  "workout-log": "workouts",
+  "meal-log": "meals"
 };
 
 export const ACTION_LABELS = {
@@ -39,11 +41,12 @@ export const ACTION_LABELS = {
   "finance-entry": "novo lançamento",
   "habit-mark": "marcar hábito",
   "sleep-log": "registrar sono",
-  "workout-log": "registrar treino"
+  "workout-log": "registrar treino",
+  "meal-log": "anotar refeição"
 };
 
 /* o que a pílula confirmada diz no lugar do título: "✓ lançado · …" */
-export const ACTION_DONE = { "finance-entry": "lançado", "habit-mark": "marcado", "sleep-log": "registrado", "workout-log": "registrado", task: "criada", note: "criada", "lead-update": "aplicado", script: "aplicado" };
+export const ACTION_DONE = { "finance-entry": "lançado", "habit-mark": "marcado", "sleep-log": "registrado", "workout-log": "registrado", "meal-log": "anotado", task: "criada", note: "criada", "lead-update": "aplicado", script: "aplicado" };
 
 /* so os campos que fazem sentido editar antes de confirmar — o resto do
    payload (arvore do mapa, etapas do funil, id do cliente/conteudo) segue
@@ -101,8 +104,20 @@ export const ACTION_FIELDS = {
     { key: "title", label: "o que treinou" },
     { key: "minutes", label: "minutos", initial: (p) => (+p.min > 0 ? String(Math.round(+p.min)) : "") },
     { key: "date", label: "dia", type: "date", initial: () => today() }
+  ],
+  /* a refeição, o que comeu e o dia; sem caloria (sem culpa). a escolha tem
+     chave própria, como os minutos do treino: o que a IA mandar fora das
+     quatro ("brunch", "almoço") aparece já como a refeição que vai gravar */
+  "meal-log": [
+    { key: "pick", label: "refeição", type: "select", initial: (p) => mealOf(p.meal), options: () => MEALS.map((m) => [m.id, m.label]) },
+    { key: "text", label: "o que comeu" },
+    { key: "date", label: "dia", type: "date", initial: () => today() }
   ]
 };
+
+/* a refeição de uma proposta: o que a pessoa deixou na caixa por cima do que
+   a IA propôs */
+const mealSpec = (p) => ({ date: p.date, meal: mealOf("pick" in p ? p.pick : p.meal), text: String(p.text || "").replace(/\s+/g, " ").trim() });
 
 /* o treino de uma proposta: o que a pessoa deixou na caixa por cima do que a
    IA propôs, com os minutos como se escrevem ("40", "1h") */
@@ -136,6 +151,11 @@ export function previewOf(actionType, payload, ctx) {
       const t = today(), w = workoutSpec(p), { day, error } = workoutDay(w, t);
       if (error) return error;
       return w.min ? workoutLine({ title: w.title || "treino", min: w.min, day }, t) : "faltam os minutos";
+    }
+    case "meal-log": {
+      const t = today(), m = mealSpec(p), { day, error } = mealDay(m, t);
+      if (error) return error;
+      return m.text ? mealLine({ ...m, day }, t) : "falta o que comeu";
     }
     default: return "";
   }
@@ -210,6 +230,9 @@ export function buildDoc(actionType, payload, v, store, opts) {
        caixa (ui.jsx), com o mesmo applyWorkout da aba e do início */
     case "workout-log":
       return workoutDoc(workoutSpec({ ...p, ...v }), null, today());
+    /* um documento por refeição; o desfazer da caixa o apaga */
+    case "meal-log":
+      return mealDoc(mealSpec({ ...p, ...v }), null, today());
     default:
       return { error: "tipo de ação desconhecido" };
   }

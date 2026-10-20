@@ -32,6 +32,7 @@ import { normalize as normalizeFinance, contextOf as financeContext, undoEntry }
 import { normalize as normalizeHabit, SCHEDULES, COLORS, WEEKDAY_NAMES, habitStatus, undoHabit, markWhen } from "./habits-data.js";
 import { normalize as normalizeSleep } from "./sleep-data.js";
 import { normalize as normalizeWorkout, logWorkout, applyWorkout } from "./workouts-data.js";
+import { normalize as normalizeMeal } from "./meals-data.js";
 /* o Ctrl+K cria tarefa de hoje com a mesma regra e a mesma forma do dia */
 import { tasks, newTask, topOrder, routeLine } from "./tasks.js";
 import { BUILD, buildIntent } from "./build-intent.js";
@@ -947,12 +948,13 @@ function useRootClass(name, on) {
    abriu a caixa fica sabendo pelo `onDone(linha)`: a pílula da conversa vira
    "✓ lançado · …" e não abre de novo. o desfazer chama `onDone(null)`, e a
    pílula volta. `chat` é o id da conversa, que vai na origem do lançamento. */
-const CREATE_LABELS = { "onboarding-map": "gerar mapa", "onboarding-funnel": "gerar funil", "finance-entry": "lançar", "sleep-log": "registrar", "workout-log": "registrar" };
+const CREATE_LABELS = { "onboarding-map": "gerar mapa", "onboarding-funnel": "gerar funil", "finance-entry": "lançar", "sleep-log": "registrar", "workout-log": "registrar", "meal-log": "anotar" };
 const CREATE_HREF = { "onboarding-map": "maps.html#", "onboarding-funnel": "funnels.html#" };
 /* o aviso é o texto fixo, ou a própria linha da pílula: o sono confirma
-   "✓ registrado · 7h de sono", igual ao início */
-const DONE_NOTICE = { "finance-entry": "lançado no financeiro", "lead-update": "cliente atualizado", script: "roteiro aplicado", "sleep-log": (line) => "✓ " + line };
-const ACTION_OPTIONS = { finance: { normalize: normalizeFinance }, sleep: { normalize: normalizeSleep }, workouts: { normalize: normalizeWorkout } };
+   "✓ registrado · 7h de sono", e a refeição "✓ anotado · almoço · salada",
+   iguais ao início */
+const DONE_NOTICE = { "finance-entry": "lançado no financeiro", "lead-update": "cliente atualizado", script: "roteiro aplicado", "sleep-log": (line) => "✓ " + line, "meal-log": (line) => "✓ " + line };
+const ACTION_OPTIONS = { finance: { normalize: normalizeFinance }, sleep: { normalize: normalizeSleep }, workouts: { normalize: normalizeWorkout }, meals: { normalize: normalizeMeal } };
 const optionPair = (o) => (Array.isArray(o) ? o : [o, o]);
 export function ProposalDialog({ proposal, chat, onClose, onDone }) {
   const { actionType, note } = proposal;
@@ -1431,7 +1433,9 @@ function TopBar({ page, onCommand, menuOpen, onMenu, menuRef }) {
    gesto de escrever); numa página de área, o início, as abas dela (se houver
    mais de uma) e o "+"; no resto (a conversa, o perfil), o início e o "+".
    trocar de área é pelo menu. as abas moram no próprio dock, e não numa faixa
-   acima dele: as quatro do trabalho cabem em 390px numa linha só */
+   acima dele: as quatro do trabalho cabem em 390px numa linha só. a aba
+   `spare` (o diário da saúde, a quinta) sai do dock até 600px, mesmo na
+   página dela: é o que faz as cinco da saúde caberem */
 function Dock({ page, onCommand }) {
   if (page === "home") return null;
   const here = sectionOf(page);
@@ -1444,7 +1448,7 @@ function Dock({ page, onCommand }) {
         </a>
         {tabs.length > 0 && <span className="dk__sep" />}
         {tabs.map((p) => (
-          <a key={p.id} className="dk__tab" href={p.href} aria-current={p.id === page ? "page" : undefined}>{p.label}</a>
+          <a key={p.id} className={"dk__tab" + (p.spare ? " dk__tab--spare" : "")} href={p.href} aria-current={p.id === page ? "page" : undefined}>{p.label}</a>
         ))}
         <span className="dk__sep" />
         <button type="button" className="dk__plus" onClick={onCommand} title="escrever, buscar ou perguntar (Ctrl K)" aria-label="Escrever, buscar ou perguntar">
