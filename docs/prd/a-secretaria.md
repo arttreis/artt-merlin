@@ -87,6 +87,10 @@ precisam distribuí-lo.
 
   "agora não" pula sem gravar. "amanhã" adia, com desfazer. A fila do dia, os hábitos, o que
   vence hoje e o conteúdo **não** entram na lista.
+
+  *Exceção (20/10/2026, D8 de `saude-completa.md`):* o **treino** do dia entra em "agora", depois
+  da sessão e dos compromissos, quando há um hábito de treino esperado hoje e nenhum treino nem
+  marca hoje. Só o treino; os outros hábitos continuam fora.
 - **D5. Fechar o dia e a revisão se pedem na conversa** ("fechar o dia", "revisar a semana", com ou sem o "?" no fim),
   porque o botão da noite saiu do início. Abrem o fechamento (`Closing`, `src/index.jsx:434`) e a
   revisão de sempre. A sequência de dias fechados continua.

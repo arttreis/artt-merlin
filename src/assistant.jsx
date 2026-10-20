@@ -28,6 +28,8 @@ import { BUILD, buildIntent, answersText, draftView, docFromDraft } from "./shar
 import { usePortrait } from "./shared/use-portrait.js";
 import { sourcesLine } from "./shared/portrait.js";
 import { normalize as normalizeTask } from "./shared/tasks.js";
+import { normalize as normalizeHabit } from "./shared/habits-data.js";
+import { normalize as normalizeWorkout } from "./shared/workouts-data.js";
 import { questsOf, questsText } from "./shared/quests.js";
 import { QuestCard } from "./shared/quest-card.jsx";
 
@@ -167,6 +169,8 @@ function Assistant() {
   /* o cartão do "o que falta hoje?" lê as mesmas coleções do início */
   const tasks = useCollection("tasks", { normalize: normalizeTask });
   const sessions = useCollection("sessions");
+  const habits = useCollection("habits", { normalize: normalizeHabit });
+  const workouts = useCollection("workouts", { normalize: normalizeWorkout });
   const portrait = usePortrait();
   const hash = useHash();
   const [messages, setMessages] = useState([]); // { from: "me"|"merlin", text } | { from: "merlin", proposal }
@@ -309,7 +313,7 @@ function Assistant() {
     const answer = (...m) => keep(mine.concat(m));
     /* o cartão é desenhado ao vivo; a conversa guarda a linha de texto, que é
        também o que o Merlin lê na pergunta seguinte */
-    const questsMsg = () => ({ from: "merlin", show: "quests", text: questsText(questsOf({ tasks: tasks.all(), sessions: sessions.all() })) });
+    const questsMsg = () => ({ from: "merlin", show: "quests", text: questsText(questsOf({ tasks: tasks.all(), sessions: sessions.all(), habits: habits.all(), workouts: workouts.all() })) });
     keep(mine);
     setInput("");
     setThinking(WAIT.ask);

@@ -7,7 +7,8 @@
  * mesmo lugar, sem perguntar outra vez.
  *
  * cada tipo de item tem o seu desenho em VIEWS. tipo novo é uma linha ali e uma
- * fonte no quests.js (as contas previstas de dias passados entraram assim).
+ * fonte no quests.js (as contas previstas de dias passados entraram assim; o
+ * treino do dia, a única exceção entre os hábitos, também).
  *
  * toda ação que grava avisa com desfazer. "agora não" não grava: pula até a
  * lista mudar, e o pulo mora só nesta página.
@@ -22,6 +23,9 @@ import { today, addDays, dateOf, notify, brl } from "./core.js";
 import { useCollection } from "./ui.jsx";
 import { normalize as normalizeFinance, configOf } from "./finance-data.js";
 import { EntryForm } from "./entry-form.jsx";
+import { WorkoutForm } from "./workout-form.jsx";
+import { normalize as normalizeHabit } from "./habits-data.js";
+import { normalize as normalizeWorkout } from "./workouts-data.js";
 import { questsOf, nextQuest, listKey, countLine, moveTask, dropTask, doneTask, paidEntry, moveEntry, DAY_HREF } from "./quests.js";
 import { runningOf, startSession, stopSession, receipt } from "./focus.js";
 import { costOf, fmt, longFmt, clock } from "./day.js";
@@ -191,6 +195,26 @@ function BillQuest({ quest, finance, later }) {
   );
 }
 
+/* o treino do dia que ainda não houve: "registrar treino" abre a caixa do treino
+   com hoje e os minutos do hábito. quem grava é a própria caixa (a mesma da
+   aba e do início, que marca o hábito e avisa com desfazer), e a quest sai
+   sozinha quando a coleção muda. a caixa vai para o body pela mesma razão da
+   conta prevista */
+function WorkoutQuest({ quest, habits, workouts, later }) {
+  const [open, setOpen] = useState(false);
+  const { week } = quest;
+  return (
+    <Shell from="agora" title={quest.title} meta={quest.min ? fmt(quest.min) : ""}
+           why={week ? week.done + " de " + week.goal + " esta semana" : "ainda sem treino hoje"}>
+      <Act main onClick={() => setOpen(true)}>registrar treino</Act>
+      <Act onClick={later}>agora não</Act>
+      {open && createPortal(
+        <WorkoutForm workouts={workouts} habits={habits} open={{ min: quest.min, habit: quest.habit.name }} onClose={() => setOpen(false)} />,
+        document.body)}
+    </Shell>
+  );
+}
+
 function GroupQuest({ quest, later, open = "abrir o dia" }) {
   return (
     <Shell from="ficou para trás" title={quest.title} why={"a mais antiga é de " + dayWord(quest.items[0].date)}>
@@ -203,6 +227,7 @@ function GroupQuest({ quest, later, open = "abrir o dia" }) {
 const VIEWS = {
   session: SessionQuest,
   appointment: AppointmentQuest,
+  workout: WorkoutQuest,
   overdue: OverdueQuest,
   "overdue-group": GroupQuest,
   bill: BillQuest,
@@ -213,7 +238,9 @@ const VIEWS = {
 
 export function QuestCard({ tasks, sessions }) {
   const finance = useCollection("finance", { normalize: normalizeFinance });
-  const state = questsOf({ tasks: tasks.all(), sessions: sessions.all(), entries: finance.all() });
+  const habits = useCollection("habits", { normalize: normalizeHabit });
+  const workouts = useCollection("workouts", { normalize: normalizeWorkout });
+  const state = questsOf({ tasks: tasks.all(), sessions: sessions.all(), entries: finance.all(), habits: habits.all(), workouts: workouts.all() });
   const key = listKey(state);
   const [skip, setSkip] = useState({ key, ids: [] });
   const skipped = skip.key === key ? skip.ids : [];
@@ -232,7 +259,7 @@ export function QuestCard({ tasks, sessions }) {
     <section className="qc" aria-label="O que falta hoje">
       {/* a chave troca o desenho quando a coisa muda: o "quanto leva?" de uma
           atrasada não pode ficar aberto na seguinte */}
-      <View key={quest.id} quest={quest} tasks={tasks} sessions={sessions} finance={finance}
+      <View key={quest.id} quest={quest} tasks={tasks} sessions={sessions} finance={finance} habits={habits} workouts={workouts}
             later={() => setSkip({ key, ids: skipped.concat(quest.id) })} />
       <p className="qc__foot">
         {next && <span>a seguir: {next}</span>}

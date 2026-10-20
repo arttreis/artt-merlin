@@ -9,10 +9,11 @@
 import "./shared/base.css";
 import "./training.css";
 import { useState } from "react";
-import { initPage, today, mondayOf, addDays, dateOf, dateLabel, weekdayOf, notify } from "./shared/core.js";
-import { mount, useCollection, useFields, EmptyStart, PeriodNav, Form, Field, icon } from "./shared/ui.jsx";
+import { initPage, today, mondayOf, addDays, dateOf, dateLabel } from "./shared/core.js";
+import { mount, useCollection, EmptyStart, PeriodNav, icon } from "./shared/ui.jsx";
+import { WorkoutForm, dayTitle } from "./shared/workout-form.jsx";
 import { normalize as normalizeHabit } from "./shared/habits-data.js";
-import { normalize, WORKOUT_MODELS, weekWorkouts, weekTotal, readMinutes, workoutDoc, workoutLine, logWorkout, applyWorkout, trainingHabit } from "./shared/workouts-data.js";
+import { normalize, WORKOUT_MODELS, weekWorkouts, weekTotal } from "./shared/workouts-data.js";
 
 initPage("training");
 
@@ -21,52 +22,6 @@ function weekRange(monday) {
   const end = addDays(monday, 6);
   if (dateOf(monday).getMonth() === dateOf(end).getMonth()) return dateOf(monday).getDate() + "–" + dateLabel(end);
   return dateLabel(monday) + "–" + dateLabel(end);
-}
-
-/* "seg 20/10" */
-const dayTitle = (day) => weekdayOf(day) + " " + day.slice(8) + "/" + day.slice(5, 7);
-
-/* ---------- a caixa do treino ----------
-   `open.id` corrige um treino; sem id, é um novo, que já pode vir com o dia,
-   o nome e os minutos (o dia vazio da semana, ou o modelo da tela vazia).
-   o novo marca o hábito de treino do dia, e a caixa diz qual antes */
-function WorkoutForm({ workouts, habits, open, onClose }) {
-  const now = today();
-  const editing = open.id ? workouts.get(open.id) : null;
-  const [v, bind] = useFields({
-    date: (editing && editing.day) || open.day || now,
-    title: (editing && editing.title) || open.title || "",
-    min: editing ? String(editing.min) : open.min ? String(open.min) : ""
-  });
-  const h = !editing ? trainingHabit(habits.all(), v.title) : null;
-  const sub = v.date > now ? "esse dia ainda não chegou"
-    : h && !h.marks[v.date] ? "marca também o hábito " + h.name
-    : "o que você treinou e por quanto tempo";
-  const spec = { date: v.date, title: v.title, min: readMinutes(v.min) };
-  const submit = () => {
-    if (editing) {
-      const { doc, error } = workoutDoc(spec, editing, now);
-      if (error) { notify(error); return false; }
-      workouts.save(doc);
-      notify("✓ registrado · " + workoutLine(doc, now), () => workouts.save({ ...editing, updatedAt: Date.now() }));
-      return;
-    }
-    const res = logWorkout(spec, habits.all(), now);
-    if (res.error) { notify(res.error); return false; }
-    notify("✓ registrado · " + res.line, applyWorkout(workouts, habits, res));
-  };
-  const erase = () => {
-    workouts.remove(editing.id);
-    notify("treino apagado", () => workouts.save({ ...editing, updatedAt: Date.now() }));
-  };
-  return (
-    <Form title={editing ? "o treino de " + dayTitle(editing.day) : "o que você treinou?"} sub={sub}
-          submit="registrar" remove={editing ? "apagar o treino" : undefined} onRemove={erase} onSubmit={submit} onClose={onClose}>
-      <Field label="dia"><input className="input" type="date" max={now} {...bind("date")} /></Field>
-      <Field label="o que treinou"><input className="input" maxLength={60} placeholder="perna" {...bind("title")} /></Field>
-      <Field label="minutos"><input className="input" inputMode="numeric" placeholder="40" {...bind("min")} /></Field>
-    </Form>
-  );
 }
 
 /* ---------- a página ---------- */

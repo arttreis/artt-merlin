@@ -1,11 +1,17 @@
 /* merlin · o que falta hoje (a secretária, D3 e D4)
  *
  * "o que falta hoje?" responde com UMA coisa: a próxima. a lista tem só dois
- * grupos, nessa ordem — o que é agora (a sessão de foco rodando, ou um
- * compromisso com hora que começa em até 30 minutos ou já está em curso) e o
- * que ficou para trás (as atrasadas e as contas previstas de dias passados). a
- * fila do dia, os hábitos, o que vence hoje e o conteúdo não entram: o dia inteiro mora no calendário, e uma lista
- * que repetisse a fila viraria a segunda fila.
+ * grupos, nessa ordem — o que é agora (a sessão de foco rodando, um
+ * compromisso com hora que começa em até 30 minutos ou já está em curso, e o
+ * treino do dia que ainda não aconteceu) e o que ficou para trás (as atrasadas
+ * e as contas previstas de dias passados). a fila do dia, o que vence hoje e o
+ * conteúdo não entram: o dia inteiro mora no calendário, e uma lista que
+ * repetisse a fila viraria a segunda fila.
+ *
+ * os hábitos também não entram, com UMA exceção (D8 do PRD saude-completa,
+ * sobre a D4 da secretária): o treino. quem treina em dia de treino só
+ * descobre que esqueceu à noite; os outros hábitos continuam na grade. a
+ * exceção é só o treino, e nenhum outro hábito entra por aqui.
  *
  * é a conta de três telas: o cartão da conversa no início, o "agora" do
  * rastreador e o cartão que o Merlin pede com `show:"quests"`. uma verdade só
@@ -21,6 +27,8 @@ import { overdue, onDate, dayTasks, topOrder } from "./tasks.js";
 import { runningOf, minutesOf } from "./focus.js";
 import { costOf } from "./day.js";
 import { pendingBefore } from "./finance-data.js";
+import { isExpected, weekProgress } from "./habits-data.js";
+import { trainingHabit } from "./workouts-data.js";
 
 /* quantos minutos antes o compromisso já é "agora" */
 export const SOON = 30;
@@ -62,18 +70,31 @@ const lateBills = (data, ctx) =>
 const billGroup = (items) =>
   ({ type: "bill-group", id: "bill-group", title: items.length + " contas a confirmar", count: items.length, href: FINANCE_HREF, items });
 
+/* o treino de hoje que ainda não houve (D8). há hábito de treino, hoje é dia
+   dele — todo dia, ou um dos dias marcados, ou "N por semana" com a meta da
+   semana ainda por bater — e não há treino registrado nem marca hoje */
+function trainingNow(data, ctx) {
+  const h = trainingHabit(data.habits, "");
+  if (!h || h.marks[ctx.date]) return [];
+  if ((data.workouts || []).some((w) => w && !w.deleted && w.day === ctx.date)) return [];
+  const week = h.schedule.type === "perWeek" ? weekProgress(h, ctx.date) : null;
+  if (week ? week.done >= week.goal : !isExpected(h, ctx.date)) return [];
+  return [{ type: "workout", id: "workout:" + ctx.date, title: "treinar", habit: h, min: h.min, week }];
+}
+
 export const SOURCES = [
   { key: "session", group: "now", list: sessionNow },
   { key: "appointment", group: "now", list: appointmentsNow },
+  { key: "workout", group: "now", list: trainingNow },
   { key: "overdue", group: "behind", list: lateTasks, many: lateGroup },
   { key: "bill", group: "behind", list: lateBills, many: billGroup }
 ];
 
 /* ---------- a lista ---------- */
 
-/* data = { tasks, sessions, blocks?, entries? }: as coleções inteiras, como
-   `all()` as devolve (`entries` é a coleção `finance`; só os lançamentos
-   contam). now é Date ou epoch ms. a conta do dia é a mesma do calendário e do
+/* data = { tasks, sessions, blocks?, entries?, habits?, workouts? }: as coleções
+   inteiras, como `all()` as devolve (`entries` é a coleção `finance`; só os
+   lançamentos contam; `habits` e `workouts` só servem ao treino do dia). now é Date ou epoch ms. a conta do dia é a mesma do calendário e do
    rastreador (dayTasks): a cópia da rotina conta. */
 export function questsOf(data, now) {
   const at = now instanceof Date ? now.getTime() : +now || Date.now();
