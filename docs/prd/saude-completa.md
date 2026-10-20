@@ -1,6 +1,6 @@
 # A saúde completa · sono, treino, alimentação e diário entram na área
 
-**Status:** 🚧 Em execução. Descoberta feita pelo orquestrador em 2026-10-20, com autonomia dada
+**Status:** ✅ No ar desde 2026-10-20 (versão do worker `4ca6519e`, PRs #68 a #73). Descoberta feita pelo orquestrador em 2026-10-20, com autonomia dada
 pelo Arthur (despachar, mergear e publicar). Decisões **(orq.)** foram tomadas pelo orquestrador e
 ficam para revisão; as **(Arthur)** vieram dele.
 **Owner:** Arthur Reis
