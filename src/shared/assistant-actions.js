@@ -388,10 +388,11 @@ export function markProposal(list, i, line) {
 }
 
 /* as falas de montar com o Merlin (shared/build.js): as perguntas antes de
-   montar, o rascunho e o "criei". o rascunho pode ser um app inteiro, e so o
-   ultimo vale — os anteriores chegam aqui sem `data` (quem grava a conversa
+   montar, o rascunho e o "criei" (com a linha de pronto, quando o tipo tem:
+   "planilha pronta · 14 linhas · 5 colunas"). o rascunho pode ser um app
+   inteiro, e so o ultimo vale — os anteriores chegam aqui sem `data` (quem grava a conversa
    tira), e ficam so com o titulo e o resumo do que mudou */
-const BUILD_KINDS = ["funnel", "app", "map"];
+const BUILD_KINDS = ["funnel", "app", "map", "sheet"];
 const str = (v, n) => String(v == null ? "" : v).slice(0, n);
 function normalizeBuildMsg(m) {
   if (m.brief && BUILD_KINDS.includes(m.brief.kind)) {
@@ -412,7 +413,7 @@ function normalizeBuildMsg(m) {
     } };
   }
   if (m.built && BUILD_KINDS.includes(m.built.kind)) {
-    return { from: "merlin", built: { kind: m.built.kind, id: str(m.built.id, 60), name: str(m.built.name, 120) } };
+    return { from: "merlin", built: { kind: m.built.kind, id: str(m.built.id, 60), name: str(m.built.name, 120), line: str(m.built.line, 200) } };
   }
   return null;
 }

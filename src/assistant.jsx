@@ -9,10 +9,10 @@
    quem pergunta de outra tela (a busca da barra, o campo da home) chega
    aqui pelo askMerlin(), que traz a pergunta e o que aquela tela sabia.
 
-   desde 10/10/2026 é aqui também que se monta com o Merlin um funil, um app
-   ou um mapa (shared/build.js): o pedido de montar vira uma conversa curta —
-   as perguntas que mudam o desenho, o rascunho, o ajuste em palavras — e só
-   vira documento quando a pessoa cria. */
+   desde 10/10/2026 é aqui também que se monta com o Merlin um funil, um app,
+   um mapa ou uma planilha (shared/build.js): o pedido de montar vira uma
+   conversa curta — as perguntas que mudam o desenho, o rascunho, o ajuste em
+   palavras — e só vira documento quando a pessoa cria. */
 import "./shared/base.css";
 import "./assistant.css";
 import { initPage, newId, notify, api, takeAsk, getCurrentPage, collection } from "./shared/core.js";
@@ -21,7 +21,7 @@ import { mount, useCollection, useHash, setHash, Markdown, ProposalDialog, Habit
 import { chatMood } from "./shared/hat.js";
 import { NAV_ICONS } from "./shared/icons.jsx";
 import { MAX_TURNS, normalizeChat, chatTitle, turnsOf, markProposal, atBottom } from "./shared/assistant-actions.js";
-import { BUILD, buildIntent, answersText, draftView, docFromDraft } from "./shared/build.js";
+import { BUILD, buildIntent, answersText, draftView, docFromDraft, builtLine, citesCash, cashPortrait } from "./shared/build.js";
 /* o retrato vai em toda pergunta: é ele que faz "continuar na conversa"
    chegar sabendo o dia, "o que tenho quinta?" ter resposta e "posso gastar
    x?" sair pelo saldo sem abrir o financeiro antes */
@@ -112,7 +112,7 @@ function BriefCard({ brief, live, onAnswer }) {
   const set = (i, v) => setAnswers((a) => ({ ...a, [i]: v }));
   return (
     <div className="build">
-      <p className="build__eyebrow t-mono">{icon("spark")}antes de montar o {BUILD[brief.kind].label}</p>
+      <p className="build__eyebrow t-mono">{icon("spark")}antes de montar {BUILD[brief.kind].the}</p>
       {brief.questions.map((q, i) => (
         <div key={i} className="build__q">
           <b>{q.q}</b>
@@ -148,14 +148,29 @@ function DraftCard({ draft, live, onCreate }) {
   const v = draftView(draft.kind, draft.data);
   return (
     <div className="build is-draft">
-      <p className="build__eyebrow t-mono">{icon("spark")}rascunho do {BUILD[draft.kind].label}</p>
+      <p className="build__eyebrow t-mono">{icon("spark")}rascunho {BUILD[draft.kind].of}</p>
       <h3 className="build__title">{v.title}</h3>
       {v.sub && <p className="build__sub">{v.sub}</p>}
-      <dl className="build__lines">
-        {v.lines.map((l, i) => (
-          <div key={i}><dt>{l.label}</dt><dd>{l.text || "—"}</dd></div>
-        ))}
-      </dl>
+      {/* a planilha se confere na grade, com a conta já feita */}
+      {v.table && (
+        <>
+          {/* a grade larga rola de lado; com tabindex, rola também pelo teclado */}
+          <div className="build__grid" tabIndex={0} role="region" aria-label={"rascunho " + BUILD[draft.kind].of + ": " + v.title}>
+            <table>
+              <thead><tr>{v.table.head.map((h, j) => <th key={j} className={v.table.right[j] ? "is-num" : ""}>{h}</th>)}</tr></thead>
+              <tbody>{v.table.rows.map((r, i) => <tr key={i}>{r.map((c, j) => <td key={j} className={v.table.right[j] ? "is-num" : ""}>{c}</td>)}</tr>)}</tbody>
+            </table>
+          </div>
+          {v.table.more > 0 && <p className="build__more">e mais {v.table.more} {v.table.more === 1 ? "linha" : "linhas"}</p>}
+        </>
+      )}
+      {v.lines.length > 0 && (
+        <dl className="build__lines">
+          {v.lines.map((l, i) => (
+            <div key={i}><dt>{l.label}</dt><dd>{l.text || "—"}</dd></div>
+          ))}
+        </dl>
+      )}
       {draft.summary && <p className="build__summary">{draft.summary}</p>}
       <div className="build__actions">
         <span className="build__hint">ou escreva abaixo o que mudar</span>
@@ -241,8 +256,11 @@ function Assistant() {
   };
 
   /* ---------- montar com o Merlin ---------- */
+  /* a planilha que cita o caixa leva o dinheiro e o negócio do retrato, e só
+     eles (shared/build.js) */
   const callBuild = async (context) => {
     try {
+      if (BUILD[context.kind].cash && citesCash(context.request)) context = { ...context, portrait: cashPortrait(await portrait()) };
       const r = await api("/merlin", { method: "POST", body: JSON.stringify({ task: "build", context }) });
       if (r.ok) return { body: r.body };
       return { error: r.status === 401 ? "entre para usar o Merlin" : (r.body && r.body.error) || "não consegui montar isso agora" };
@@ -293,11 +311,15 @@ function Assistant() {
     keep(mine.concat([{ from: "merlin", draft: { ...d, data, title: draftView(d.kind, data).title, summary: r.body.summary || "" } }]));
     feel("done");
   };
+  /* com linha de pronto (a planilha), a conversa fica e a linha abre o que
+     foi criado; sem ela, vai direto para a tela dele */
   const create = (d) => {
     const { collection: name, doc, href } = docFromDraft(d.kind, d.data, newId);
     collection(name).save(doc);
-    keep(messages.concat([{ from: "merlin", built: { kind: d.kind, id: doc.id, name: doc.name } }]));
-    location.href = href;
+    const line = builtLine(d.kind, doc);
+    keep(messages.concat([{ from: "merlin", built: { kind: d.kind, id: doc.id, name: doc.name, line } }]));
+    if (line) feel("done");
+    else location.href = href;
   };
 
   const ask = async (text, mode) => {
@@ -484,7 +506,9 @@ function Assistant() {
                       : m.draft
                       ? <DraftCard draft={m.draft} live={!!flow && flow.at === i && !thinking} onCreate={() => create(m.draft)} />
                       : m.built
-                      ? <p>criei o {BUILD[m.built.kind].label} <a href={BUILD[m.built.kind].href + m.built.id}>{m.built.name}</a></p>
+                      ? m.built.line
+                        ? <p className="chat__done">✓ {m.built.line} · <a href={BUILD[m.built.kind].href + m.built.id}>abrir</a></p>
+                        : <p>criei {BUILD[m.built.kind].the} <a href={BUILD[m.built.kind].href + m.built.id}>{m.built.name}</a></p>
                       : m.show === "quests"
                       ? i === lastCard
                         ? <div className="chat__quest"><QuestCard tasks={tasks} sessions={sessions} /></div>
@@ -520,7 +544,7 @@ function Assistant() {
             )}
             {flow && (
               <p className="chat__mode">
-                {icon("spark")}{flow.brief ? "respondendo as perguntas do " + BUILD[flow.brief.kind].label : "ajustando o rascunho: " + flow.draft.title}
+                {icon("spark")}{flow.brief ? "respondendo as perguntas " + BUILD[flow.brief.kind].of : "ajustando o rascunho: " + flow.draft.title}
                 <button type="button" aria-label="Sair da montagem" title="sair da montagem" onClick={() => setFlowOn(false)}>{icon("x")}</button>
               </p>
             )}

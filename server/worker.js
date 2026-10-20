@@ -1336,6 +1336,11 @@ function cleanCapture(d, c) {
 const BUILD_PER_HOUR = 40;
 const MAX_QUESTIONS = 4;
 const NODE_TYPE_SET = new Set(NODE_TYPES.split(", "));
+/* se COL_TYPES mudar em shared/sheet.js, muda aqui junto. o teto do rascunho
+   (40 × 10, D6) é menor que o da folha (200 × 26): a conversa monta o começo */
+const SHEET_COL_TYPES = ["text", "number", "money", "date"];
+const SHEET_MAX_ROWS = 40, SHEET_MAX_COLS = 10;
+const BUILD_PORTRAIT_MAX = 1500;
 const BUILD_KINDS = {
   funnel: {
     label: "funil de marketing e vendas",
@@ -1365,6 +1370,24 @@ const BUILD_KINDS = {
       "Cada title com 2 a 7 palavras; note só quando acrescenta, até 20 palavras. Os ramos de um mesmo nó não se repetem entre si e vêm do mais importante para o menos. " +
       "name = o nome do mapa (até 6 palavras). " +
       'Formato: {"name":"…","tree":{"title":"…","note":"","children":[{"title":"…","note":"","children":[]}]},"summary":"…"}'
+  },
+  /* a planilha (PRD desenhos, D3 e D6). `cash`: quando o pedido cita o caixa,
+     a tela manda o dinheiro e o negócio do retrato, e eles entram como valor
+     inicial — cópia, sem ligação viva */
+  sheet: {
+    label: "planilha",
+    cash: true,
+    matters: "para que serve a conta, o que entra como linha e que números a pessoa já tem",
+    draft:
+      "Monte a planilha pronta para usar, com a conta já feita por fórmulas. " +
+      "cols: de 2 a " + SHEET_MAX_COLS + " colunas {name (até 4 palavras), type (exatamente um de " + SHEET_COL_TYPES.join(", ") + "; money é em reais)}. " +
+      "rows: de 1 a " + SHEET_MAX_ROWS + " linhas, cada uma uma lista de células em texto, na ordem das colunas (\"\" para vazia); o cabeçalho NÃO é linha. " +
+      "Número à brasileira: 1.234,56; em money, só o número, sem R$; percentual como 30%; data como DD/MM/AAAA. " +
+      "Fórmula começa com = e usa a letra da coluna (A é a primeira) e o número da linha (1 é a primeira linha de rows), as quatro operações, parênteses e SOMA, MÉDIA, MÍN e MÁX em intervalos, com ; entre argumentos: =B1*C1, =SOMA(D1:D5), =(B1+B2)/(1-C3). " +
+      "Toda conta que dá para fazer é fórmula, não número digitado; total e resultado na última linha. " +
+      "Use os números que a pessoa deu e os do caixa, quando vierem; o que faltar, ponha um exemplo comum para este caso e diga no summary que é para trocar. Nunca invente resultado. " +
+      "name = o nome da planilha (até 6 palavras). " +
+      'Formato: {"name":"…","cols":[{"name":"…","type":"text"}],"rows":[["…","…"]],"summary":"…"}'
   }
 };
 const BUILD_TASKS = {
@@ -1376,7 +1399,8 @@ const BUILD_TASKS = {
       "Pedido: " + String(c.request || "").slice(0, 1500) + "\n" +
       (c.answers ? "O que a pessoa respondeu:\n" + String(c.answers).slice(0, 1500) + "\n" : "") +
       (step === "revise" && c.draft ? "Rascunho atual (JSON):\n" + JSON.stringify(c.draft).slice(0, 24000) + "\n" : "") +
-      (step === "revise" ? "Ajuste pedido: " + String(c.change || "").slice(0, 1000) + "\n" : "");
+      (step === "revise" ? "Ajuste pedido: " + String(c.change || "").slice(0, 1000) + "\n" : "") +
+      (k.cash && c.portrait ? "O caixa da pessoa agora (uma cópia para valor inicial; a planilha não se atualiza sozinha):\n" + String(c.portrait).slice(0, BUILD_PORTRAIT_MAX) + "\n" : "");
     if (step === "brief") {
       return {
         instruction:
@@ -1414,9 +1438,19 @@ function cleanTree(node, depth, budget) {
 }
 const OFFER_TYPES = new Set(["main", "bump", "upsell", "downsell"]);
 const CREATIVE_FORMATS = new Set(["image", "video", "carousel", "text"]);
+const SHEET_COL_SET = new Set(SHEET_COL_TYPES);
+function cleanSheet(d) {
+  const cols = arr(d.cols, SHEET_MAX_COLS).filter((c) => c && typeof c === "object").map((c) => ({
+    name: cut(c.name, 60), type: SHEET_COL_SET.has(String(c.type)) ? String(c.type) : "text"
+  }));
+  const cell = (v) => (typeof v === "string" || (typeof v === "number" && Number.isFinite(v)) ? cut(v, 500) : "");
+  const rows = arr(d.rows, SHEET_MAX_ROWS).filter(Array.isArray).map((r) => cols.map((_, j) => cell(r[j])));
+  return { name: cut(d.name, 120), cols, rows };
+}
 function cleanDraft(kind, d) {
   if (kind === "app") return { name: cut(d.name, 120), ...cleanBlueprint(d) };
   if (kind === "map") return { name: cut(d.name, 120), tree: cleanTree(d.tree || {}, 1, { n: 80 }) };
+  if (kind === "sheet") return cleanSheet(d);
   const named = (x, k) => x && String(x[k] || "").trim();
   return {
     name: cut(d.name, 120), channel: cut(d.channel, 60),
@@ -1481,13 +1515,14 @@ const QUOTA = {
    por dia e por tarefa. e a conta; o teto la em cima e outra coisa. o nome da
    tarefa e o que a pessoa fez, nao so a rota: um assistant que propoe uma acao
    e um assistant que so responde custam diferente, e uma captura grava uma
-   linha por tipo de item que devolveu. */
-function usageTasks(name, step, data) {
+   linha por tipo de item que devolveu, e uma montagem diz o passo e o tipo
+   (build:draft:sheet, PRD desenhos D7). */
+function usageTasks(name, step, data, kind) {
   if (CAPTURE_TASKS[name]) {
     const kinds = [...new Set(cleanCapture(data).map((x) => x.kind))];
     return kinds.length ? kinds.map((k) => "capture:" + k) : ["capture:none"];
   }
-  if (BUILD_TASKS[name]) return ["build:" + step];
+  if (BUILD_TASKS[name]) return ["build:" + step + ":" + kind];
   if (name === "assistant") {
     const raw = data && Array.isArray(data.suggestions) ? data.suggestions[0] : null;
     return [raw && ASSISTANT_ACTIONS[raw.actionType] && raw.title ? "assistant:action" : "assistant:answer"];
@@ -1522,12 +1557,14 @@ async function advise(req, env, person) {
   const name = String((body && body.task) || "");
   const task = body && (LIST_TASKS[name] || TEXT_TASKS[name] || BLUEPRINT_TASKS[name] || CAPTURE_TASKS[name] || BUILD_TASKS[name]);
   if (!task || !body.context || typeof body.context !== "object") return fail("tarefa inválida");
-  /* o retrato só vale para a pergunta ao assistente (PRD da secretária, D8),
-     e o segredo MERLIN_PORTRAIT_OFF o desliga para todos, sem build (D9) */
-  if (name !== "assistant" || env.MERLIN_PORTRAIT_OFF) delete body.context.portrait;
+  /* o retrato só vale para a pergunta ao assistente (PRD da secretária, D8)
+     e para a montagem que lê o caixa (a planilha, PRD desenhos), e o segredo
+     MERLIN_PORTRAIT_OFF o desliga para todos, sem build (D9) */
+  const cashBuild = name === "build" && BUILD_KINDS[body.context.kind] && BUILD_KINDS[body.context.kind].cash;
+  if ((name !== "assistant" && !cashBuild) || env.MERLIN_PORTRAIT_OFF) delete body.context.portrait;
   /* o tamanho do retrato que vai de fato (o já cortado) entra na linha da
      medição, no wrangler tail */
-  const portraitChars = body.context.portrait ? Math.min(String(body.context.portrait).length, PORTRAIT_MAX) : 0;
+  const portraitChars = body.context.portrait ? Math.min(String(body.context.portrait).length, cashBuild ? BUILD_PORTRAIT_MAX : PORTRAIT_MAX) : 0;
   const isText = !!TEXT_TASKS[name];
   const isCapture = !!CAPTURE_TASKS[name];
   const isBuild = !!BUILD_TASKS[name];
@@ -1585,7 +1622,7 @@ async function advise(req, env, person) {
   const data = extractJson(text);
   /* a Anthropic respondeu, e respondeu cobrando: conta mesmo a recusa e o
      formato torto */
-  await recordUsage(env, person, usageTasks(name, step, data), answer.usage, portraitChars);
+  await recordUsage(env, person, usageTasks(name, step, data, kind), answer.usage, portraitChars);
   if (answer.stop_reason === "refusal") return fail("o Merlin preferiu não responder a isso", 422);
   if (BLUEPRINT_TASKS[name]) {
     if (!data || typeof data !== "object") return fail("o Merlin respondeu fora do formato", 502);
@@ -1595,7 +1632,10 @@ async function advise(req, env, person) {
     if (!data || typeof data !== "object") return fail("o Merlin respondeu fora do formato", 502);
     if (step === "brief") return json({ questions: Array.isArray(data.questions) ? cleanQuestions(data) : [] });
     const draft = cleanDraft(kind, data);
-    const empty = kind === "funnel" ? !draft.stages.length : kind === "app" ? !draft.features.length && !draft.entities.length && !draft.screens.length : !draft.tree.children.length;
+    const empty = kind === "funnel" ? !draft.stages.length
+      : kind === "app" ? !draft.features.length && !draft.entities.length && !draft.screens.length
+      : kind === "sheet" ? !draft.cols.length || !draft.rows.length
+      : !draft.tree.children.length;
     if (empty) return fail("o Merlin devolveu um rascunho vazio; tente de novo", 502);
     return json({ draft, summary: cut(data.summary, 400) });
   }

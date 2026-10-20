@@ -388,6 +388,14 @@ tracejada no próprio palco, onde ela nasceria, e um clique é que a torna real.
   resposta lida como markdown, e o saldo do financeiro disponível de qualquer tela
   (`shared/finance-data.js`), pra "posso assumir 3 mil por mês?" ter resposta sem a pessoa
   precisar abrir o financeiro antes.
+- **Os verbos de montar**: "monta um funil…", "quero um app…", "cria um mapa mental…" e, desde
+  20/10/2026, "faz uma planilha de…" (`docs/prd/desenhos.md`, D6) viram a conversa curta da
+  tarefa `build`: até 4 perguntas clicáveis, o rascunho, o ajuste em palavras, e nada gravado
+  sem "criar". O verbo tem que vir antes do que se monta ("revisar a planilha" não é pedido),
+  e com duração é tarefa ("planilha 2h"). Com dois do mesmo verbo, vale o mais perto dele ("faz
+  uma planilha de custos do app" é planilha). Cada tipo é uma linha em `BUILD_KINDS` (worker) e
+  em `BUILD` (`shared/build-intent.js`); tirar a linha do worker desliga o verbo. A medição
+  anota o passo e o tipo (`build:draft:sheet`).
 
 ---
 
@@ -611,6 +619,12 @@ Não é Excel: a conversa monta, a página ajusta.
   Sai o valor, não a fórmula.
 - **Modelos** na tela vazia (D5): precificação, custo do produto, MRR em 12 meses e ponto de
   equilíbrio, cada um com as fórmulas prontas.
+- **Pela conversa** (D6): "faz uma planilha dos custos do produto" monta o rascunho na conversa,
+  que se confere numa grade com as fórmulas já calculadas (as 8 primeiras linhas), e "criar a
+  planilha" deixa a linha "✓ planilha pronta · 14 linhas · 5 colunas · abrir", sem sair da
+  conversa. Teto de 40 linhas × 10 colunas: a conversa monta o começo, a página cresce. Quando o
+  pedido cita o caixa ("planilha do meu fluxo de caixa"), vão junto só as seções dinheiro e
+  negócio do retrato, como valor inicial: é cópia, não ligação.
 - Sem gráfico, formatação de célula, várias folhas, `.xlsx`, importar CSV nem ligação viva com o
   caixa.
 

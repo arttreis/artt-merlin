@@ -1190,7 +1190,7 @@ function CommandPalette({ onClose }) {
   /* o pedido de montar vai para a conversa do assistente, que pergunta o que
      falta e mostra o rascunho. a duracao continua mandando: e tarefa */
   const build = route && route.kind !== "task" ? buildIntent(term) : null;
-  if (build) rows.push({ key: "build", kind: "ask", label: "montar com o Merlin", text: "o " + BUILD[build].label + ": " + term.trim(), run: () => askMerlin(term.trim()) });
+  if (build) rows.push({ key: "build", kind: "ask", label: "montar com o Merlin", text: BUILD[build].the + ": " + term.trim(), run: () => askMerlin(term.trim()) });
   if (route) {
     rows.push({ key: "do", kind: route.kind, label: ROUTE_LABEL[route.kind](route), text: route.kind === "ask" ? route.text : route.title, run: () => runRoute(route) });
     /* perguntar e sempre possivel: e o atalho de quem queria conversar sobre
