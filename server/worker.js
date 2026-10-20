@@ -994,9 +994,20 @@ const ASSISTANT_ACTIONS = {
   /* o time é cadastro leve (PRD meu-negocio, D5): o custo é centavos por mês,
      e o fixo no caixa quem decide é a caixa da tela */
   "team-add": { collection: "team", fields: ["name", "role", "cost"] },
-  "team-delivery": { collection: "team", fields: ["name", "text", "date"] }
+  "team-delivery": { collection: "team", fields: ["name", "text", "date"] },
+  /* o horizonte e a fonte são listas fechadas: fora delas, o trimestre e "à
+     mão". o período não vem da IA: é o de hoje, na tela (PRD meu-negocio, D4) */
+  "goal-set": { collection: "plans", fields: ["kind", "text", "source", "target"], clean: cleanGoal }
 };
 const ASSISTANT_ACTION_TYPES = Object.keys(ASSISTANT_ACTIONS).join(", ");
+function cleanGoal(p) {
+  return {
+    kind: ["year", "half", "quarter"].includes(p.kind) ? p.kind : "quarter",
+    text: String(p.text || "").slice(0, 140),
+    source: ["clients", "revenue", "won", "launched", "team", "manual"].includes(p.source) ? p.source : "manual",
+    target: Math.max(0, Math.round(+p.target) || 0)
+  };
+}
 
 /* o retrato vai em `context.portrait`, com teto próprio: o `pageContext`
    continua com 1.200. as fontes são uma lista fechada, como o catálogo: o que
@@ -1025,6 +1036,7 @@ LIST_TASKS.assistant = (c) => ({
     "op-done {title (o processo como está no contexto, ou no infinitivo como a pessoa disse: \"emiti as notas\" é \"emitir notas\"), date (AAAA-MM-DD do dia em que fez; sem data, hoje)} — use quando a pessoa contar que fez uma obrigação recorrente da empresa (\"emiti as notas\", \"paguei o DAS\"); a tela acha o processo. " +
     "team-add {name (o nome da pessoa, como foi dito: \"Ana\"), role (o papel, curto: dev, design, suporte, vendas, freela, sócio…; \"designer\" é design, \"programador\" é dev), cost (o custo por mês em centavos, número inteiro: \"3 mil\" é 300000; 0 se a pessoa não disse — nunca estime)} — use quando a pessoa contar que alguém entrou para trabalhar com ela (\"a Ana entra como designer, 3 mil\", \"o João vai ser meu dev\"); quem trabalha com ela não é cliente, e \"@\" continua sendo cliente. " +
     "team-delivery {name (quem entregou, como foi dito), text (o que entregou, curto e na grafia da pessoa: \"landing\", \"o logo\"; até 140 caracteres), date (AAAA-MM-DD do dia da entrega; sem data, hoje)} — use quando a pessoa contar que alguém do time entregou algo (\"a Ana entregou a landing\"); nunca avalie, compare pessoas nem fale de horas ou produtividade. " +
+    "goal-set {kind (quarter para o trimestre — \"meta do tri\" —, half para o semestre, year para o ano; sem horizonte, quarter), text (a meta, curta, na voz da pessoa: \"chegar a 10 clientes ativos\", \"lançar o app\"), source (de onde o número vem: clients para clientes ativos, revenue para faturamento da empresa, won para leads fechados, launched para lançar um produto, team para pessoas no time, manual quando não é nenhum desses), target (o número da meta: 10 em \"10 clientes\"; em revenue, centavos — \"30 mil\" é 3000000; em launched, 1; 0 se a pessoa não disse — nunca estime)} — use quando a pessoa disser uma meta do negócio para o trimestre, o semestre ou o ano (\"meta do tri: 10 clientes\", \"este ano quero faturar 300 mil\"); a tela mede sozinha e diz onde a pessoa está. " +
     "Há três jeitos de responder. REGISTRO (a pessoa conta algo para anotar ou pede para criar): proponha a ação. " +
     "CONSULTA (uma PERGUNTA sobre a vida dela — o dia, a agenda, a rotina, a semana —, inclusive financeira, \"posso gastar X\", \"dá pra fazer Y\"): devolva suggestions vazio e responda em clarify só pelo retrato e pelo contexto da tela; quando o dado não estiver neles, diga \"não sei\" e o que falta (ex. \"o financeiro não veio no retrato: monte o financeiro\"), nunca estime nem invente. Seção do retrato que diz \"ainda carregando\" é dado que não chegou, e não \"nada\". " +
     "CONSELHO (pede opinião, \"o que eu faço\", \"vale a pena\"): recomende citando o que viu no retrato (o horário, a sobra, a atrasada), em vez de conselho genérico. " +

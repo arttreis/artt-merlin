@@ -16,6 +16,7 @@ import { readMinutes, workoutDoc, workoutDay, workoutLine } from "./workouts-dat
 import { MEALS, mealOf, mealDoc, mealDay, mealLine } from "./meals-data.js";
 import { FREQS, normalize as normalizeOp, opDoc, findOp, markDone, freqLabel, periodLabel, parseDay, dayText } from "./ops-data.js";
 import { roleOf, personLine, personDoc, addDelivery, findPerson, activeTeam } from "./team-data.js";
+import { KINDS, GOAL_SOURCES, goalDoc, goalLine, periodOf, readTarget, targetText } from "./plans-data.js";
 
 export const ACTION_COLLECTIONS = {
   task: "tasks",
@@ -33,7 +34,8 @@ export const ACTION_COLLECTIONS = {
   "op-add": "ops",
   "op-done": "ops",
   "team-add": "team",
-  "team-delivery": "team"
+  "team-delivery": "team",
+  "goal-set": "plans"
 };
 
 export const ACTION_LABELS = {
@@ -52,11 +54,12 @@ export const ACTION_LABELS = {
   "op-add": "novo processo",
   "op-done": "marcar feito",
   "team-add": "alguém novo no time",
-  "team-delivery": "anotar entrega"
+  "team-delivery": "anotar entrega",
+  "goal-set": "nova meta"
 };
 
 /* o que a pílula confirmada diz no lugar do título: "✓ lançado · …" */
-export const ACTION_DONE = { "finance-entry": "lançado", "habit-mark": "marcado", "sleep-log": "registrado", "workout-log": "registrado", "meal-log": "anotado", "op-add": "processo", "op-done": "feito", "team-add": "no time", "team-delivery": "anotado", task: "criada", note: "criada", "lead-update": "aplicado", script: "aplicado" };
+export const ACTION_DONE = { "finance-entry": "lançado", "habit-mark": "marcado", "sleep-log": "registrado", "workout-log": "registrado", "meal-log": "anotado", "op-add": "processo", "op-done": "feito", "team-add": "no time", "team-delivery": "anotado", "goal-set": "meta", task: "criada", note: "criada", "lead-update": "aplicado", script: "aplicado" };
 
 /* so os campos que fazem sentido editar antes de confirmar — o resto do
    payload (arvore do mapa, etapas do funil, id do cliente/conteudo) segue
@@ -159,6 +162,15 @@ export const ACTION_FIELDS = {
         ...(String((p && p.name) || "").trim() && !findPerson(store.all(), p.name) ? [["new", "novo no time: " + String(p.name).trim()]] : [])] },
     { key: "text", label: "o que entregou" },
     { key: "date", label: "dia", type: "date", initial: () => today() }
+  ],
+  /* o horizonte, a meta, de onde o número vem e o alvo. o alvo tem chave
+     própria, como os minutos do treino: o faturamento chega em centavos e
+     aparece como se escreve ("30.000") */
+  "goal-set": [
+    { key: "kind", label: "horizonte", type: "select", initial: () => "quarter", options: () => [["quarter", "trimestre"], ["half", "semestre"], ["year", "ano"]] },
+    { key: "text", label: "a meta" },
+    { key: "source", label: "como se mede", type: "select", initial: () => "manual", options: () => GOAL_SOURCES.map((s) => [s.id, s.label]) },
+    { key: "aim", label: "alvo", initial: (p) => targetText(Math.max(0, Math.round(+p.target) || 0), p.source) }
   ]
 };
 
@@ -169,6 +181,13 @@ const opOf = (p, store) => {
   return ("pick" in p && p.pick ? ops.find((o) => o.id === p.pick) : null) || (p.pick ? null : findOp(ops, p.title));
 };
 const opDay = (p, freq) => (typeof p.day === "number" ? p.day : parseDay(freq, p.day));
+
+/* a meta de uma proposta: o que a pessoa deixou na caixa por cima do que a
+   IA propôs, com o alvo lido como se escreve. o período é o de hoje */
+const goalSpec = (p) => {
+  const kind = KINDS.includes(p.kind) ? p.kind : "quarter";
+  return { kind, period: periodOf(today(), kind), text: p.text, source: p.source, target: "aim" in p ? readTarget(p.aim, p.source) : typeof p.target === "string" ? readTarget(p.target, p.source) : Math.max(0, Math.round(+p.target) || 0) };
+};
 
 /* a refeição de uma proposta: o que a pessoa deixou na caixa por cima do que
    a IA propôs */
@@ -222,6 +241,12 @@ export function previewOf(actionType, payload, ctx) {
     }
     case "team-add": return personLine({ name: String(p.name || "").trim(), role: roleOf(p.role), cost: p.cost });
     case "team-delivery": return [p.name, p.text, p.date && p.date !== today() ? p.date.slice(8, 10) + "/" + p.date.slice(5, 7) : ""].filter(Boolean).join(" · ");
+    /* `ctx` aqui são as coleções que a meta lê ({ finance, clients, team }):
+       "meta do 4º tri · 10 clientes ativos (hoje 6)" */
+    case "goal-set": {
+      const { doc, error } = goalDoc(goalSpec(p), [], today());
+      return error || goalLine(doc, ctx);
+    }
     default: return "";
   }
 }
@@ -327,6 +352,10 @@ export function buildDoc(actionType, payload, v, store, opts) {
       if (!who) return { error: "escolha quem entregou, ou crie" };
       return addDelivery(who, { text: v.text, date: v.date }, today());
     }
+    /* uma meta por documento; o período cheio não grava ("três já é muito
+       para um trimestre"), e o desfazer da caixa a apaga */
+    case "goal-set":
+      return goalDoc(goalSpec({ ...p, ...v }), store.all(), today());
     default:
       return { error: "tipo de ação desconhecido" };
   }

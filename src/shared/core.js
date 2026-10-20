@@ -283,6 +283,7 @@ export const SECTIONS = [
      plano, o time e a operação entram aqui, na ordem plano, caixa, time,
      operação; vendas continua no inbox (D1) */
   { id: "business", label: "meu negócio", icon: "business", pages: [
+    { id: "plans", label: "plano", href: "plans.html" },
     { id: "cash", label: "caixa", href: "cash.html" },
     { id: "team", label: "time", href: "team.html" },
     { id: "ops", label: "operação", href: "ops.html" }

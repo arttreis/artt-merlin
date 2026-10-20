@@ -35,6 +35,7 @@ import { normalize as normalizeWorkout, logWorkout, applyWorkout } from "./worko
 import { normalize as normalizeMeal } from "./meals-data.js";
 import { normalize as normalizeOp } from "./ops-data.js";
 import { normalize as normalizeTeam, joinTeam, noteDelivery } from "./team-data.js";
+import { normalize as normalizePlan } from "./plans-data.js";
 /* o Ctrl+K cria tarefa de hoje com a mesma regra e a mesma forma do dia */
 import { tasks, newTask, topOrder, routeLine } from "./tasks.js";
 import { BUILD, buildIntent } from "./build-intent.js";
@@ -950,13 +951,16 @@ function useRootClass(name, on) {
    abriu a caixa fica sabendo pelo `onDone(linha)`: a pílula da conversa vira
    "✓ lançado · …" e não abre de novo. o desfazer chama `onDone(null)`, e a
    pílula volta. `chat` é o id da conversa, que vai na origem do lançamento. */
-const CREATE_LABELS = { "onboarding-map": "gerar mapa", "onboarding-funnel": "gerar funil", "finance-entry": "lançar", "sleep-log": "registrar", "workout-log": "registrar", "meal-log": "anotar", "op-done": "marcar feito", "team-add": "adicionar", "team-delivery": "anotar" };
+const CREATE_LABELS = { "onboarding-map": "gerar mapa", "onboarding-funnel": "gerar funil", "finance-entry": "lançar", "sleep-log": "registrar", "workout-log": "registrar", "meal-log": "anotar", "op-done": "marcar feito", "team-add": "adicionar", "team-delivery": "anotar", "goal-set": "definir" };
 const CREATE_HREF = { "onboarding-map": "maps.html#", "onboarding-funnel": "funnels.html#" };
 /* o aviso é o texto fixo, ou a própria linha da pílula: o sono confirma
    "✓ registrado · 7h de sono", e a refeição "✓ anotado · almoço · salada",
    iguais ao início */
-const DONE_NOTICE = { "finance-entry": "lançado no financeiro", "lead-update": "cliente atualizado", script: "roteiro aplicado", "sleep-log": (line) => "✓ " + line, "meal-log": (line) => "✓ " + line, "op-add": (line) => "✓ " + line, "op-done": (line) => "✓ " + line };
-const ACTION_OPTIONS = { finance: { normalize: normalizeFinance }, sleep: { normalize: normalizeSleep }, workouts: { normalize: normalizeWorkout }, meals: { normalize: normalizeMeal }, ops: { normalize: normalizeOp }, team: { normalize: normalizeTeam } };
+const DONE_NOTICE = { "finance-entry": "lançado no financeiro", "lead-update": "cliente atualizado", script: "roteiro aplicado", "sleep-log": (line) => "✓ " + line, "meal-log": (line) => "✓ " + line, "op-add": (line) => "✓ " + line, "op-done": (line) => "✓ " + line, "goal-set": (line) => "✓ " + line };
+const ACTION_OPTIONS = { finance: { normalize: normalizeFinance }, sleep: { normalize: normalizeSleep }, workouts: { normalize: normalizeWorkout }, meals: { normalize: normalizeMeal }, ops: { normalize: normalizeOp }, team: { normalize: normalizeTeam }, plans: { normalize: normalizePlan } };
+/* o que a meta lê para se medir (plans-data.js, progressOf): a caixa diz
+   "(hoje 6)" antes e depois de confirmar */
+const goalData = () => ({ finance: collection("finance", { normalize: normalizeFinance }).all(), clients: collection("clients").all(), team: collection("team").all() });
 const optionPair = (o) => (Array.isArray(o) ? o : [o, o]);
 export function ProposalDialog({ proposal, chat, onClose, onDone }) {
   const { actionType, note } = proposal;
@@ -971,7 +975,7 @@ export function ProposalDialog({ proposal, chat, onClose, onDone }) {
   });
   const [v, bind, set] = useFields(initial);
   if (!collectionName) return null;
-  const ctx = collectionName === "finance" ? financeContext(bookCollection(store, v.book)) : collectionName === "ops" ? { store } : null;
+  const ctx = collectionName === "finance" ? financeContext(bookCollection(store, v.book)) : collectionName === "ops" ? { store } : collectionName === "plans" ? goalData() : null;
   const submit = () => {
     const { doc, error } = buildDoc(actionType, payload, v, store, { chat });
     if (error) { notify(error); return false; }
@@ -1011,7 +1015,9 @@ export function ProposalDialog({ proposal, chat, onClose, onDone }) {
     /* o lançamento da empresa diz onde caiu: "✓ lançado no caixa · R$ 2.400 ·
        Acme" (PRD meu-negocio, D8) */
     const cash = actionType === "finance-entry" && doc.book === "business";
-    const line = cash ? cashLine(doc) : (ACTION_DONE[actionType] || "criado") + " · " + (previewOf(actionType, { ...payload, ...v }, ctx) || v.title || v.name || proposal.title);
+    /* a meta diz o horizonte e onde está: "✓ meta do 4º tri · 10 clientes
+       ativos (hoje 6)" (D8) */
+    const line = cash ? cashLine(doc) : actionType === "goal-set" ? previewOf(actionType, { ...payload, ...v }, ctx) : (ACTION_DONE[actionType] || "criado") + " · " + (previewOf(actionType, { ...payload, ...v }, ctx) || v.title || v.name || proposal.title);
     if (onDone) onDone(line);
     const undo = undoEntry(before, doc);
     const notice = cash ? (l) => "✓ " + l : DONE_NOTICE[actionType];
