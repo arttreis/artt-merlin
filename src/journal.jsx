@@ -38,8 +38,11 @@ function DayCard({ day, future, now, journal, picked }) {
   useLayoutEffect(() => {
     const el = field.current;
     if (!el) return;
-    el.style.height = "auto";
-    el.style.height = el.scrollHeight + 2 + "px";
+    const fit = () => { el.style.height = "auto"; el.style.height = el.scrollHeight + 2 + "px"; };
+    fit();
+    /* girar a tela ou redimensionar muda a largura do cartão, e a do texto junto */
+    window.addEventListener("resize", fit);
+    return () => window.removeEventListener("resize", fit);
   }, [draft]);
   const filled = !!draft.trim() || !!(entry && entry.body);
   /* apagar leva o texto que está na tela, gravado ou não: desfazer devolve o
