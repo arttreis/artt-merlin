@@ -94,17 +94,19 @@ export const ACTION_FIELDS = {
     { key: "hours", label: "horas dormidas", initial: (p) => sleepLabel(p.min) },
     { key: "date", label: "dia em que acordou", type: "date", initial: () => today() }
   ],
-  /* o que e quanto tempo; sem os minutos, a caixa os pede antes de gravar */
+  /* o que e quanto tempo; sem os minutos, a caixa os pede antes de gravar.
+     o campo tem chave própria, como as horas do sono: o 0 da IA aparece
+     vazio, e não "0" */
   "workout-log": [
     { key: "title", label: "o que treinou" },
-    { key: "min", label: "minutos", initial: (p) => (+p.min > 0 ? String(Math.round(+p.min)) : "") },
+    { key: "minutes", label: "minutos", initial: (p) => (+p.min > 0 ? String(Math.round(+p.min)) : "") },
     { key: "date", label: "dia", type: "date", initial: () => today() }
   ]
 };
 
 /* o treino de uma proposta: o que a pessoa deixou na caixa por cima do que a
    IA propôs, com os minutos como se escrevem ("40", "1h") */
-const workoutSpec = (p) => ({ date: p.date, title: String(p.title || "").trim(), min: readMinutes(p.min) });
+const workoutSpec = (p) => ({ date: p.date, title: String(p.title || "").trim(), min: readMinutes("minutes" in p ? p.minutes : p.min) });
 
 /* os minutos de uma proposta de sono: o que a pessoa escreveu na caixa, ou o
    que a IA propôs */
