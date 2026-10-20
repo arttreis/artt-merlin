@@ -1098,6 +1098,27 @@ check("conversa: os campos guardam o que a IA propôs", body.suggestions[0] && b
 check("conversa: a instrução cita meal-log", /meal-log/.test(claudeAsked), String(claudeAsked).slice(0, 300));
 check("conversa: workout-log, sleep-log e finance-entry continuam no catálogo", /workout-log/.test(claudeAsked) && /sleep-log/.test(claudeAsked) && /finance-entry/.test(claudeAsked));
 
+/* a conversa: o catálogo ganha op-add e op-done (ticket #79), com os campos fechados */
+claudeAnswer = { stop_reason: "end_turn", content: [{ type: "text", text: JSON.stringify({ suggestions: [{ actionType: "op-add", title: "emitir notas · todo dia 5", note: "", payload: {
+  title: "emitir notas", freq: "monthly", day: 5, amount: 4500, id: "o1", done: ["2026-10-05"], hack: "<script>"
+} }], clarify: "" }) }] };
+r = await call("POST", "/merlin", { task: "assistant", context: { message: "todo dia 5 emito as notas" } }, mealCookie);
+body = await r.json();
+check("conversa: op-add entra no catálogo", r.status === 200 && body.suggestions.length === 1 && body.suggestions[0].actionType === "op-add", JSON.stringify(body));
+check("conversa: a proposta de op-add só tem title, freq e day", body.suggestions[0] && Object.keys(body.suggestions[0].payload).sort().join() === "day,freq,title" && !("hack" in body.suggestions[0].payload) && !("amount" in body.suggestions[0].payload) && !("done" in body.suggestions[0].payload), JSON.stringify(body.suggestions[0] && body.suggestions[0].payload));
+check("conversa: op-add guarda o que a IA propôs", body.suggestions[0] && body.suggestions[0].payload.title === "emitir notas" && body.suggestions[0].payload.freq === "monthly" && String(body.suggestions[0].payload.day) === "5", JSON.stringify(body.suggestions[0] && body.suggestions[0].payload));
+check("conversa: a instrução cita op-add e op-done", /op-add/.test(claudeAsked) && /op-done/.test(claudeAsked), String(claudeAsked).slice(0, 300));
+
+claudeAnswer = { stop_reason: "end_turn", content: [{ type: "text", text: JSON.stringify({ suggestions: [{ actionType: "op-done", title: "emitir notas · outubro", note: "", payload: {
+  title: "emitir notas", date: "2026-10-17", freq: "monthly", day: 5, amount: 4500, id: "o1", hack: "<script>"
+} }], clarify: "" }) }] };
+r = await call("POST", "/merlin", { task: "assistant", context: { message: "emiti as notas" } }, mealCookie);
+body = await r.json();
+check("conversa: op-done entra no catálogo", r.status === 200 && body.suggestions.length === 1 && body.suggestions[0].actionType === "op-done", JSON.stringify(body));
+check("conversa: a proposta de op-done só tem title e date", body.suggestions[0] && Object.keys(body.suggestions[0].payload).sort().join() === "date,title" && !("hack" in body.suggestions[0].payload) && !("freq" in body.suggestions[0].payload) && !("amount" in body.suggestions[0].payload), JSON.stringify(body.suggestions[0] && body.suggestions[0].payload));
+check("conversa: op-done guarda o que a IA propôs", body.suggestions[0] && body.suggestions[0].payload.title === "emitir notas" && body.suggestions[0].payload.date === "2026-10-17", JSON.stringify(body.suggestions[0] && body.suggestions[0].payload));
+check("conversa: op-done também fica no catálogo ao lado de meal-log e workout-log", /op-done/.test(claudeAsked) && /meal-log/.test(claudeAsked) && /workout-log/.test(claudeAsked));
+
 /* ---- 13f. o teto do conselheiro ----
    a chave da Anthropic e uma so para o time. o teto e por pessoa e por hora:
    quem gastou espera, e quem esta ao lado nao paga por isso. */

@@ -8,7 +8,8 @@
  *
  * cada tipo de item tem o seu desenho em VIEWS. tipo novo é uma linha ali e uma
  * fonte no quests.js (as contas previstas de dias passados entraram assim; o
- * treino do dia, a única exceção entre os hábitos, também).
+ * treino do dia, a única exceção entre os hábitos, e o processo da empresa
+ * que vence, também).
  *
  * toda ação que grava avisa com desfazer. "agora não" não grava: pula até a
  * lista mudar, e o pulo mora só nesta página.
@@ -26,6 +27,7 @@ import { EntryForm } from "./entry-form.jsx";
 import { WorkoutForm } from "./workout-form.jsx";
 import { normalize as normalizeHabit } from "./habits-data.js";
 import { normalize as normalizeWorkout } from "./workouts-data.js";
+import { normalize as normalizeOp, markDone, doneLine, freqLabel } from "./ops-data.js";
 import { questsOf, nextQuest, listKey, countLine, moveTask, dropTask, doneTask, paidEntry, moveEntry, DAY_HREF } from "./quests.js";
 import { runningOf, startSession, stopSession, receipt } from "./focus.js";
 import { costOf, fmt, longFmt, clock } from "./day.js";
@@ -215,6 +217,28 @@ function WorkoutQuest({ quest, habits, workouts, later }) {
   );
 }
 
+/* o processo da empresa que vence hoje (ou venceu no período): "feito" grava o
+   dia de hoje no período, com desfazer, e a quest sai sozinha. é prazo, e
+   nada vai para o calendário (PRD meu-negocio, D6) */
+function OpQuest({ quest, ops, later }) {
+  const { op, due, late } = quest;
+  const done = () => {
+    const before = ops.get(op.id);
+    const { doc, error } = markDone(before || op, today(), today());
+    if (error) { notify(error); return; }
+    ops.save(doc);
+    notify("✓ feito · " + doneLine(doc, today()), before ? () => ops.save({ ...before, updatedAt: Date.now() }) : null);
+  };
+  return (
+    <Shell from={late ? "operação · venceu " + dayWord(due) : "operação · vence hoje"} title={op.title} meta={freqLabel(op)}
+           why={op.checklist.length ? op.checklist.map((c) => c.text).join(" · ") : ""}>
+      <Act main onClick={done}>feito</Act>
+      <a className="qc__act" href="ops.html">abrir a operação</a>
+      <Act onClick={later}>agora não</Act>
+    </Shell>
+  );
+}
+
 function GroupQuest({ quest, later, open = "abrir o dia" }) {
   return (
     <Shell from="ficou para trás" title={quest.title} why={"a mais antiga é de " + dayWord(quest.items[0].date)}>
@@ -228,6 +252,7 @@ const VIEWS = {
   session: SessionQuest,
   appointment: AppointmentQuest,
   workout: WorkoutQuest,
+  op: OpQuest,
   overdue: OverdueQuest,
   "overdue-group": GroupQuest,
   bill: BillQuest,
@@ -242,7 +267,8 @@ export function QuestCard({ tasks, sessions }) {
   const finance = bookCollection(useCollection("finance", { normalize: normalizeFinance }), "personal");
   const habits = useCollection("habits", { normalize: normalizeHabit });
   const workouts = useCollection("workouts", { normalize: normalizeWorkout });
-  const state = questsOf({ tasks: tasks.all(), sessions: sessions.all(), entries: finance.all(), habits: habits.all(), workouts: workouts.all() });
+  const ops = useCollection("ops", { normalize: normalizeOp });
+  const state = questsOf({ tasks: tasks.all(), sessions: sessions.all(), entries: finance.all(), habits: habits.all(), workouts: workouts.all(), ops: ops.all() });
   const key = listKey(state);
   const [skip, setSkip] = useState({ key, ids: [] });
   const skipped = skip.key === key ? skip.ids : [];
@@ -261,7 +287,7 @@ export function QuestCard({ tasks, sessions }) {
     <section className="qc" aria-label="O que falta hoje">
       {/* a chave troca o desenho quando a coisa muda: o "quanto leva?" de uma
           atrasada não pode ficar aberto na seguinte */}
-      <View key={quest.id} quest={quest} tasks={tasks} sessions={sessions} finance={finance} habits={habits} workouts={workouts}
+      <View key={quest.id} quest={quest} tasks={tasks} sessions={sessions} finance={finance} habits={habits} workouts={workouts} ops={ops}
             later={() => setSkip({ key, ids: skipped.concat(quest.id) })} />
       <p className="qc__foot">
         {next && <span>a seguir: {next}</span>}

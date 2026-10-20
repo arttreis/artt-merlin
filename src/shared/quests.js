@@ -2,8 +2,9 @@
  *
  * "o que falta hoje?" responde com UMA coisa: a próxima. a lista tem só dois
  * grupos, nessa ordem — o que é agora (a sessão de foco rodando, um
- * compromisso com hora que começa em até 30 minutos ou já está em curso, e o
- * treino do dia que ainda não aconteceu) e o que ficou para trás (as atrasadas
+ * compromisso com hora que começa em até 30 minutos ou já está em curso, o
+ * treino do dia que ainda não aconteceu e o processo da empresa que vence
+ * hoje ou venceu no período) e o que ficou para trás (as atrasadas
  * e as contas previstas de dias passados). a fila do dia, o que vence hoje e o
  * conteúdo não entram: o dia inteiro mora no calendário, e uma lista que
  * repetisse a fila viraria a segunda fila.
@@ -29,6 +30,7 @@ import { costOf } from "./day.js";
 import { pendingBefore } from "./finance-data.js";
 import { isExpected, weekProgress } from "./habits-data.js";
 import { trainingHabit } from "./workouts-data.js";
+import { pendingOn } from "./ops-data.js";
 
 /* quantos minutos antes o compromisso já é "agora" */
 export const SOON = 30;
@@ -82,19 +84,27 @@ function trainingNow(data, ctx) {
   return [{ type: "workout", id: "workout:" + ctx.date, title: "treinar", habit: h, min: h.min, week }];
 }
 
+/* o processo da empresa que vence hoje, ou que venceu no período e não foi
+   feito (PRD meu-negocio, D6). é prazo e não tempo: entra aqui, e nunca vira
+   tarefa no calendário */
+const opsNow = (data, ctx) =>
+  pendingOn(data.ops, ctx.date).map(({ op, due, late }) => ({ type: "op", id: "op:" + op.id + ":" + due, title: op.title, op, due, late }));
+
 export const SOURCES = [
   { key: "session", group: "now", list: sessionNow },
   { key: "appointment", group: "now", list: appointmentsNow },
   { key: "workout", group: "now", list: trainingNow },
+  { key: "op", group: "now", list: opsNow },
   { key: "overdue", group: "behind", list: lateTasks, many: lateGroup },
   { key: "bill", group: "behind", list: lateBills, many: billGroup }
 ];
 
 /* ---------- a lista ---------- */
 
-/* data = { tasks, sessions, blocks?, entries?, habits?, workouts? }: as coleções
-   inteiras, como `all()` as devolve (`entries` é a coleção `finance`; só os
-   lançamentos contam; `habits` e `workouts` só servem ao treino do dia). now é Date ou epoch ms. a conta do dia é a mesma do calendário e do
+/* data = { tasks, sessions, blocks?, entries?, habits?, workouts?, ops? }: as
+   coleções inteiras, como `all()` as devolve (`entries` é a coleção `finance`;
+   só os lançamentos contam; `habits` e `workouts` só servem ao treino do dia, e
+   `ops` aos processos da empresa). now é Date ou epoch ms. a conta do dia é a mesma do calendário e do
    rastreador (dayTasks): a cópia da rotina conta. */
 export function questsOf(data, now) {
   const at = now instanceof Date ? now.getTime() : +now || Date.now();

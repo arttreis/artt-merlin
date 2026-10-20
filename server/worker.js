@@ -990,7 +990,9 @@ const ASSISTANT_ACTIONS = {
   "habit-mark": { collection: "habits", fields: ["habit", "name", "date"] },
   "sleep-log": { collection: "sleep", fields: ["min", "date"] },
   "workout-log": { collection: "workouts", fields: ["title", "min", "date"] },
-  "meal-log": { collection: "meals", fields: ["meal", "text", "date"] }
+  "meal-log": { collection: "meals", fields: ["meal", "text", "date"] },
+  "op-add": { collection: "ops", fields: ["title", "freq", "day"] },
+  "op-done": { collection: "ops", fields: ["title", "date"] }
 };
 const ASSISTANT_ACTION_TYPES = Object.keys(ASSISTANT_ACTIONS).join(", ");
 
@@ -1017,6 +1019,8 @@ LIST_TASKS.assistant = (c) => ({
     "sleep-log {min (minutos dormidos, número: \"7h\" é 420, \"7h e meia\" é 450; 0 se a pessoa não disse — nunca estime), date (AAAA-MM-DD do dia em que a pessoa ACORDOU: \"dormi 7h\" é hoje, \"ontem dormi 6h\" é ontem)} — use quando a pessoa contar quanto dormiu; horas de sono são sleep-log, nunca habit-mark nem task. " +
     "workout-log {title (o que treinou, curto: \"perna\", \"corrida\"; vazio se a pessoa não disse), min (minutos de treino, número: \"1h\" é 60; 0 se a pessoa não disse — nunca estime), date (AAAA-MM-DD do dia em que treinou; sem data, hoje)} — use quando a pessoa contar um treino com o que treinou ou por quanto tempo (\"treinei perna 40min\", \"ontem corri 30 min\"); a tela marca sozinha o hábito de treino. \"treinei\" sem detalhe nenhum continua habit-mark. " +
     "meal-log {meal (breakfast para café da manhã, lunch para almoço, snack para lanche, dinner para jantar; quando a pessoa não diz a refeição — \"comi uma maçã\" —, escolha pela hora em que ela comeu, ou pela de agora: antes das 11 breakfast, até as 15 lunch, até as 18 snack, depois dinner), text (o que comeu, curto e na grafia da pessoa: \"salada\", \"pizza\"; até 120 caracteres), date (AAAA-MM-DD do dia em que comeu; sem data, hoje)} — use quando a pessoa contar uma refeição que FEZ (\"almocei salada\", \"ontem jantei pizza\"); \"gastei 45 no almoço\" é finance-entry e \"comprar pão\" é task. Nunca fale de caloria, nem diga se a comida é boa ou ruim. " +
+    "op-add {title (o processo no infinitivo, curto: \"emitir notas\", \"pagar DAS\", \"backup\"), freq (monthly, weekly ou yearly), day (monthly: o dia do mês, número de 1 a 31; weekly: o dia da semana, número de 0 a 6, domingo=0; yearly: \"MM-DD\")} — use quando a pessoa contar uma obrigação recorrente da empresa, com prazo (\"todo dia 5 emito as notas\", \"toda sexta faço o backup\"); é prazo, não horário: bloco de tempo na semana é routine-block. " +
+    "op-done {title (o processo como está no contexto, ou no infinitivo como a pessoa disse: \"emiti as notas\" é \"emitir notas\"), date (AAAA-MM-DD do dia em que fez; sem data, hoje)} — use quando a pessoa contar que fez uma obrigação recorrente da empresa (\"emiti as notas\", \"paguei o DAS\"); a tela acha o processo. " +
     "Há três jeitos de responder. REGISTRO (a pessoa conta algo para anotar ou pede para criar): proponha a ação. " +
     "CONSULTA (uma PERGUNTA sobre a vida dela — o dia, a agenda, a rotina, a semana —, inclusive financeira, \"posso gastar X\", \"dá pra fazer Y\"): devolva suggestions vazio e responda em clarify só pelo retrato e pelo contexto da tela; quando o dado não estiver neles, diga \"não sei\" e o que falta (ex. \"o financeiro não veio no retrato: monte o financeiro\"), nunca estime nem invente. Seção do retrato que diz \"ainda carregando\" é dado que não chegou, e não \"nada\". " +
     "CONSELHO (pede opinião, \"o que eu faço\", \"vale a pena\"): recomende citando o que viu no retrato (o horário, a sobra, a atrasada), em vez de conselho genérico. " +
