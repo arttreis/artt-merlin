@@ -12,6 +12,7 @@ import { newEntry, entryLine, paidOf, configOf, contextOf } from "./finance-data
 import { SOURCES } from "./portrait.js";
 import { normalize as normalizeHabit, habitStatus, markOn } from "./habits-data.js";
 import { sleepLabel, sleepLine, readHours, sleepDoc, nightOf } from "./sleep-data.js";
+import { readMinutes, workoutDoc, workoutDay, workoutLine } from "./workouts-data.js";
 
 export const ACTION_COLLECTIONS = {
   task: "tasks",
@@ -23,7 +24,8 @@ export const ACTION_COLLECTIONS = {
   script: "content",
   "finance-entry": "finance",
   "habit-mark": "habits",
-  "sleep-log": "sleep"
+  "sleep-log": "sleep",
+  "workout-log": "workouts"
 };
 
 export const ACTION_LABELS = {
@@ -36,11 +38,12 @@ export const ACTION_LABELS = {
   script: "roteiro",
   "finance-entry": "novo lançamento",
   "habit-mark": "marcar hábito",
-  "sleep-log": "registrar sono"
+  "sleep-log": "registrar sono",
+  "workout-log": "registrar treino"
 };
 
 /* o que a pílula confirmada diz no lugar do título: "✓ lançado · …" */
-export const ACTION_DONE = { "finance-entry": "lançado", "habit-mark": "marcado", "sleep-log": "registrado", task: "criada", note: "criada", "lead-update": "aplicado", script: "aplicado" };
+export const ACTION_DONE = { "finance-entry": "lançado", "habit-mark": "marcado", "sleep-log": "registrado", "workout-log": "registrado", task: "criada", note: "criada", "lead-update": "aplicado", script: "aplicado" };
 
 /* so os campos que fazem sentido editar antes de confirmar — o resto do
    payload (arvore do mapa, etapas do funil, id do cliente/conteudo) segue
@@ -90,8 +93,20 @@ export const ACTION_FIELDS = {
   "sleep-log": [
     { key: "hours", label: "horas dormidas", initial: (p) => sleepLabel(p.min) },
     { key: "date", label: "dia em que acordou", type: "date", initial: () => today() }
+  ],
+  /* o que e quanto tempo; sem os minutos, a caixa os pede antes de gravar.
+     o campo tem chave própria, como as horas do sono: o 0 da IA aparece
+     vazio, e não "0" */
+  "workout-log": [
+    { key: "title", label: "o que treinou" },
+    { key: "minutes", label: "minutos", initial: (p) => (+p.min > 0 ? String(Math.round(+p.min)) : "") },
+    { key: "date", label: "dia", type: "date", initial: () => today() }
   ]
 };
+
+/* o treino de uma proposta: o que a pessoa deixou na caixa por cima do que a
+   IA propôs, com os minutos como se escrevem ("40", "1h") */
+const workoutSpec = (p) => ({ date: p.date, title: String(p.title || "").trim(), min: readMinutes("minutes" in p ? p.minutes : p.min) });
 
 /* os minutos de uma proposta de sono: o que a pessoa escreveu na caixa, ou o
    que a IA propôs */
@@ -116,6 +131,11 @@ export function previewOf(actionType, payload, ctx) {
       const t = today(), { day, error } = nightOf(p, t);
       if (error) return error;
       return sleepMin(p) ? sleepLine(sleepMin(p), day, t) : "faltam as horas";
+    }
+    case "workout-log": {
+      const t = today(), w = workoutSpec(p), { day, error } = workoutDay(w, t);
+      if (error) return error;
+      return w.min ? workoutLine({ title: w.title || "treino", min: w.min, day }, t) : "faltam os minutos";
     }
     default: return "";
   }
@@ -186,6 +206,10 @@ export function buildDoc(actionType, payload, v, store, opts) {
       const t = today(), { day } = nightOf({ date: v.date || p.date }, t);
       return sleepDoc({ date: day, min: sleepMin({ ...p, ...v }) }, store.get(day), t);
     }
+    /* um documento por treino; quem marca o hábito de treino do dia é a
+       caixa (ui.jsx), com o mesmo applyWorkout da aba e do início */
+    case "workout-log":
+      return workoutDoc(workoutSpec({ ...p, ...v }), null, today());
     default:
       return { error: "tipo de ação desconhecido" };
   }

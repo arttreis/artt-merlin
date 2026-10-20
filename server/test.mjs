@@ -898,6 +898,97 @@ check("conversa: os campos guardam o que a IA propôs", body.suggestions[0] && b
 check("conversa: a instrução cita sleep-log", /sleep-log/.test(claudeAsked), String(claudeAsked).slice(0, 300));
 check("conversa: habit-mark e finance-entry continuam no catálogo", /habit-mark/.test(claudeAsked) && /finance-entry/.test(claudeAsked));
 
+/* ---- 13e-sexies. o treino ----
+   "treinei perna 40min" escrito no início, ou dito na conversa, vira uma sessão
+   de treino (e o hábito de treino é marcado pelo navegador, não pelo Worker). o
+   que o Worker garante: o título é curto, os minutos são um inteiro entre 0 e
+   600, a data é um dia de verdade (senão, o de hoje), e nada de outro tipo vaza
+   para o item. "treinei" sem detalhe continua habit (não é workout).
+   a seção entra como uma pessoa nova: o teto da captura é de 60 por hora por
+   pessoa, e as seções de antes já gastaram quase todo o de `cookie`. */
+sentEmails = [];
+await call("POST", "/code", { email: "treino@exemplo.com" });
+r = await call("POST", "/sign-in", { email: "treino@exemplo.com", code: codeFromEmail() });
+const workoutCookie = cookieOf(r);
+const workoutCtx = { today: "2026-10-18 (domingo)", hour: "19:10", clients: [], habits: ["treinar"] };
+const workoutItem = (over) => ({ kind: "workout", title: "perna", min: 40, date: "2026-10-18", ...over });
+const readWorkout = async (text, items, ctx) => {
+  claudeAnswer = { stop_reason: "end_turn", content: [{ type: "text", text: JSON.stringify({ items }) }] };
+  const res = await call("POST", "/merlin", { task: "capture", context: { ...(ctx || workoutCtx), text } }, workoutCookie);
+  return { status: res.status, body: await res.json() };
+};
+
+let wk13 = await readWorkout("treinei perna 40min", [workoutItem()]);
+check("treino: a leitura devolve um item", wk13.status === 200 && wk13.body.items.length === 1, JSON.stringify(wk13.body));
+check("treino: 'treinei perna 40min' volta como workout, perna, 40, no dia dito", wk13.body.items[0].kind === "workout" && wk13.body.items[0].title === "perna" && wk13.body.items[0].min === 40 && wk13.body.items[0].date === "2026-10-18", JSON.stringify(wk13.body.items[0]));
+check("treino: o item só tem kind, title, min e date", Object.keys(wk13.body.items[0] || {}).sort().join() === "date,kind,min,title", JSON.stringify(wk13.body.items[0]));
+check("treino: a instrução da captura cita workout", /workout/.test(claudeAsked), String(claudeAsked).slice(0, 400));
+check("treino: a instrução ainda cita habit e sleep (os tipos antigos continuam)", /habit/.test(claudeAsked) && /sleep/.test(claudeAsked));
+check("treino: a leitura grava capture:workout na usage", db.usage.some((x) => x.task === "capture:workout" && x.n >= 1), JSON.stringify(db.usage.map((x) => x.task)));
+
+/* o título */
+wk13 = await readWorkout("treinei", [workoutItem({ title: "  corrida  " })]);
+check("treino: o título perde os espaços das pontas", wk13.body.items[0].title === "corrida", JSON.stringify(wk13.body.items));
+wk13 = await readWorkout("treinei", [workoutItem({ title: "x".repeat(300) })]);
+check("treino: título enorme é cortado em 60", wk13.body.items[0].title.length === 60, String(wk13.body.items[0].title.length));
+wk13 = await readWorkout("treinei 30 min", [workoutItem({ title: "", min: 30 })]);
+check("treino: sem título mas com minutos, o item fica", wk13.body.items.length === 1 && wk13.body.items[0].kind === "workout" && wk13.body.items[0].min === 30, JSON.stringify(wk13.body.items));
+wk13 = await readWorkout("treinei perna", [workoutItem({ min: undefined })]);
+check("treino: sem minutos mas com título, o item fica com min 0 (o cartão pede os minutos)", wk13.body.items.length === 1 && wk13.body.items[0].title === "perna" && wk13.body.items[0].min === 0, JSON.stringify(wk13.body.items));
+wk13 = await readWorkout("hum", [workoutItem({ title: "", min: undefined }), workoutItem({ title: "   ", min: 0 }), { kind: "workout" }]);
+check("treino: item sem título e sem minutos é descartado", wk13.status === 200 && wk13.body.items.length === 0, JSON.stringify(wk13.body));
+
+/* os minutos */
+wk13 = await readWorkout("corri 9999", [workoutItem({ min: 9999 })]);
+check("treino: min 9999 vira o teto de 600", wk13.body.items[0].min === 600, JSON.stringify(wk13.body.items));
+wk13 = await readWorkout("corri 40", [workoutItem({ min: 40.4 })]);
+check("treino: min fracionado é arredondado para inteiro", wk13.body.items[0].min === 40, JSON.stringify(wk13.body.items));
+wk13 = await readWorkout("corri 40", [workoutItem({ min: "40" })]);
+check("treino: min em texto numérico vira número", wk13.body.items[0].min === 40, JSON.stringify(wk13.body.items));
+wk13 = await readWorkout("treinei perna", [workoutItem({ min: "muito" })]);
+check("treino: min inválido vira 0 e o item fica", wk13.body.items.length === 1 && wk13.body.items[0].min === 0, JSON.stringify(wk13.body.items));
+wk13 = await readWorkout("treinei perna", [workoutItem({ min: -30 })]);
+check("treino: min negativo vira 0 e o item fica", wk13.body.items.length === 1 && wk13.body.items[0].min === 0, JSON.stringify(wk13.body.items));
+
+/* a data */
+wk13 = await readWorkout("ontem corri 30 min", [workoutItem({ title: "corrida", min: 30, date: "2026-10-17" })]);
+check("treino: a data dita (ontem) fica", wk13.body.items[0].date === "2026-10-17" && wk13.body.items[0].min === 30, JSON.stringify(wk13.body.items[0]));
+wk13 = await readWorkout("treinei perna 40min", [workoutItem({ date: "ontem" })]);
+check("treino: data inválida vira o dia de context.today", wk13.body.items[0].date === "2026-10-18", JSON.stringify(wk13.body.items[0]));
+wk13 = await readWorkout("treinei perna 40min", [workoutItem({ date: undefined })]);
+check("treino: sem data vira o dia de context.today", wk13.body.items[0].date === "2026-10-18", JSON.stringify(wk13.body.items[0]));
+wk13 = await readWorkout("treinei perna 40min", [workoutItem({ date: "2026-10-1" })]);
+check("treino: data fora do formato AAAA-MM-DD vira hoje", wk13.body.items[0].date === "2026-10-18", JSON.stringify(wk13.body.items[0]));
+
+/* a IA manda campo a mais e ele não passa */
+wk13 = await readWorkout("treinei perna 40min", [workoutItem({ amount: 4500, habit: "treinar", name: "x", hack: "<script>" })]);
+check("treino: campo de outro tipo não vaza para o item", Object.keys(wk13.body.items[0]).sort().join() === "date,kind,min,title", JSON.stringify(wk13.body.items[0]));
+
+/* "treinei" sem detalhe continua hábito */
+wk13 = await readWorkout("treinei", [habitItem()]);
+check("treino: 'treinei' sozinho continua habit, sem min nem title", wk13.body.items.length === 1 && wk13.body.items[0].kind === "habit" && !("min" in wk13.body.items[0]) && !("title" in wk13.body.items[0]), JSON.stringify(wk13.body.items));
+
+/* uma linha com várias coisas: a ordem fica */
+wk13 = await readWorkout("treinei perna 40min, gastei 45 no almoço e meditei", [workoutItem(), money(), habitItem()]);
+check("treino: treino, gasto e hábito mantêm a ordem", wk13.body.items.map((x) => x.kind).join() === "workout,money,habit", wk13.body.items.map((x) => x.kind).join());
+check("treino: o gasto e o hábito continuam limpos", wk13.body.items[1].amount === 4500 && wk13.body.items[1].title === "almoço" && !("min" in wk13.body.items[1]) && !("amount" in wk13.body.items[0]) && !("min" in wk13.body.items[2]), JSON.stringify(wk13.body.items));
+wk13 = await readWorkout("ligar pro João e treinei perna 40min", [{ kind: "task", title: "ligar pro João", min: 30, date: "2026-10-18" }, workoutItem()]);
+check("treino: tarefa e treino mantêm a ordem, e o min da tarefa não se mistura", wk13.body.items.map((x) => x.kind).join() === "task,workout" && wk13.body.items[0].min === 30 && wk13.body.items[1].min === 40, JSON.stringify(wk13.body.items));
+wk13 = await readWorkout("dormi 7h e treinei perna 40min", [sleepItem(), workoutItem()]);
+check("treino: sono e treino mantêm a ordem, cada um com os seus campos", wk13.body.items.map((x) => x.kind).join() === "sleep,workout" && Object.keys(wk13.body.items[0]).sort().join() === "date,kind,min" && Object.keys(wk13.body.items[1]).sort().join() === "date,kind,min,title", JSON.stringify(wk13.body.items));
+
+/* a conversa: o catálogo ganha workout-log, com os campos fechados */
+claudeAnswer = { stop_reason: "end_turn", content: [{ type: "text", text: JSON.stringify({ suggestions: [{ actionType: "workout-log", title: "corrida · 30 min", note: "ontem", payload: {
+  title: "corrida", min: 30, date: "2026-10-17", amount: 4500, habit: "treinar", id: "w1", hack: "<script>"
+} }], clarify: "" }) }] };
+r = await call("POST", "/merlin", { task: "assistant", context: { message: "ontem corri 30 min" } }, workoutCookie);
+body = await r.json();
+check("conversa: workout-log entra no catálogo", r.status === 200 && body.suggestions.length === 1 && body.suggestions[0].actionType === "workout-log", JSON.stringify(body));
+check("conversa: a proposta só tem title, min e date", body.suggestions[0] && Object.keys(body.suggestions[0].payload).sort().join() === "date,min,title" && !("hack" in body.suggestions[0].payload) && !("amount" in body.suggestions[0].payload) && !("habit" in body.suggestions[0].payload), JSON.stringify(body.suggestions[0] && body.suggestions[0].payload));
+check("conversa: os campos guardam o que a IA propôs", body.suggestions[0] && body.suggestions[0].payload.title === "corrida" && body.suggestions[0].payload.min === 30 && body.suggestions[0].payload.date === "2026-10-17", JSON.stringify(body.suggestions[0] && body.suggestions[0].payload));
+check("conversa: a instrução cita workout-log", /workout-log/.test(claudeAsked), String(claudeAsked).slice(0, 300));
+check("conversa: sleep-log, habit-mark e finance-entry continuam no catálogo", /sleep-log/.test(claudeAsked) && /habit-mark/.test(claudeAsked) && /finance-entry/.test(claudeAsked));
+
 /* ---- 13f. o teto do conselheiro ----
    a chave da Anthropic e uma so para o time. o teto e por pessoa e por hora:
    quem gastou espera, e quem esta ao lado nao paga por isso. */
