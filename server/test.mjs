@@ -1119,6 +1119,28 @@ check("conversa: a proposta de op-done só tem title e date", body.suggestions[0
 check("conversa: op-done guarda o que a IA propôs", body.suggestions[0] && body.suggestions[0].payload.title === "emitir notas" && body.suggestions[0].payload.date === "2026-10-17", JSON.stringify(body.suggestions[0] && body.suggestions[0].payload));
 check("conversa: op-done também fica no catálogo ao lado de meal-log e workout-log", /op-done/.test(claudeAsked) && /meal-log/.test(claudeAsked) && /workout-log/.test(claudeAsked));
 
+/* o time (ticket #78): team-add e team-delivery entram no catálogo com a
+   coleção team, e só com os seus campos. nenhuma das duas vira vigilância:
+   horas, nota e ranking que a IA mandar não chegam à tela */
+const teamAnswer = (actionType, payload) => ({ stop_reason: "end_turn", content: [{ type: "text", text: JSON.stringify({ suggestions: [{ actionType, title: "time", note: "", payload }], clarify: "" }) }] });
+claudeAnswer = teamAnswer("team-add", { name: "Ana", role: "design", cost: 300000, hours: 40, rating: 5, book: "personal", hack: "<script>" });
+r = await call("POST", "/merlin", { task: "assistant", context: { message: "a Ana entra como designer, 3 mil" } }, mealCookie);
+body = await r.json();
+check("conversa: team-add entra no catálogo", r.status === 200 && body.suggestions.length === 1 && body.suggestions[0].actionType === "team-add", JSON.stringify(body));
+check("conversa: a proposta do team-add só tem name, role e cost", body.suggestions[0] && Object.keys(body.suggestions[0].payload).sort().join() === "cost,name,role", JSON.stringify(body.suggestions[0] && body.suggestions[0].payload));
+check("conversa: o team-add guarda o que a IA propôs", body.suggestions[0] && body.suggestions[0].payload.name === "Ana" && body.suggestions[0].payload.role === "design" && body.suggestions[0].payload.cost === 300000, JSON.stringify(body.suggestions[0] && body.suggestions[0].payload));
+claudeAnswer = teamAnswer("team-delivery", { name: "Ana", text: "landing", date: "2026-10-18", hours: 6, score: 9 });
+r = await call("POST", "/merlin", { task: "assistant", context: { message: "a Ana entregou a landing" } }, mealCookie);
+body = await r.json();
+check("conversa: team-delivery entra no catálogo", r.status === 200 && body.suggestions.length === 1 && body.suggestions[0].actionType === "team-delivery", JSON.stringify(body));
+check("conversa: a proposta do team-delivery só tem name, text e date", body.suggestions[0] && Object.keys(body.suggestions[0].payload).sort().join() === "date,name,text", JSON.stringify(body.suggestions[0] && body.suggestions[0].payload));
+check("conversa: a instrução cita team-add e team-delivery", /team-add/.test(claudeAsked) && /team-delivery/.test(claudeAsked), String(claudeAsked).slice(0, 300));
+{
+  const src = (await import("node:fs")).readFileSync(new URL("./worker.js", import.meta.url), "utf8");
+  const spec = (t) => (src.match(new RegExp('"' + t + '": \{ collection: "([a-z]+)"')) || [])[1];
+  check("catálogo: as duas ações do time gravam na coleção team", spec("team-add") === "team" && spec("team-delivery") === "team", spec("team-add") + " " + spec("team-delivery"));
+}
+
 /* ---- 13f. o teto do conselheiro ----
    a chave da Anthropic e uma so para o time. o teto e por pessoa e por hora:
    quem gastou espera, e quem esta ao lado nao paga por isso. */

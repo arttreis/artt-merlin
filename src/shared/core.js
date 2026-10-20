@@ -284,6 +284,7 @@ export const SECTIONS = [
      operação; vendas continua no inbox (D1) */
   { id: "business", label: "meu negócio", icon: "business", pages: [
     { id: "cash", label: "caixa", href: "cash.html" },
+    { id: "team", label: "time", href: "team.html" },
     { id: "ops", label: "operação", href: "ops.html" }
   ] },
   /* onde se arruma o tempo. a rotina é a semana-modelo, que só existe para
@@ -339,6 +340,7 @@ const SEARCH_SOURCES = [
   { type: "finance", label: "R$", field: "name", href: (d) => (d.book === "business" ? "cash.html" : "finance.html"), filter: (d) => d.type === "entry" || d.type === "fixed" || d.type === "debt" || d.type === "card" },
   { type: "habits", label: "hábito", field: "name", href: () => "habits.html", filter: (d) => !d.archived },
   { type: "routine", label: "rotina", field: "title", href: () => "routine.html" },
+  { type: "team", label: "time", field: "name", href: (d) => "team.html#" + encodeURIComponent(d.id) },
   /* o "como foi o dia" e texto corrido: acha no corpo, mostra o trecho e leva
      ao cartao do dia na pagina do diario (a semana certa, o id e a data) */
   { type: "journal", label: "diário", href: (d) => "journal.html#" + encodeURIComponent(d.id), each: (d) => [String(d.body || "").replace(/\s+/g, " ").trim()], clip: true }
@@ -898,7 +900,7 @@ document.addEventListener("visibilitychange", () => {
    nao baixou espera a proxima sincronizacao, e a marca de "feito" so e
    gravada quando todas fecharam. depois disso ela nunca mais faz nada. */
 const FRONTS_PURGED = "merlin:fronts-removed";
-const PURGE_TYPES = ["notes", "clients", "tasks", "week", "maps", "funnels", "apps", "finance", "habits", "plans", "bookmarks", "content", "cadence", "profile", "closes", "reviews", "sessions", "journal", "sleep", "workouts", "meals", "ops"];
+const PURGE_TYPES = ["notes", "clients", "tasks", "week", "maps", "funnels", "apps", "finance", "habits", "plans", "bookmarks", "content", "cadence", "profile", "closes", "reviews", "sessions", "journal", "sleep", "workouts", "meals", "ops", "team"];
 function stripFront(value) {
   if (Array.isArray(value)) return value.map(stripFront).some(Boolean);
   if (!value || typeof value !== "object") return false;

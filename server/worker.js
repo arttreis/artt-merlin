@@ -992,7 +992,11 @@ const ASSISTANT_ACTIONS = {
   "workout-log": { collection: "workouts", fields: ["title", "min", "date"] },
   "meal-log": { collection: "meals", fields: ["meal", "text", "date"] },
   "op-add": { collection: "ops", fields: ["title", "freq", "day"] },
-  "op-done": { collection: "ops", fields: ["title", "date"] }
+  "op-done": { collection: "ops", fields: ["title", "date"] },
+  /* o time é cadastro leve (PRD meu-negocio, D5): o custo é centavos por mês,
+     e o fixo no caixa quem decide é a caixa da tela */
+  "team-add": { collection: "team", fields: ["name", "role", "cost"] },
+  "team-delivery": { collection: "team", fields: ["name", "text", "date"] }
 };
 const ASSISTANT_ACTION_TYPES = Object.keys(ASSISTANT_ACTIONS).join(", ");
 
@@ -1021,6 +1025,8 @@ LIST_TASKS.assistant = (c) => ({
     "meal-log {meal (breakfast para café da manhã, lunch para almoço, snack para lanche, dinner para jantar; quando a pessoa não diz a refeição — \"comi uma maçã\" —, escolha pela hora em que ela comeu, ou pela de agora: antes das 11 breakfast, até as 15 lunch, até as 18 snack, depois dinner), text (o que comeu, curto e na grafia da pessoa: \"salada\", \"pizza\"; até 120 caracteres), date (AAAA-MM-DD do dia em que comeu; sem data, hoje)} — use quando a pessoa contar uma refeição que FEZ (\"almocei salada\", \"ontem jantei pizza\"); \"gastei 45 no almoço\" é finance-entry e \"comprar pão\" é task. Nunca fale de caloria, nem diga se a comida é boa ou ruim. " +
     "op-add {title (o processo no infinitivo, curto: \"emitir notas\", \"pagar DAS\", \"backup\"), freq (monthly, weekly ou yearly), day (monthly: o dia do mês, número de 1 a 31; weekly: o dia da semana, número de 0 a 6, domingo=0; yearly: \"MM-DD\")} — use quando a pessoa contar uma obrigação recorrente da empresa, com prazo (\"todo dia 5 emito as notas\", \"toda sexta faço o backup\"); é prazo, não horário: bloco de tempo na semana é routine-block. " +
     "op-done {title (o processo como está no contexto, ou no infinitivo como a pessoa disse: \"emiti as notas\" é \"emitir notas\"), date (AAAA-MM-DD do dia em que fez; sem data, hoje)} — use quando a pessoa contar que fez uma obrigação recorrente da empresa (\"emiti as notas\", \"paguei o DAS\"); a tela acha o processo. " +
+    "team-add {name (o nome da pessoa, como foi dito: \"Ana\"), role (o papel, curto: dev, design, suporte, vendas, freela, sócio…; \"designer\" é design, \"programador\" é dev), cost (o custo por mês em centavos, número inteiro: \"3 mil\" é 300000; 0 se a pessoa não disse — nunca estime)} — use quando a pessoa contar que alguém entrou para trabalhar com ela (\"a Ana entra como designer, 3 mil\", \"o João vai ser meu dev\"); quem trabalha com ela não é cliente, e \"@\" continua sendo cliente. " +
+    "team-delivery {name (quem entregou, como foi dito), text (o que entregou, curto e na grafia da pessoa: \"landing\", \"o logo\"; até 140 caracteres), date (AAAA-MM-DD do dia da entrega; sem data, hoje)} — use quando a pessoa contar que alguém do time entregou algo (\"a Ana entregou a landing\"); nunca avalie, compare pessoas nem fale de horas ou produtividade. " +
     "Há três jeitos de responder. REGISTRO (a pessoa conta algo para anotar ou pede para criar): proponha a ação. " +
     "CONSULTA (uma PERGUNTA sobre a vida dela — o dia, a agenda, a rotina, a semana —, inclusive financeira, \"posso gastar X\", \"dá pra fazer Y\"): devolva suggestions vazio e responda em clarify só pelo retrato e pelo contexto da tela; quando o dado não estiver neles, diga \"não sei\" e o que falta (ex. \"o financeiro não veio no retrato: monte o financeiro\"), nunca estime nem invente. Seção do retrato que diz \"ainda carregando\" é dado que não chegou, e não \"nada\". " +
     "CONSELHO (pede opinião, \"o que eu faço\", \"vale a pena\"): recomende citando o que viu no retrato (o horário, a sobra, a atrasada), em vez de conselho genérico. " +

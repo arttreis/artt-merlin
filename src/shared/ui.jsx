@@ -34,6 +34,7 @@ import { normalize as normalizeSleep } from "./sleep-data.js";
 import { normalize as normalizeWorkout, logWorkout, applyWorkout } from "./workouts-data.js";
 import { normalize as normalizeMeal } from "./meals-data.js";
 import { normalize as normalizeOp } from "./ops-data.js";
+import { normalize as normalizeTeam, joinTeam, noteDelivery } from "./team-data.js";
 /* o Ctrl+K cria tarefa de hoje com a mesma regra e a mesma forma do dia */
 import { tasks, newTask, topOrder, routeLine } from "./tasks.js";
 import { BUILD, buildIntent } from "./build-intent.js";
@@ -949,13 +950,13 @@ function useRootClass(name, on) {
    abriu a caixa fica sabendo pelo `onDone(linha)`: a pílula da conversa vira
    "✓ lançado · …" e não abre de novo. o desfazer chama `onDone(null)`, e a
    pílula volta. `chat` é o id da conversa, que vai na origem do lançamento. */
-const CREATE_LABELS = { "onboarding-map": "gerar mapa", "onboarding-funnel": "gerar funil", "finance-entry": "lançar", "sleep-log": "registrar", "workout-log": "registrar", "meal-log": "anotar", "op-done": "marcar feito" };
+const CREATE_LABELS = { "onboarding-map": "gerar mapa", "onboarding-funnel": "gerar funil", "finance-entry": "lançar", "sleep-log": "registrar", "workout-log": "registrar", "meal-log": "anotar", "op-done": "marcar feito", "team-add": "adicionar", "team-delivery": "anotar" };
 const CREATE_HREF = { "onboarding-map": "maps.html#", "onboarding-funnel": "funnels.html#" };
 /* o aviso é o texto fixo, ou a própria linha da pílula: o sono confirma
    "✓ registrado · 7h de sono", e a refeição "✓ anotado · almoço · salada",
    iguais ao início */
 const DONE_NOTICE = { "finance-entry": "lançado no financeiro", "lead-update": "cliente atualizado", script: "roteiro aplicado", "sleep-log": (line) => "✓ " + line, "meal-log": (line) => "✓ " + line, "op-add": (line) => "✓ " + line, "op-done": (line) => "✓ " + line };
-const ACTION_OPTIONS = { finance: { normalize: normalizeFinance }, sleep: { normalize: normalizeSleep }, workouts: { normalize: normalizeWorkout }, meals: { normalize: normalizeMeal }, ops: { normalize: normalizeOp } };
+const ACTION_OPTIONS = { finance: { normalize: normalizeFinance }, sleep: { normalize: normalizeSleep }, workouts: { normalize: normalizeWorkout }, meals: { normalize: normalizeMeal }, ops: { normalize: normalizeOp }, team: { normalize: normalizeTeam } };
 const optionPair = (o) => (Array.isArray(o) ? o : [o, o]);
 export function ProposalDialog({ proposal, chat, onClose, onDone }) {
   const { actionType, note } = proposal;
@@ -984,6 +985,18 @@ export function ProposalDialog({ proposal, chat, onClose, onDone }) {
       const undo = applyWorkout(store, habits, res);
       if (onDone) onDone(line);
       notify("✓ " + line, () => { undo(); if (onDone) onDone(null); });
+      return;
+    }
+    /* o time (PRD meu-negocio, D8), pelos mesmos joinTeam e noteDelivery da
+       aba: "✓ no time · Ana · design · R$ 3.000/mês", com o fixo no caixa da
+       empresa quando marcado, e "✓ anotado · Ana · landing" */
+    if (actionType === "team-add" || actionType === "team-delivery") {
+      const res = actionType === "team-add"
+        ? joinTeam(store, bookCollection(collection("finance", { normalize: normalizeFinance }), "business"), doc, v.launch)
+        : noteDelivery(store, doc, today());
+      const line = ACTION_DONE[actionType] + " · " + res.line;
+      if (onDone) onDone(line);
+      notify("✓ " + line, () => { res.undo(); if (onDone) onDone(null); });
       return;
     }
     const before = store.get(doc.id);
@@ -1021,7 +1034,7 @@ export function ProposalDialog({ proposal, chat, onClose, onDone }) {
               ? <MoneyInput value={+v[f.key] || 0} onChange={(c) => set(f.key, c)} />
               : f.type === "select"
               ? <select className="select" {...bind(f.key)}>
-                  {f.options(store, v).map(optionPair).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+                  {f.options(store, v, payload).map(optionPair).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
                 </select>
               : <input className="input" type={f.type === "number" ? "number" : f.type === "date" ? "date" : "text"} {...bind(f.key)} />}
           </Field>

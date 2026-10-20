@@ -1389,3 +1389,17 @@ export const CASH_TEMPLATES = [
     { id: "sale", name: "venda avulsa", kind: "in", category: "Vendas" }
   ] }
 ];
+
+/* ---------- o time ----------
+   os papéis de quem costuma trabalhar com um negócio pequeno (PRD meu-negocio,
+   D5). escolher um abre a caixa da pessoa com o papel; o nome e o custo ficam
+   em branco, porque são dela */
+export const TEAM_TEMPLATES = [
+  { key: "roles", label: "papéis", items: [
+    { id: "dev", name: "dev", summary: "quem programa", role: "dev" },
+    { id: "design", name: "design", summary: "quem desenha", role: "design" },
+    { id: "support", name: "suporte", summary: "quem atende", role: "suporte" },
+    { id: "sales", name: "vendas", summary: "quem vende", role: "vendas" },
+    { id: "freela", name: "freela", summary: "fixo, por fora", role: "freela" }
+  ] }
+];
