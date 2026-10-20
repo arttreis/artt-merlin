@@ -1,0 +1,31 @@
+/* merlin · o CSS desta página
+   importado logo depois do base.css: primeiro o comum, depois o da página. */
+
+/* uma pessoa por linha: o nome e o papel, a última entrega embaixo e o custo
+   à direita. em 390px a entrega quebra linha e nada rola para o lado */
+.tm-person{
+  display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"main cost" "last cost";align-items:center;gap:2px var(--pd2);
+  width:100%;padding:10px 12px;border:1px solid var(--line-soft);border-radius:var(--br2);background:var(--fill);color:inherit;font:inherit;text-align:left;cursor:pointer;
+  transition:background var(--t),border-color var(--t);
+}
+.tm-person:hover{background:var(--fill-hover);border-color:var(--ink-30)}
+.tm-person__main{grid-area:main;display:flex;align-items:baseline;gap:8px;min-width:0}
+/* o nome tem prioridade: num celular estreito, o papel encolhe primeiro */
+.tm-person__name{flex:0 1 auto;font-weight:500;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tm-person__role{flex:0 100 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;font-size:11px;color:var(--ink-50);white-space:nowrap}
+.tm-person__last{grid-area:last;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tm-person__cost{grid-area:cost;font-size:13px;color:var(--ink-50);white-space:nowrap}
+
+.tm-gone{display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px;margin:var(--pd2) 0 0}
+.tm-gone__name{padding:0;border:0;background:none;color:inherit;font:inherit;text-decoration:underline;text-underline-offset:2px;cursor:pointer}
+.tm-gone__name:hover{color:var(--ink)}
+
+/* a pessoa aberta: a próxima conversa no alto e as entregas embaixo */
+.tm-next{display:flex;align-items:center;justify-content:space-between;gap:var(--pd2);margin:0 0 var(--pd)}
+.tm-next .t-mono{font-size:11px;color:var(--ink-50)}
+.tm-next .input{max-width:180px}
+.tm-heading{margin-top:var(--pd)}
+.tm-deliveries{margin-top:var(--pd2)}
+.tm-delivery{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:10px}
+.tm-delivery__day{font-size:11px;color:var(--ink-50);white-space:nowrap}
+.tm-delivery__text{min-width:0;overflow-wrap:anywhere}

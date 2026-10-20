@@ -5,7 +5,7 @@
    o proprio normalize() dela, chamado na proxima leitura daquela pagina, e
    quem faz a validacao funda (arvore de mapa, no de funil etc.); aqui so
    se monta o documento minimo e se filtra o que o campo aceita. */
-import { newId, today } from "./core.js";
+import { newId, today, foldKey } from "./core.js";
 import { journalEntry } from "./client-doc.js";
 import { layoutNodes } from "./funnel-layout.js";
 import { newEntry, entryLine, paidOf, configOf, contextOf, bookOf, bookCollection } from "./finance-data.js";
@@ -15,6 +15,7 @@ import { sleepLabel, sleepLine, readHours, sleepDoc, nightOf } from "./sleep-dat
 import { readMinutes, workoutDoc, workoutDay, workoutLine } from "./workouts-data.js";
 import { MEALS, mealOf, mealDoc, mealDay, mealLine } from "./meals-data.js";
 import { FREQS, normalize as normalizeOp, opDoc, findOp, markDone, freqLabel, periodLabel, parseDay, dayText } from "./ops-data.js";
+import { roleOf, personLine, personDoc, addDelivery, findPerson, activeTeam } from "./team-data.js";
 
 export const ACTION_COLLECTIONS = {
   task: "tasks",
@@ -30,7 +31,9 @@ export const ACTION_COLLECTIONS = {
   "workout-log": "workouts",
   "meal-log": "meals",
   "op-add": "ops",
-  "op-done": "ops"
+  "op-done": "ops",
+  "team-add": "team",
+  "team-delivery": "team"
 };
 
 export const ACTION_LABELS = {
@@ -47,18 +50,20 @@ export const ACTION_LABELS = {
   "workout-log": "registrar treino",
   "meal-log": "anotar refeição",
   "op-add": "novo processo",
-  "op-done": "marcar feito"
+  "op-done": "marcar feito",
+  "team-add": "alguém novo no time",
+  "team-delivery": "anotar entrega"
 };
 
 /* o que a pílula confirmada diz no lugar do título: "✓ lançado · …" */
-export const ACTION_DONE = { "finance-entry": "lançado", "habit-mark": "marcado", "sleep-log": "registrado", "workout-log": "registrado", "meal-log": "anotado", "op-add": "processo", "op-done": "feito", task: "criada", note: "criada", "lead-update": "aplicado", script: "aplicado" };
+export const ACTION_DONE = { "finance-entry": "lançado", "habit-mark": "marcado", "sleep-log": "registrado", "workout-log": "registrado", "meal-log": "anotado", "op-add": "processo", "op-done": "feito", "team-add": "no time", "team-delivery": "anotado", task: "criada", note: "criada", "lead-update": "aplicado", script: "aplicado" };
 
 /* so os campos que fazem sentido editar antes de confirmar — o resto do
    payload (arvore do mapa, etapas do funil, id do cliente/conteudo) segue
    como a IA propos, sem virar campo de formulario.
    alem de texto, numero, data e textarea, o campo pode ser `money` (centavos),
-   `select` (as opcoes vem de `options(store, v)`: a colecao alvo e o que ja
-   esta na caixa) e `check`.
+   `select` (as opcoes vem de `options(store, v, payload)`: a colecao alvo, o que ja
+   esta na caixa e o que a IA propôs) e `check`.
    `initial(payload, store)` preenche o que a IA deixou em branco. */
 export const ACTION_FIELDS = {
   task: [
@@ -135,6 +140,25 @@ export const ACTION_FIELDS = {
     { key: "pick", label: "processo", type: "select", initial: (p, store) => { const op = findOp(opsOf(store), p.title); return op ? op.id : ""; },
       options: (store) => [["", "escolha o processo"], ...opsOf(store).filter((o) => !o.deleted).map((o) => [o.id, o.title])] },
     { key: "date", label: "dia", type: "date", initial: () => today() }
+  ],
+  /* com custo, "lançar como fixo no caixa" vem marcado (PRD meu-negocio, D5):
+     o fixo cai no livro da empresa, nunca no pessoal */
+  "team-add": [
+    { key: "name", label: "nome" },
+    { key: "role", label: "papel" },
+    { key: "cost", label: "custo por mês", type: "money" },
+    { key: "launch", label: "lançar como fixo no caixa", type: "check", initial: (p) => +p.cost > 0 }
+  ],
+  /* quem entregou: a pessoa achada pelo nome já vem escolhida, e aí não há
+     "novo no time" (seria uma segunda Ana); sem ninguém com o nome, a caixa
+     pede para escolher alguém do time ou criar */
+  "team-delivery": [
+    { key: "person", label: "quem", type: "select",
+      initial: (p, store) => { const who = findPerson(store.all(), p.name); return who ? who.id : ""; },
+      options: (store, v, p) => [["", "escolha quem"], ...activeTeam(store.all()).map((x) => [x.id, x.name]),
+        ...(String((p && p.name) || "").trim() && !findPerson(store.all(), p.name) ? [["new", "novo no time: " + String(p.name).trim()]] : [])] },
+    { key: "text", label: "o que entregou" },
+    { key: "date", label: "dia", type: "date", initial: () => today() }
   ]
 };
 
@@ -196,6 +220,8 @@ export function previewOf(actionType, payload, ctx) {
       const op = opOf(p, ctx && ctx.store);
       return op ? op.title + " · " + periodLabel(op, p.date || today()) : String(p.title || "");
     }
+    case "team-add": return personLine({ name: String(p.name || "").trim(), role: roleOf(p.role), cost: p.cost });
+    case "team-delivery": return [p.name, p.text, p.date && p.date !== today() ? p.date.slice(8, 10) + "/" + p.date.slice(5, 7) : ""].filter(Boolean).join(" · ");
     default: return "";
   }
 }
@@ -285,6 +311,21 @@ export function buildDoc(actionType, payload, v, store, opts) {
       const op = opOf({ ...p, ...v }, store);
       if (!op) return { error: "não achei esse processo" };
       return markDone(op, v.date || today(), today());
+    }
+    /* a pessoa nova; quem lança o fixo no caixa é a caixa (ui.jsx), com o
+       mesmo joinTeam da aba. o mesmo nome no time não entra duas vezes */
+    case "team-add": {
+      const r = personDoc({ name: v.name, role: v.role, cost: v.cost }, null);
+      if (r.error) return r;
+      const same = findPerson(store.all(), r.doc.name);
+      return same && foldKey(same.name) === foldKey(r.doc.name) ? { error: same.name + " já está no time" } : r;
+    }
+    /* a entrega vai para a pessoa escolhida, ou para a que nasce com ela */
+    case "team-delivery": {
+      const who = v.person === "new" ? personDoc({ name: p.name }, null).doc
+        : store.all().find((x) => x.id === v.person && !x.archived);
+      if (!who) return { error: "escolha quem entregou, ou crie" };
+      return addDelivery(who, { text: v.text, date: v.date }, today());
     }
     default:
       return { error: "tipo de ação desconhecido" };

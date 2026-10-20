@@ -1007,7 +1007,7 @@ Na ordem do desenho do Arthur. A primeira aba é a porta da área (`SECTIONS`, n
 | --- | --- | --- | --- |
 | **saúde** | `health` | `habits` | hábitos, sono, treino, alimentação, diário |
 | **trabalho** | `work` | `apps` | produtos, conteúdo, funis, mapas |
-| **meu negócio** | `business` | `business` | caixa, operação |
+| **meu negócio** | `business` | `business` | caixa, time, operação |
 | **organização** | `organization` | `calendar` | calendário, rotina, notas |
 | **finanças** | `money` | `finance` | financeiro |
 | **inbox** | `inbox` | `inbox` | o que falta, leads, clientes |
@@ -1038,8 +1038,11 @@ D2), com o **caixa** da empresa: o mesmo financeiro, num livro separado (`book: 
 documento; sem o campo, é pessoal, e nada migrou). O financeiro pessoal não vê o livro da empresa,
 nem o caixa vê o pessoal. O verbo é o mesmo lançamento da conversa ("recebi 2.400 da Acme na
 empresa"), com o seletor "pessoal | empresa" na caixa: na dúvida, pessoal, e a pessoa decide. O
-plano, o time e a operação entram na mesma área, na ordem plano, caixa, time, operação; vendas
-continua no inbox (D1).
+**time** veio em seguida (D5), com os seus dois verbos ("a Ana entra como designer, 3 mil", "a Ana
+entregou a landing"): cadastro leve de quem trabalha com você, com o custo, que vira um fixo no
+caixa da empresa, e as entregas que o dono anota. Sem horas, ponto, ranking nem login; "saiu do
+time" arquiva e mantém as entregas. O plano e a operação entram na mesma área, na ordem plano,
+caixa, time, operação; vendas continua no inbox (D1).
 
 A **operação** (D6) é a última aba: os processos recorrentes da empresa ("emitir notas · todo dia
 5"), e marcar feito vale pelo período. Operação é **prazo, não tempo**: a rotina diz quando se
