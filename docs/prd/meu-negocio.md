@@ -1,6 +1,6 @@
 # Meu negócio · caixa da empresa, plano, time e operação
 
-**Status:** 🚧 Em execução. Descoberta feita pelo orquestrador em 2026-10-20, com autonomia dada
+**Status:** ✅ No ar desde 2026-10-20 (versão do worker `c56b81b6`, PRs #82 e #84 a #89). Descoberta feita pelo orquestrador em 2026-10-20, com autonomia dada
 pelo Arthur. Decisões **(orq.)** foram tomadas pelo orquestrador e ficam para revisão; as
 **(Arthur)** vieram dele.
 **Owner:** Arthur Reis
