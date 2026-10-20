@@ -392,7 +392,12 @@ export function markProposal(list, i, line) {
    "planilha pronta · 14 linhas · 5 colunas"). o rascunho pode ser um app
    inteiro, e so o ultimo vale — os anteriores chegam aqui sem `data` (quem grava a conversa
    tira), e ficam so com o titulo e o resumo do que mudou */
-const BUILD_KINDS = ["funnel", "app", "map", "sheet"];
+const BUILD_KINDS = ["funnel", "app", "map", "sheet", "deck"];
+/* o ajuste de um documento aberto, pedido de dentro do editor (o "pedir ao
+   Merlin" da apresentação e da planilha): o antes e o depois, e se a pessoa
+   já aplicou. como o rascunho, só o último guarda os documentos */
+const ADJUST_KINDS = ["deck", "sheet"];
+const obj = (v) => (v && typeof v === "object" && !Array.isArray(v) ? v : null);
 const str = (v, n) => String(v == null ? "" : v).slice(0, n);
 function normalizeBuildMsg(m) {
   if (m.brief && BUILD_KINDS.includes(m.brief.kind)) {
@@ -414,6 +419,14 @@ function normalizeBuildMsg(m) {
   }
   if (m.built && BUILD_KINDS.includes(m.built.kind)) {
     return { from: "merlin", built: { kind: m.built.kind, id: str(m.built.id, 60), name: str(m.built.name, 120), line: str(m.built.line, 200) } };
+  }
+  if (m.adjust && ADJUST_KINDS.includes(m.adjust.kind)) {
+    const a = m.adjust;
+    return { from: "merlin", adjust: {
+      kind: a.kind, id: str(a.id, 60), name: str(a.name, 120),
+      slide: Math.max(0, Math.round(+a.slide) || 0), summary: str(a.summary, 400), line: str(a.line, 200),
+      applied: !!a.applied, before: obj(a.before), after: obj(a.after)
+    } };
   }
   return null;
 }
@@ -479,6 +492,7 @@ export function turnsOf(list) {
       : m.brief ? "[perguntou antes de montar: " + m.brief.questions.map((q) => q.q).join(" ") + "]"
       : m.draft ? "[mostrou o rascunho: " + m.draft.title + "]"
       : m.built ? "[criou: " + m.built.name + "]"
+      : m.adjust ? "[propôs um ajuste em " + m.adjust.name + (m.adjust.applied ? ", e a pessoa aplicou" : "") + "]"
       : String(m.text || "")
   })).filter((t) => t.content);
 }

@@ -574,6 +574,126 @@ check("planilha: o ajuste que volta sem nada também é erro", r.status === 502,
 r = await call("POST", "/merlin", { task: "build", context: { kind: "sheet", step: "publicar", request: "x" } }, cookie);
 check("planilha: passo que não existe continua recusado", r.status === 400);
 db.advice.splice(0, db.advice.length, ...adviceSnapSheet);
+/* a apresentação na conversa (ticket #94): os três passos, a limpeza dos slides,
+   o teto de 12 e o piso de 3 (1 no ajuste de uma que já existe), e o que se sabe
+   do produto, que só sobe na montagem dela */
+const adviceSnapDeck = db.advice.map((x) => ({ ...x }));
+claudeAnswer = { stop_reason: "end_turn", content: [{ type: "text", text: JSON.stringify({ questions: [{ q: "Para quem é a apresentação?", options: ["investidor", "cliente"] }] }) }] };
+r = await call("POST", "/merlin", { task: "build", context: { kind: "deck", step: "brief", request: "monta uma apresentação do produto Agenda" } }, cookie);
+body = await r.json();
+check("apresentação: o passo brief pergunta antes", r.status === 200 && body.questions && body.questions.length === 1 && body.questions[0].options.length === 2, JSON.stringify(body));
+check("apresentação: a pergunta fala em apresentação e leva o pedido", /apresentação/i.test(claudeMessages.at(-1).content) && /produto Agenda/.test(claudeAsked), String(claudeAsked).slice(0, 200));
+check("apresentação: a pergunta vai no Haiku", claudeModel === "claude-haiku-5-5/low", claudeModel);
+const messySlide = {
+  layout: "inventado", title: "t".repeat(300), body: "b".repeat(900), left: "l".repeat(2000), right: "r".repeat(2000),
+  number: "9".repeat(40), caption: "c".repeat(300), notes: "n".repeat(3000),
+  items: ["um", 5, null, "dois", { a: 1 }, "y".repeat(300), "t4", "t5", "t6", "t7", "t8", "t9"]
+};
+const deckAnswer = {
+  name: "Pitch da Agenda",
+  slides: [
+    messySlide,
+    { layout: "cover", title: { a: 1 }, body: null, number: 70, caption: 5, left: [1], notes: true, items: "texto solto" },
+    { layout: "columns", title: "duas", left: "esquerda", right: "direita", extra: "campo de fora", id: "inventado" },
+    { layout: "number", title: "número", number: "R$ 497", caption: "por mês" },
+    ...Array.from({ length: 10 }, (_, i) => ({ layout: "cover", title: "extra " + i })),
+    "texto solto", null, [1, 2], 7
+  ],
+  summary: "pitch curto"
+};
+claudeAnswer = { stop_reason: "end_turn", content: [{ type: "text", text: JSON.stringify(deckAnswer) }] };
+const deckBefore = spent(2);
+r = await call("POST", "/merlin", { task: "build", context: { kind: "deck", step: "draft", request: "monta uma apresentação do produto Agenda", answers: "Para quem é a apresentação? investidor", product: "O app Agenda do Salão: agenda para cabeleireiras. MARCA-DO-PRODUTO" } }, cookie);
+body = await r.json();
+const dSlides = (body.draft && body.draft.slides) || [];
+check("apresentação: o passo draft devolve rascunho e resumo", r.status === 200 && body.draft && body.summary === "pitch curto", JSON.stringify(body).slice(0, 300));
+check("apresentação: o rascunho tem só name e slides", body.draft && Object.keys(body.draft).sort().join() === "name,slides" && body.draft.name === "Pitch da Agenda", JSON.stringify(Object.keys(body.draft || {})));
+check("apresentação: o teto é de 12 slides, e o que não é objeto não vira slide", dSlides.length === 12, String(dSlides.length));
+check("apresentação: cada slide tem exatamente as 9 chaves", dSlides.every((s) => Object.keys(s).sort().join() === "body,caption,items,layout,left,notes,number,right,title"), JSON.stringify(dSlides[2]));
+check("apresentação: campo que o modelo inventou não passa", !("extra" in dSlides[2]) && !("id" in dSlides[2]) && dSlides[2].left === "esquerda" && dSlides[2].right === "direita" && dSlides[2].layout === "columns", JSON.stringify(dSlides[2]));
+check("apresentação: layout fora dos quatro vira bullets, os quatro passam", dSlides[0].layout === "bullets" && dSlides[1].layout === "cover" && dSlides[2].layout === "columns" && dSlides[3].layout === "number", dSlides.slice(0, 4).map((s) => s.layout).join());
+check("apresentação: os campos de texto são cortados nos tetos", dSlides[0].title.length === 160 && dSlides[0].body.length === 600 && dSlides[0].left.length === 1200 && dSlides[0].right.length === 1200 && dSlides[0].number.length === 24 && dSlides[0].caption.length === 160 && dSlides[0].notes.length === 2000, [dSlides[0].title, dSlides[0].body, dSlides[0].left, dSlides[0].right, dSlides[0].number, dSlides[0].caption, dSlides[0].notes].map((x) => x.length).join());
+check("apresentação: número vira texto, e objeto, nulo, lista e booleano viram vazio", dSlides[1].number === "70" && dSlides[1].caption === "5" && dSlides[1].title === "" && dSlides[1].body === "" && dSlides[1].left === "" && dSlides[1].notes === "", JSON.stringify(dSlides[1]));
+check("apresentação: todo campo de texto é string", dSlides.every((s) => ["title", "body", "left", "right", "number", "caption", "notes"].every((f) => typeof s[f] === "string")));
+check("apresentação: items fica só com as strings, até 8, cada uma até 200", dSlides[0].items.length === 8 && dSlides[0].items[0] === "um" && dSlides[0].items[1] === "dois" && dSlides[0].items[2].length === 200 && dSlides[0].items[7] === "t8" && dSlides.every((s) => Array.isArray(s.items) && s.items.every((x) => typeof x === "string" && x.length <= 200)), JSON.stringify(dSlides[0].items.map((x) => x.slice(0, 6))));
+check("apresentação: items que não é lista vira lista vazia", Array.isArray(dSlides[1].items) && dSlides[1].items.length === 0, JSON.stringify(dSlides[1].items));
+check("apresentação: o rascunho vai no Opus e conta na montagem", claudeModel === "claude-opus-5-5/medium" && spent(2) === deckBefore + 1, claudeModel);
+check("apresentação: a linha de log traz o tipo", /^merlin build:draft:deck in=/.test(logged.at(-1)), logged.at(-1));
+check("apresentação: o pedido do rascunho leva o pedido e as respostas", /produto Agenda/.test(claudeAsked) && /Para quem é a apresentação\? investidor/.test(claudeAsked), String(claudeAsked).slice(0, 300));
+check("apresentação: o pedido fala em 3 a 12 slides e nos quatro layouts", /3 a 12/.test(claudeMessages.at(-1).content) && ["cover", "bullets", "number", "columns"].every((l) => claudeMessages.at(-1).content.includes(l)), String(claudeMessages.at(-1).content).slice(0, 400));
+check("apresentação: o que se sabe do produto sobe na montagem dela", claudeAsked.includes("MARCA-DO-PRODUTO") && claudeAsked.includes("Agenda do Salão"), String(claudeAsked).slice(0, 300));
+const deckDraft1 = body.draft;
+
+/* o texto do produto sobe cortado em 6000 */
+claudeAnswer = { stop_reason: "end_turn", content: [{ type: "text", text: JSON.stringify(deckAnswer) }] };
+await call("POST", "/merlin", { task: "build", context: { kind: "deck", step: "draft", request: "monta uma apresentação", product: "§".repeat(7000) } }, cookie);
+check("apresentação: o produto é cortado em 6000 caracteres", claudeAsked.includes("§".repeat(6000)) && !claudeAsked.includes("§".repeat(6001)), String((claudeAsked.match(/§+/) || [""])[0].length));
+
+/* o ajuste: o rascunho atual e o pedido, e o produto também */
+claudeAnswer = { stop_reason: "end_turn", content: [{ type: "text", text: JSON.stringify({ name: "Pitch da Agenda", slides: [{ layout: "cover", title: "capa" }, { layout: "bullets", title: "tópicos", items: ["a"] }, { layout: "number", title: "número", number: "5" }], summary: "troquei o fecho" }) }] };
+r = await call("POST", "/merlin", { task: "build", context: { kind: "deck", step: "revise", request: "monta uma apresentação", draft: deckDraft1, change: "tira o último slide", product: "MARCA-DO-PRODUTO" } }, cookie);
+body = await r.json();
+check("apresentação: o passo revise devolve outro rascunho", r.status === 200 && body.draft && body.draft.slides.length === 3 && body.summary === "troquei o fecho", JSON.stringify(body).slice(0, 300));
+check("apresentação: o ajuste manda o rascunho atual e o pedido", /Rascunho atual/.test(claudeAsked) && /extra 5/.test(claudeAsked) && /Ajuste pedido: tira o último slide/.test(claudeAsked) && /AJUSTE/.test(claudeMessages.at(-1).content), String(claudeAsked).slice(0, 200));
+check("apresentação: o ajuste também leva o produto", claudeAsked.includes("MARCA-DO-PRODUTO"));
+
+/* o piso: 3 slides na conversa; 1 no ajuste de uma apresentação que já existe */
+const slidesOf = (len) => Array.from({ length: len }, (_, i) => ({ layout: "bullets", title: "slide " + i, items: ["x"] }));
+const askDeck = async (slides, over) => {
+  claudeAnswer = { stop_reason: "end_turn", content: [{ type: "text", text: JSON.stringify({ name: "Pitch", slides, summary: "ok" }) }] };
+  const res = await call("POST", "/merlin", { task: "build", context: { kind: "deck", step: "draft", request: "monta uma apresentação", ...over } }, cookie);
+  return { status: res.status, body: await res.json() };
+};
+let dk = await askDeck([]);
+check("apresentação: sem slides é erro de rascunho vazio", dk.status === 502 && /o Merlin devolveu um rascunho vazio; tente de novo/.test(dk.body.error || ""), dk.status + " " + JSON.stringify(dk.body));
+dk = await askDeck(["texto", null, 5, [1]]);
+check("apresentação: só o que não é objeto também é rascunho vazio", dk.status === 502 && /rascunho vazio/.test(dk.body.error || ""), dk.status + " " + JSON.stringify(dk.body));
+dk = await askDeck(slidesOf(1));
+check("apresentação: 1 slide é erro, com a razão", dk.status === 502 && /menos de 3 slides/.test(dk.body.error || ""), dk.status + " " + JSON.stringify(dk.body));
+dk = await askDeck(slidesOf(2));
+check("apresentação: 2 slides é erro, com a razão", dk.status === 502 && /menos de 3 slides/.test(dk.body.error || ""), dk.status + " " + JSON.stringify(dk.body));
+dk = await askDeck([...slidesOf(2), "texto", null]);
+check("apresentação: 2 slides e lixo continua sendo 2", dk.status === 502 && /menos de 3 slides/.test(dk.body.error || ""), dk.status + " " + JSON.stringify(dk.body));
+dk = await askDeck(slidesOf(3));
+check("apresentação: 3 slides passa", dk.status === 200 && dk.body.draft.slides.length === 3, dk.status + " " + JSON.stringify(dk.body).slice(0, 200));
+dk = await askDeck(slidesOf(12));
+check("apresentação: 12 slides passa inteiro", dk.status === 200 && dk.body.draft.slides.length === 12, dk.status + " " + (dk.body.draft && dk.body.draft.slides.length));
+dk = await askDeck(slidesOf(20));
+check("apresentação: 20 slides voltam cortados em 12", dk.status === 200 && dk.body.draft.slides.length === 12 && dk.body.draft.slides[11].title === "slide 11", dk.status + " " + (dk.body.draft && dk.body.draft.slides.length));
+dk = await askDeck(slidesOf(2), { step: "revise", draft: deckDraft1, change: "corta" });
+check("apresentação: o ajuste de uma que não está aberta também pede 3", dk.status === 502 && /menos de 3 slides/.test(dk.body.error || ""), dk.status + " " + JSON.stringify(dk.body));
+dk = await askDeck(slidesOf(1), { step: "revise", open: true, draft: deckDraft1, change: "deixa só a capa" });
+check("apresentação aberta: o ajuste aceita 1 slide", dk.status === 200 && dk.body.draft.slides.length === 1, dk.status + " " + JSON.stringify(dk.body).slice(0, 200));
+check("apresentação aberta: o pedido avisa que o documento já existe", /já tem aberto|já existe|aberto/i.test(claudeMessages.at(-1).content), String(claudeMessages.at(-1).content).slice(-300));
+dk = await askDeck(slidesOf(2), { step: "revise", open: true, draft: deckDraft1, change: "tira um" });
+check("apresentação aberta: 2 slides também passa", dk.status === 200 && dk.body.draft.slides.length === 2, dk.status + " " + JSON.stringify(dk.body).slice(0, 200));
+dk = await askDeck(slidesOf(15), { step: "revise", open: true, draft: deckDraft1, change: "acrescenta" });
+check("apresentação aberta: o teto continua 12", dk.status === 200 && dk.body.draft.slides.length === 12, dk.status + " " + (dk.body.draft && dk.body.draft.slides.length));
+dk = await askDeck([], { step: "revise", open: true, draft: deckDraft1, change: "apaga tudo" });
+check("apresentação aberta: sem nenhum slide ainda é erro", dk.status === 502 && /rascunho vazio/.test(dk.body.error || ""), dk.status + " " + JSON.stringify(dk.body));
+db.advice.splice(0, db.advice.length, ...adviceSnapDeck);
+
+/* o produto só sobe na montagem da apresentação */
+const SEGREDO = "SEGREDO-DO-PRODUTO-XYZ";
+claudeAnswer = { stop_reason: "end_turn", content: [{ type: "text", text: JSON.stringify({ name: "Funil", stages: [{ nodeType: "ad", title: "anúncio" }, { nodeType: "lp", title: "página" }] }) }] };
+r = await call("POST", "/merlin", { task: "build", context: { kind: "funnel", step: "draft", request: "monta um funil", product: SEGREDO } }, cookie);
+check("o produto não sobe na montagem do funil", r.status === 200 && !JSON.stringify(claudeMessages).includes(SEGREDO) && !String(claudeSystem).includes(SEGREDO), String(r.status));
+claudeAnswer = { stop_reason: "end_turn", content: [{ type: "text", text: JSON.stringify({ name: "Custos", cols: [{ name: "a", type: "text" }], rows: [["x"]] }) }] };
+r = await call("POST", "/merlin", { task: "build", context: { kind: "sheet", step: "draft", request: "faz uma planilha", product: SEGREDO } }, cookie);
+check("o produto não sobe na montagem da planilha", r.status === 200 && !JSON.stringify(claudeMessages).includes(SEGREDO) && !String(claudeSystem).includes(SEGREDO), String(r.status));
+claudeAnswer = { stop_reason: "end_turn", content: [{ type: "text", text: JSON.stringify({ name: "Mapa", tree: { title: "x", children: [{ title: "a" }] } }) }] };
+r = await call("POST", "/merlin", { task: "build", context: { kind: "map", step: "draft", request: "faz um mapa", product: SEGREDO } }, cookie);
+check("o produto não sobe na montagem do mapa", r.status === 200 && !JSON.stringify(claudeMessages).includes(SEGREDO) && !String(claudeSystem).includes(SEGREDO), String(r.status));
+claudeAnswer = { stop_reason: "end_turn", content: [{ type: "text", text: '{"suggestions":[],"clarify":"oi"}' }] };
+r = await call("POST", "/merlin", { task: "assistant", context: { message: "oi", product: SEGREDO } }, cookie);
+check("o produto não sobe no assistente", r.status === 200 && !JSON.stringify(claudeMessages).includes(SEGREDO) && !String(claudeSystem).includes(SEGREDO), String(r.status));
+claudeAnswer = { stop_reason: "end_turn", content: [{ type: "text", text: JSON.stringify({ items: [] }) }] };
+r = await call("POST", "/merlin", { task: "capture", context: { text: "oi", today: "2026-10-10", product: SEGREDO } }, cookie);
+check("o produto não sobe na leitura do início", r.status === 200 && !JSON.stringify(claudeMessages).includes(SEGREDO), String(r.status));
+claudeAnswer = { stop_reason: "end_turn", content: [{ type: "text", text: JSON.stringify(deckAnswer) }] };
+r = await call("POST", "/merlin", { task: "build", context: { kind: "deck", step: "draft", request: "monta uma apresentação", product: SEGREDO } }, cookie);
+check("o produto sobe na montagem da apresentação (a prova de que o teste acima enxerga)", r.status === 200 && JSON.stringify(claudeMessages).includes(SEGREDO), String(r.status));
+db.advice.splice(0, db.advice.length, ...adviceSnapDeck);
 r = await call("POST", "/merlin", { task: "build", context: { kind: "map", step: "publicar", request: "x" } }, cookie);
 check("montagem recusa passo que não existe", r.status === 400);
 globalThis.fetch = realFetch;
@@ -1450,6 +1570,20 @@ check("a planilha grava build:draft:sheet, com os tokens dela", !!usageOf(meterI
 check("o tipo separa as linhas: o do mapa não leva os tokens da planilha", !!usageOf(meterId, "build:draft:map") && usageOf(meterId, "build:draft:map").n === 1 && usageOf(meterId, "build:draft:map").tokens_in === 900);
 check("a medição da montagem não grava mais o nome sem tipo", !usageRows(meterId).some((x) => x.task === "build:brief" || x.task === "build:draft" || x.task === "build:revise"), JSON.stringify(usageRows(meterId).map((x) => x.task)));
 check("a linha de log da montagem traz o tipo", /^merlin build:draft:sheet in=600 out=250 portrait=0$/.test(logged.at(-1)), logged.at(-1));
+
+/* a apresentação grava build:<passo>:deck, uma linha por passo (ticket #94) */
+const deckSlides = [{ layout: "cover", title: "capa" }, { layout: "bullets", title: "tópicos", items: ["a"] }, { layout: "number", title: "número", number: "5" }];
+claudeAnswer = answerWith({ name: "Pitch", slides: deckSlides }, { input_tokens: 700, output_tokens: 300 });
+await ask("build", { kind: "deck", step: "draft", request: "uma apresentação", product: "o app Agenda" }, meterCookie);
+check("a linha de log da apresentação traz o tipo", /^merlin build:draft:deck in=700 out=300 portrait=0$/.test(logged.at(-1)), logged.at(-1));
+claudeAnswer = answerWith({ name: "Pitch", slides: deckSlides }, { input_tokens: 800, output_tokens: 120 });
+await ask("build", { kind: "deck", step: "revise", open: true, request: "uma apresentação", draft: { name: "Pitch", slides: deckSlides }, change: "muda o título" }, meterCookie);
+claudeAnswer = answerWith({ questions: [] }, { input_tokens: 150, output_tokens: 15 });
+await ask("build", { kind: "deck", step: "brief", request: "uma apresentação" }, meterCookie);
+check("a apresentação grava build:draft:deck, com os tokens dela", !!usageOf(meterId, "build:draft:deck") && usageOf(meterId, "build:draft:deck").n === 1 && usageOf(meterId, "build:draft:deck").tokens_in === 700 && usageOf(meterId, "build:draft:deck").tokens_out === 300, JSON.stringify(usageRows(meterId).map((x) => x.task)));
+check("a apresentação grava os outros dois passos também", !!usageOf(meterId, "build:revise:deck") && usageOf(meterId, "build:revise:deck").tokens_in === 800 && !!usageOf(meterId, "build:brief:deck") && usageOf(meterId, "build:brief:deck").tokens_in === 150, JSON.stringify(usageRows(meterId).map((x) => x.task)));
+check("a apresentação não mexe na linha da planilha", usageOf(meterId, "build:draft:sheet").n === 1 && usageOf(meterId, "build:draft:sheet").tokens_in === 600);
+check("a medição da apresentação não grava o nome sem tipo", !usageRows(meterId).some((x) => x.task === "build:draft" || x.task === "build:revise" || x.task === "build:brief"), JSON.stringify(usageRows(meterId).map((x) => x.task)));
 
 claudeAnswer = answerWith({ text: "## semana\n- foi" }, { input_tokens: 700, output_tokens: 80 });
 await ask("week", { range: "1-7 set", cards: [] }, meterCookie);

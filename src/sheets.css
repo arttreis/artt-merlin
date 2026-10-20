@@ -70,4 +70,7 @@
   .sh-cell{min-width:96px}
   .sh-cell.sh-first{min-width:118px;max-width:140px}
   .sh-name{font-size:16px}
+  /* no celular o "pedir ao Merlin" é só o ícone, para a barra caber */
+  #sh-ask{padding:0 10px}
+  #sh-ask .sh-ask__label{display:none}
 }

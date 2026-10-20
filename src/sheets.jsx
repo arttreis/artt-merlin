@@ -9,7 +9,7 @@
    com os modelos. a lista de planilhas mora em desenhos. */
 import "./shared/base.css";
 import "./sheets.css";
-import { initPage, newId, notify } from "./shared/core.js";
+import { initPage, newId, notify, askMerlin, takeChange } from "./shared/core.js";
 import { useState, useEffect, useRef, useMemo, useLayoutEffect } from "react";
 import { mount, useCollection, useHash, useKeydown, isTyping, useFields, Form, Field, Dialog, icon } from "./shared/ui.jsx";
 import {
@@ -17,6 +17,7 @@ import {
   COL_TYPES, SHEET_ROWS, SHEET_COLS
 } from "./shared/sheet.js";
 import { SheetStart } from "./shared/sheet-start.jsx";
+import { adjustPrefix } from "./shared/build-intent.js";
 
 /* a planilha não tem aba própria: acende "desenhos" */
 initPage("drawings");
@@ -133,6 +134,20 @@ function Editor({ id, sheets }) {
     else change(() => snapshot);
   };
 
+  /* ---- o ajuste que a pessoa aplicou na conversa (o "pedir ao Merlin") ----
+     chega uma vez só, ao abrir: é um passo do desfazer, e o aviso diz */
+  useEffect(() => {
+    const got = takeChange("sheet", id);
+    if (!got) return;
+    const before = docRef.current;
+    const next = normalizeSheet({ ...got.doc, id, createdAt: before.createdAt, updatedAt: Date.now() });
+    if (change(() => next)) notify(got.line || "o Merlin mudou a planilha", undoTo(before));
+  }, []);
+  const askHere = () => {
+    if (saveTimer.current) saveNow();
+    askMerlin(adjustPrefix("sheet", docRef.current.name), { prefill: true, target: { kind: "sheet", id } });
+  };
+
   /* ---- outra aba ou a nuvem mexeram nesta planilha ---- */
   useEffect(() => sheets.onChange((origin) => {
     if (!sheets.has(id)) { location.hash = ""; return; }
@@ -242,6 +257,7 @@ function Editor({ id, sheets }) {
         <input className="sh-name" id="sh-name" maxLength="120" aria-label="Nome da planilha" value={doc.name}
           onChange={(e) => { const v = e.currentTarget.value; change((d) => ({ ...d, name: v }), { history: false }); }}
           onBlur={() => { if (!doc.name.trim()) change((d) => ({ ...d, name: "planilha sem nome" }), { history: false }); }} />
+        <button className="pill" type="button" id="sh-ask" title="pedir ao Merlin um ajuste na planilha" aria-label="Pedir ao Merlin" onClick={askHere}>{icon("spark")}<span className="sh-ask__label">pedir ao Merlin</span></button>
         <button className="action" type="button" id="sh-more" title="mais" aria-label="Mais" onClick={() => setMenuOpen(true)}><MoreIcon /></button>
       </div>
 

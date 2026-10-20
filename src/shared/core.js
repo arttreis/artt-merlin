@@ -1212,12 +1212,18 @@ export const getCurrentPage = () => currentPage;
    ficar no historico do navegador. vai no sessionStorage e e consumido uma
    vez so, na chegada. */
 const ASK_KEY = "merlin:ask";
-export function askMerlin(message) {
+/* `prefill`: a mensagem chega no campo, para a pessoa completar, em vez de ir
+   direto (o "pedir ao Merlin" do editor: "na apresentação X, slide 3: ").
+   `target`: o documento aberto, {kind, id}, que é o assunto do ajuste */
+export function askMerlin(message, options) {
+  const o = options || {};
   try {
     sessionStorage.setItem(ASK_KEY, JSON.stringify({
       message: String(message || ""),
       page: currentPage,
-      pageContext: getPageContext() || ""
+      pageContext: getPageContext() || "",
+      prefill: !!o.prefill,
+      target: o.target || null
     }));
   } catch (e) { /* sem sessionStorage a pergunta se perde, mas a tela abre */ }
   location.href = "assistant.html";
@@ -1235,6 +1241,24 @@ export function takeAsk() {
     const d = JSON.parse(raw);
     return d && typeof d === "object" ? d : null;
   } catch (e) { return null; }
+}
+
+/* o caminho de volta: o ajuste que a pessoa aplicou na conversa vai para o
+   editor do documento, que o aplica como um passo do próprio desfazer e
+   avisa ("o Merlin mudou o slide 3 · desfazer"). pelo mesmo sessionStorage,
+   lido uma vez só, e só pelo editor daquele documento, logo em seguida: o
+   que ficou esquecido lá por mais de dois minutos não vale mais */
+const CHANGE_KEY = "merlin:change";
+export function sendChange(kind, id, doc, line, at) {
+  try { sessionStorage.setItem(CHANGE_KEY, JSON.stringify({ kind, id, doc, line: String(line || ""), at: +at || 0, t: Date.now() })); } catch (e) { /* sem sessionStorage o ajuste não chega */ }
+}
+export function takeChange(kind, id) {
+  let d = null;
+  try { d = JSON.parse(sessionStorage.getItem(CHANGE_KEY) || "null"); } catch (e) { return null; }
+  if (!d || d.kind !== kind || d.id !== id) return null;
+  try { sessionStorage.removeItem(CHANGE_KEY); } catch (e) { /* segue */ }
+  if (!d.doc || typeof d.doc !== "object" || !(Date.now() - d.t < 120000)) return null;
+  return d;
 }
 
 /* ---------- o onboarding como estado ----------

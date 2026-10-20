@@ -1341,6 +1341,11 @@ const NODE_TYPE_SET = new Set(NODE_TYPES.split(", "));
 const SHEET_COL_TYPES = ["text", "number", "money", "date"];
 const SHEET_MAX_ROWS = 40, SHEET_MAX_COLS = 10;
 const BUILD_PORTRAIT_MAX = 1500;
+/* se SLIDE_LAYOUTS mudar em shared/deck.js, muda aqui junto. a conversa monta
+   de 3 a 12 slides (D6); o editor vai até 30 */
+const DECK_LAYOUTS = ["cover", "bullets", "number", "columns"];
+const DECK_MIN = 3, DECK_MAX = 12;
+const PRODUCT_MAX = 6000;
 const BUILD_KINDS = {
   funnel: {
     label: "funil de marketing e vendas",
@@ -1376,6 +1381,7 @@ const BUILD_KINDS = {
      inicial — cópia, sem ligação viva */
   sheet: {
     label: "planilha",
+    a: "uma ",
     cash: true,
     matters: "para que serve a conta, o que entra como linha e que números a pessoa já tem",
     draft:
@@ -1388,6 +1394,26 @@ const BUILD_KINDS = {
       "Use os números que a pessoa deu e os do caixa, quando vierem; o que faltar, ponha um exemplo comum para este caso e diga no summary que é para trocar. Nunca invente resultado. " +
       "name = o nome da planilha (até 6 palavras). " +
       'Formato: {"name":"…","cols":[{"name":"…","type":"text"}],"rows":[["…","…"]],"summary":"…"}'
+  },
+  /* a apresentação (PRD desenhos, D4 e D6). `product`: quando o pedido nomeia
+     um produto, a tela manda o que o Merlin sabe dele (o projeto de app, o
+     funil e a oferta ligados, as metas do plano), e os slides citam isso */
+  deck: {
+    label: "apresentação de slides",
+    a: "uma ",
+    product: true,
+    matters: "para quem é a apresentação, o que ela quer conseguir de quem assiste e quantos slides cabem",
+    draft:
+      "Monte a apresentação pronta para mostrar: slides de texto 16:9, de " + DECK_MIN + " a " + DECK_MAX + " (o número que a pessoa pediu, quando pedir). " +
+      "Cada slide tem layout (exatamente um de " + DECK_LAYOUTS.join(", ") + ") e só os campos dele: " +
+      "cover = capa ou fecho, com title e body (uma frase); bullets = title e items (de 2 a 6 tópicos de até 12 palavras); " +
+      "number = title (o que se mede), number (o número, curto: 70%, R$ 497, 1.200) e caption (o que ele quer dizer); " +
+      "columns = title, left e right (cada coluna: uma linha de título, uma linha em branco e o texto). " +
+      "notes = o que dizer no slide, até 40 palavras. O primeiro slide é capa. " +
+      "Use o nome, o problema, as funcionalidades e os números do produto que vierem no contexto, como estão. " +
+      "O que não está no pedido nem no contexto você não sabe: não invente número, cliente nem resultado — escreva o tópico com … para a pessoa preencher e diga no summary o que falta. " +
+      "name = o nome da apresentação (até 6 palavras). " +
+      'Formato: {"name":"…","slides":[{"layout":"cover","title":"…","body":"…","items":[],"left":"","right":"","number":"","caption":"","notes":"…"}],"summary":"…"}'
   }
 };
 const BUILD_TASKS = {
@@ -1400,11 +1426,12 @@ const BUILD_TASKS = {
       (c.answers ? "O que a pessoa respondeu:\n" + String(c.answers).slice(0, 1500) + "\n" : "") +
       (step === "revise" && c.draft ? "Rascunho atual (JSON):\n" + JSON.stringify(c.draft).slice(0, 24000) + "\n" : "") +
       (step === "revise" ? "Ajuste pedido: " + String(c.change || "").slice(0, 1000) + "\n" : "") +
-      (k.cash && c.portrait ? "O caixa da pessoa agora (uma cópia para valor inicial; a planilha não se atualiza sozinha):\n" + String(c.portrait).slice(0, BUILD_PORTRAIT_MAX) + "\n" : "");
+      (k.cash && c.portrait ? "O caixa da pessoa agora (uma cópia para valor inicial; a planilha não se atualiza sozinha):\n" + String(c.portrait).slice(0, BUILD_PORTRAIT_MAX) + "\n" : "") +
+      (k.product && c.product ? "O que o Merlin sabe do produto (são os fatos; o que não está aqui, não invente):\n" + String(c.product).slice(0, PRODUCT_MAX) + "\n" : "");
     if (step === "brief") {
       return {
         instruction:
-          "A pessoa pediu para você montar um " + k.label + ". Antes de montar, decida o que falta saber. " +
+          "A pessoa pediu para você montar " + (k.a || "um ") + k.label + ". Antes de montar, decida o que falta saber. " +
           "Pergunte só o que muda o desenho e que não está no pedido nem no que você já sabe de quem está na tela. O que costuma importar aqui: " + k.matters + ". " +
           "No máximo " + MAX_QUESTIONS + " perguntas curtas, cada uma com 2 a 4 respostas prováveis (até 6 palavras cada) para a pessoa clicar. " +
           "Se o pedido já basta para um bom rascunho, devolva questions vazio. " +
@@ -1417,7 +1444,8 @@ const BUILD_TASKS = {
       instruction:
         draft + " " +
         (step === "revise"
-          ? "Este é um AJUSTE: parta do rascunho atual, aplique só o que foi pedido e devolva o rascunho inteiro no mesmo formato; summary diz em uma frase o que mudou."
+          ? "Este é um AJUSTE: parta do rascunho atual, aplique só o que foi pedido e devolva o rascunho inteiro no mesmo formato; summary diz em uma frase o que mudou." +
+            (c.open ? " O rascunho é um documento que a pessoa já tem aberto: o que o ajuste não cita volta exatamente igual, na mesma ordem e na mesma quantidade." : "")
           : "summary diz em uma frase o que você montou e por quê."),
       context
     };
@@ -1447,7 +1475,20 @@ function cleanSheet(d) {
   const rows = arr(d.rows, SHEET_MAX_ROWS).filter(Array.isArray).map((r) => cols.map((_, j) => cell(r[j])));
   return { name: cut(d.name, 120), cols, rows };
 }
+const DECK_LAYOUT_SET = new Set(DECK_LAYOUTS);
+const DECK_TEXT = { title: 160, body: 600, left: 1200, right: 1200, number: 24, caption: 160, notes: 2000 };
+function cleanDeck(d) {
+  const text = (v, n) => (typeof v === "string" || (typeof v === "number" && Number.isFinite(v)) ? cut(v, n) : "");
+  const slides = arr(d.slides, DECK_MAX).filter((s) => s && typeof s === "object" && !Array.isArray(s)).map((s) => {
+    const out = { layout: DECK_LAYOUT_SET.has(String(s.layout)) ? String(s.layout) : "bullets" };
+    for (const f in DECK_TEXT) out[f] = text(s[f], DECK_TEXT[f]);
+    out.items = (Array.isArray(s.items) ? s.items : []).filter((x) => typeof x === "string").slice(0, 8).map((x) => cut(x, 200));
+    return out;
+  });
+  return { name: cut(d.name, 120), slides };
+}
 function cleanDraft(kind, d) {
+  if (kind === "deck") return cleanDeck(d);
   if (kind === "app") return { name: cut(d.name, 120), ...cleanBlueprint(d) };
   if (kind === "map") return { name: cut(d.name, 120), tree: cleanTree(d.tree || {}, 1, { n: 80 }) };
   if (kind === "sheet") return cleanSheet(d);
@@ -1562,6 +1603,8 @@ async function advise(req, env, person) {
      MERLIN_PORTRAIT_OFF o desliga para todos, sem build (D9) */
   const cashBuild = name === "build" && BUILD_KINDS[body.context.kind] && BUILD_KINDS[body.context.kind].cash;
   if ((name !== "assistant" && !cashBuild) || env.MERLIN_PORTRAIT_OFF) delete body.context.portrait;
+  /* o que se sabe do produto só vai na montagem da apresentação (ticket #94) */
+  if (!(name === "build" && BUILD_KINDS[body.context.kind] && BUILD_KINDS[body.context.kind].product)) delete body.context.product;
   /* o tamanho do retrato que vai de fato (o já cortado) entra na linha da
      medição, no wrangler tail */
   const portraitChars = body.context.portrait ? Math.min(String(body.context.portrait).length, cashBuild ? BUILD_PORTRAIT_MAX : PORTRAIT_MAX) : 0;
@@ -1635,8 +1678,12 @@ async function advise(req, env, person) {
     const empty = kind === "funnel" ? !draft.stages.length
       : kind === "app" ? !draft.features.length && !draft.entities.length && !draft.screens.length
       : kind === "sheet" ? !draft.cols.length || !draft.rows.length
+      : kind === "deck" ? !draft.slides.length
       : !draft.tree.children.length;
     if (empty) return fail("o Merlin devolveu um rascunho vazio; tente de novo", 502);
+    /* a apresentação montada aqui tem de 3 a 12 slides; o ajuste de uma que já
+       existe (`open`, o "pedir ao Merlin" do editor) pode ter menos */
+    if (kind === "deck" && !body.context.open && draft.slides.length < DECK_MIN) return fail("o Merlin devolveu menos de 3 slides; tente de novo", 502);
     return json({ draft, summary: cut(data.summary, 400) });
   }
   if (isCapture) {

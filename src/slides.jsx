@@ -14,7 +14,7 @@
    com os modelos. a lista de apresentações mora em desenhos. */
 import "./shared/base.css";
 import "./slides.css";
-import { initPage, newId, notify } from "./shared/core.js";
+import { initPage, newId, notify, askMerlin, takeChange } from "./shared/core.js";
 import { useState, useEffect, useRef, useLayoutEffect } from "react";
 import { mount, useCollection, useHash, useKeydown, Dialog, icon } from "./shared/ui.jsx";
 import {
@@ -22,6 +22,7 @@ import {
   SLIDE_LAYOUTS, DECK_SLIDES, SLIDE_ITEMS
 } from "./shared/deck.js";
 import { DeckStart } from "./shared/deck-start.jsx";
+import { adjustPrefix } from "./shared/build-intent.js";
 
 /* a apresentação não tem aba própria: acende "desenhos" */
 initPage("drawings");
@@ -228,6 +229,23 @@ function Editor({ id, decks }) {
     if (at != null) setCur(at);
   };
 
+  /* ---- o ajuste que a pessoa aplicou na conversa (o "pedir ao Merlin") ----
+     chega uma vez só, ao abrir: é um passo do desfazer, como qualquer
+     mudança, e o aviso diz o que mudou */
+  useEffect(() => {
+    const got = takeChange("deck", id);
+    if (!got) return;
+    const before = docRef.current;
+    const next = normalizeDeck({ ...got.doc, id, createdAt: before.createdAt, updatedAt: Date.now() });
+    const to = Math.max(0, Math.min(got.at, next.slides.length - 1));
+    if (change(() => next)) { setCur(to); notify(got.line || "o Merlin mudou a apresentação", undoTo(before, Math.min(to, before.slides.length - 1))); }
+  }, []);
+  /* a conversa abre com o slide no campo: "na apresentação X, slide 3: " */
+  const askHere = () => {
+    if (saveTimer.current) saveNow();
+    askMerlin(adjustPrefix("deck", docRef.current.name, at + 1), { prefill: true, target: { kind: "deck", id } });
+  };
+
   /* ---- outra aba ou a nuvem mexeram nesta apresentação ---- */
   useEffect(() => decks.onChange((origin) => {
     if (!decks.has(id)) { location.hash = ""; return; }
@@ -316,6 +334,7 @@ function Editor({ id, decks }) {
         <input className="dk-name" id="dk-name" maxLength="120" aria-label="Nome da apresentação" value={doc.name}
           onChange={(e) => { const v = e.currentTarget.value; change((d) => ({ ...d, name: v }), { history: false }); }}
           onBlur={() => { if (!doc.name.trim()) change((d) => ({ ...d, name: "apresentação sem nome" }), { history: false }); }} />
+        <button className="pill" type="button" id="dk-ask" title={"pedir ao Merlin um ajuste no slide " + (at + 1)} aria-label="Pedir ao Merlin" onClick={askHere}>{icon("spark")}<span className="dk-ask__label">pedir ao Merlin</span></button>
         <button className="pill pill--accent" type="button" id="dk-play" ref={playRef} title="apresentar em tela cheia" onClick={() => present(at)}><PlayIcon />apresentar</button>
         <button className="action" type="button" id="dk-more" title="mais" aria-label="Mais" onClick={() => setMenuOpen(true)}><MoreIcon /></button>
       </div>

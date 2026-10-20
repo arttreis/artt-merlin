@@ -1293,7 +1293,7 @@ const dataLeft = () => globalThis.localStorage.keys().filter((k) => k in DATA);
     { from: "merlin", built: { kind: "sheet", id: "p2", name: "Outra" } },
     { from: "merlin", built: { kind: "sheet", id: "p3", name: "Longa", line: "x".repeat(500) } },
     { from: "merlin", built: { kind: "funnel", id: "f1", name: "Funil" } },
-    { from: "merlin", built: { kind: "deck", id: "d1", name: "inventado" } }
+    { from: "merlin", built: { kind: "video", id: "d1", name: "inventado" } }
   ] });
   check("conversa: o brief da planilha sobrevive", !!chat.messages[1].brief && chat.messages[1].brief.kind === "sheet" && chat.messages[1].brief.questions.length === 1, JSON.stringify(chat.messages[1]));
   check("conversa: o rascunho da planilha sobrevive, com os dados", !!chat.messages[2].draft && chat.messages[2].draft.kind === "sheet" && chat.messages[2].draft.data && chat.messages[2].draft.data.rows.length === 3, JSON.stringify(chat.messages[2]).slice(0, 200));
@@ -1301,6 +1301,218 @@ const dataLeft = () => globalThis.localStorage.keys().filter((k) => k in DATA);
   check("conversa: 'criei' sem linha ganha linha vazia", chat.messages[4].built && chat.messages[4].built.line === "" && chat.messages[6].built.line === "", JSON.stringify([chat.messages[4], chat.messages[6]]));
   check("conversa: a linha do 'criei' tem teto de 200", chat.messages[5].built && chat.messages[5].built.line.length === 200, String(chat.messages[5].built && chat.messages[5].built.line.length));
   check("conversa: tipo que não existe não vira 'criei'", !chat.messages[7].built, JSON.stringify(chat.messages[7]));
+
+  /* a apresentação na conversa (ticket #94) */
+  {
+    const D = await import("./deck.js?n=" + (++n));
+    const P = await import("./plans-data.js?n=" + (++n));
+    const SH = await import("./sheet.js?n=" + (++n));
+    const sl = (o) => ({ layout: "bullets", title: "", body: "", items: [], left: "", right: "", number: "", caption: "", notes: "", ...o });
+    let dk = 0;
+    const did = () => "i" + (++dk);
+
+    /* o pedido */
+    check("apresentação: o pedido de apresentação, slides, ppt ou deck vira deck",
+      B.buildIntent("monta uma apresentação do produto X em 6 slides") === "deck" && B.buildIntent("faz uns slides") === "deck"
+      && B.buildIntent("monta um ppt do lançamento") === "deck" && B.buildIntent("cria um deck do produto") === "deck",
+      [B.buildIntent("monta uma apresentação do produto X em 6 slides"), B.buildIntent("faz uns slides"), B.buildIntent("monta um ppt do lançamento"), B.buildIntent("cria um deck do produto")].join());
+    check("apresentação: com o app no meio da frase, vence o mais perto do verbo", B.buildIntent("monta uma apresentação do app Agenda") === "deck" && B.buildIntent("Monta uma apresentação do app Agenda") === "deck", String(B.buildIntent("monta uma apresentação do app Agenda")));
+    check("apresentação: falar dela, ou dar duração, não é pedir uma", B.buildIntent("apresentação 1h") === null && B.buildIntent("revisar a apresentação") === null && B.buildIntent("apresentação") === null && B.buildIntent("slides") === null,
+      [B.buildIntent("apresentação 1h"), B.buildIntent("revisar a apresentação")].join());
+    check("apresentação: planilha, funil e mapa continuam como eram", B.buildIntent("faz uma planilha de precificação") === "sheet" && B.buildIntent("monta um funil pra minha consultoria") === "funnel" && B.buildIntent("monta um mapa do funil de vendas") === "map" && B.buildIntent("faz uma planilha de custos do meu app") === "sheet" && B.buildIntent("monta um funil numa apresentação") === "funnel",
+      [B.buildIntent("faz uma planilha de custos do meu app"), B.buildIntent("monta um funil numa apresentação")].join());
+    const bd = B.BUILD.deck || {};
+    check("apresentação: BUILD.deck aponta para decks e abre em slides.html",
+      bd.label === "apresentação" && bd.collection === "decks" && bd.href === "slides.html#" && bd.create === "criar a apresentação" && bd.the === "a apresentação" && bd.of === "da apresentação" && bd.product === true, JSON.stringify(bd));
+    check("apresentação: só o deck pede o que se sabe do produto", !B.BUILD.sheet.product && !B.BUILD.funnel.product && !B.BUILD.app.product && !B.BUILD.map.product);
+
+    /* a carta do rascunho */
+    const deckDraft = {
+      name: "Pitch da Agenda",
+      slides: [
+        sl({ layout: "cover", title: "Agenda do Salão", body: "menos faltas, mais agenda cheia" }),
+        sl({ layout: "bullets", title: "o problema", items: ["cliente esquece", "salão perde o horário"] }),
+        sl({ layout: "number", title: "o tamanho da dor", number: "30%", caption: "faltam sem avisar" }),
+        sl({ layout: "columns", title: "hoje e com o app", left: "hoje\n\ncaderno", right: "com o app\n\nlembrete" }),
+        sl({ layout: "bullets", title: "", items: ["sem título"] }),
+        sl({ layout: "cover", title: "o próximo passo", body: "teste grátis" })
+      ]
+    };
+    const dv = B.draftView("deck", deckDraft);
+    check("apresentação: a carta traz o nome e o tamanho", dv.title === "Pitch da Agenda" && dv.sub === "6 slides", JSON.stringify([dv.title, dv.sub]));
+    check("apresentação: uma linha por slide, com o título", Array.isArray(dv.lines) && dv.lines.length === 6 && dv.lines[0].label === "slide 1" && dv.lines[0].text === "Agenda do Salão" && dv.lines[5].label === "slide 6" && dv.lines[5].text === "o próximo passo", JSON.stringify(dv.lines));
+    check("apresentação: slide sem título usa o nome do layout", dv.lines[4].text === "título + tópicos", JSON.stringify(dv.lines[4]));
+    check("apresentação: o nome de cada layout vem do deck.js", D.SLIDE_LAYOUTS.every((l) => B.draftView("deck", { name: "x", slides: [sl({ layout: l.id })] }).lines[0].text === l.label));
+    const oneView = B.draftView("deck", { name: "", slides: [sl({ title: "a" })] });
+    check("apresentação: sem nome a carta se chama apresentação, e 1 slide é singular", oneView.title === "apresentação" && oneView.sub === "1 slide", JSON.stringify(oneView));
+
+    /* o rascunho vira documento */
+    const dd = B.docFromDraft("deck", { ...deckDraft, app: "app-9" }, did);
+    check("apresentação: vai para decks e abre em slides.html", dd.collection === "decks" && dd.href === "slides.html#" + dd.doc.id && !!dd.doc.id, JSON.stringify([dd.collection, dd.href]));
+    check("apresentação: o documento já é o que o normalizeDeck devolveria", JSON.stringify(D.normalizeDeck(dd.doc)) === JSON.stringify(dd.doc), JSON.stringify(dd.doc).slice(0, 300));
+    check("apresentação: nome, layouts, títulos e itens ficam", dd.doc.name === "Pitch da Agenda" && dd.doc.slides.map((s) => s.layout).join() === "cover,bullets,number,columns,bullets,cover" && dd.doc.slides[1].title === "o problema" && dd.doc.slides[1].items.join("|") === "cliente esquece|salão perde o horário" && dd.doc.slides[2].number === "30%" && dd.doc.slides[3].left === "hoje\n\ncaderno", JSON.stringify(dd.doc.slides.slice(0, 2)));
+    const slideIds = dd.doc.slides.map((s) => s.id);
+    check("apresentação: cada slide tem um id do makeId, e todos são únicos", slideIds.length === 6 && slideIds.every((x) => /^i\d+$/.test(x)) && new Set([...slideIds, dd.doc.id]).size === 7, JSON.stringify(slideIds));
+    check("apresentação: o app vem do rascunho, ou fica vazio", dd.doc.app === "app-9" && B.docFromDraft("deck", deckDraft, did).doc.app === "", dd.doc.app);
+    check("apresentação: as datas de criação e edição estão preenchidas", dd.doc.createdAt > 0 && dd.doc.updatedAt > 0);
+    check("apresentação: cada apresentação tem id próprio", B.docFromDraft("deck", deckDraft, did).doc.id !== dd.doc.id);
+
+    /* a linha do "criei" */
+    const solo = D.normalizeDeck({ id: "u", name: "x", slides: [sl({ title: "a" })] });
+    check("apresentação pronta: a linha de 'criei'", B.builtLine("deck", dd.doc) === "apresentação pronta · 6 slides", B.builtLine("deck", dd.doc));
+    check("apresentação pronta: o singular", B.builtLine("deck", solo) === "apresentação pronta · 1 slide", B.builtLine("deck", solo));
+    check("apresentação pronta: a da planilha não muda", B.builtLine("sheet", B.docFromDraft("sheet", { name: "c", cols: [{ name: "a", type: "text" }], rows: [["1"]] }, did).doc) === "planilha pronta · 1 linha · 1 coluna");
+
+    /* o produto que o pedido cita */
+    const apps = [{ id: "a1", name: "Agenda" }, { id: "a2", name: "Agenda Pro" }, { id: "a3", name: "Café" }, { id: "a4", name: "" }, { id: "a5" }];
+    const named = (t) => { const x = B.productNamed(t, apps); return x ? x.id : null; };
+    check("produto citado: acha o app pelo nome", named("monta uma apresentação do agenda") === "a1" && named("monta uma apresentação do app Agenda") === "a1", String(named("monta uma apresentação do agenda")));
+    check("produto citado: com dois, vence o nome mais longo", named("monta uma apresentação do agenda pro") === "a2", String(named("monta uma apresentação do agenda pro")));
+    check("produto citado: sem diferenciar maiúscula nem acento", named("apresentação do cafe") === "a3" && named("APRESENTAÇÃO DO CAFÉ") === "a3", String(named("apresentação do cafe")));
+    check("produto citado: tem de ser palavra inteira", named("monta uma apresentação do agendamento") === null && named("apresentação do cafeína") === null, String(named("agendamento")));
+    check("produto citado: nenhum, ou app sem nome, dá null", named("monta uma apresentação do lançamento") === null && named("") === null && B.productNamed("qualquer coisa", []) === null && B.productNamed("qualquer coisa", [{ id: "x", name: "" }, { id: "y" }]) === null);
+    check("produto citado: devolve o objeto da lista", B.productNamed("apresentação do agenda pro", apps) === apps[1]);
+
+    /* o que o Merlin sabe do produto */
+    const app = {
+      id: "a1", name: "Agenda do Salão", pitch: "agenda para quem atende sozinha", problem: "perde cliente por esquecimento", audience: "cabeleireiras autônomas", value: "menos faltas",
+      features: [{ id: "f1", title: "agendar horário", phase: "mvp" }, { id: "f2", title: "lembrete por WhatsApp", phase: "mvp" }, { id: "f3", title: "integração com contabilidade", phase: "later" }],
+      funnel: "fn1"
+    };
+    const funnels = [
+      { id: "fn1", name: "Funil da Agenda", nodes: [{ id: "n1", title: "Anúncio de teste" }, { id: "n2", title: "Página de captura" }], offers: [{ id: "o1", name: "Plano mensal", price: 49700 }, { id: "o2", name: "Plano anual", price: 399000 }] },
+      { id: "fn2", name: "Funil de outra coisa", nodes: [{ id: "n9", title: "Etapa alheia" }], offers: [{ id: "o9", name: "Oferta alheia", price: 100 }] }
+    ];
+    const plans = [
+      { id: "p1", kind: "year", period: "2026", text: "fechar o ano forte", source: "manual", target: 0, current: 0, createdAt: 1 },
+      { id: "p2", kind: "half", period: "2026-H2", text: "", source: "clients", target: 10, createdAt: 2 },
+      { id: "p3", kind: "quarter", period: "2026-Q4", text: "", source: "revenue", target: 3000000, createdAt: 3 },
+      { id: "p4", kind: "quarter", period: "2026-Q4", text: "lançar a versão 2", source: "manual", target: 0, createdAt: 4 },
+      { id: "p5", kind: "quarter", period: "2026-Q3", text: "meta do trimestre passado", source: "manual", target: 0, createdAt: 5 },
+      { id: "p6", kind: "year", period: "2025", text: "meta do ano passado", source: "manual", target: 0, createdAt: 6 }
+    ];
+    const pdata = { funnels, plans, finance: [], clients: [{ status: "active" }, { status: "active" }, { status: "lost" }], team: [] };
+    const ctx = B.productContext(app, pdata, "2026-10-20");
+    check("contexto do produto: é texto de até 6000 caracteres", typeof ctx === "string" && ctx.length > 0 && ctx.length <= 6000, String(ctx && ctx.length));
+    check("contexto do produto: leva o nome, a frase, o problema, o público e o valor", ["Agenda do Salão", "agenda para quem atende sozinha", "perde cliente por esquecimento", "cabeleireiras autônomas", "menos faltas"].every((t) => ctx.includes(t)), ctx.slice(0, 400));
+    check("contexto do produto: leva as funcionalidades da primeira versão e não as de depois", ctx.includes("agendar horário") && ctx.includes("lembrete por WhatsApp") && !ctx.includes("integração com contabilidade"), ctx);
+    check("contexto do produto: leva o funil ligado, com etapas e ofertas", ctx.includes("Funil da Agenda") && ctx.includes("Anúncio de teste") && ctx.includes("Página de captura") && ctx.includes("Plano mensal") && ctx.includes("Plano anual"), ctx);
+    check("contexto do produto: o preço vai em reais, não em centavos", /R\$\s?497(?![\d.])/.test(ctx) && /R\$\s?3\.990/.test(ctx) && !ctx.includes("49700") && !ctx.includes("399000"), ctx);
+    check("contexto do produto: não leva o funil de outro produto", !ctx.includes("Funil de outra coisa") && !ctx.includes("Etapa alheia") && !ctx.includes("Oferta alheia"), ctx);
+    const goalLines = ["p1", "p2", "p3", "p4"].map((id) => P.goalLine(P.normalize(plans.find((p) => p.id === id)), pdata));
+    check("contexto do produto: leva as metas do ano, do semestre e do trimestre de hoje", goalLines.every((l) => ctx.includes(l)), goalLines.filter((l) => !ctx.includes(l)).join(" | "));
+    check("contexto do produto: não leva meta de outro período", !ctx.includes("meta do trimestre passado") && !ctx.includes("meta do ano passado"), ctx);
+    const bare = B.productContext({ id: "a2", name: "App pelado", features: [], funnel: "" }, { funnels, plans: [], finance: [], clients: [], team: [] }, "2026-10-20");
+    check("contexto do produto: sem funil e sem metas não sobra linha vazia nem 'undefined'", bare.includes("App pelado") && !/undefined|null|NaN|\[object/.test(bare) && !bare.includes("Funil da Agenda") && !bare.includes("meta do"), bare);
+    const gone = B.productContext({ ...app, funnel: "apagado" }, pdata, "2026-10-20");
+    check("contexto do produto: funil ligado que não existe mais é ignorado", gone.includes("Agenda do Salão") && !/undefined|null/.test(gone) && !gone.includes("Funil da Agenda"), gone);
+    check("contexto do produto: aguenta dados que faltam", typeof B.productContext(app, {}, "2026-10-20") === "string" && B.productContext(app, {}, "2026-10-20").includes("Agenda do Salão"));
+    const huge = B.productContext({ ...app, problem: "p".repeat(3000), audience: "a".repeat(3000), value: "v".repeat(3000), features: Array.from({ length: 80 }, (_, i) => ({ id: "h" + i, title: "funcionalidade número " + i, phase: "mvp" })) }, { ...pdata, funnels: [{ id: "fn1", name: "Funil da Agenda", nodes: Array.from({ length: 40 }, (_, i) => ({ id: "m" + i, title: "etapa " + i })), offers: [] }] }, "2026-10-20");
+    check("contexto do produto: texto enorme é cortado em 6000", huge.length <= 6000 && huge.includes("Agenda do Salão"), String(huge.length));
+
+    /* ajustar um documento aberto: o pedido leva o prefixo, e a volta o decifra */
+    check("ajuste: o prefixo da apresentação, com o slide", B.adjustPrefix("deck", "Pitch", 3) === "na apresentação Pitch, slide 3: ", B.adjustPrefix("deck", "Pitch", 3));
+    check("ajuste: o prefixo da planilha", B.adjustPrefix("sheet", "Custos") === "na planilha Custos: ", B.adjustPrefix("sheet", "Custos"));
+    const ao = (t) => B.adjustOf(t);
+    check("ajuste: lê o pedido da apresentação com o slide", JSON.stringify(ao("na apresentação Pitch, slide 3: muda o título")) === JSON.stringify({ kind: "deck", name: "Pitch", slide: 3, change: "muda o título" }), JSON.stringify(ao("na apresentação Pitch, slide 3: muda o título")));
+    check("ajuste: sem o slide, slide 0, e a maiúscula do começo vale", JSON.stringify(ao("Na apresentação Pitch: tira o último")) === JSON.stringify({ kind: "deck", name: "Pitch", slide: 0, change: "tira o último" }), JSON.stringify(ao("Na apresentação Pitch: tira o último")));
+    check("ajuste: lê o pedido da planilha", JSON.stringify(ao("na planilha Custos: soma a coluna C")) === JSON.stringify({ kind: "sheet", name: "Custos", slide: 0, change: "soma a coluna C" }), JSON.stringify(ao("na planilha Custos: soma a coluna C")));
+    check("ajuste: o nome pode ter espaços", (ao("na apresentação Plano de Vendas 2026, slide 12: troca o número") || {}).name === "Plano de Vendas 2026" && (ao("na apresentação Plano de Vendas 2026, slide 12: troca o número") || {}).slide === 12, JSON.stringify(ao("na apresentação Plano de Vendas 2026, slide 12: troca o número")));
+    check("ajuste: o prefixo sem pedido, ou um texto qualquer, não é ajuste", ao("na planilha Custos: ") === null && ao("na planilha Custos:") === null && ao("faz uma planilha de custos") === null && ao("") === null && ao("revisar a apresentação") === null, JSON.stringify([ao("na planilha Custos: "), ao("faz uma planilha de custos")]));
+    check("ajuste: o que o prefixo escreve, a leitura devolve", JSON.stringify(ao(B.adjustPrefix("deck", "Pitch", 3) + "muda o título")) === JSON.stringify({ kind: "deck", name: "Pitch", slide: 3, change: "muda o título" }) && (ao(B.adjustPrefix("deck", "Pitch") + "tira") || {}).slide === 0 && (ao(B.adjustPrefix("sheet", "Custos") + "soma") || {}).kind === "sheet");
+
+    /* o documento aberto vira rascunho (o que sobe ao Merlin) */
+    const deckDoc = D.normalizeDeck({ id: "dk1", name: "Pitch", app: "a1", createdAt: 1000, updatedAt: 1000, slides: [
+      { id: "x1", layout: "cover", title: "Capa", body: "oi" }, { id: "x2", layout: "bullets", title: "Tópicos", items: ["um", "dois"], notes: "falar devagar" }, { id: "x3", layout: "number", title: "Número", number: "70%", caption: "da dor" }
+    ] });
+    const dod = B.draftOfDoc("deck", deckDoc);
+    const SLIDE_KEYS = "body,caption,items,layout,left,notes,number,right,title";
+    check("rascunho do documento: a apresentação vira só nome e slides", Object.keys(dod).sort().join() === "name,slides" && dod.name === "Pitch" && dod.slides.length === 3, JSON.stringify(Object.keys(dod)));
+    check("rascunho do documento: o slide perde o id e guarda as 9 chaves", dod.slides.every((s) => Object.keys(s).sort().join() === SLIDE_KEYS) && dod.slides[1].items.join() === "um,dois" && dod.slides[1].notes === "falar devagar" && dod.slides[2].number === "70%", JSON.stringify(dod.slides[1]));
+    const sheetDoc = B.docFromDraft("sheet", { name: "Custos", cols: [{ name: "item", type: "text" }, { name: "qtd", type: "number" }, { name: "preço", type: "money" }, { name: "total", type: "money" }], rows: [["caixa", "2", "18", "=B1*C1"], ["fita", "10", "", "=B2*C2"], ["", "", "3,5", ""]] }, did).doc;
+    const dos = B.draftOfDoc("sheet", sheetDoc);
+    check("rascunho do documento: a planilha vira nome, colunas e linhas", Object.keys(dos).sort().join() === "cols,name,rows" && dos.name === "Custos" && JSON.stringify(dos.cols) === JSON.stringify([{ name: "item", type: "text" }, { name: "qtd", type: "number" }, { name: "preço", type: "money" }, { name: "total", type: "money" }]), JSON.stringify(dos.cols));
+    check("rascunho do documento: a célula vai como foi digitada, a vazia como texto vazio", JSON.stringify(dos.rows) === JSON.stringify([["caixa", "2", "18", "=B1*C1"], ["fita", "10", "", "=B2*C2"], ["", "", "3,5", ""]]), JSON.stringify(dos.rows));
+
+    /* cabe ajustar? o Merlin devolve até 12 slides, 40 linhas e 10 colunas */
+    const deckOf = (len) => D.normalizeDeck({ id: "z", name: "z", slides: Array.from({ length: len }, (_, i) => ({ id: "s" + i, title: "t" + i })) });
+    const sheetOf2 = (rows, cols) => SH.normalizeSheet({ id: "z", name: "z", cols: Array.from({ length: cols }, (_, i) => ({ id: "c" + i, name: "c" + i, type: "text" })), rows: Array.from({ length: rows }, (_, i) => ({ id: "r" + i, cells: {} })) });
+    check("cabe ajustar: apresentação de até 12 slides", B.fitsAdjust("deck", deckOf(12)) === true && B.fitsAdjust("deck", deckOf(13)) === false && B.fitsAdjust("deck", deckOf(1)) === true);
+    check("cabe ajustar: planilha de até 40 linhas e 10 colunas", B.fitsAdjust("sheet", sheetOf2(40, 10)) === true && B.fitsAdjust("sheet", sheetOf2(41, 10)) === false && B.fitsAdjust("sheet", sheetOf2(40, 11)) === false && B.fitsAdjust("sheet", sheetOf2(3, 3)) === true);
+
+    /* o rascunho novo entra no documento, sem trocar de identidade */
+    let ak = 0;
+    const aid = () => "n" + (++ak);
+    const grown = { name: "Pitch novo", slides: [sl({ layout: "cover", title: "Capa nova" }), sl({ layout: "bullets", title: "Tópicos", items: ["um", "dois", "três"] }), sl({ layout: "number", title: "Número", number: "80%" }), sl({ layout: "columns", title: "Quarto", left: "a", right: "b" })] };
+    const applied = B.applyDraft("deck", deckDoc, grown, aid);
+    check("aplicar: a apresentação mantém id, app e criação, e a edição é nova", applied.id === "dk1" && applied.app === "a1" && applied.createdAt === 1000 && applied.updatedAt > 0 && applied.name === "Pitch novo", JSON.stringify({ ...applied, slides: undefined }));
+    check("aplicar: o slide na posição i guarda o id do slide i, e os a mais ganham do makeId", applied.slides.map((s) => s.id).slice(0, 3).join() === "x1,x2,x3" && /^n\d+$/.test(applied.slides[3].id) && new Set(applied.slides.map((s) => s.id)).size === 4, JSON.stringify(applied.slides.map((s) => s.id)));
+    check("aplicar: o texto é o do rascunho, e o resultado é o que o normalizeDeck devolveria", applied.slides[0].title === "Capa nova" && applied.slides[1].items.length === 3 && applied.slides[3].left === "a" && JSON.stringify(D.normalizeDeck(applied)) === JSON.stringify(applied), JSON.stringify(applied.slides[0]));
+    const shrunk = B.applyDraft("deck", deckDoc, { name: "Pitch", slides: grown.slides.slice(0, 2) }, aid);
+    check("aplicar: com menos slides, sobram os ids das primeiras posições", shrunk.slides.map((s) => s.id).join() === "x1,x2", JSON.stringify(shrunk.slides.map((s) => s.id)));
+    check("aplicar: o documento de antes não é mexido", deckDoc.slides.length === 3 && deckDoc.name === "Pitch" && deckDoc.slides[0].title === "Capa");
+
+    const sheetIn = { ...sheetDoc, id: "sh1", app: "a1", createdAt: 2000, updatedAt: 2000 };
+    const sheetNext = { name: "Custos 2", cols: [{ name: "item", type: "text" }, { name: "qtd", type: "number" }, { name: "preço", type: "money" }, { name: "total", type: "money" }], rows: [["caixa", "3", "18", "=B1*C1"], ["fita", "10", "", "=B2*C2"], ["", "", "3,5", ""], ["lacre", "1", "0,5", "=B4*C4"]] };
+    const sApplied = B.applyDraft("sheet", sheetIn, sheetNext, aid);
+    check("aplicar na planilha: mantém id, app e criação", sApplied.id === "sh1" && sApplied.app === "a1" && sApplied.createdAt === 2000 && sApplied.updatedAt > 0 && sApplied.name === "Custos 2", JSON.stringify({ ...sApplied, cols: undefined, rows: undefined }));
+    check("aplicar na planilha: colunas e linhas mantêm o id pela posição, as a mais ganham novo", sApplied.cols.slice(0, 4).map((c) => c.id).join() === sheetIn.cols.map((c) => c.id).join() && sApplied.rows.slice(0, 3).map((r) => r.id).join() === sheetIn.rows.map((r) => r.id).join() && sApplied.rows.length === 4 && /^n\d+$/.test(sApplied.rows[3].id), JSON.stringify(sApplied.rows.map((r) => r.id)));
+    check("aplicar na planilha: a célula guarda o texto cru, a vazia não entra, e o resultado é o do normalizeSheet", sApplied.rows[0].cells[sApplied.cols[1].id] === "3" && sApplied.rows[0].cells[sApplied.cols[3].id] === "=B1*C1" && !(sApplied.cols[0].id in sApplied.rows[2].cells) && JSON.stringify(SH.normalizeSheet(sApplied)) === JSON.stringify(sApplied), JSON.stringify(sApplied.rows[0]));
+
+    /* o antes e o depois, para a linha da conversa */
+    const dvOne = B.adjustView("deck", deckDoc, B.applyDraft("deck", deckDoc, { name: "Pitch", slides: [dod.slides[0], { ...dod.slides[1], title: "Tópicos novos" }, dod.slides[2]] }, aid));
+    check("antes e depois da apresentação: um slide mudou, a linha diz qual", dvOne.line === "o Merlin mudou o slide 2" && dvOne.pairs.length === 1 && dvOne.more === 0 && dvOne.pairs[0].label === "slide 2", JSON.stringify(dvOne));
+    check("antes e depois da apresentação: o texto é uma linha só, com o título e o resto", dvOne.pairs[0].before.includes("Tópicos") && dvOne.pairs[0].after.includes("Tópicos novos") && dvOne.pairs[0].before.includes("um") && dvOne.pairs[0].after.includes("dois") && !/\n/.test(dvOne.pairs[0].before + dvOne.pairs[0].after), JSON.stringify(dvOne.pairs[0]));
+    const dvItem = B.adjustView("deck", deckDoc, B.applyDraft("deck", deckDoc, { name: "Pitch", slides: [dod.slides[0], { ...dod.slides[1], items: ["um", "dois", "terceiro"] }, dod.slides[2]] }, aid));
+    check("antes e depois da apresentação: mudar só um item também conta, e o item aparece", dvItem.pairs.length === 1 && dvItem.pairs[0].after.includes("terceiro") && !dvItem.pairs[0].before.includes("terceiro"), JSON.stringify(dvItem.pairs));
+    const nada = B.adjustView("deck", deckDoc, B.applyDraft("deck", deckDoc, dod, aid));
+    check("antes e depois da apresentação: nada mudou, nenhum par", nada.pairs.length === 0 && nada.more === 0, JSON.stringify(nada));
+    const six = D.normalizeDeck({ id: "s6", name: "seis", slides: Array.from({ length: 6 }, (_, i) => ({ id: "q" + i, layout: "bullets", title: "velho " + i })) });
+    const sixNew = B.applyDraft("deck", six, { name: "seis", slides: Array.from({ length: 6 }, (_, i) => sl({ title: i < 5 ? "novo " + i : "velho 5" })) }, aid);
+    const dvMany = B.adjustView("deck", six, sixNew);
+    check("antes e depois da apresentação: no máximo 3 pares, e diz quantos ficaram de fora", dvMany.pairs.length === 3 && dvMany.more === 2 && dvMany.pairs.map((p) => p.label).join() === "slide 1,slide 2,slide 3" && dvMany.line === "o Merlin mudou a apresentação", JSON.stringify(dvMany));
+    const dvThree = B.adjustView("deck", six, B.applyDraft("deck", six, { name: "seis", slides: Array.from({ length: 6 }, (_, i) => sl({ title: i < 3 ? "novo " + i : "velho " + i })) }, aid));
+    check("antes e depois da apresentação: exatamente 3 mudanças não deixam sobra", dvThree.pairs.length === 3 && dvThree.more === 0, JSON.stringify(dvThree));
+    /* só um slide a mais no fim: o par dele tem o antes vazio */
+    const dvAdd = B.adjustView("deck", deckDoc, B.applyDraft("deck", deckDoc, { name: "Pitch", slides: [...dod.slides, sl({ title: "Quarto" })] }, aid));
+    check("antes e depois da apresentação: slide novo tem antes vazio, e a quantidade diferente vira 'a apresentação'", dvAdd.pairs.some((p) => p.label === "slide 4" && p.before === "" && p.after.includes("Quarto")) && dvAdd.line === "o Merlin mudou a apresentação", JSON.stringify(dvAdd));
+    const dvCut = B.adjustView("deck", deckDoc, B.applyDraft("deck", deckDoc, { name: "Pitch", slides: dod.slides.slice(0, 2) }, aid));
+    check("antes e depois da apresentação: slide que saiu tem depois vazio", dvCut.pairs.length === 1 && dvCut.pairs[0].label === "slide 3" && dvCut.pairs[0].after === "" && dvCut.pairs[0].before.includes("Número") && dvCut.line === "o Merlin mudou a apresentação", JSON.stringify(dvCut));
+
+    const sheetAfter = B.applyDraft("sheet", sheetIn, { ...sheetNext, rows: sheetNext.rows.slice(0, 3) }, aid);
+    const sv = B.adjustView("sheet", sheetIn, sheetAfter);
+    const byLabel = Object.fromEntries(sv.pairs.map((p) => [p.label, p]));
+    check("antes e depois da planilha: só as células que mudaram, com o endereço", sv.pairs.length === 2 && !!byLabel.B1 && !!byLabel.D1 && sv.more === 0 && sv.line === "o Merlin mudou a planilha", JSON.stringify(sv));
+    check("antes e depois da planilha: o valor é o mostrado, com a fórmula já calculada", !!byLabel.B1 && !!byLabel.D1 && byLabel.B1.before === "2" && byLabel.B1.after === "3" && byLabel.D1.before === "36,00" && byLabel.D1.after === "54,00", JSON.stringify(sv.pairs));
+    const svNew = B.adjustView("sheet", sheetIn, B.applyDraft("sheet", sheetIn, { ...dos, rows: dos.rows.concat([["lacre", "", "", ""]]) }, aid));
+    check("antes e depois da planilha: célula de linha nova tem antes vazio", svNew.pairs.length === 1 && svNew.pairs[0].label === "A4" && svNew.pairs[0].before === "" && svNew.pairs[0].after === "lacre", JSON.stringify(svNew));
+    const longSheet = (suffix) => ({ id: "l", name: "l", cols: [{ id: "ca", name: "n", type: "text" }], rows: Array.from({ length: 10 }, (_, i) => ({ id: "lr" + i, cells: { ca: "v" + i + suffix } })) });
+    const svMany = B.adjustView("sheet", longSheet(""), longSheet("-novo"));
+    check("antes e depois da planilha: no máximo 8 pares, e o resto vai em more", svMany.pairs.length === 8 && svMany.more === 2 && svMany.pairs[0].label === "A1" && svMany.pairs[7].label === "A8", JSON.stringify(svMany.pairs.map((p) => p.label)) + svMany.more);
+    const svNone = B.adjustView("sheet", sheetIn, sheetIn);
+    check("antes e depois da planilha: nada mudou, nenhum par", svNone.pairs.length === 0 && svNone.more === 0, JSON.stringify(svNone));
+
+    /* a conversa guarda a apresentação e o ajuste */
+    const dchat = normalizeChat({ id: "c2", messages: [
+      { from: "merlin", brief: { kind: "deck", request: "monta uma apresentação", answered: false, questions: [{ q: "Para quem?", options: ["investidor", "cliente"] }] } },
+      { from: "merlin", draft: { kind: "deck", request: "monta uma apresentação", answers: "", title: "Pitch", summary: "6 slides", data: deckDraft } },
+      { from: "merlin", built: { kind: "deck", id: "d1", name: "Pitch", line: "apresentação pronta · 6 slides" } },
+      { from: "merlin", adjust: { kind: "deck", id: "d1", name: "Pitch", slide: 3, summary: "troquei o título", line: "o Merlin mudou o slide 3", applied: true, before: { title: "a" }, after: { title: "b" } } },
+      { from: "merlin", adjust: { kind: "sheet", id: "s1", name: "Custos", slide: 0, summary: "somei", line: "o Merlin mudou a planilha", applied: false, before: null, after: null } },
+      { from: "merlin", adjust: { kind: "funnel", id: "f1", name: "Funil", slide: 0, summary: "x", line: "x", applied: true, before: null, after: null } },
+      { from: "merlin", adjust: { kind: "deck", id: "d2", name: "Outra", slide: -2, summary: "", line: "", applied: false, before: "texto", after: 7 } },
+      { from: "merlin", adjust: { kind: "deck", id: "d3", name: "Sem slide", summary: "", line: "" } }
+    ] });
+    const M = dchat.messages;
+    check("conversa: o brief da apresentação sobrevive", !!M[0].brief && M[0].brief.kind === "deck" && M[0].brief.questions.length === 1, JSON.stringify(M[0]));
+    check("conversa: o rascunho da apresentação sobrevive, com os dados", !!M[1].draft && M[1].draft.kind === "deck" && M[1].draft.data && M[1].draft.data.slides.length === 6, JSON.stringify(M[1]).slice(0, 200));
+    check("conversa: o 'criei' da apresentação guarda a linha", M[2].built && M[2].built.kind === "deck" && M[2].built.line === "apresentação pronta · 6 slides", JSON.stringify(M[2]));
+    check("conversa: o ajuste da apresentação sobrevive inteiro", M[3].from === "merlin" && !!M[3].adjust && M[3].adjust.kind === "deck" && M[3].adjust.id === "d1" && M[3].adjust.name === "Pitch" && M[3].adjust.slide === 3 && M[3].adjust.summary === "troquei o título" && M[3].adjust.line === "o Merlin mudou o slide 3" && M[3].adjust.applied === true && M[3].adjust.before.title === "a" && M[3].adjust.after.title === "b", JSON.stringify(M[3]));
+    check("conversa: o ajuste da planilha sobrevive, com antes e depois nulos", !!M[4].adjust && M[4].adjust.kind === "sheet" && M[4].adjust.applied === false && M[4].adjust.before === null && M[4].adjust.after === null && M[4].adjust.slide === 0, JSON.stringify(M[4]));
+    check("conversa: ajuste de outro tipo é descartado", !M[5].adjust, JSON.stringify(M[5]));
+    check("conversa: o slide do ajuste é inteiro, e antes e depois que não são objeto viram nulo", !!M[6].adjust && M[6].adjust.slide === 0 && M[6].adjust.applied === false && M[6].adjust.before === null && M[6].adjust.after === null, JSON.stringify(M[6]));
+    check("conversa: ajuste sem slide fica no slide 0, e sem applied fica não aplicado", !!M[7].adjust && M[7].adjust.slide === 0 && M[7].adjust.applied === false, JSON.stringify(M[7]));
+  }
 }
 
 /* ---- a vitrine saiu da busca (PRD o-menu-por-area, D7) ----

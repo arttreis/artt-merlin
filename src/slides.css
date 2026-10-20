@@ -151,4 +151,7 @@
   .dk-stage{max-width:none;min-width:0}
   .dk-name{font-size:16px}
   #dk-play{padding:0 10px}
+  /* no celular o "pedir ao Merlin" é só o ícone, para a barra caber */
+  #dk-ask{padding:0 10px}
+  #dk-ask .dk-ask__label{display:none}
 }
