@@ -1055,6 +1055,10 @@ o início, as abas da área em que se está e o "+"; na conversa (`assistant.htm
 não são de área nenhuma, com o início e o "+". O "+" e o `Ctrl+K` continuam em toda tela que não
 seja o início e o rastreador; no início, o próprio campo é esse gesto.
 
+A saúde tem cinco abas, e no celular (até 600px) elas não cabem no dock: o diário sai dele, mesmo
+na página dele, e continua no menu e no Hoje (`spare` em `SECTIONS`). As outras quatro cabem de
+360px para cima.
+
 ### 13.4 "O que falta" no inbox
 
 A sessão de foco não ganhou página. A aba "o que falta" do inbox leva a `index.html#next`, e o

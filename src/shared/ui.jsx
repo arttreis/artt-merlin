@@ -1433,7 +1433,9 @@ function TopBar({ page, onCommand, menuOpen, onMenu, menuRef }) {
    gesto de escrever); numa página de área, o início, as abas dela (se houver
    mais de uma) e o "+"; no resto (a conversa, o perfil), o início e o "+".
    trocar de área é pelo menu. as abas moram no próprio dock, e não numa faixa
-   acima dele: as quatro do trabalho cabem em 390px numa linha só */
+   acima dele: as quatro do trabalho cabem em 390px numa linha só. a aba
+   `spare` (o diário da saúde, a quinta) sai do dock até 600px, mesmo na
+   página dela: é o que faz as cinco da saúde caberem */
 function Dock({ page, onCommand }) {
   if (page === "home") return null;
   const here = sectionOf(page);
@@ -1446,7 +1448,7 @@ function Dock({ page, onCommand }) {
         </a>
         {tabs.length > 0 && <span className="dk__sep" />}
         {tabs.map((p) => (
-          <a key={p.id} className="dk__tab" href={p.href} aria-current={p.id === page ? "page" : undefined}>{p.label}</a>
+          <a key={p.id} className={"dk__tab" + (p.spare ? " dk__tab--spare" : "")} href={p.href} aria-current={p.id === page ? "page" : undefined}>{p.label}</a>
         ))}
         <span className="dk__sep" />
         <button type="button" className="dk__plus" onClick={onCommand} title="escrever, buscar ou perguntar (Ctrl K)" aria-label="Escrever, buscar ou perguntar">

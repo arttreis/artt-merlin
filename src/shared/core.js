@@ -253,13 +253,14 @@ initTheme();
 export const SECTIONS = [
   /* hábitos, sono, treino, alimentação e diário (PRD saude-completa, D2). o
      diário é o histórico do "como foi o dia" do Hoje: a semana em cartões,
-     um por dia (VISAO, 9.3) */
+     um por dia (VISAO, 9.3). com cinco abas o dock não cabe no celular, e o
+     diário é o que sai dele primeiro (`spare`): continua no menu e no Hoje */
   { id: "health", label: "saúde", icon: "habits", pages: [
     { id: "habits", label: "hábitos", href: "habits.html" },
     { id: "sleep", label: "sono", href: "sleep.html" },
     { id: "training", label: "treino", href: "training.html" },
     { id: "meals", label: "alimentação", href: "meals.html" },
-    { id: "journal", label: "diário", href: "journal.html" }
+    { id: "journal", label: "diário", href: "journal.html", spare: true }
   ] },
   /* o produto é o centro (VISAO, 9.5) e abre a área. o conteúdo e o funil são
      como gente chega a ele, e o mapa é o desenho que pensa em galhos */

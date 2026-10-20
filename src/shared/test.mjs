@@ -1291,6 +1291,7 @@ const dataLeft = () => globalThis.localStorage.keys().filter((k) => k in DATA);
   });
   check("áreas: são dezesseis abas", PAGES.length === 16, String(PAGES.length));
   check("áreas: o diário é uma aba de saúde", sectionOf("journal")?.id === "health", String(sectionOf("journal")?.id));
+  check("áreas: só o diário sai do dock no celular (spare), e a alimentação fica", PAGES.filter((p) => p.spare).map((p) => p.id).join() === "journal", PAGES.filter((p) => p.spare).map((p) => p.id).join());
   check("áreas: a vitrine não está em nenhuma", !PAGES.some((p) => p.id === "wishlist") && !PAGES.some((p) => /wishlist/.test(p.href)));
 
   const pageIds = PAGES.map((p) => p.id);
