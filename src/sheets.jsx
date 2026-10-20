@@ -80,7 +80,7 @@ function Editor({ id, sheets }) {
   const [colForm, setColForm] = useState(null); // índice da coluna | null
   const historyRef = useRef([]), futureRef = useRef([]);
   const saveTimer = useRef(0);
-  const gridRef = useRef(null), pointer = useRef("mouse");
+  const gridRef = useRef(null), pointer = useRef("mouse"), lastClick = useRef("");
   const values = useMemo(() => evaluateSheet(doc), [doc]);
 
   /* ---- gravar: o mesmo respiro do mapa, e o que esperava sobe ao sair ---- */
@@ -163,6 +163,8 @@ function Editor({ id, sheets }) {
     return { ...d, rows: d.rows.map((x, i) => (i === ri ? { ...x, cells } : x)) };
   });
   const focusGrid = () => requestAnimationFrame(() => {
+    const active = document.activeElement;
+    if (active && active.classList.contains("sh-input")) return; // a tecla seguinte já abriu a célula
     const el = gridRef.current && gridRef.current.querySelector("[data-sel='1']");
     if (el) el.focus({ preventScroll: false });
   });
@@ -288,8 +290,10 @@ function Editor({ id, sheets }) {
                            onClick={() => {
                              if (on && edit) return;
                              /* no toque, tocar já escreve (deslizar rola, e não dispara clique);
-                                no mouse, o primeiro clique escolhe e o segundo escreve */
-                             if (pointer.current === "touch" || !wide || on) { setSel({ r: ri, c: ci }); setEdit({ draft: rows[ri].cells[col.id] || "" }); }
+                                no mouse, o primeiro clique escolhe e o segundo, na mesma, escreve */
+                             const key = row.id + ":" + col.id, again = on && lastClick.current === key;
+                             lastClick.current = key;
+                             if (pointer.current === "touch" || !wide || again) { setSel({ r: ri, c: ci }); setEdit({ draft: rows[ri].cells[col.id] || "" }); }
                              else select(ri, ci);
                            }}>
                         {on && edit
